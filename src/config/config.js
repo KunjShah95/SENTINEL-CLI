@@ -1,5 +1,6 @@
 import { promises as fs } from 'fs';
 import path from 'path';
+import envLoader from './envLoader.js';
 
 // const __filename = fileURLToPath(import.meta.url);
 // const __dirname = path.dirname(__filename);
@@ -115,7 +116,7 @@ export class Config {
             enabled: true,
             weight: 0.22,
             apiKeyEnv: 'OPENROUTER_API_KEY',
-          }
+          },
         ],
         cache: {
           enabled: true,
@@ -143,6 +144,9 @@ export class Config {
   }
 
   async load() {
+    // Load environment variables from .env file first
+    await envLoader.loadEnvFile();
+
     try {
       const configData = await fs.readFile(this.configPath, 'utf8');
       this.config = JSON.parse(configData);

@@ -500,7 +500,10 @@ export class QualityAnalyzer extends BaseAnalyzer {
       let pattern;
 
       if (/\s/.test(point.trim())) {
-        const parts = point.trim().split(/\s+/).map(part => `\\b${part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
+        const parts = point
+          .trim()
+          .split(/\s+/)
+          .map(part => `\\b${part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
         pattern = parts.join('\\s+');
       } else if (/^\w+$/.test(point)) {
         pattern = `\\b${escaped}\\b`;

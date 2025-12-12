@@ -27,14 +27,17 @@ export default class LLMOrchestrator {
   }
 
   normalizeProviders(aiConfig) {
-    const configuredProviders = Array.isArray(aiConfig.providers) && aiConfig.providers.length > 0
-      ? aiConfig.providers
-      : [{
-        id: aiConfig.provider || 'local',
-        provider: aiConfig.provider || 'local',
-        model: aiConfig.model || 'gpt-3.5-turbo',
-        enabled: true,
-      }];
+    const configuredProviders =
+      Array.isArray(aiConfig.providers) && aiConfig.providers.length > 0
+        ? aiConfig.providers
+        : [
+          {
+            id: aiConfig.provider || 'local',
+            provider: aiConfig.provider || 'local',
+            model: aiConfig.model || 'gpt-3.5-turbo',
+            enabled: true,
+          },
+        ];
 
     return configuredProviders
       .map((providerConfig, index) => {
@@ -212,11 +215,9 @@ export default class LLMOrchestrator {
       payload.response_format = { type: 'json_object' };
     }
 
-    const response = await axios.post(
-      'https://api.openai.com/v1/chat/completions',
-      payload,
-      { headers: { Authorization: `Bearer ${provider.apiKey}` } }
-    );
+    const response = await axios.post('https://api.openai.com/v1/chat/completions', payload, {
+      headers: { Authorization: `Bearer ${provider.apiKey}` },
+    });
 
     return response.data.choices[0]?.message?.content || '';
   }
@@ -268,7 +269,8 @@ export default class LLMOrchestrator {
       {
         headers: {
           Authorization: `Bearer ${provider.apiKey}`,
-          'HTTP-Referer': provider.metadata?.referer || 'https://github.com/KunjShah95/Sentinel-CLI',
+          'HTTP-Referer':
+            provider.metadata?.referer || 'https://github.com/KunjShah95/Sentinel-CLI',
         },
       }
     );
@@ -282,9 +284,7 @@ export default class LLMOrchestrator {
         model: provider.model || 'claude-3-opus-20240229',
         max_tokens: this.maxTokens,
         temperature: this.temperature,
-        messages: [
-          { role: 'user', content: prompt }
-        ],
+        messages: [{ role: 'user', content: prompt }],
         ...(options.systemPrompt ? { system: options.systemPrompt } : {}),
       },
       {
@@ -310,7 +310,10 @@ export default class LLMOrchestrator {
 
     let cleaned = rawResponse.trim();
     if (cleaned.startsWith('```')) {
-      cleaned = cleaned.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/, '');
+      cleaned = cleaned
+        .replace(/^```json\s*/i, '')
+        .replace(/^```\s*/i, '')
+        .replace(/\s*```$/, '');
     }
 
     try {
@@ -355,7 +358,9 @@ export default class LLMOrchestrator {
           if (!existing.suggestion && normalized.suggestion) {
             existing.suggestion = normalized.suggestion;
           }
-          existing.tags = Array.from(new Set([...(existing.tags || []), ...(normalized.tags || [])]));
+          existing.tags = Array.from(
+            new Set([...(existing.tags || []), ...(normalized.tags || [])])
+          );
         }
       }
     }

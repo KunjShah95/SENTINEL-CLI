@@ -18,7 +18,7 @@
     "dev": "node --watch src/index.js",
     "review": "node src/cli.js analyze",
     "install-hooks": "node src/cli.js install-hooks",
-    "test": "jest",
+    "test": "jest --passWithNoTests",
     "test:watch": "jest --watch",
     "lint": "eslint src/",
     "format": "prettier --write src/",

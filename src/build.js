@@ -54,7 +54,17 @@ class BuildTool {
   }
 
   async copySourceFiles() {
-    const filesToCopy = ['index.js', 'cli.js', 'bot.js', 'demo.js', 'analyzers', 'config', 'git', 'output', 'llm'];
+    const filesToCopy = [
+      'index.js',
+      'cli.js',
+      'bot.js',
+      'demo.js',
+      'analyzers',
+      'config',
+      'git',
+      'output',
+      'llm',
+    ];
 
     for (const item of filesToCopy) {
       const srcPath = path.join(this.srcDir, item);

@@ -71,21 +71,95 @@ export class DependencyAnalyzer extends BaseAnalyzer {
     // Known vulnerable package patterns
     return {
       npm: [
-        { name: 'event-stream', version: '<4.0.0', severity: 'critical', cve: 'CVE-2018-16492', message: 'Malicious code injection in event-stream' },
-        { name: 'lodash', version: '<4.17.21', severity: 'high', cve: 'CVE-2021-23337', message: 'Command injection vulnerability in lodash' },
-        { name: 'minimist', version: '<1.2.6', severity: 'high', cve: 'CVE-2021-44906', message: 'Prototype pollution vulnerability' },
-        { name: 'node-fetch', version: '<2.6.7', severity: 'medium', cve: 'CVE-2022-0235', message: 'Exposure of sensitive information' },
-        { name: 'axios', version: '<0.21.2', severity: 'medium', cve: 'CVE-2021-3749', message: 'Server-Side Request Forgery' },
-        { name: 'express', version: '<4.17.3', severity: 'medium', cve: 'CVE-2022-24999', message: 'Open redirect vulnerability' },
-        { name: 'moment', version: '*', severity: 'info', message: 'Consider using date-fns or dayjs - moment is deprecated' },
-        { name: 'request', version: '*', severity: 'info', message: 'Package is deprecated, use axios or node-fetch instead' },
+        {
+          name: 'event-stream',
+          version: '<4.0.0',
+          severity: 'critical',
+          cve: 'CVE-2018-16492',
+          message: 'Malicious code injection in event-stream',
+        },
+        {
+          name: 'lodash',
+          version: '<4.17.21',
+          severity: 'high',
+          cve: 'CVE-2021-23337',
+          message: 'Command injection vulnerability in lodash',
+        },
+        {
+          name: 'minimist',
+          version: '<1.2.6',
+          severity: 'high',
+          cve: 'CVE-2021-44906',
+          message: 'Prototype pollution vulnerability',
+        },
+        {
+          name: 'node-fetch',
+          version: '<2.6.7',
+          severity: 'medium',
+          cve: 'CVE-2022-0235',
+          message: 'Exposure of sensitive information',
+        },
+        {
+          name: 'axios',
+          version: '<0.21.2',
+          severity: 'medium',
+          cve: 'CVE-2021-3749',
+          message: 'Server-Side Request Forgery',
+        },
+        {
+          name: 'express',
+          version: '<4.17.3',
+          severity: 'medium',
+          cve: 'CVE-2022-24999',
+          message: 'Open redirect vulnerability',
+        },
+        {
+          name: 'moment',
+          version: '*',
+          severity: 'info',
+          message: 'Consider using date-fns or dayjs - moment is deprecated',
+        },
+        {
+          name: 'request',
+          version: '*',
+          severity: 'info',
+          message: 'Package is deprecated, use axios or node-fetch instead',
+        },
       ],
       pip: [
-        { name: 'django', version: '<3.2.13', severity: 'high', cve: 'CVE-2022-28346', message: 'SQL injection vulnerability' },
-        { name: 'flask', version: '<2.0.0', severity: 'medium', message: 'Multiple security fixes in Flask 2.x' },
-        { name: 'requests', version: '<2.20.0', severity: 'high', cve: 'CVE-2018-18074', message: 'Authorization header leak' },
-        { name: 'pyyaml', version: '<5.4', severity: 'critical', cve: 'CVE-2020-14343', message: 'Arbitrary code execution' },
-        { name: 'pillow', version: '<9.0.0', severity: 'high', message: 'Multiple vulnerabilities in older versions' },
+        {
+          name: 'django',
+          version: '<3.2.13',
+          severity: 'high',
+          cve: 'CVE-2022-28346',
+          message: 'SQL injection vulnerability',
+        },
+        {
+          name: 'flask',
+          version: '<2.0.0',
+          severity: 'medium',
+          message: 'Multiple security fixes in Flask 2.x',
+        },
+        {
+          name: 'requests',
+          version: '<2.20.0',
+          severity: 'high',
+          cve: 'CVE-2018-18074',
+          message: 'Authorization header leak',
+        },
+        {
+          name: 'pyyaml',
+          version: '<5.4',
+          severity: 'critical',
+          cve: 'CVE-2020-14343',
+          message: 'Arbitrary code execution',
+        },
+        {
+          name: 'pillow',
+          version: '<9.0.0',
+          severity: 'high',
+          message: 'Multiple vulnerabilities in older versions',
+        },
       ],
     };
   }
@@ -93,8 +167,14 @@ export class DependencyAnalyzer extends BaseAnalyzer {
   initializeDeprecatedPatterns() {
     return {
       npm: [
-        { pattern: /^left-pad$/, message: 'left-pad is deprecated, use String.prototype.padStart()' },
-        { pattern: /^ua-parser-js$/i, message: 'ua-parser-js had malicious code injection, verify source' },
+        {
+          pattern: /^left-pad$/,
+          message: 'left-pad is deprecated, use String.prototype.padStart()',
+        },
+        {
+          pattern: /^ua-parser-js$/i,
+          message: 'ua-parser-js had malicious code injection, verify source',
+        },
         { pattern: /^colors$/i, message: 'colors package had protestware, verify version' },
         { pattern: /^faker$/i, message: 'Original faker is deprecated, use @faker-js/faker' },
       ],
@@ -181,8 +261,8 @@ export class DependencyAnalyzer extends BaseAnalyzer {
       }
 
       // Check for exact versions (can be risky)
-      const exactVersionDeps = Object.entries(allDeps).filter(([_, v]) =>
-        /^\d+\.\d+\.\d+$/.test(v) && !v.startsWith('^') && !v.startsWith('~')
+      const exactVersionDeps = Object.entries(allDeps).filter(
+        ([_, v]) => /^\d+\.\d+\.\d+$/.test(v) && !v.startsWith('^') && !v.startsWith('~')
       );
 
       if (exactVersionDeps.length > 5) {
@@ -198,7 +278,6 @@ export class DependencyAnalyzer extends BaseAnalyzer {
           analyzer: this.name,
         });
       }
-
     } catch (error) {
       issues.push({
         severity: 'medium',

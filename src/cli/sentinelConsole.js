@@ -51,7 +51,9 @@ export async function runSentinelConsole(options = {}) {
   console.log(chalk.hex('#9B72CB')('Pulse ideas straight into the mesh. Type :exit to leave.\n'));
 
   if (orchestrator.providers.length === 0) {
-    console.log(chalk.yellow('No AI providers enabled. Configure API keys to chat with live models.'));
+    console.log(
+      chalk.yellow('No AI providers enabled. Configure API keys to chat with live models.')
+    );
     return;
   }
 
@@ -119,7 +121,11 @@ export async function runSentinelConsole(options = {}) {
         console.log(chalk.hex('#9B72CB')(`#${id}`));
         console.log(chalk.cyan('You: ') + entry.prompt);
         const preview = entry.response ? entry.response.slice(0, 160) : '[no response captured]';
-        console.log(chalk.green('Sentinel: ') + preview + (entry.response && entry.response.length > 160 ? '...' : ''));
+        console.log(
+          chalk.green('Sentinel: ') +
+            preview +
+            (entry.response && entry.response.length > 160 ? '...' : '')
+        );
         console.log(divider());
       });
       continue;

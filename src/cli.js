@@ -13,7 +13,6 @@ import Config from './config/config.js';
 
 const program = new Command();
 
-
 const pickGradient = (gradientLib, name = 'aqua') => {
   const lib = gradientLib || null;
   if (!lib) return null;
@@ -35,7 +34,7 @@ const pickGradient = (gradientLib, name = 'aqua') => {
 
 const padCenter = (lines, width) => {
   if (!width) return lines;
-  return lines.map((line) => {
+  return lines.map(line => {
     const pad = Math.max(0, Math.floor((width - line.length) / 2));
     return ' '.repeat(pad) + line;
   });
@@ -98,13 +97,16 @@ program
   .option('--banner-message <text>', 'Banner text', 'SENTINEL')
   .option('--banner-font <name>', 'Figlet font name', 'Standard')
   .option('--banner-gradient <name>', 'Banner gradient: aqua|fire|rainbow|aurora|mono', 'aqua')
-  .option('--banner-width <number>', 'Banner width for centering', (v) => parseInt(v, 10))
+  .option('--banner-width <number>', 'Banner width for centering', v => parseInt(v, 10))
   .option('--no-banner-color', 'Disable banner gradients')
-  .hook('preAction', async (thisCommand) => {
-    const isRootNoSubcommand = thisCommand?.name?.() === 'sentinel' && (!thisCommand.args || thisCommand.args.length === 0);
+  .hook('preAction', async thisCommand => {
+    const isRootNoSubcommand =
+      thisCommand?.name?.() === 'sentinel' && (!thisCommand.args || thisCommand.args.length === 0);
     if (isRootNoSubcommand) return; // default action handles banner when no subcommand
     // Show banner only for main commands, avoid cluttering precise outputs like JSON
-    const opts = thisCommand.optsWithGlobals ? thisCommand.optsWithGlobals() : { ...program.opts(), ...thisCommand.opts() };
+    const opts = thisCommand.optsWithGlobals
+      ? thisCommand.optsWithGlobals()
+      : { ...program.opts(), ...thisCommand.opts() };
     if (!opts.format || opts.format === 'console') {
       await displayBanner({
         bannerMessage: opts.bannerMessage,
@@ -237,9 +239,12 @@ const parseAssignment = (assignment, type = 'model') => {
   return { id, value: rawValue };
 };
 
-const parseIdList = (value) => {
+const parseIdList = value => {
   if (!value) return [];
-  return value.split(',').map(item => item.trim()).filter(Boolean);
+  return value
+    .split(',')
+    .map(item => item.trim())
+    .filter(Boolean);
 };
 
 program
@@ -248,21 +253,28 @@ program
   .option('--enable <ids>', 'Enable provider IDs (comma-separated)')
   .option('--disable <ids>', 'Disable provider IDs (comma-separated)')
   .option('--model <id=model>', 'Set provider model (repeatable)', collectAssignments, [])
-  .option('--weight <id=weight>', 'Set provider inference weight (repeatable)', collectAssignments, [])
+  .option(
+    '--weight <id=weight>',
+    'Set provider inference weight (repeatable)',
+    collectAssignments,
+    []
+  )
   .option('--env <id=ENV>', 'Set API key environment variable (repeatable)', collectAssignments, [])
   .option('--strip-secrets <ids>', 'Remove inline API keys for provider IDs (comma-separated)')
-  .action(async (options) => {
+  .action(async options => {
     const config = new Config();
     await config.load();
     const aiConfig = config.get('ai') || {};
     const providers = Array.isArray(aiConfig.providers) ? [...aiConfig.providers] : [];
 
     if (providers.length === 0) {
-      console.log(chalk.yellow('No AI providers configured yet. Run `node src/cli.js setup` first.'));
+      console.log(
+        chalk.yellow('No AI providers configured yet. Run `node src/cli.js setup` first.')
+      );
       return;
     }
 
-    const getProvider = (id) => providers.find(provider => provider.id === id);
+    const getProvider = id => providers.find(provider => provider.id === id);
     let mutated = false;
 
     for (const id of parseIdList(options.enable)) {
@@ -319,7 +331,9 @@ program
         }
         const weight = Number(value);
         if (Number.isNaN(weight) || weight <= 0 || weight > 1) {
-          console.log(chalk.red(`Invalid weight "${value}" for ${id}. Use a number between 0 and 1.`));
+          console.log(
+            chalk.red(`Invalid weight "${value}" for ${id}. Use a number between 0 and 1.`)
+          );
           continue;
         }
         if (provider.weight !== weight) {
@@ -344,7 +358,11 @@ program
           provider.apiKeyEnv = value;
           if (provider.apiKey) {
             delete provider.apiKey;
-            console.log(chalk.yellow(`Removed inline API key for ${id}. Environment variable will be used instead.`));
+            console.log(
+              chalk.yellow(
+                `Removed inline API key for ${id}. Environment variable will be used instead.`
+              )
+            );
           }
           mutated = true;
           console.log(chalk.green(`Set API key env for ${id} -> ${value}`));
@@ -363,7 +381,11 @@ program
       if (provider.apiKey) {
         delete provider.apiKey;
         mutated = true;
-        console.log(chalk.green(`Removed inline API key for ${id}. Ensure ${provider.apiKeyEnv || 'an appropriate env var'} is set at runtime.`));
+        console.log(
+          chalk.green(
+            `Removed inline API key for ${id}. Ensure ${provider.apiKeyEnv || 'an appropriate env var'} is set at runtime.`
+          )
+        );
       }
     }
 
@@ -378,7 +400,7 @@ program
       console.log(
         chalk.red(
           '⚠️  Sentinel Tip: Some providers still have API keys stored in .codereviewrc.json.\n' +
-          '    Consider running `sentinel models --env id=ENV_VAR --strip-secrets id` to rely on environment variables.'
+            '    Consider running `sentinel models --env id=ENV_VAR --strip-secrets id` to rely on environment variables.'
         )
       );
     }
@@ -386,7 +408,9 @@ program
     console.log(chalk.bold('AI Providers'));
     console.log(chalk.gray('──────────────────────────────────────────'));
     providers.forEach(provider => {
-      console.log(`${chalk.cyan(provider.id)} ${provider.enabled === false ? chalk.red('[disabled]') : chalk.green('[enabled]')}`);
+      console.log(
+        `${chalk.cyan(provider.id)} ${provider.enabled === false ? chalk.red('[disabled]') : chalk.green('[enabled]')}`
+      );
       console.log(`  Provider  : ${provider.provider}`);
       console.log(`  Model     : ${provider.model || 'default'}`);
       console.log(`  Weight    : ${provider.weight ?? '0.33'}`);
@@ -408,7 +432,8 @@ program
   .option('--persona <text>', 'Override the Sentinel persona instructions')
   .action(async (promptArgs, options) => {
     const inlinePrompt =
-      options.prompt || (Array.isArray(promptArgs) && promptArgs.length ? promptArgs.join(' ') : null);
+      options.prompt ||
+      (Array.isArray(promptArgs) && promptArgs.length ? promptArgs.join(' ') : null);
     await runSentinelConsole({ ...options, prompt: inlinePrompt });
   });
 

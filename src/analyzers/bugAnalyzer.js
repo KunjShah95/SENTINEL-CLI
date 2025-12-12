@@ -550,19 +550,19 @@ export class BugAnalyzer extends BaseAnalyzer {
     const securityPatterns = [
       {
         name: 'SQL Injection',
-        pattern: /(\$.*=\s*["'].*(SELECT|INSERT|UPDATE|DELETE).*["'].*\.\s*\$.*;)/ig,
+        pattern: /(\$.*=\s*["'].*(SELECT|INSERT|UPDATE|DELETE).*["'].*\.\s*\$.*;)/gi,
         severity: 'high',
         type: 'security',
       },
       {
         name: 'Cross-Site Scripting (XSS)',
-        pattern: /echo\s*\$.*;\s*\/\/\s*unsanitized/ig,
+        pattern: /echo\s*\$.*;\s*\/\/\s*unsanitized/gi,
         severity: 'high',
         type: 'security',
       },
       {
         name: 'File Inclusion Vulnerability',
-        pattern: /(include|require)(_once)?\s*\(\s*\$.*\s*\);/ig,
+        pattern: /(include|require)(_once)?\s*\(\s*\$.*\s*\);/gi,
         severity: 'high',
         type: 'security',
       },
@@ -636,7 +636,7 @@ export class BugAnalyzer extends BaseAnalyzer {
     const securityPatterns = [
       {
         name: 'Hardcoded API Key',
-        pattern: /(['"])(sk_live_|sk_test_)[A-Za-z0-9]{24,}(['"])/ig,
+        pattern: /(['"])(sk_live_|sk_test_)[A-Za-z0-9]{24,}(['"])/gi,
         severity: 'critical',
         type: 'security',
       },
@@ -648,13 +648,13 @@ export class BugAnalyzer extends BaseAnalyzer {
       },
       {
         name: 'Weak Cryptography',
-        pattern: /MD5\(|SHA1\(/ig,
+        pattern: /MD5\(|SHA1\(/gi,
         severity: 'high',
         type: 'security',
       },
       {
         name: 'Command Injection',
-        pattern: /(exec|system|passthru|shell_exec)\s*\(.*\$_(GET|POST|REQUEST|COOKIE)\[.*\].*\)/ig,
+        pattern: /(exec|system|passthru|shell_exec)\s*\(.*\$_(GET|POST|REQUEST|COOKIE)\[.*\].*\)/gi,
         severity: 'critical',
         type: 'security',
       },
@@ -695,7 +695,7 @@ export class BugAnalyzer extends BaseAnalyzer {
     const securityPatterns = [
       {
         name: 'Hardcoded API Key',
-        pattern: /(['"])(sk_live_|sk_test_)[A-Za-z0-9]{24,}(['"])/ig,
+        pattern: /(['"])(sk_live_|sk_test_)[A-Za-z0-9]{24,}(['"])/gi,
         severity: 'critical',
         type: 'security',
       },
@@ -707,13 +707,13 @@ export class BugAnalyzer extends BaseAnalyzer {
       },
       {
         name: 'Weak Cryptography',
-        pattern: /hashlib\.(md5|sha1)\(/ig,
+        pattern: /hashlib\.(md5|sha1)\(/gi,
         severity: 'high',
         type: 'security',
       },
       {
         name: 'Command Injection',
-        pattern: /(os\.system|subprocess\.Popen|subprocess\.call)\s*\(.*input\(.*\).*\)/ig,
+        pattern: /(os\.system|subprocess\.Popen|subprocess\.call)\s*\(.*input\(.*\).*\)/gi,
         severity: 'critical',
         type: 'security',
       },

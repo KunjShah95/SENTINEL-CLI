@@ -1,4 +1,3 @@
-
 import chalk from 'chalk';
 import ora from 'ora';
 import { promises as fs } from 'fs';
@@ -14,7 +13,6 @@ import { DependencyAnalyzer } from './analyzers/dependencyAnalyzer.js';
 import { AccessibilityAnalyzer } from './analyzers/accessibilityAnalyzer.js';
 import { AIAnalyzer } from './analyzers/aiAnalyzer.js';
 import ReportGenerator from './output/reportGenerator.js';
-
 
 const config = new Config();
 const gitUtils = new GitUtils();
@@ -64,7 +62,6 @@ export class CodeReviewBot {
       if (aiConfig && aiConfig.enabled) {
         this.analyzers.push(new AIAnalyzer(config));
       }
-
     } catch (error) {
       console.error(chalk.red('✗') + ` Failed to initialize: ${error.message}`);
       throw error;
@@ -262,7 +259,9 @@ export class CodeReviewBot {
         total += group.length;
         const color = this.getSeverityColor(severity);
         const icon = this.getSeverityIcon(severity);
-        console.log(`  ${icon} ${color(severity.toUpperCase().padEnd(8))} : ${chalk.bold(group.length)}`);
+        console.log(
+          `  ${icon} ${color(severity.toUpperCase().padEnd(8))} : ${chalk.bold(group.length)}`
+        );
       }
     }
     console.log(chalk.gray('──────────────────────────────────────────────────'));
@@ -276,7 +275,9 @@ export class CodeReviewBot {
 
       const color = this.getSeverityColor(severity);
 
-      console.log('\n' + color(`  ${this.getSeverityHeaderIcon(severity)} ${severity.toUpperCase()} ISSUES`));
+      console.log(
+        '\n' + color(`  ${this.getSeverityHeaderIcon(severity)} ${severity.toUpperCase()} ISSUES`)
+      );
 
       for (const issue of severityIssues) {
         this.displayIssue(issue, color);
@@ -287,8 +288,9 @@ export class CodeReviewBot {
     const suggestions = issues.filter(issue => issue.suggestion).length;
     if (suggestions > 0) {
       console.log(
-        '\n' + chalk.hex('#FBBC05')('💡 Optimization Tips') +
-        chalk.gray(`: ${suggestions} suggestions available to improve your code.`)
+        '\n' +
+          chalk.hex('#FBBC05')('💡 Optimization Tips') +
+          chalk.gray(`: ${suggestions} suggestions available to improve your code.`)
       );
     }
     console.log('');
@@ -329,10 +331,10 @@ export class CodeReviewBot {
   getSeverityColor(severity) {
     const colors = {
       critical: chalk.hex('#EA4335'), // Google Red
-      high: chalk.hex('#FBBC05'),     // Google Yellow/Orangeish
-      medium: chalk.hex('#4285F4'),   // Google Blue
-      low: chalk.hex('#34A853'),      // Google Green
-      info: chalk.hex('#9AA0A6'),     // Google Grey
+      high: chalk.hex('#FBBC05'), // Google Yellow/Orangeish
+      medium: chalk.hex('#4285F4'), // Google Blue
+      low: chalk.hex('#34A853'), // Google Green
+      info: chalk.hex('#9AA0A6'), // Google Grey
     };
     return colors[severity] || chalk.gray;
   }
@@ -354,7 +356,7 @@ export class CodeReviewBot {
       high: '⚠️ ',
       medium: '⚡',
       low: '✅',
-      info: '📝'
+      info: '📝',
     };
     return icons[severity] || '•';
   }
@@ -411,7 +413,7 @@ export class CodeReviewBot {
         name: 'enableAI',
         message: 'Enable AI Analysis?',
         default: false,
-      }
+      },
     ];
 
     const answers = await inquirer.prompt(basicQuestions);
@@ -430,8 +432,8 @@ export class CodeReviewBot {
             { name: 'Groq (Llama3/Mixtral) - GROQ_API_KEY', value: 'groq' },
             { name: 'OpenRouter (Various Models) - OPENROUTER_API_KEY', value: 'openrouter' },
           ],
-          default: 'openai'
-        }
+          default: 'openai',
+        },
       ];
       aiSettings = await inquirer.prompt(aiQuestions);
 
@@ -444,14 +446,16 @@ export class CodeReviewBot {
       console.log(chalk.white('  1. Copy .env.example to .env:'));
       console.log(chalk.cyan('     cp .env.example .env'));
       console.log('');
-      console.log(chalk.white(`  2. Add your ${aiSettings.provider.toUpperCase()} API key to the .env file:`));
+      console.log(
+        chalk.white(`  2. Add your ${aiSettings.provider.toUpperCase()} API key to the .env file:`)
+      );
 
       const envVarMap = {
         openai: 'OPENAI_API_KEY',
         anthropic: 'ANTHROPIC_API_KEY',
         gemini: 'GEMINI_API_KEY',
         groq: 'GROQ_API_KEY',
-        openrouter: 'OPENROUTER_API_KEY'
+        openrouter: 'OPENROUTER_API_KEY',
       };
       console.log(chalk.cyan(`     ${envVarMap[aiSettings.provider]}=your-api-key-here`));
       console.log('');
