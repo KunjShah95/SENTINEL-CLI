@@ -134,6 +134,7 @@ export function Footer() {
 
         <div className="pt-8 border-t border-gray-900 flex flex-col md:flex-row justify-between items-center gap-6 text-gray-500 text-xs">
           <p>© 2025 SENTINEL-CLI. Built with love for the open source community.</p>
+WARN! Due to `builds` existing in your configuration file, the Build and Development Settings defined in your Project Settings will not apply. Learn More: https://vercel.link/unused-build-settings
           <div className="flex gap-8">
             <span>MIT License</span>
             <span>v2.0.4</span>
