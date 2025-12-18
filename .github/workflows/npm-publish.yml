@@ -55,6 +55,8 @@ jobs:
   # Build and publish to npm
   # ============================================================
   publish:
+    # Prevent exposing repository secrets for untrusted events (e.g., pull requests)
+    if: ${{ github.event_name != 'pull_request' }}
     needs: test
     runs-on: ubuntu-latest
     permissions:
@@ -77,7 +79,10 @@ jobs:
 
       - name: Get package version
         id: get_version
-        run: echo "version=$(node -p \"require('./package.json').version\")" >> $GITHUB_OUTPUT
+        run: |
+          # Use a small script to avoid YAML/quoting issues with nested quotes
+          version=$(node -e "process.stdout.write(require('./package.json').version)")
+          echo "version=$version" >> $GITHUB_OUTPUT
 
       - name: Install dependencies
         run: npm ci

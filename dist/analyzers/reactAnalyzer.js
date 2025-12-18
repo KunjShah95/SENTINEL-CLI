@@ -144,14 +144,14 @@ export class ReactAnalyzer extends BaseAnalyzer {
                 message: 'This lifecycle method is deprecated and will be removed in React 18.',
                 suggestion: 'Use componentDidMount, getDerivedStateFromProps, or getSnapshotBeforeUpdate.',
             },
-            // setState in constructor
+            // Inline style objects (not recommended, prefer CSS classes)
             {
-                pattern: /constructor\s*\([^)]*\)\s*{[^}]*this\.setState/g,
-                severity: 'high',
-                type: 'bugs',
-                title: 'setState in constructor',
-                message: 'Calling setState in constructor is invalid. Initialize state directly.',
-                suggestion: 'Use this.state = { ... } instead of this.setState().',
+                pattern: /style\s*=\s*{[^}]*(?<!--)\w+\s*:\s*['"][^'"]*["'](?!.*CSS custom|.*var\(--)/g,
+                severity: 'low',
+                type: 'quality',
+                title: 'Inline style object',
+                message: 'CSS inline styles should not be used for static values, use CSS classes instead',
+                suggestion: 'Move static styles to CSS classes or Tailwind utility classes. Exception: using CSS custom properties (--variable-name) or CSS variables (var(--name)) for dynamic data is acceptable',
             },
         ];
     }

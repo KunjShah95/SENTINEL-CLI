@@ -97,7 +97,9 @@ export class BaseAnalyzer {
     const extension = filePath.split('.').pop()?.toLowerCase();
     const languageMap = {
       js: 'javascript',
+      jsx: 'javascript',
       ts: 'typescript',
+      tsx: 'typescript',
       py: 'python',
       java: 'java',
       php: 'php',

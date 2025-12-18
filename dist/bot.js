@@ -168,17 +168,18 @@ export class CodeReviewBot {
         // Analyze specific files provided via CLI
         for (const filePath of options.files) {
           try {
-            // Validate file path to prevent path traversal
-            const normalizedPath = path.normalize(filePath);
-            if (normalizedPath.includes('..')) {
-              console.warn(chalk.yellow('⚠') + ` Skipping potentially unsafe file path: ${filePath}`);
+            const absolutePath = path.resolve(filePath);
+            const workspaceRoot = process.cwd();
+            const relativePath = path.relative(workspaceRoot, absolutePath);
+            
+            if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
+              console.warn(chalk.yellow('⚠') + ` Skipping file outside workspace: ${filePath}`);
               continue;
             }
             
-            const absolutePath = path.resolve(normalizedPath);
             const content = await fs.readFile(absolutePath, 'utf8');
             files.push({
-              path: filePath, // Keep relative path for reporting
+              path: relativePath, // Use relative path for reporting
               content: content,
               type: 'file',
             });

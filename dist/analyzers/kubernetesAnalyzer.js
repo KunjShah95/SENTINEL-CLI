@@ -12,19 +12,36 @@ export default class KubernetesAnalyzer extends BaseAnalyzer {
 
   shouldAnalyzeFile(filePath) {
     // Check for Kubernetes manifest files
-    return /\.(yaml|yml)$/i.test(filePath) && (
-      filePath.includes('k8s') ||
-      filePath.includes('kubernetes') ||
-      filePath.includes('deployment') ||
-      filePath.includes('pod') ||
-      filePath.includes('service') ||
-      filePath.includes('configmap') ||
-      filePath.includes('secret')
+    const normalized = filePath.toLowerCase();
+    return (normalized.endsWith('.yaml') || normalized.endsWith('.yml')) && (
+      normalized.includes('k8s') ||
+      normalized.includes('kubernetes') ||
+      normalized.includes('deployment') ||
+      normalized.includes('pod') ||
+      normalized.includes('service') ||
+      normalized.includes('configmap') ||
+      normalized.includes('secret')
     );
   }
 
-  async analyzeFile(file) {
-    const content = file.content;
+  async analyze(files, context) {
+    this.reset();
+    const startTime = Date.now();
+
+    for (const file of files) {
+      if (!this.shouldAnalyzeFile(file.path)) continue;
+
+      this.stats.filesAnalyzed++;
+      this.stats.linesAnalyzed += file.content.split('\n').length;
+
+      await this.analyzeFile(file.path, file.content, context);
+    }
+
+    this.stats.executionTime = Date.now() - startTime;
+    return this.getIssues();
+  }
+
+  async analyzeFile(filePath, content, _context) {
     const lines = content.split('\n');
     
     // Parse YAML-like content (simplified)
@@ -33,18 +50,18 @@ export default class KubernetesAnalyzer extends BaseAnalyzer {
     if (!manifest) return;
     
     // Security checks
-    this.checkPrivilegedContainers(manifest, file.path);
-    this.checkRootUser(manifest, file.path);
-    this.checkSecurityContext(manifest, file.path);
-    this.checkResourceLimits(manifest, file.path);
-    this.checkCapabilities(manifest, file.path);
-    this.checkHostPaths(manifest, file.path);
-    this.checkHostNetwork(manifest, file.path);
-    this.checkImagePullPolicy(manifest, file.path);
-    this.checkSecretsHandling(manifest, file.path, lines);
-    this.checkServiceAccounts(manifest, file.path);
-    this.checkNetworkPolicies(manifest, file.path);
-    this.checkReadOnlyFilesystem(manifest, file.path);
+    this.checkPrivilegedContainers(manifest, filePath, content);
+    this.checkRootUser(manifest, filePath, content);
+    this.checkSecurityContext(manifest, filePath, content);
+    this.checkResourceLimits(manifest, filePath, content);
+    this.checkCapabilities(manifest, filePath, content);
+    this.checkHostPaths(manifest, filePath, content);
+    this.checkHostNetwork(manifest, filePath, content);
+    this.checkImagePullPolicy(manifest, filePath, content);
+    this.checkSecretsHandling(manifest, filePath, lines);
+    this.checkServiceAccounts(manifest, filePath, content);
+    this.checkNetworkPolicies(manifest, filePath, content);
+    this.checkReadOnlyFilesystem(manifest, filePath, content);
   }
 
   parseKubernetesManifest(content) {
@@ -85,7 +102,7 @@ export default class KubernetesAnalyzer extends BaseAnalyzer {
     return manifest;
   }
 
-  checkPrivilegedContainers(manifest, filePath) {
+  checkPrivilegedContainers(manifest, filePath, content) {
     if (manifest.hasPrivileged) {
       this.addIssue({
         type: 'kubernetes-security',
@@ -93,14 +110,14 @@ export default class KubernetesAnalyzer extends BaseAnalyzer {
         title: 'Privileged container detected',
         message: 'Running containers in privileged mode gives them unrestricted access to the host.',
         file: filePath,
-        line: this.findLineNumber('privileged:', filePath),
+        line: this.findLineNumber('privileged:', content),
         suggestion: 'Remove privileged: true or use specific capabilities instead',
         tags: ['kubernetes', 'security', 'privileged', 'critical']
       });
     }
   }
 
-  checkRootUser(manifest, filePath) {
+  checkRootUser(manifest, filePath, content) {
     if (manifest.hasRunAsRoot) {
       this.addIssue({
         type: 'kubernetes-security',
@@ -108,7 +125,7 @@ export default class KubernetesAnalyzer extends BaseAnalyzer {
         title: 'Container runs as root (UID 0)',
         message: 'Running as root user increases security risk if container is compromised.',
         file: filePath,
-        line: this.findLineNumber('runAsUser:', filePath),
+        line: this.findLineNumber('runAsUser: 0', content),
         suggestion: 'Set runAsUser to non-zero UID (e.g., 1000)',
         tags: ['kubernetes', 'security', 'root-user']
       });
@@ -128,7 +145,7 @@ export default class KubernetesAnalyzer extends BaseAnalyzer {
     }
   }
 
-  checkSecurityContext(manifest, filePath) {
+  checkSecurityContext(manifest, filePath, content) {
     if (!manifest.hasSecurityContext) {
       this.addIssue({
         type: 'kubernetes-security',
@@ -155,14 +172,14 @@ export default class KubernetesAnalyzer extends BaseAnalyzer {
         title: 'Privilege escalation allowed',
         message: 'allowPrivilegeEscalation: true permits container processes to gain more privileges.',
         file: filePath,
-        line: this.findLineNumber('allowPrivilegeEscalation:', filePath),
+        line: this.findLineNumber('allowPrivilegeEscalation:', content),
         suggestion: 'Set allowPrivilegeEscalation: false',
         tags: ['kubernetes', 'security', 'privilege-escalation']
       });
     }
   }
 
-  checkResourceLimits(manifest, filePath) {
+  checkResourceLimits(manifest, filePath, _content) {
     if (!manifest.hasResourceLimits) {
       this.addIssue({
         type: 'kubernetes-reliability',
@@ -184,7 +201,7 @@ resources:
     }
   }
 
-  checkCapabilities(manifest, filePath) {
+  checkCapabilities(manifest, filePath, _content) {
     if (!manifest.hasCapabilities) {
       this.addIssue({
         type: 'kubernetes-security',
@@ -201,7 +218,7 @@ resources:
     }
   }
 
-  checkHostPaths(manifest, filePath) {
+  checkHostPaths(manifest, filePath, content) {
     if (manifest.hasHostPath) {
       this.addIssue({
         type: 'kubernetes-security',
@@ -209,14 +226,14 @@ resources:
         title: 'hostPath volume detected',
         message: 'Mounting host paths gives container access to the host filesystem.',
         file: filePath,
-        line: this.findLineNumber('hostPath:', filePath),
+        line: this.findLineNumber('hostPath:', content),
         suggestion: 'Use PersistentVolumes, ConfigMaps, or Secrets instead of hostPath',
         tags: ['kubernetes', 'security', 'hostpath', 'volumes']
       });
     }
   }
 
-  checkHostNetwork(manifest, filePath) {
+  checkHostNetwork(manifest, filePath, content) {
     if (manifest.hasHostNetwork) {
       this.addIssue({
         type: 'kubernetes-security',
@@ -224,7 +241,7 @@ resources:
         title: 'Host network mode enabled',
         message: 'hostNetwork: true gives container access to host network stack.',
         file: filePath,
-        line: this.findLineNumber('hostNetwork:', filePath),
+        line: this.findLineNumber('hostNetwork:', content),
         suggestion: 'Remove hostNetwork: true unless absolutely necessary',
         tags: ['kubernetes', 'security', 'network', 'hostnetwork']
       });
@@ -237,7 +254,7 @@ resources:
         title: 'Host PID namespace enabled',
         message: 'hostPID: true allows container to see all host processes.',
         file: filePath,
-        line: this.findLineNumber('hostPID:', filePath),
+        line: this.findLineNumber('hostPID:', content),
         suggestion: 'Remove hostPID: true',
         tags: ['kubernetes', 'security', 'hostpid']
       });
@@ -250,16 +267,16 @@ resources:
         title: 'Host IPC namespace enabled',
         message: 'hostIPC: true allows container to access host IPC.',
         file: filePath,
-        line: this.findLineNumber('hostIPC:', filePath),
+        line: this.findLineNumber('hostIPC:', content),
         suggestion: 'Remove hostIPC: true',
         tags: ['kubernetes', 'security', 'hostipc']
       });
     }
   }
 
-  checkImagePullPolicy(manifest, filePath) {
+  checkImagePullPolicy(manifest, filePath, content) {
     // Check for missing imagePullPolicy or wrong value
-    if (!/imagePullPolicy:\s*Always/i.test(manifest.kind)) {
+    if (!/imagePullPolicy:\s*Always/i.test(content)) {
       this.addIssue({
         type: 'kubernetes-best-practice',
         severity: 'low',
@@ -298,10 +315,10 @@ resources:
     }
   }
 
-  checkServiceAccounts(manifest, filePath) {
+  checkServiceAccounts(manifest, filePath, content) {
     if (manifest.kind === 'Pod' || manifest.kind === 'Deployment') {
       // Check if default service account is used
-      if (!/serviceAccountName:/i.test(manifest.kind)) {
+      if (!/serviceAccountName:/i.test(content)) {
         this.addIssue({
           type: 'kubernetes-security',
           severity: 'medium',
@@ -316,7 +333,7 @@ resources:
     }
   }
 
-  checkNetworkPolicies(manifest, filePath) {
+  checkNetworkPolicies(manifest, filePath, _content) {
     // This is a cluster-level check, just a reminder
     if (manifest.kind === 'Deployment' || manifest.kind === 'Pod') {
       this.addIssue({
@@ -332,7 +349,7 @@ resources:
     }
   }
 
-  checkReadOnlyFilesystem(manifest, filePath) {
+  checkReadOnlyFilesystem(manifest, filePath, _content) {
     if (!manifest.hasReadOnlyRootFilesystem) {
       this.addIssue({
         type: 'kubernetes-security',
@@ -347,8 +364,13 @@ resources:
     }
   }
 
-  findLineNumber(_searchString, _filePath) {
-    // Simplified - would need actual file content in real implementation
+  findLineNumber(searchString, content) {
+    const lines = content.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].includes(searchString)) {
+        return i + 1;
+      }
+    }
     return 1;
   }
 }

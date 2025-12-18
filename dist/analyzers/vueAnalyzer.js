@@ -203,14 +203,14 @@ export class VueAnalyzer extends BaseAnalyzer {
 
   async analyze(files, context) {
     this.issues = [];
-    const vueFiles = files.filter(f => this.shouldAnalyzeFile(f));
-
-    for (const file of vueFiles) {
-      try {
-        const content = await this.readFile(file);
-        await this.analyzeFile(file, content, context);
-      } catch (error) {
-        // Skip files that can't be read
+    
+    for (const file of files) {
+      if (this.shouldAnalyzeFile(file.path)) {
+        try {
+          await this.analyzeFile(file.path, file.content, context);
+        } catch (error) {
+          // Skip files that can't be analyzed
+        }
       }
     }
 
@@ -219,19 +219,6 @@ export class VueAnalyzer extends BaseAnalyzer {
       issues: this.issues,
       stats: this.getStats(),
     };
-  }
-
-  async readFile(filePath) {
-    const fs = await import('fs/promises');
-    const path = await import('path');
-    
-    // Validate and sanitize file path
-    const normalizedPath = path.normalize(filePath);
-    if (normalizedPath.includes('..')) {
-      throw new Error('Path traversal detected');
-    }
-    
-    return fs.readFile(normalizedPath, 'utf8');
   }
 
   async analyzeFile(filePath, content, _context) {

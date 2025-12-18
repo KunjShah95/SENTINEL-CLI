@@ -115,42 +115,32 @@ program
   .option('--banner-font <name>', 'Figlet font name', 'Standard')
   .option('--banner-gradient <name>', 'Banner gradient: aqua|fire|rainbow|aurora|mono', 'aqua')
   .option('--banner-width <number>', 'Banner width for centering', v => parseInt(v, 10))
-  .option('--no-banner-color', 'Disable banner gradients')
-  .hook('preAction', async (thisCommand, actionCommand) => {
-    // Commander runs hooks for each command in the chain (root + subcommand).
-    // Only print the banner once for the leaf/action command.
-    const isRoot = thisCommand?.name?.() === 'sentinel';
-    if (isRoot && thisCommand?.args?.length) return;
-    if (actionCommand && thisCommand !== actionCommand) return;
-    const isRootNoSubcommand =
-      thisCommand?.name?.() === 'sentinel' && (!thisCommand.args || thisCommand.args.length === 0);
-    if (isRootNoSubcommand) return; // default action handles banner when no subcommand
-    // Show banner only for main commands, avoid cluttering precise outputs like JSON
-    const opts = thisCommand.optsWithGlobals
-      ? thisCommand.optsWithGlobals()
-      : { ...program.opts(), ...thisCommand.opts() };
-    if (!opts.format || opts.format === 'console') {
-      await displayBanner({
-        bannerMessage: opts.bannerMessage,
-        bannerFont: opts.bannerFont,
-        bannerGradient: opts.bannerGradient,
-        bannerWidth: opts.bannerWidth,
-        bannerColor: opts.bannerColor !== false,
-      });
-    }
-  });
+  .option('--no-banner-color', 'Disable banner gradients');
 
-// Show banner when no subcommand is provided (default help path)
-program.action(async (_args, command) => {
-  const opts = command?.optsWithGlobals ? command.optsWithGlobals() : program.opts();
-  await displayBanner({
-    bannerMessage: opts.bannerMessage,
-    bannerFont: opts.bannerFont,
-    bannerGradient: opts.bannerGradient,
-    bannerWidth: opts.bannerWidth,
-    bannerColor: opts.bannerColor !== false,
-  });
-  command.outputHelp();
+let bannerShown = false;
+const showBannerOnce = async (command) => {
+  if (bannerShown) return;
+  bannerShown = true; // Set immediately to prevent race conditions from bubbling hooks
+  
+  // Get options, handling both the root program and subcommands
+  const programOpts = program.opts();
+  const commandOpts = command ? command.opts() : {};
+  const opts = { ...programOpts, ...commandOpts };
+  
+  // Only show banner for console output (default)
+  if (!opts.format || opts.format === 'console') {
+    await displayBanner({
+      bannerMessage: opts.bannerMessage,
+      bannerFont: opts.bannerFont,
+      bannerGradient: opts.bannerGradient,
+      bannerWidth: opts.bannerWidth,
+      bannerColor: opts.bannerColor !== false,
+    });
+  }
+};
+
+program.hook('preAction', async (thisCommand) => {
+  await showBannerOnce(thisCommand);
 });
 
 program
@@ -1270,5 +1260,12 @@ program
       process.exit(1);
     }
   });
+
+// Show help if no command was provided
+if (!process.argv.slice(2).length) {
+  await showBannerOnce(program);
+  program.outputHelp();
+  process.exit(0);
+}
 
 program.parse();

@@ -154,35 +154,13 @@ export class DockerAnalyzer extends BaseAnalyzer {
 
   async analyze(files, context) {
     this.issues = [];
-    const dockerFiles = files.filter(f => this.shouldAnalyzeFile(f));
+    const dockerFiles = files.filter(f => this.shouldAnalyzeFile(f.path));
 
     for (const file of dockerFiles) {
-      try {
-        const content = await this.readFile(file);
-        await this.analyzeFile(file, content, context);
-      } catch (error) {
-        // Skip files that can't be read
-      }
+      await this.analyzeFile(file.path, file.content, context);
     }
 
-    return {
-      analyzer: this.name,
-      issues: this.issues,
-      stats: this.getStats(),
-    };
-  }
-
-  async readFile(filePath) {
-    const fs = await import('fs/promises');
-    const path = await import('path');
-    
-    // Validate and sanitize file path
-    const normalizedPath = path.normalize(filePath);
-    if (normalizedPath.includes('..')) {
-      throw new Error('Path traversal detected');
-    }
-    
-    return fs.readFile(normalizedPath, 'utf8');
+    return this.getIssues();
   }
 
   async analyzeFile(filePath, content, _context) {

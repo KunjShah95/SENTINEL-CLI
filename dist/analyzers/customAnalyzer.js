@@ -161,6 +161,51 @@ export class CustomAnalyzer extends BaseAnalyzer {
                 console.warn(`[CustomAnalyzer] Invalid regex in rule ${rule.id}: ${regexError.message}`);
             }
         }
+
+        // Built-in style rules
+        this.checkInlineStyles(filePath, content, lines);
+    }
+
+    checkInlineStyles(filePath, content, lines) {
+        // Check for inline style patterns that should be in external CSS
+        // EXCEPTION: CSS custom properties (--variable-name) and var(--name) are acceptable for data-driven styles
+        const stylePatterns = [
+            {
+                pattern: /style\s*=\s*{[^}]*}/g,
+                title: 'Inline style object',
+                message: 'CSS inline styles should not be used, move styles to an external CSS file',
+                suggestion: 'Move styles to CSS classes or Tailwind utility classes. Exception: CSS custom properties (--name) for dynamic data is acceptable',
+                severity: 'low',
+                skipIf: /--\w+:|var\(\s*--|\s*as\s+React\.CSSProperties/,
+            },
+        ];
+
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+
+            // Skip lines with CSS custom properties - they're acceptable for data-driven styles
+            if (/var\(\s*--|\s*--[\w-]+\s*:|as\s+React\.CSSProperties|CSS custom|CSS variables/i.test(line)) {
+                continue;
+            }
+
+            for (const pattern of stylePatterns) {
+                if (pattern.pattern.test(line)) {
+                    this.addIssue({
+                        severity: pattern.severity || 'info',
+                        type: 'quality',
+                        title: pattern.title,
+                        message: pattern.message,
+                        file: filePath,
+                        line: i + 1,
+                        column: line.search(pattern.pattern) + 1,
+                        snippet: this.getCodeSnippet(content, i + 1).snippet,
+                        suggestion: pattern.suggestion,
+                        tags: ['style', 'css'],
+                        analyzer: this.name,
+                    });
+                }
+            }
+        }
     }
 }
 
