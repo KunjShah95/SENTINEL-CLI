@@ -1,16 +1,8 @@
 {
   "version": 2,
   "name": "sentinel-cli-website",
-  "builds": [
-    {
-      "src": "frontend/package.json",
-      "use": "@vercel/static-build",
-      "config": { "distDir": "build" }
-    }
-  ],
-  "outputDirectory": "frontend/build",
   "routes": [
     { "handle": "filesystem" },
-    { "src": "\/(.*)", "dest": "frontend/build/index.html" }
+    { "src": "\\/(.*)", "dest": "frontend/build/index.html" }
   ]
 }
