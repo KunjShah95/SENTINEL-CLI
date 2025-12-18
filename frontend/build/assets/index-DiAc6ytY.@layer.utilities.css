@@ -291,7 +291,6 @@
         margin-left: auto;
     }
     .line-clamp-1 {
-        -webkit-line-clamp: 1;
         -webkit-box-orient: vertical;
         display: -webkit-box;
         overflow: hidden;
@@ -330,7 +329,7 @@
         display: table-row;
     }
     .field-sizing-content {
-        field-sizing: content;
+        width: fit-content;    
     }
     .aspect-square {
         aspect-ratio: 1;
@@ -2012,9 +2011,7 @@
         --tw-tracking: var(--tracking-widest);
         letter-spacing: var(--tracking-widest);
     }
-    .text-balance {
-        text-wrap: balance;
-    }
+    
     .break-words {
         overflow-wrap: break-word;
     }
@@ -3484,7 +3481,6 @@
     :is(
         .\*\:data-\[slot\=select-value\]\:line-clamp-1 > *
     )[data-slot='select-value'] {
-        -webkit-line-clamp: 1;
         -webkit-box-orient: vertical;
         display: -webkit-box;
         overflow: hidden;
