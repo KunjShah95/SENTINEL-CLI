@@ -39,7 +39,10 @@ export class QualityAnalyzer extends BaseAnalyzer {
     switch (extension) {
     case 'js':
     case 'ts':
+    case 'jsx':
+    case 'tsx':
       issues.push(...this.checkJavaScriptQuality(content, filePath));
+      issues.push(...this.checkInlineStyles(content, filePath));
       break;
     case 'py':
       issues.push(...this.checkPythonQuality(content, filePath));
@@ -390,43 +393,84 @@ export class QualityAnalyzer extends BaseAnalyzer {
     return issues;
   }
 
-  extractFunctions(code) {
-    const functions = [];
-    const lines = code.split('\n');
+      checkInlineStyles(code, filePath) {
+        const issues = [];
+        const lines = code.split('\n');
 
-    // Simple regex patterns for different languages
-    const functionPatterns = [
-      /function\s+(\w+)\s*\(/g, // JavaScript function
-      /(\w+)\s*:\s*\([^)]*\)\s*=>/g, // JavaScript arrow function
-      /def\s+(\w+)\s*\(/g, // Python function
-      /public\s+\w+\s+(\w+)\s*\(/g, // Java method
-      /private\s+\w+\s+(\w+)\s*\(/g, // Java method
-    ];
+        for (let lineNum = 0; lineNum < lines.length; lineNum++) {
+          const line = lines[lineNum];
 
-    for (let lineNum = 0; lineNum < lines.length; lineNum++) {
-      const line = lines[lineNum];
+          // Skip lines with CSS custom properties/variables - they're legitimate for data-driven styling
+          if (/var\(\s*--|\s*--[\w-]+\s*:|as\s+React\.CSSProperties|CSS custom|CSS variables|@ts-ignore/i.test(line)) {
+            continue;
+          }
 
-      for (const pattern of functionPatterns) {
-        let match;
-        while ((match = pattern.exec(line)) !== null) {
-          const funcName = match[1];
-          functions.push({
-            name: funcName,
-            line: lineNum + 1,
-            column: match.index + 1,
-            body: this.extractFunctionBody(lines, lineNum),
-            hasDocumentation: this.hasDocumentation(lines, lineNum),
-          });
+          // Only flag direct CSS property assignments without dynamic values
+          // Exclude lines that are comments
+          if (line.trim().startsWith('//') || line.trim().startsWith('*')) {
+            continue;
+          }
+
+          // Check for hardcoded inline styles (not using variables)
+          const hasInlineStyle = /style\s*=\s*{/.test(line);
+          const hasColorOrDynamicValue = /indicatorColor|item\.color|itemConfig/i.test(line);
+
+          if (hasInlineStyle && !hasColorOrDynamicValue) {
+            issues.push({
+              severity: 'low',
+              type: 'quality',
+              title: 'CSS inline styles',
+              message: 'CSS inline styles should not be used, move styles to an external CSS file',
+              file: filePath,
+              line: lineNum + 1,
+              column: line.search(/style/i) + 1,
+              snippet: this.getCodeSnippet(code, lineNum + 1).snippet,
+              suggestion: 'Move styles to CSS classes or external CSS file. Exception: CSS custom properties/variables for data-driven colors are acceptable',
+              tags: ['quality', 'css', 'style'],
+            });
+          }
+        }
+
+        return issues;
+      }
+
+    extractFunctions(code) {
+      const functions = [];
+      const lines = code.split('\n');
+
+      // Simple regex patterns for different languages
+      const functionPatterns = [
+        /function\s+(\w+)\s*\(/g, // JavaScript function
+        /(\w+)\s*:\s*\([^)]*\)\s*=>/g, // JavaScript arrow function
+        /def\s+(\w+)\s*\(/g, // Python function
+        /public\s+\w+\s+(\w+)\s*\(/g, // Java method
+        /private\s+\w+\s+(\w+)\s*\(/g, // Java method
+      ];
+
+      for (let lineNum = 0; lineNum < lines.length; lineNum++) {
+        const line = lines[lineNum];
+
+        for (const pattern of functionPatterns) {
+          let match;
+          while ((match = pattern.exec(line)) !== null) {
+            const funcName = match[1];
+            functions.push({
+              name: funcName,
+              line: lineNum + 1,
+              column: match.index + 1,
+              body: this.extractFunctionBody(lines, lineNum),
+              hasDocumentation: this.hasDocumentation(lines, lineNum),
+            });
+          }
         }
       }
+
+      return functions;
     }
 
-    return functions;
-  }
-
-  extractClasses(code) {
-    const classes = [];
-    const lines = code.split('\n');
+    extractClasses(code) {
+      const classes = [];
+      const lines = code.split('\n');
 
     const classPatterns = [
       /class\s+(\w+)/g, // JavaScript/Python class

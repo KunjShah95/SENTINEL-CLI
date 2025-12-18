@@ -12,6 +12,13 @@ import { PerformanceAnalyzer } from './analyzers/performanceAnalyzer.js';
 import { DependencyAnalyzer } from './analyzers/dependencyAnalyzer.js';
 import { AccessibilityAnalyzer } from './analyzers/accessibilityAnalyzer.js';
 import { AIAnalyzer } from './analyzers/aiAnalyzer.js';
+import { CustomAnalyzer } from './analyzers/customAnalyzer.js';
+import { TypeScriptAnalyzer } from './analyzers/typescriptAnalyzer.js';
+import { ReactAnalyzer } from './analyzers/reactAnalyzer.js';
+import { APISecurityAnalyzer } from './analyzers/apiSecurityAnalyzer.js';
+import { EnvSecurityAnalyzer } from './analyzers/envSecurityAnalyzer.js';
+import { DockerAnalyzer } from './analyzers/dockerAnalyzer.js';
+import KubernetesAnalyzer from './analyzers/kubernetesAnalyzer.js';
 import ReportGenerator from './output/reportGenerator.js';
 
 const config = new Config();
@@ -47,14 +54,49 @@ export class CodeReviewBot {
         this.analyzers.push(new PerformanceAnalyzer(config));
       }
 
-      // NEW: Dependency vulnerability analyzer
+      // Dependency vulnerability analyzer
       if (enabledAnalyzers.includes('dependency') || enabledAnalyzers.includes('deps')) {
         this.analyzers.push(new DependencyAnalyzer(config));
       }
 
-      // NEW: Accessibility (a11y) analyzer
+      // Accessibility (a11y) analyzer
       if (enabledAnalyzers.includes('accessibility') || enabledAnalyzers.includes('a11y')) {
         this.analyzers.push(new AccessibilityAnalyzer(config));
+      }
+
+      // TypeScript-specific analyzer
+      if (enabledAnalyzers.includes('typescript') || enabledAnalyzers.includes('ts')) {
+        this.analyzers.push(new TypeScriptAnalyzer(config));
+      }
+
+      // React-specific analyzer
+      if (enabledAnalyzers.includes('react') || enabledAnalyzers.includes('jsx')) {
+        this.analyzers.push(new ReactAnalyzer(config));
+      }
+
+      // API Security analyzer
+      if (enabledAnalyzers.includes('api') || enabledAnalyzers.includes('api-security')) {
+        this.analyzers.push(new APISecurityAnalyzer(config));
+      }
+
+      // Environment/Secrets analyzer
+      if (enabledAnalyzers.includes('secrets') || enabledAnalyzers.includes('env')) {
+        this.analyzers.push(new EnvSecurityAnalyzer(config));
+      }
+
+      // Docker analyzer
+      if (enabledAnalyzers.includes('docker') || enabledAnalyzers.includes('dockerfile')) {
+        this.analyzers.push(new DockerAnalyzer(config));
+      }
+
+      // Kubernetes analyzer
+      if (enabledAnalyzers.includes('kubernetes') || enabledAnalyzers.includes('k8s')) {
+        this.analyzers.push(new KubernetesAnalyzer(config));
+      }
+
+      // Custom rules analyzer (always enabled if .sentinelrules exists)
+      if (enabledAnalyzers.includes('custom') || enabledAnalyzers.length > 0) {
+        this.analyzers.push(new CustomAnalyzer(config));
       }
 
       // Initialize AI Analyzer if enabled in config
@@ -67,6 +109,7 @@ export class CodeReviewBot {
       throw error;
     }
   }
+
 
   async runAnalysis(options = {}) {
     const spinner = options.silent ? null : ora('Running code analysis...').start();
@@ -126,9 +169,17 @@ export class CodeReviewBot {
         for (const filePath of options.files) {
           try {
             const absolutePath = path.resolve(filePath);
+            const workspaceRoot = process.cwd();
+            const relativePath = path.relative(workspaceRoot, absolutePath);
+            
+            if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
+              console.warn(chalk.yellow('⚠') + ` Skipping file outside workspace: ${filePath}`);
+              continue;
+            }
+            
             const content = await fs.readFile(absolutePath, 'utf8');
             files.push({
-              path: filePath, // Keep relative path for reporting
+              path: relativePath, // Use relative path for reporting
               content: content,
               type: 'file',
             });
@@ -289,8 +340,8 @@ export class CodeReviewBot {
     if (suggestions > 0) {
       console.log(
         '\n' +
-          chalk.hex('#FBBC05')('💡 Optimization Tips') +
-          chalk.gray(`: ${suggestions} suggestions available to improve your code.`)
+        chalk.hex('#FBBC05')('💡 Optimization Tips') +
+        chalk.gray(`: ${suggestions} suggestions available to improve your code.`)
       );
     }
     console.log('');
@@ -387,6 +438,16 @@ export class CodeReviewBot {
             name: 'Accessibility Analyzer (WCAG compliance checks)',
             value: 'accessibility',
             checked: false,
+          },
+          {
+            name: 'Docker Analyzer (Dockerfile security & best practices)',
+            value: 'docker',
+            checked: true,
+          },
+          {
+            name: 'Kubernetes Analyzer (K8s manifest security)',
+            value: 'kubernetes',
+            checked: true,
           },
         ],
       },

@@ -1,5 +1,10 @@
 version: '3.9'
 
+# ============================================================
+# Sentinel CLI v1.3.0 - Docker Compose Configuration
+# Supports: Production, Development, CI/CD, and specialized services
+# ============================================================
+
 services:
   # Production Sentinel service
   sentinel:
@@ -7,33 +12,90 @@ services:
       context: .
       dockerfile: Dockerfile
       target: production
-    image: sentinel-cli:latest
+    image: sentinel-cli:1.3.0
     container_name: sentinel-review
     environment:
       - NODE_ENV=production
-      # API Keys - set these in your .env file or environment
+      - SENTINEL_DOCKER=true
+      # AI Provider API Keys
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - GROQ_API_KEY=${GROQ_API_KEY:-}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      # Integration API Keys
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL:-}
+      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL:-}
     volumes:
       # Mount your project for analysis
       - ./:/workspace:ro
       # Persist reports
       - ./reports:/app/reports
-      # Persist cache for AI responses
+      # Persist cache and history
       - ./cache:/app/cache
+      - ./.sentinel:/app/.sentinel
     working_dir: /workspace
     command: ["analyze", "--format", "console"]
 
-  # Development Sentinel service with hot reload
+  # Security audit service
+  sentinel-security:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    image: sentinel-cli:1.3.0
+    container_name: sentinel-security
+    environment:
+      - NODE_ENV=production
+      - SENTINEL_ANALYZERS=security,api,secrets,dependency
+    volumes:
+      - ./:/workspace:ro
+      - ./reports:/app/reports
+    working_dir: /workspace
+    command: ["security-audit", "--format", "console"]
+
+  # Full scan service
+  sentinel-full:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    image: sentinel-cli:1.3.0
+    container_name: sentinel-full-scan
+    environment:
+      - NODE_ENV=production
+    volumes:
+      - ./:/workspace:ro
+      - ./reports:/app/reports
+      - ./.sentinel:/app/.sentinel
+    working_dir: /workspace
+    command: ["full-scan", "--save-history"]
+
+  # SARIF output for GitHub Security
+  sentinel-sarif:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: ci
+    image: sentinel-cli:1.3.0-ci
+    container_name: sentinel-sarif
+    environment:
+      - NODE_ENV=production
+      - CI=true
+    volumes:
+      - ./:/workspace:ro
+      - ./reports:/app/reports
+    working_dir: /workspace
+    command: ["sarif", "--output", "/app/reports/sentinel-results.sarif"]
+
+  # Development service with hot reload
   sentinel-dev:
     build:
       context: .
       dockerfile: Dockerfile
       target: development
-    image: sentinel-cli:dev
+    image: sentinel-cli:1.3.0-dev
     container_name: sentinel-dev
     environment:
       - NODE_ENV=development
@@ -42,6 +104,9 @@ services:
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL:-}
+      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL:-}
     volumes:
       - ./:/app
       - /app/node_modules
@@ -49,21 +114,76 @@ services:
       - "3000:3000"
     command: ["npm", "run", "dev"]
 
-  # CI-specific service for automated reviews
+  # CI/CD service for automated reviews
   sentinel-ci:
     build:
       context: .
       dockerfile: Dockerfile
-      target: production
-    image: sentinel-cli:ci
+      target: ci
+    image: sentinel-cli:1.3.0-ci
     container_name: sentinel-ci
     environment:
       - NODE_ENV=production
       - CI=true
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
     volumes:
       - ./:/workspace:ro
       - ./reports:/app/reports
     working_dir: /workspace
-    command: ["analyze", "--format", "json", "--output", "/app/reports/code-review.json"]
+    command: ["analyze", "--all-analyzers", "--format", "json", "--output", "/app/reports/code-review.json"]
+
+  # GitHub PR review service
+  sentinel-pr:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    image: sentinel-cli:1.3.0
+    container_name: sentinel-pr-review
+    environment:
+      - NODE_ENV=production
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+    volumes:
+      - ./:/workspace:ro
+    working_dir: /workspace
+    # Usage: docker-compose run sentinel-pr review-pr https://github.com/owner/repo/pull/123
+    entrypoint: ["node", "src/cli.js"]
+    command: ["--help"]
+
+  # Notification service (Slack/Discord)
+  sentinel-notify:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    image: sentinel-cli:1.3.0
+    container_name: sentinel-notify
+    environment:
+      - NODE_ENV=production
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL:-}
+      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL:-}
+    volumes:
+      - ./:/workspace:ro
+    working_dir: /workspace
+    command: ["notify", "--slack", "--discord", "--project", "MyProject"]
+
+# ============================================================
+# Volume definitions for persistent data
+# ============================================================
+volumes:
+  sentinel-cache:
+    driver: local
+  sentinel-reports:
+    driver: local
+  sentinel-history:
+    driver: local
+
+# ============================================================
+# Network for service communication
+# ============================================================
+networks:
+  default:
+    name: sentinel-network
+    driver: bridge

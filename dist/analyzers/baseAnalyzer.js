@@ -7,21 +7,21 @@ export class BaseAnalyzer {
       filesAnalyzed: 0,
       linesAnalyzed: 0,
       issuesFound: 0,
-      executionTime: 0
+      executionTime: 0,
     };
   }
 
   /**
    * Main analysis method to be implemented by subclasses
    */
-  async analyze(files, context) {
+  async analyze(_files, _context) {
     throw new Error('analyze() must be implemented by subclass');
   }
 
   /**
    * Analyze a single file
    */
-  async analyzeFile(filePath, content, context) {
+  async analyzeFile(_filePath, _content, _context) {
     throw new Error('analyzeFile() must be implemented by subclass');
   }
 
@@ -64,7 +64,7 @@ export class BaseAnalyzer {
       suggestion: issue.suggestion,
       confidence: issue.confidence || 0.8,
       tags: issue.tags || [],
-      ...issue
+      ...issue,
     };
 
     this.issues.push(formattedIssue);
@@ -96,16 +96,16 @@ export class BaseAnalyzer {
     // Check if file extension is supported
     const extension = filePath.split('.').pop()?.toLowerCase();
     const languageMap = {
-      'js': 'javascript',
-      'ts': 'typescript',
-      'py': 'python',
-      'java': 'java',
-      'php': 'php',
-      'go': 'go',
-      'rs': 'rust',
-      'cpp': 'cpp',
-      'c': 'c',
-      'cs': 'csharp'
+      js: 'javascript',
+      ts: 'typescript',
+      py: 'python',
+      java: 'java',
+      php: 'php',
+      go: 'go',
+      rs: 'rust',
+      cpp: 'cpp',
+      c: 'c',
+      cs: 'csharp',
     };
 
     const language = languageMap[extension];
@@ -138,19 +138,22 @@ export class BaseAnalyzer {
     const start = Math.max(0, line - context - 1);
     const end = Math.min(lines.length, line + context);
 
-    const snippet = lines.slice(start, end).map((codeLine, index) => {
-      const lineNumber = start + index + 1;
-      const isTargetLine = lineNumber === line;
-      const prefix = isTargetLine ? '>>> ' : '    ';
-      return `${prefix}${lineNumber.toString().padStart(4)}: ${codeLine}`;
-    }).join('\n');
+    const snippet = lines
+      .slice(start, end)
+      .map((codeLine, index) => {
+        const lineNumber = start + index + 1;
+        const isTargetLine = lineNumber === line;
+        const prefix = isTargetLine ? '>>> ' : '    ';
+        return `${prefix}${lineNumber.toString().padStart(4)}: ${codeLine}`;
+      })
+      .join('\n');
 
     return {
       snippet,
       startLine: start + 1,
       endLine: end,
       targetLine: line,
-      context: context
+      context: context,
     };
   }
 
@@ -162,12 +165,29 @@ export class BaseAnalyzer {
 
     // Count decision points
     const decisionKeywords = [
-      'if', 'else', 'elseif', 'for', 'while', 'do', 'case', 'catch',
-      'finally', 'try', 'switch', '&&', '||', '?', ':'
+      'if',
+      'else',
+      'elseif',
+      'for',
+      'while',
+      'do',
+      'case',
+      'catch',
+      'finally',
+      'try',
+      'switch',
+      '&&',
+      '||',
+      '?',
+      ':',
     ];
 
     for (const keyword of decisionKeywords) {
-      const regex = new RegExp(`\\b${keyword}\\b`, 'g');
+      const escapedKeyword = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      // Only use word boundaries for alphanumeric keywords to avoid invalid regex (e.g. /\b?\b/)
+      const isWord = /^\w+$/.test(keyword);
+      const pattern = isWord ? `\\b${escapedKeyword}\\b` : escapedKeyword;
+      const regex = new RegExp(pattern, 'g');
       const matches = code.match(regex);
       if (matches) {
         complexity += matches.length;
@@ -189,7 +209,7 @@ export class BaseAnalyzer {
     let maintainability = 100;
     maintainability -= Math.min(lines / 10, 20); // Penalize long files
     maintainability -= Math.min(complexity * 2, 30); // Penalize high complexity
-    maintainability += Math.min(comments / lines * 50, 10); // Reward comments
+    maintainability += Math.min((comments / lines) * 50, 10); // Reward comments
 
     return Math.max(0, Math.min(100, maintainability));
   }
@@ -203,32 +223,32 @@ export class BaseAnalyzer {
         name: 'SQL Injection',
         pattern: /(SELECT|INSERT|UPDATE|DELETE).*\+.*|execute\s*\(\s*['"][^'"]*['"]/gi,
         severity: 'high',
-        type: 'security'
+        type: 'security',
       },
       {
         name: 'Hardcoded Password',
         pattern: /(password|passwd|pwd)\s*=\s*['"][^'"]+['"]/gi,
         severity: 'medium',
-        type: 'security'
+        type: 'security',
       },
       {
         name: 'API Key Exposure',
         pattern: /(api[_-]?key|secret[_-]?key|token)\s*=\s*['"][^'"]{20,}['"]/gi,
         severity: 'medium',
-        type: 'security'
+        type: 'security',
       },
       {
         name: 'Eval Usage',
         pattern: /\beval\s*\(/gi,
         severity: 'high',
-        type: 'security'
+        type: 'security',
       },
       {
         name: 'InnerHTML Usage',
         pattern: /\.innerHTML\s*=/gi,
         severity: 'medium',
-        type: 'security'
-      }
+        type: 'security',
+      },
     ];
 
     const issues = [];
@@ -248,8 +268,12 @@ export class BaseAnalyzer {
             line: lineNum + 1,
             column: line.search(pattern.pattern) + 1,
             snippet: this.getCodeSnippet(code, lineNum + 1).snippet,
-            tags: ['security', 'vulnerability']
+            tags: ['security', 'vulnerability'],
           });
+        }
+        // Always reset lastIndex for global regexes
+        if (pattern.pattern.global) {
+          pattern.pattern.lastIndex = 0;
         }
       }
     }
@@ -266,8 +290,8 @@ export class BaseAnalyzer {
       formatted: {
         severity: this.formatSeverity(issue.severity),
         location: `${issue.file}:${issue.line}${issue.column ? ':' + issue.column : ''}`,
-        type: issue.type.toUpperCase()
-      }
+        type: issue.type.toUpperCase(),
+      },
     };
   }
 
@@ -280,7 +304,7 @@ export class BaseAnalyzer {
       high: '🟠',
       medium: '🟡',
       low: '🔵',
-      info: 'ℹ️'
+      info: 'ℹ️',
     };
     return colors[severity] || 'ℹ️';
   }
@@ -319,7 +343,7 @@ export class BaseAnalyzer {
       filesAnalyzed: 0,
       linesAnalyzed: 0,
       issuesFound: 0,
-      executionTime: 0
+      executionTime: 0,
     };
   }
 }

@@ -31,20 +31,19 @@ export class SecurityAnalyzer extends BaseAnalyzer {
 
     // Run language-specific security checks
     const extension = filePath.split('.').pop()?.toLowerCase();
-    switch (extension) {
-    case 'js':
-    case 'ts':
-      issues.push(...this.checkJavaScriptSecurity(content, filePath));
-      break;
-    case 'py':
-      issues.push(...this.checkPythonSecurity(content, filePath));
-      break;
-    case 'java':
-      issues.push(...this.checkJavaSecurity(content, filePath));
-      break;
-    case 'php':
-      issues.push(...this.checkPHPSecurity(content, filePath));
-      break;
+    const languageMap = {
+      js: 'javascript',
+      jsx: 'javascript',
+      ts: 'javascript',
+      tsx: 'javascript',
+      py: 'python',
+      java: 'java',
+      php: 'php',
+    };
+
+    const language = languageMap[extension];
+    if (language && this.securityRules[language]) {
+      issues.push(...this.checkLanguageSecurity(content, filePath, language));
     }
 
     // Add issues to the analyzer
@@ -158,14 +157,15 @@ export class SecurityAnalyzer extends BaseAnalyzer {
     };
   }
 
-  checkJavaScriptSecurity(code, filePath) {
+  checkLanguageSecurity(code, filePath, language) {
     const issues = [];
     const lines = code.split('\n');
+    const rules = this.securityRules[language];
 
     for (let lineNum = 0; lineNum < lines.length; lineNum++) {
       const line = lines[lineNum];
 
-      for (const rule of this.securityRules.javascript) {
+      for (const rule of rules) {
         if (rule.pattern.test(line)) {
           issues.push({
             severity: rule.severity,
@@ -177,106 +177,7 @@ export class SecurityAnalyzer extends BaseAnalyzer {
             column: line.search(rule.pattern) + 1,
             snippet: this.getCodeSnippet(code, lineNum + 1).snippet,
             suggestion: rule.suggestion,
-            tags: ['security', 'javascript', 'vulnerability'],
-          });
-        }
-
-        // Always reset regex lastIndex
-        if (rule.pattern.global) {
-          rule.pattern.lastIndex = 0;
-        }
-      }
-    }
-
-    return issues;
-  }
-
-  checkPythonSecurity(code, filePath) {
-    const issues = [];
-    const lines = code.split('\n');
-
-    for (let lineNum = 0; lineNum < lines.length; lineNum++) {
-      const line = lines[lineNum];
-
-      for (const rule of this.securityRules.python) {
-        if (rule.pattern.test(line)) {
-          issues.push({
-            severity: rule.severity,
-            type: 'security',
-            title: rule.name,
-            message: rule.message,
-            file: filePath,
-            line: lineNum + 1,
-            column: line.search(rule.pattern) + 1,
-            snippet: this.getCodeSnippet(code, lineNum + 1).snippet,
-            suggestion: rule.suggestion,
-            tags: ['security', 'python', 'vulnerability'],
-          });
-        }
-
-        // Always reset regex lastIndex
-        if (rule.pattern.global) {
-          rule.pattern.lastIndex = 0;
-        }
-      }
-    }
-
-    return issues;
-  }
-
-  checkJavaSecurity(code, filePath) {
-    const issues = [];
-    const lines = code.split('\n');
-
-    for (let lineNum = 0; lineNum < lines.length; lineNum++) {
-      const line = lines[lineNum];
-
-      for (const rule of this.securityRules.java) {
-        if (rule.pattern.test(line)) {
-          issues.push({
-            severity: rule.severity,
-            type: 'security',
-            title: rule.name,
-            message: rule.message,
-            file: filePath,
-            line: lineNum + 1,
-            column: line.search(rule.pattern) + 1,
-            snippet: this.getCodeSnippet(code, lineNum + 1).snippet,
-            suggestion: rule.suggestion,
-            tags: ['security', 'java', 'vulnerability'],
-          });
-        }
-
-        // Always reset regex lastIndex
-        if (rule.pattern.global) {
-          rule.pattern.lastIndex = 0;
-        }
-      }
-    }
-
-    return issues;
-  }
-
-  checkPHPSecurity(code, filePath) {
-    const issues = [];
-    const lines = code.split('\n');
-
-    for (let lineNum = 0; lineNum < lines.length; lineNum++) {
-      const line = lines[lineNum];
-
-      for (const rule of this.securityRules.php) {
-        if (rule.pattern.test(line)) {
-          issues.push({
-            severity: rule.severity,
-            type: 'security',
-            title: rule.name,
-            message: rule.message,
-            file: filePath,
-            line: lineNum + 1,
-            column: line.search(rule.pattern) + 1,
-            snippet: this.getCodeSnippet(code, lineNum + 1).snippet,
-            suggestion: rule.suggestion,
-            tags: ['security', 'php', 'vulnerability'],
+            tags: ['security', language, 'vulnerability'],
           });
         }
 

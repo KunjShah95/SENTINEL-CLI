@@ -23,7 +23,7 @@ export class BugAnalyzer extends BaseAnalyzer {
     return this.getIssues();
   }
 
-  async analyzeFile(filePath, content, context) {
+  async analyzeFile(filePath, content, _context) {
     const issues = [];
 
     // Run bug detection checks
@@ -37,19 +37,25 @@ export class BugAnalyzer extends BaseAnalyzer {
     // Language-specific bug checks
     const extension = filePath.split('.').pop()?.toLowerCase();
     switch (extension) {
-      case 'js':
-      case 'ts':
-        issues.push(...this.checkJavaScriptBugs(content, filePath));
-        break;
-      case 'py':
-        issues.push(...this.checkPythonBugs(content, filePath));
-        break;
-      case 'java':
-        issues.push(...this.checkJavaBugs(content, filePath));
-        break;
-      case 'php':
-        issues.push(...this.checkPHPBugs(content, filePath));
-        break;
+    case 'js':
+    case 'ts':
+      issues.push(...this.checkJavaScriptBugs(content, filePath));
+      break;
+    case 'py':
+      issues.push(...this.checkPythonBugs(content, filePath));
+      break;
+    case 'java':
+      issues.push(...this.checkJavaBugs(content, filePath));
+      break;
+    case 'php':
+      issues.push(...this.checkPHPBugs(content, filePath));
+      break;
+    }
+
+    // Run security vulnerability checks (regex based)
+    issues.push(...this.checkSecurityVulnerabilities(content, filePath));
+    if (extension === 'py') {
+      issues.push(...this.checkPythonSecurityVulnerabilities(content, filePath));
     }
 
     // Add issues to the analyzer
@@ -62,43 +68,27 @@ export class BugAnalyzer extends BaseAnalyzer {
     return {
       // Common programming bugs across languages
       nullPointer: {
-        patterns: [
-          /null\./gi,
-          /\.get\(null\)/gi,
-          /\[\s*null\s*\]/gi,
-          /null\s*\./gi
-        ],
+        patterns: [/null\./gi, /\.get\(null\)/gi, /\[\s*null\s*\]/gi, /null\s*\./gi],
         severity: 'high',
-        type: 'bug'
+        type: 'bug',
       },
 
       divisionByZero: {
-        patterns: [
-          /\/\s*0(\s|$|\))/gi,
-          /%\s*0(\s|$|\))/gi
-        ],
+        patterns: [/\/\s*0(\s|$|\))/gi, /%\s*0(\s|$|\))/gi],
         severity: 'high',
-        type: 'bug'
+        type: 'bug',
       },
 
       infiniteLoop: {
-        patterns: [
-          /for\s*\(\s*;;\s*\)/gi,
-          /while\s*\(\s*true\s*\)/gi,
-          /while\s*\(\s*1\s*\)/gi
-        ],
+        patterns: [/for\s*\(\s*;;\s*\)/gi, /while\s*\(\s*true\s*\)/gi, /while\s*\(\s*1\s*\)/gi],
         severity: 'medium',
-        type: 'bug'
+        type: 'bug',
       },
 
       arrayIndexOutOfBounds: {
-        patterns: [
-          /\[.*\]\[.*\]/gi,
-          /arr\[.*length.*\]/gi,
-          /list\[.*\.size\(\).*\]/gi
-        ],
+        patterns: [/\[.*\]\[.*\]/gi, /arr\[.*length.*\]/gi, /list\[.*\.size\(\).*\]/gi],
         severity: 'high',
-        type: 'bug'
+        type: 'bug',
       },
 
       resourceLeak: {
@@ -106,11 +96,11 @@ export class BugAnalyzer extends BaseAnalyzer {
           /new\s+FileInputStream\s*\([^)]*\)/gi,
           /new\s+FileOutputStream\s*\([^)]*\)/gi,
           /open\s*\([^)]*\)(?!.*close)/gi,
-          /fopen\s*\([^)]*\)(?!.*fclose)/gi
+          /fopen\s*\([^)]*\)(?!.*fclose)/gi,
         ],
         severity: 'medium',
-        type: 'bug'
-      }
+        type: 'bug',
+      },
     };
   }
 
@@ -135,9 +125,12 @@ export class BugAnalyzer extends BaseAnalyzer {
               column: line.search(pattern) + 1,
               snippet: this.getCodeSnippet(code, lineNum + 1).snippet,
               suggestion: this.getBugSuggestion(bugType),
-              tags: ['bug', 'common', bugType]
+              tags: ['bug', 'common', bugType],
             });
+          }
 
+          // Always reset regex lastIndex
+          if (pattern.global) {
             pattern.lastIndex = 0;
           }
         }
@@ -155,7 +148,7 @@ export class BugAnalyzer extends BaseAnalyzer {
       const line = lines[lineNum];
 
       // Check for assignment in condition (common typo)
-      if (/\=\s*[^!<>]=/.test(line) && /if|while|for/.test(line)) {
+      if (/=\s*[^!<>]=/.test(line) && /if|while|for/.test(line)) {
         issues.push({
           severity: 'medium',
           type: 'bug',
@@ -166,7 +159,7 @@ export class BugAnalyzer extends BaseAnalyzer {
           column: line.search(/[^=]=/),
           snippet: this.getCodeSnippet(code, lineNum + 1).snippet,
           suggestion: 'Use == for comparison, = for assignment',
-          tags: ['bug', 'logic', 'condition']
+          tags: ['bug', 'logic', 'condition'],
         });
       }
 
@@ -188,7 +181,7 @@ export class BugAnalyzer extends BaseAnalyzer {
             column: line.indexOf('case'),
             snippet: this.getCodeSnippet(code, lineNum + 1, 5).snippet,
             suggestion: 'Add break statement to prevent fall-through',
-            tags: ['bug', 'switch', 'fallthrough']
+            tags: ['bug', 'switch', 'fallthrough'],
           });
         }
       }
@@ -206,7 +199,7 @@ export class BugAnalyzer extends BaseAnalyzer {
             column: line.search(/[<>]=/),
             snippet: this.getCodeSnippet(code, lineNum + 1).snippet,
             suggestion: 'Verify array index boundaries',
-            tags: ['bug', 'bounds', 'array']
+            tags: ['bug', 'bounds', 'array'],
           });
         }
       }
@@ -226,10 +219,11 @@ export class BugAnalyzer extends BaseAnalyzer {
       if (line.includes('fopen') || line.includes('open') || line.includes('FileInputStream')) {
         // Look for corresponding close in next 50 lines
         const followingLines = lines.slice(lineNum + 1, lineNum + 51);
-        const hasClose = followingLines.some(followingLine =>
-          followingLine.includes('fclose') ||
-          followingLine.includes('close') ||
-          followingLine.includes('close()')
+        const hasClose = followingLines.some(
+          followingLine =>
+            followingLine.includes('fclose') ||
+            followingLine.includes('close') ||
+            followingLine.includes('close()')
         );
 
         if (!hasClose) {
@@ -243,7 +237,7 @@ export class BugAnalyzer extends BaseAnalyzer {
             column: line.indexOf('open') + 1,
             snippet: this.getCodeSnippet(code, lineNum + 1).snippet,
             suggestion: 'Ensure proper resource cleanup with try-finally or using statements',
-            tags: ['bug', 'resource', 'leak']
+            tags: ['bug', 'resource', 'leak'],
           });
         }
       }
@@ -251,9 +245,8 @@ export class BugAnalyzer extends BaseAnalyzer {
       // Check for database connections
       if (line.includes('Connection') || line.includes('connect')) {
         const followingLines = lines.slice(lineNum + 1, lineNum + 101);
-        const hasClose = followingLines.some(followingLine =>
-          followingLine.includes('close') ||
-          followingLine.includes('disconnect')
+        const hasClose = followingLines.some(
+          followingLine => followingLine.includes('close') || followingLine.includes('disconnect')
         );
 
         if (!hasClose) {
@@ -267,7 +260,7 @@ export class BugAnalyzer extends BaseAnalyzer {
             column: line.search(/connect|Connection/) + 1,
             snippet: this.getCodeSnippet(code, lineNum + 1).snippet,
             suggestion: 'Close database connections in finally block or use connection pooling',
-            tags: ['bug', 'database', 'resource']
+            tags: ['bug', 'database', 'resource'],
           });
         }
       }
@@ -296,7 +289,7 @@ export class BugAnalyzer extends BaseAnalyzer {
             column: line.search(/\w+\.\w+\(/),
             snippet: this.getCodeSnippet(code, lineNum + 1).snippet,
             suggestion: 'Add null check before method call',
-            tags: ['bug', 'null', 'dereference']
+            tags: ['bug', 'null', 'dereference'],
           });
         }
       }
@@ -314,7 +307,7 @@ export class BugAnalyzer extends BaseAnalyzer {
             column: line.search(/\[\s*\w+\s*\]/),
             snippet: this.getCodeSnippet(code, lineNum + 1).snippet,
             suggestion: 'Add null check before array access',
-            tags: ['bug', 'null', 'array']
+            tags: ['bug', 'null', 'array'],
           });
         }
       }
@@ -331,12 +324,18 @@ export class BugAnalyzer extends BaseAnalyzer {
       const line = lines[lineNum];
 
       // Check for unsynchronized access to shared variables
-      if (line.includes('++') || line.includes('--') || line.includes('+= ') || line.includes('-= ')) {
-        const varName = line.match(/(\w+)\s*[+\-]{2}/) || line.match(/(\w+)\s*[+\-]=/);
+      if (
+        line.includes('++') ||
+        line.includes('--') ||
+        line.includes('+= ') ||
+        line.includes('-= ')
+      ) {
+        const varName = line.match(/(\w+)\s*[+-]{2}/) || line.match(/(\w+)\s*[+-]=/);
         if (varName) {
           // Check if this variable is used elsewhere without synchronization
           const allLines = lines.join('\n');
-          const unsynchronizedAccess = allLines.includes(varName[1]) &&
+          const unsynchronizedAccess =
+            allLines.includes(varName[1]) &&
             !allLines.includes('synchronized') &&
             !allLines.includes('lock') &&
             !allLines.includes('mutex');
@@ -352,7 +351,7 @@ export class BugAnalyzer extends BaseAnalyzer {
               column: line.search(varName[1]),
               snippet: this.getCodeSnippet(code, lineNum + 1).snippet,
               suggestion: 'Add synchronization for shared variable access',
-              tags: ['bug', 'concurrency', 'race-condition']
+              tags: ['bug', 'concurrency', 'race-condition'],
             });
           }
         }
@@ -372,9 +371,9 @@ export class BugAnalyzer extends BaseAnalyzer {
       // Check for event listeners without removal
       if (line.includes('addEventListener') || line.includes('on(')) {
         const followingLines = lines.slice(lineNum + 1, lineNum + 51);
-        const hasRemoval = followingLines.some(followingLine =>
-          followingLine.includes('removeEventListener') ||
-          followingLine.includes('off(')
+        const hasRemoval = followingLines.some(
+          followingLine =>
+            followingLine.includes('removeEventListener') || followingLine.includes('off(')
         );
 
         if (!hasRemoval) {
@@ -388,7 +387,7 @@ export class BugAnalyzer extends BaseAnalyzer {
             column: line.search(/addEventListener|on\(/),
             snippet: this.getCodeSnippet(code, lineNum + 1).snippet,
             suggestion: 'Remove event listeners when no longer needed',
-            tags: ['bug', 'memory', 'leak']
+            tags: ['bug', 'memory', 'leak'],
           });
         }
       }
@@ -416,14 +415,19 @@ export class BugAnalyzer extends BaseAnalyzer {
           column: line.search(/==/),
           snippet: this.getCodeSnippet(code, lineNum + 1).snippet,
           suggestion: 'Replace == with === for strict equality',
-          tags: ['bug', 'javascript', 'comparison']
+          tags: ['bug', 'javascript', 'comparison'],
         });
       }
 
       // Check for array mutation in forEach
       if (line.includes('.forEach') && !line.includes('const ') && !line.includes('let ')) {
         const followingLine = lines[lineNum + 1];
-        if (followingLine && (followingLine.includes('push') || followingLine.includes('pop') || followingLine.includes('shift'))) {
+        if (
+          followingLine &&
+          (followingLine.includes('push') ||
+            followingLine.includes('pop') ||
+            followingLine.includes('shift'))
+        ) {
           issues.push({
             severity: 'medium',
             type: 'bug',
@@ -434,13 +438,18 @@ export class BugAnalyzer extends BaseAnalyzer {
             column: line.search(/\.forEach/),
             snippet: this.getCodeSnippet(code, lineNum + 1, 2).snippet,
             suggestion: 'Use for loop or filter method instead',
-            tags: ['bug', 'javascript', 'iteration']
+            tags: ['bug', 'javascript', 'iteration'],
           });
         }
       }
 
       // Check for accidental global variables
-      if (line.match(/\w+\s*=/) && !line.includes('var') && !line.includes('let') && !line.includes('const')) {
+      if (
+        line.match(/\w+\s*=/) &&
+        !line.includes('var') &&
+        !line.includes('let') &&
+        !line.includes('const')
+      ) {
         issues.push({
           severity: 'medium',
           type: 'bug',
@@ -451,7 +460,7 @@ export class BugAnalyzer extends BaseAnalyzer {
           column: line.search(/=/),
           snippet: this.getCodeSnippet(code, lineNum + 1).snippet,
           suggestion: 'Add var, let, or const declaration',
-          tags: ['bug', 'javascript', 'scope']
+          tags: ['bug', 'javascript', 'scope'],
         });
       }
     }
@@ -467,7 +476,12 @@ export class BugAnalyzer extends BaseAnalyzer {
       const line = lines[lineNum];
 
       // Check for mutable default arguments
-      if (line.includes('def ') && (/\([^)]*=\s*\[\s*\]/.test(line) || /\([^)]*=\s*\{\s*\}/.test(line) || /\([^)]*=\s*\(\s*\)/.test(line))) {
+      if (
+        line.includes('def ') &&
+        (/\([^)]*=\s*\[\s*\]/.test(line) ||
+          /\([^)]*=\s*\{\s*\}/.test(line) ||
+          /\([^)]*=\s*\(\s*\)/.test(line))
+      ) {
         issues.push({
           severity: 'high',
           type: 'bug',
@@ -475,10 +489,10 @@ export class BugAnalyzer extends BaseAnalyzer {
           message: 'Using mutable objects as default arguments can lead to unexpected behavior',
           file: filePath,
           line: lineNum + 1,
-          column: line.search(/=\s*[\[\{\(]/),
+          column: line.search(/=\s*[[{(]/),
           snippet: this.getCodeSnippet(code, lineNum + 1).snippet,
           suggestion: 'Use None as default and initialize inside the function',
-          tags: ['bug', 'python', 'function']
+          tags: ['bug', 'python', 'function'],
         });
       }
 
@@ -494,7 +508,7 @@ export class BugAnalyzer extends BaseAnalyzer {
           column: line.search(/except:/),
           snippet: this.getCodeSnippet(code, lineNum + 1).snippet,
           suggestion: 'Catch specific exceptions instead',
-          tags: ['bug', 'python', 'exception']
+          tags: ['bug', 'python', 'exception'],
         });
       }
     }
@@ -523,7 +537,7 @@ export class BugAnalyzer extends BaseAnalyzer {
             column: line.search(/public|protected|private/),
             snippet: this.getCodeSnippet(code, lineNum + 1).snippet,
             suggestion: 'Add @Override annotation above method declaration',
-            tags: ['bug', 'java', 'annotation']
+            tags: ['bug', 'java', 'annotation'],
           });
         }
       }
@@ -536,22 +550,22 @@ export class BugAnalyzer extends BaseAnalyzer {
     const securityPatterns = [
       {
         name: 'SQL Injection',
-        pattern: /(\$.*=\s*["'].*(SELECT|INSERT|UPDATE|DELETE).*["'].*\.\s*\$.*;)/i,
+        pattern: /(\$.*=\s*["'].*(SELECT|INSERT|UPDATE|DELETE).*["'].*\.\s*\$.*;)/gi,
         severity: 'high',
-        type: 'security'
+        type: 'security',
       },
       {
         name: 'Cross-Site Scripting (XSS)',
-        pattern: /echo\s*\$.*;\s*\/\/\s*unsanitized/i,
+        pattern: /echo\s*\$.*;\s*\/\/\s*unsanitized/gi,
         severity: 'high',
-        type: 'security'
+        type: 'security',
       },
       {
         name: 'File Inclusion Vulnerability',
-        pattern: /(include|require)(_once)?\s*\(\s*\$.*\s*\);/i,
+        pattern: /(include|require)(_once)?\s*\(\s*\$.*\s*\);/gi,
         severity: 'high',
-        type: 'security'
-      }
+        type: 'security',
+      },
     ];
 
     const issues = [];
@@ -571,8 +585,13 @@ export class BugAnalyzer extends BaseAnalyzer {
             line: lineNum + 1,
             column: line.search(pattern.pattern) + 1,
             snippet: this.getCodeSnippet(code, lineNum + 1).snippet,
-            tags: ['security', 'vulnerability', 'php']
+            tags: ['security', 'vulnerability', 'php'],
           });
+        }
+
+        // Always reset lastIndex for global regexes
+        if (pattern.pattern.global) {
+          pattern.pattern.lastIndex = 0;
         }
       }
     }
@@ -586,7 +605,7 @@ export class BugAnalyzer extends BaseAnalyzer {
       divisionByZero: 'Division by Zero',
       infiniteLoop: 'Infinite Loop Detected',
       arrayIndexOutOfBounds: 'Array Index Out of Bounds',
-      resourceLeak: 'Resource Leak Detected'
+      resourceLeak: 'Resource Leak Detected',
     };
     return titles[bugType] || 'Programming Bug Detected';
   }
@@ -597,7 +616,7 @@ export class BugAnalyzer extends BaseAnalyzer {
       divisionByZero: 'Division or modulo operation with zero as the divisor',
       infiniteLoop: 'Loop construct that may lead to non-terminating execution',
       arrayIndexOutOfBounds: 'Accessing array or list with an index outside its valid range',
-      resourceLeak: 'Opened resource that may not be properly closed, leading to leaks'
+      resourceLeak: 'Opened resource that may not be properly closed, leading to leaks',
     };
     return messages[bugType] || 'A programming bug has been detected in the code';
   }
@@ -608,7 +627,7 @@ export class BugAnalyzer extends BaseAnalyzer {
       divisionByZero: 'Ensure divisor is not zero before performing division',
       infiniteLoop: 'Review loop conditions to ensure termination',
       arrayIndexOutOfBounds: 'Validate array indices before access',
-      resourceLeak: 'Use try-finally or using statements to ensure resources are closed'
+      resourceLeak: 'Use try-finally or using statements to ensure resources are closed',
     };
     return suggestions[bugType] || 'Review the code for potential bugs and fix accordingly';
   }
@@ -617,28 +636,28 @@ export class BugAnalyzer extends BaseAnalyzer {
     const securityPatterns = [
       {
         name: 'Hardcoded API Key',
-        pattern: /(['"])(sk_live_|sk_test_)[A-Za-z0-9]{24,}(['"])/i,
+        pattern: /(['"])(sk_live_|sk_test_)[A-Za-z0-9]{24,}(['"])/gi,
         severity: 'critical',
-        type: 'security'
+        type: 'security',
       },
       {
         name: 'Insecure Randomness',
-        pattern: /Math\.random\(\)/,
+        pattern: /Math\.random\(\)/g,
         severity: 'medium',
-        type: 'security'
+        type: 'security',
       },
       {
         name: 'Weak Cryptography',
-        pattern: /MD5\(|SHA1\(/i,
+        pattern: /MD5\(|SHA1\(/gi,
         severity: 'high',
-        type: 'security'
+        type: 'security',
       },
       {
         name: 'Command Injection',
-        pattern: /(exec|system|passthru|shell_exec)\s*\(.*\$_(GET|POST|REQUEST|COOKIE)\[.*\].*\)/i,
+        pattern: /(exec|system|passthru|shell_exec)\s*\(.*\$_(GET|POST|REQUEST|COOKIE)\[.*\].*\)/gi,
         severity: 'critical',
-        type: 'security'
-      }
+        type: 'security',
+      },
     ];
 
     const issues = [];
@@ -658,9 +677,12 @@ export class BugAnalyzer extends BaseAnalyzer {
             line: lineNum + 1,
             column: line.search(pattern.pattern) + 1,
             snippet: this.getCodeSnippet(code, lineNum + 1).snippet,
-            tags: ['security', 'vulnerability']
+            tags: ['security', 'vulnerability'],
           });
+        }
 
+        // Always reset lastIndex for global regexes
+        if (pattern.pattern.global) {
           pattern.pattern.lastIndex = 0;
         }
       }
@@ -673,28 +695,28 @@ export class BugAnalyzer extends BaseAnalyzer {
     const securityPatterns = [
       {
         name: 'Hardcoded API Key',
-        pattern: /(['"])(sk_live_|sk_test_)[A-Za-z0-9]{24,}(['"])/i,
+        pattern: /(['"])(sk_live_|sk_test_)[A-Za-z0-9]{24,}(['"])/gi,
         severity: 'critical',
-        type: 'security'
+        type: 'security',
       },
       {
         name: 'Insecure Randomness',
-        pattern: /random\.random\(\)/,
+        pattern: /random\.random\(\)/g,
         severity: 'medium',
-        type: 'security'
+        type: 'security',
       },
       {
         name: 'Weak Cryptography',
-        pattern: /hashlib\.(md5|sha1)\(/i,
+        pattern: /hashlib\.(md5|sha1)\(/gi,
         severity: 'high',
-        type: 'security'
+        type: 'security',
       },
       {
         name: 'Command Injection',
-        pattern: /(os\.system|subprocess\.Popen|subprocess\.call)\s*\(.*input\(.*\).*\)/i,
+        pattern: /(os\.system|subprocess\.Popen|subprocess\.call)\s*\(.*input\(.*\).*\)/gi,
         severity: 'critical',
-        type: 'security'
-      }
+        type: 'security',
+      },
     ];
 
     const issues = [];
@@ -714,9 +736,12 @@ export class BugAnalyzer extends BaseAnalyzer {
             line: lineNum + 1,
             column: line.search(pattern.pattern) + 1,
             snippet: this.getCodeSnippet(code, lineNum + 1).snippet,
-            tags: ['security', 'vulnerability', 'python']
+            tags: ['security', 'vulnerability', 'python'],
           });
+        }
 
+        // Always reset lastIndex for global regexes
+        if (pattern.pattern.global) {
           pattern.pattern.lastIndex = 0;
         }
       }

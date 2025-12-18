@@ -91,11 +91,18 @@ export default class AnalysisCache {
 
     const now = Date.now();
     let removed = false;
+    const keysToRemove = [];
     for (const [key, entry] of Object.entries(this.data.entries)) {
       if (now - entry.timestamp > this.ttlMs) {
-        delete this.data.entries[key];
-        removed = true;
+        keysToRemove.push(key);
       }
+    }
+    
+    if (keysToRemove.length > 0) {
+      for (const key of keysToRemove) {
+        delete this.data.entries[key];
+      }
+      removed = true;
     }
 
     if (removed) {

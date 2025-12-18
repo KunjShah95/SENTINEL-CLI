@@ -1,0 +1,6 @@
+/* Sidebar wrapper responsive layout using CSS custom properties */
+[data-slot="sidebar-wrapper"] {
+  display: flex;
+  min-height: 100svh;
+  width: 100%;
+}

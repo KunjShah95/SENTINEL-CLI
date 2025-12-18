@@ -1,0 +1,6 @@
+# Generated build files
+/build
+/dist
+
+# Third-party library warnings
+node_modules

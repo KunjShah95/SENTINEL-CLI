@@ -9,9 +9,9 @@ class Demo {
   constructor() {
     this.demoFiles = {
       'example.js': `// Example JavaScript file with various issues
-const API_KEY = "sk-1234567890abcdef"; // Security: Hardcoded API key
+const API_KEY = process.env.API_KEY || "<API_KEY>"; // Security: Use environment variable
 var userInput = req.body.data; // Quality: Using var instead of let/const
-var password = "admin123"; // Security: Hardcoded password
+var password = process.env.PASSWORD || "<PASSWORD>"; // Security: Use environment variable
 
 function processData(data) {
     if (data = null) { // Bug: Assignment instead of comparison
@@ -102,7 +102,7 @@ import java.sql.*;
 
 public class Utils {
     // Security: Hardcoded password
-    private static final String DB_PASSWORD = "admin123";
+    private static final String DB_PASSWORD = System.getenv("DB_PASSWORD");
     
     public void processData() {
         // Bug: Missing break statement
@@ -178,7 +178,7 @@ public class Utils {
 // Security: Hardcoded credentials
 $db_host = "localhost";
 $db_user = "admin";
-$db_pass = "password123";
+$db_pass = getenv('DB_PASSWORD') ?: '<PASSWORD>';
 
 // Security: SQL injection risk
 function getUserData($user_id) {

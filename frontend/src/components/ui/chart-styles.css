@@ -1,0 +1,10 @@
+/* Dynamic chart indicator styles using CSS custom properties */
+.chart-indicator-dot {
+  background-color: var(--bg-color, transparent);
+  border-color: var(--border-color, currentColor);
+}
+
+/* Chart color dot for legend */
+.chart-color-dot {
+  background-color: var(--dot-color, currentColor);
+}

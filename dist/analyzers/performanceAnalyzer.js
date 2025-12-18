@@ -23,7 +23,7 @@ export class PerformanceAnalyzer extends BaseAnalyzer {
     return this.getIssues();
   }
 
-  async analyzeFile(filePath, content, context) {
+  async analyzeFile(filePath, content, _context) {
     const issues = [];
 
     // Run performance checks
@@ -35,16 +35,16 @@ export class PerformanceAnalyzer extends BaseAnalyzer {
     // Language-specific performance checks
     const extension = filePath.split('.').pop()?.toLowerCase();
     switch (extension) {
-      case 'js':
-      case 'ts':
-        issues.push(...this.checkJavaScriptPerformance(content, filePath));
-        break;
-      case 'py':
-        issues.push(...this.checkPythonPerformance(content, filePath));
-        break;
-      case 'java':
-        issues.push(...this.checkJavaPerformance(content, filePath));
-        break;
+    case 'js':
+    case 'ts':
+      issues.push(...this.checkJavaScriptPerformance(content, filePath));
+      break;
+    case 'py':
+      issues.push(...this.checkPythonPerformance(content, filePath));
+      break;
+    case 'java':
+      issues.push(...this.checkJavaPerformance(content, filePath));
+      break;
     }
 
     // Add issues to the analyzer
@@ -59,29 +59,23 @@ export class PerformanceAnalyzer extends BaseAnalyzer {
         patterns: [
           /for\s*\(\s*var\s+i\s*=\s*0\s*;\s*i\s*<\s*.*\.length\s*;/gi,
           /while\s*\([^)]*\.length/gi,
-          /\.forEach\s*\(\s*function/gi
+          /\.forEach\s*\(\s*function/gi,
         ],
         severity: 'medium',
-        type: 'performance'
+        type: 'performance',
       },
 
       stringConcatenation: {
-        patterns: [
-          /\w+\s*\+=\s*['"]/gi,
-          /String\s*\(\s*\w+\s*\)/gi
-        ],
+        patterns: [/\w+\s*\+=\s*['"]/gi, /String\s*\(\s*\w+\s*\)/gi],
         severity: 'low',
-        type: 'performance'
+        type: 'performance',
       },
 
       unnecessaryObjectCreation: {
-        patterns: [
-          /new\s+Object\s*\(\)/gi,
-          /new\s+Array\s*\(\s*\)/gi
-        ],
+        patterns: [/new\s+Object\s*\(\)/gi, /new\s+Array\s*\(\s*\)/gi],
         severity: 'low',
-        type: 'performance'
-      }
+        type: 'performance',
+      },
     };
   }
 
@@ -105,9 +99,12 @@ export class PerformanceAnalyzer extends BaseAnalyzer {
               column: line.search(pattern) + 1,
               snippet: this.getCodeSnippet(code, lineNum + 1).snippet,
               suggestion: this.getPerformanceSuggestion(patternType),
-              tags: ['performance', 'optimization', patternType]
+              tags: ['performance', 'optimization', patternType],
             });
+          }
 
+          // Always reset regex lastIndex
+          if (pattern.global) {
             pattern.lastIndex = 0;
           }
         }
@@ -136,15 +133,15 @@ export class PerformanceAnalyzer extends BaseAnalyzer {
           column: line.search(/new/),
           snippet: this.getCodeSnippet(code, lineNum + 1).snippet,
           suggestion: 'Move object creation outside the loop or use object pooling',
-          tags: ['performance', 'memory', 'allocation']
+          tags: ['performance', 'memory', 'allocation'],
         });
       }
 
       // Check for array.push in nested loops
       if (line.includes('.push(') && lineNum > 0) {
         const prevLines = lines.slice(Math.max(0, lineNum - 10), lineNum);
-        const hasNestedLoop = prevLines.some(prevLine =>
-          prevLine.includes('for') || prevLine.includes('while')
+        const hasNestedLoop = prevLines.some(
+          prevLine => prevLine.includes('for') || prevLine.includes('while')
         );
 
         if (hasNestedLoop) {
@@ -157,8 +154,9 @@ export class PerformanceAnalyzer extends BaseAnalyzer {
             line: lineNum + 1,
             column: line.search(/\.push/),
             snippet: this.getCodeSnippet(code, lineNum + 1, 2).snippet,
-            suggestion: 'Consider pre-allocating array size or using more efficient data structures',
-            tags: ['performance', 'array', 'optimization']
+            suggestion:
+              'Consider pre-allocating array size or using more efficient data structures',
+            tags: ['performance', 'array', 'optimization'],
           });
         }
       }
@@ -171,7 +169,7 @@ export class PerformanceAnalyzer extends BaseAnalyzer {
     const issues = [];
     const lines = code.split('\n');
 
-    // Check for nested loops (potential O(n²) complexity)
+    // Check for nested loops (potential O(n^k) complexity)
     let loopDepth = 0;
     let maxLoopDepth = 0;
 
@@ -198,7 +196,7 @@ export class PerformanceAnalyzer extends BaseAnalyzer {
           column: 1,
           snippet: this.getCodeSnippet(code, lineNum + 1, 3).snippet,
           suggestion: 'Consider optimizing the algorithm or using more efficient data structures',
-          tags: ['performance', 'complexity', 'algorithm']
+          tags: ['performance', 'complexity', 'algorithm'],
         });
         break; // Only report once per file
       }
@@ -226,7 +224,7 @@ export class PerformanceAnalyzer extends BaseAnalyzer {
           column: line.search(/sleep/),
           snippet: this.getCodeSnippet(code, lineNum + 1).snippet,
           suggestion: 'Use asynchronous operations or non-blocking alternatives',
-          tags: ['performance', 'blocking', 'async']
+          tags: ['performance', 'blocking', 'async'],
         });
       }
 
@@ -242,7 +240,7 @@ export class PerformanceAnalyzer extends BaseAnalyzer {
           column: line.search(/readFileSync|FileInputStream/),
           snippet: this.getCodeSnippet(code, lineNum + 1).snippet,
           suggestion: 'Use asynchronous I/O operations for better performance',
-          tags: ['performance', 'io', 'async']
+          tags: ['performance', 'io', 'async'],
         });
       }
     }
@@ -260,8 +258,8 @@ export class PerformanceAnalyzer extends BaseAnalyzer {
       // Check for querySelector in loops
       if (line.includes('querySelector') && lineNum > 0) {
         const prevLines = lines.slice(Math.max(0, lineNum - 10), lineNum);
-        const hasLoop = prevLines.some(prevLine =>
-          prevLine.includes('for') || prevLine.includes('while')
+        const hasLoop = prevLines.some(
+          prevLine => prevLine.includes('for') || prevLine.includes('while')
         );
 
         if (hasLoop) {
@@ -275,7 +273,7 @@ export class PerformanceAnalyzer extends BaseAnalyzer {
             column: line.search(/querySelector/),
             snippet: this.getCodeSnippet(code, lineNum + 1, 2).snippet,
             suggestion: 'Cache DOM elements outside loops for better performance',
-            tags: ['performance', 'dom', 'optimization']
+            tags: ['performance', 'dom', 'optimization'],
           });
         }
       }
@@ -292,7 +290,7 @@ export class PerformanceAnalyzer extends BaseAnalyzer {
           column: line.search(/eval/),
           snippet: this.getCodeSnippet(code, lineNum + 1).snippet,
           suggestion: 'Avoid eval() - use alternatives like JSON.parse() or Function constructor',
-          tags: ['performance', 'security', 'eval']
+          tags: ['performance', 'security', 'eval'],
         });
       }
     }
@@ -310,8 +308,8 @@ export class PerformanceAnalyzer extends BaseAnalyzer {
       // Check for string concatenation in loop
       if (line.includes('+= ') && line.includes('str')) {
         const prevLines = lines.slice(Math.max(0, lineNum - 5), lineNum);
-        const hasLoop = prevLines.some(prevLine =>
-          prevLine.includes('for') || prevLine.includes('while')
+        const hasLoop = prevLines.some(
+          prevLine => prevLine.includes('for') || prevLine.includes('while')
         );
 
         if (hasLoop) {
@@ -322,10 +320,10 @@ export class PerformanceAnalyzer extends BaseAnalyzer {
             message: 'String concatenation in loops creates many intermediate objects',
             file: filePath,
             line: lineNum + 1,
-            column: line.search(/[\+\=]/),
+            column: line.search(/[+=]/),
             snippet: this.getCodeSnippet(code, lineNum + 1).snippet,
             suggestion: 'Use list.append() and join() for better performance',
-            tags: ['performance', 'string', 'optimization']
+            tags: ['performance', 'string', 'optimization'],
           });
         }
       }
@@ -344,8 +342,8 @@ export class PerformanceAnalyzer extends BaseAnalyzer {
       // Check for string concatenation in loop
       if (line.includes('+=') && line.includes('String')) {
         const prevLines = lines.slice(Math.max(0, lineNum - 5), lineNum);
-        const hasLoop = prevLines.some(prevLine =>
-          prevLine.includes('for') || prevLine.includes('while')
+        const hasLoop = prevLines.some(
+          prevLine => prevLine.includes('for') || prevLine.includes('while')
         );
 
         if (hasLoop) {
@@ -356,10 +354,10 @@ export class PerformanceAnalyzer extends BaseAnalyzer {
             message: 'String concatenation in loops creates many String objects',
             file: filePath,
             line: lineNum + 1,
-            column: line.search(/[\+\=]/),
+            column: line.search(/[+=]/),
             snippet: this.getCodeSnippet(code, lineNum + 1).snippet,
             suggestion: 'Use StringBuilder for better performance',
-            tags: ['performance', 'string', 'optimization']
+            tags: ['performance', 'string', 'optimization'],
           });
         }
       }
@@ -372,7 +370,7 @@ export class PerformanceAnalyzer extends BaseAnalyzer {
     const titles = {
       inefficientLoops: 'Inefficient Loop Pattern',
       stringConcatenation: 'Inefficient String Operation',
-      unnecessaryObjectCreation: 'Unnecessary Object Creation'
+      unnecessaryObjectCreation: 'Unnecessary Object Creation',
     };
     return titles[patternType] || 'Performance Issue';
   }
@@ -381,7 +379,7 @@ export class PerformanceAnalyzer extends BaseAnalyzer {
     const messages = {
       inefficientLoops: 'This loop pattern may be inefficient for large datasets',
       stringConcatenation: 'String concatenation can be optimized',
-      unnecessaryObjectCreation: 'Creating unnecessary objects can impact performance'
+      unnecessaryObjectCreation: 'Creating unnecessary objects can impact performance',
     };
     return messages[patternType] || 'Potential performance issue detected';
   }
@@ -390,7 +388,7 @@ export class PerformanceAnalyzer extends BaseAnalyzer {
     const suggestions = {
       inefficientLoops: 'Consider using more efficient iteration methods or data structures',
       stringConcatenation: 'Use StringBuilder, join(), or template literals for better performance',
-      unnecessaryObjectCreation: 'Reuse objects or use object pooling when possible'
+      unnecessaryObjectCreation: 'Reuse objects or use object pooling when possible',
     };
     return suggestions[patternType] || 'Consider optimizing this code for better performance';
   }

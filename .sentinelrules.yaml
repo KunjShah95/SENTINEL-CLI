@@ -1,0 +1,38 @@
+# Sentinel Custom Rules
+# Define your own regex-based code review rules here
+
+rules:
+  - id: no-console-log
+    pattern: "console\\.log"
+    message: "Avoid using console.log in production code"
+    severity: warning
+    filePattern: "\\.(js|ts|jsx|tsx)$"
+    suggestion: "Use a proper logging library or remove before committing"
+
+  - id: no-todo-comments
+    pattern: "TODO:|FIXME:|HACK:|XXX:"
+    message: "Unresolved TODO/FIXME comment found"
+    severity: info
+    suggestion: "Address or create an issue for this TODO"
+
+  - id: no-hardcoded-localhost
+    pattern: "localhost:\\d+"
+    message: "Hardcoded localhost URL detected"
+    severity: medium
+    suggestion: "Use environment variables for URLs"
+
+  - id: no-debugger
+    pattern: "\\bdebugger\\b"
+    message: "Debugger statement found"
+    severity: high
+    filePattern: "\\.(js|ts|jsx|tsx)$"
+    suggestion: "Remove debugger statement before committing"
+
+  # Data-driven styling patterns - these are acceptable uses of inline styles
+  # for dynamic colors from configuration/data
+  - id: dynamic-inline-styles
+    pattern: "(--\\w+:|as\\s+React\\.CSSProperties|CSS custom properties|CSS variables)"
+    message: "Using CSS custom properties for dynamic styling (acceptable pattern)"
+    severity: info
+    filePattern: "\\.(jsx|tsx)$"
+    suggestion: "This pattern is acceptable for data-driven colors and dynamic values"

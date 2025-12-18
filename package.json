@@ -1,7 +1,7 @@
 {
   "name": "sentinel-cli",
-  "version": "1.2.2",
-  "description": "Sentinel - AI-Powered Code Guardian: Automated code review with security scanning, dependency analysis, accessibility checks, and multi-LLM integration",
+  "version": "1.3.0",
+  "description": "Sentinel - AI-Powered Code Guardian: Automated code review with security scanning, dependency analysis, accessibility checks, TypeScript/React analysis, API security, secrets detection, and multi-LLM integration",
   "main": "src/index.js",
   "type": "module",
   "bin": {
@@ -10,6 +10,7 @@
   "files": [
     "src/**/*",
     "dist/**/*",
+    "frontend/build/**/*",
     "README.md",
     ".env.example"
   ],
@@ -17,14 +18,23 @@
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
     "review": "node src/cli.js analyze",
+    "security": "node src/cli.js security-audit",
+    "full-scan": "node src/cli.js full-scan",
+    "frontend": "node src/cli.js frontend",
+    "backend": "node src/cli.js backend",
+    "pre-commit": "node src/cli.js pre-commit --block",
     "install-hooks": "node src/cli.js install-hooks",
     "test": "jest --passWithNoTests",
     "test:watch": "jest --watch",
     "lint": "eslint src/",
     "format": "prettier --write src/",
     "build": "node src/build.js",
+    "build:frontend": "cd frontend && npm install && npm run build",
+    "build:all": "npm run build && npm run build:frontend",
+    "dashboard": "node src/cli.js dashboard",
+    "deploy": "npm run build:frontend && npx vercel --prod",
     "demo": "node src/demo.js",
-    "prepublishOnly": "npm run lint && npm run build",
+    "prepublishOnly": "npm run lint && npm run build:all",
     "postversion": "git push && git push --tags"
   },
   "keywords": [
@@ -70,6 +80,7 @@
     "ora": "^7.0.1",
     "semver": "^7.5.4",
     "simple-git": "^3.24.0",
+    "sirv": "^3.0.2",
     "uuid": "^9.0.1",
     "ws": "^8.14.2"
   },

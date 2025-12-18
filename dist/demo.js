@@ -9,9 +9,9 @@ class Demo {
   constructor() {
     this.demoFiles = {
       'example.js': `// Example JavaScript file with various issues
-const API_KEY = "sk-1234567890abcdef"; // Security: Hardcoded API key
+const API_KEY = process.env.API_KEY || "<API_KEY>"; // Security: Use environment variable
 var userInput = req.body.data; // Quality: Using var instead of let/const
-var password = "admin123"; // Security: Hardcoded password
+var password = process.env.PASSWORD || "<PASSWORD>"; // Security: Use environment variable
 
 function processData(data) {
     if (data = null) { // Bug: Assignment instead of comparison
@@ -102,7 +102,7 @@ import java.sql.*;
 
 public class Utils {
     // Security: Hardcoded password
-    private static final String DB_PASSWORD = "admin123";
+    private static final String DB_PASSWORD = System.getenv("DB_PASSWORD");
     
     public void processData() {
         // Bug: Missing break statement
@@ -178,7 +178,7 @@ public class Utils {
 // Security: Hardcoded credentials
 $db_host = "localhost";
 $db_user = "admin";
-$db_pass = "password123";
+$db_pass = getenv('DB_PASSWORD') ?: '<PASSWORD>';
 
 // Security: SQL injection risk
 function getUserData($user_id) {
@@ -223,12 +223,12 @@ function processForm() {
     echo "Hello " . $name . ", your email is " . $email;
 }
 
-?>`
+?>`,
     };
   }
 
   async run() {
-    console.log(chalk.green.bold('🚀 Welcome to Sentinel Demo!'));
+    console.log(chalk.green.bold('🚀 Welcome to the Sentinel Demo!'));
     console.log(chalk.gray('This demo will create example files with various code issues.\n'));
 
     const { action } = await inquirer.prompt([
@@ -240,24 +240,24 @@ function processForm() {
           'Create demo files with issues',
           'Show configuration options',
           'Run analysis on demo files',
-          'Exit'
-        ]
-      }
+          'Exit',
+        ],
+      },
     ]);
 
     switch (action) {
-      case 'Create demo files with issues':
-        await this.createDemoFiles();
-        break;
-      case 'Show configuration options':
-        await this.showConfigOptions();
-        break;
-      case 'Run analysis on demo files':
-        await this.runAnalysis();
-        break;
-      case 'Exit':
-        console.log(chalk.blue('👋 Thanks for trying Sentinel!'));
-        process.exit(0);
+    case 'Create demo files with issues':
+      await this.createDemoFiles();
+      break;
+    case 'Show configuration options':
+      await this.showConfigOptions();
+      break;
+    case 'Run analysis on demo files':
+      await this.runAnalysis();
+      break;
+    case 'Exit':
+      console.log(chalk.blue('👋 Thanks for trying Sentinel!'));
+      process.exit(0);
     }
   }
 
@@ -282,8 +282,8 @@ function processForm() {
         type: 'confirm',
         name: 'runAnalysis',
         message: 'Would you like to run the analysis now?',
-        default: true
-      }
+        default: true,
+      },
     ]);
 
     if (runAnalysis) {
@@ -320,9 +320,9 @@ function processForm() {
     try {
       // Import and run the CLI analyze command
       const { execSync } = await import('child_process');
-      const output = execSync('node src/cli.js analyze', { 
-        encoding: 'utf8', 
-        stdio: 'inherit' 
+      execSync('node src/cli.js analyze', {
+        encoding: 'utf8',
+        stdio: 'inherit',
       });
     } catch (error) {
       console.log(chalk.red('Analysis completed with issues found.'));

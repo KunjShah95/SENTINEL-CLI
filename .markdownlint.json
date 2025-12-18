@@ -1,0 +1,19 @@
+{
+  "default": true,
+  "MD013": false,
+  "MD033": false,
+  "MD036": false,
+  "MD040": false,
+  "MD022": false,
+  "MD031": false,
+  "MD032": false,
+  "MD051": false,
+  "line-length": false,
+  "no-inline-html": false,
+  "no-emphasis-as-heading": false,
+  "fenced-code-language": false,
+  "blanks-around-headings": false,
+  "blanks-around-fences": false,
+  "blanks-around-lists": false,
+  "link-fragments": false
+}

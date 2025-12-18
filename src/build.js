@@ -14,12 +14,12 @@ const __dirname = path.dirname(__filename);
 
 class BuildTool {
   constructor() {
-    this.srcDir = path.join(__dirname);
+    this.srcDir = __dirname;
     this.distDir = path.join(__dirname, '..', 'dist');
   }
 
   async build() {
-    console.log('?? Building Sentinel...');
+    console.log('🔨 Building Sentinel...');
 
     try {
       // Create dist directory
@@ -38,19 +38,13 @@ class BuildTool {
       console.log(`📦 Output directory: ${this.distDir}`);
     } catch (error) {
       console.error('❌ Build failed:', error.message);
-      process.exit(1);
+      throw error;
     }
   }
 
   async createDistDirectory() {
-    try {
-      await fs.mkdir(this.distDir, { recursive: true });
-      console.log('📁 Created dist directory');
-    } catch (error) {
-      if (error.code !== 'EEXIST') {
-        throw error;
-      }
-    }
+    await fs.mkdir(this.distDir, { recursive: true });
+    console.log('📁 Created dist directory');
   }
 
   async copySourceFiles() {
@@ -67,8 +61,21 @@ class BuildTool {
     ];
 
     for (const item of filesToCopy) {
-      const srcPath = path.join(this.srcDir, item);
-      const destPath = path.join(this.distDir, item);
+      // Validate item name to prevent path traversal
+      if (item.includes('..') || item.includes('/') || item.includes('\\')) {
+        console.warn(`⚠️  Skipping potentially unsafe item: ${item}`);
+        continue;
+      }
+      
+      const srcPath = path.resolve(this.srcDir, item);
+      const destPath = path.resolve(this.distDir, item);
+      
+      // Validate paths are within expected directories
+      if (!srcPath.startsWith(path.resolve(this.srcDir)) || 
+          !destPath.startsWith(path.resolve(this.distDir))) {
+        console.warn(`⚠️  Skipping unsafe path: ${item}`);
+        continue;
+      }
 
       try {
         const stats = await fs.stat(srcPath);
@@ -88,17 +95,42 @@ class BuildTool {
 
   async copyDirectory(srcDir, destDir) {
     await fs.mkdir(destDir, { recursive: true });
-    const items = await fs.readdir(srcDir);
+    
+    let items;
+    try {
+      items = await fs.readdir(srcDir);
+    } catch (error) {
+      console.warn(`⚠️  Cannot read directory ${srcDir}: ${error.message}`);
+      return;
+    }
 
     for (const item of items) {
-      const srcPath = path.join(srcDir, item);
-      const destPath = path.join(destDir, item);
-      const stats = await fs.stat(srcPath);
+      // Validate item name to prevent path traversal
+      if (item.includes('..') || item.includes('/') || item.includes('\\')) {
+        console.warn(`⚠️  Skipping potentially unsafe item: ${item}`);
+        continue;
+      }
+      
+      const srcPath = path.resolve(srcDir, item);
+      const destPath = path.resolve(destDir, item);
+      
+      // Validate paths are within expected directories
+      if (!srcPath.startsWith(path.resolve(srcDir)) || 
+          !destPath.startsWith(path.resolve(destDir))) {
+        console.warn(`⚠️  Skipping unsafe path: ${item}`);
+        continue;
+      }
 
-      if (stats.isDirectory()) {
-        await this.copyDirectory(srcPath, destPath);
-      } else {
-        await fs.copyFile(srcPath, destPath);
+      try {
+        const stats = await fs.stat(srcPath);
+
+        if (stats.isDirectory()) {
+          await this.copyDirectory(srcPath, destPath);
+        } else {
+          await fs.copyFile(srcPath, destPath);
+        }
+      } catch (error) {
+        console.warn(`⚠️  Could not copy ${item}: ${error.message}`);
       }
     }
   }
@@ -114,9 +146,13 @@ import './cli.js';
   }
 
   async createDistPackageJson() {
-    const originalPackageJson = JSON.parse(
-      await fs.readFile(path.join(__dirname, '..', 'package.json'), 'utf8')
-    );
+    let originalPackageJson;
+    try {
+      const packageJsonContent = await fs.readFile(path.join(__dirname, '..', 'package.json'), 'utf8');
+      originalPackageJson = JSON.parse(packageJsonContent);
+    } catch (error) {
+      throw new Error(`Failed to read package.json: ${error.message}`);
+    }
 
     const distPackageJson = {
       name: originalPackageJson.name,
@@ -144,9 +180,12 @@ import './cli.js';
 }
 
 // Run build if called directly
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (path.resolve(fileURLToPath(import.meta.url)) === path.resolve(process.argv[1])) {
   const buildTool = new BuildTool();
-  buildTool.build().catch(console.error);
+  buildTool.build().catch((error) => {
+    console.error('❌ Build failed:', error.message);
+    process.exit(1);
+  });
 }
 
 export default BuildTool;

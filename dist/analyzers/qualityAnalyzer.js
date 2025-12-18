@@ -23,7 +23,7 @@ export class QualityAnalyzer extends BaseAnalyzer {
     return this.getIssues();
   }
 
-  async analyzeFile(filePath, content, context) {
+  async analyzeFile(filePath, content, _context) {
     const issues = [];
 
     // Run quality checks
@@ -37,16 +37,16 @@ export class QualityAnalyzer extends BaseAnalyzer {
     // Language-specific checks
     const extension = filePath.split('.').pop()?.toLowerCase();
     switch (extension) {
-      case 'js':
-      case 'ts':
-        issues.push(...this.checkJavaScriptQuality(content, filePath));
-        break;
-      case 'py':
-        issues.push(...this.checkPythonQuality(content, filePath));
-        break;
-      case 'java':
-        issues.push(...this.checkJavaQuality(content, filePath));
-        break;
+    case 'js':
+    case 'ts':
+      issues.push(...this.checkJavaScriptQuality(content, filePath));
+      break;
+    case 'py':
+      issues.push(...this.checkPythonQuality(content, filePath));
+      break;
+    case 'java':
+      issues.push(...this.checkJavaQuality(content, filePath));
+      break;
     }
 
     // Add issues to the analyzer
@@ -62,13 +62,12 @@ export class QualityAnalyzer extends BaseAnalyzer {
       maxFunctionLength: 50,
       maxClassLength: 500,
       minFunctionLength: 1,
-      requiredCommentRatio: 0.1
+      requiredCommentRatio: 0.1,
     };
   }
 
   checkCodeComplexity(code, filePath) {
     const issues = [];
-    const lines = code.split('\n');
     const functions = this.extractFunctions(code);
 
     for (const func of functions) {
@@ -84,7 +83,7 @@ export class QualityAnalyzer extends BaseAnalyzer {
           column: func.column,
           snippet: this.getCodeSnippet(code, func.line).snippet,
           suggestion: 'Consider breaking this function into smaller, more focused functions',
-          tags: ['quality', 'complexity', 'maintainability']
+          tags: ['quality', 'complexity', 'maintainability'],
         });
       }
     }
@@ -104,7 +103,8 @@ export class QualityAnalyzer extends BaseAnalyzer {
 
       if (lineMap.has(line)) {
         const duplicates = lineMap.get(line);
-        if (duplicates.length >= 2) { // Found 3+ occurrences
+        if (duplicates.length >= 2) {
+          // Found 3+ occurrences
           issues.push({
             severity: 'low',
             type: 'quality',
@@ -115,7 +115,7 @@ export class QualityAnalyzer extends BaseAnalyzer {
             column: 1,
             snippet: this.getCodeSnippet(code, i + 1).snippet,
             suggestion: 'Consider extracting this into a reusable function or constant',
-            tags: ['quality', 'duplication', 'maintainability']
+            tags: ['quality', 'duplication', 'maintainability'],
           });
         }
         duplicates.push(i + 1);
@@ -140,8 +140,9 @@ export class QualityAnalyzer extends BaseAnalyzer {
         file: filePath,
         line: 1,
         column: 1,
-        suggestion: 'Consider refactoring to improve readability, reduce complexity, or add more comments',
-        tags: ['quality', 'maintainability', 'refactoring']
+        suggestion:
+          'Consider refactoring to improve readability, reduce complexity, or add more comments',
+        tags: ['quality', 'maintainability', 'refactoring'],
       });
     }
 
@@ -152,7 +153,6 @@ export class QualityAnalyzer extends BaseAnalyzer {
     const issues = [];
     const lines = code.split('\n');
     const functions = this.extractFunctions(code);
-    const classes = this.extractClasses(code);
 
     let commentLines = 0;
     let totalLines = 0;
@@ -173,12 +173,12 @@ export class QualityAnalyzer extends BaseAnalyzer {
         severity: 'low',
         type: 'quality',
         title: 'Low Documentation Coverage',
-        message: `Comment ratio is ${(commentRatio * 100).toFixed(1)}% (threshold: ${(this.qualityRules.requiredCommentRatio * 100)}%)`,
+        message: `Comment ratio is ${(commentRatio * 100).toFixed(1)}% (threshold: ${this.qualityRules.requiredCommentRatio * 100}%)`,
         file: filePath,
         line: 1,
         column: 1,
         suggestion: 'Add more comments to explain complex logic and public APIs',
-        tags: ['quality', 'documentation', 'readability']
+        tags: ['quality', 'documentation', 'readability'],
       });
     }
 
@@ -194,7 +194,7 @@ export class QualityAnalyzer extends BaseAnalyzer {
           line: func.line,
           column: func.column,
           suggestion: 'Add JSDoc comments or other appropriate documentation',
-          tags: ['quality', 'documentation', 'api']
+          tags: ['quality', 'documentation', 'api'],
         });
       }
     }
@@ -226,7 +226,7 @@ export class QualityAnalyzer extends BaseAnalyzer {
             column: 1,
             snippet: this.getCodeSnippet(code, lineNum + 1).snippet,
             suggestion: 'Stick to one naming convention throughout the codebase',
-            tags: ['quality', 'naming', 'consistency']
+            tags: ['quality', 'naming', 'consistency'],
           });
         }
       }
@@ -254,7 +254,7 @@ export class QualityAnalyzer extends BaseAnalyzer {
           column: line.indexOf('console') + 1,
           snippet: this.getCodeSnippet(code, lineNum + 1).snippet,
           suggestion: 'Remove debug statements or use proper logging framework',
-          tags: ['quality', 'debug', 'logging']
+          tags: ['quality', 'debug', 'logging'],
         });
       }
 
@@ -269,7 +269,7 @@ export class QualityAnalyzer extends BaseAnalyzer {
           line: lineNum + 1,
           column: 1,
           suggestion: 'Address this technical debt or create a proper issue',
-          tags: ['quality', 'technical-debt', 'maintenance']
+          tags: ['quality', 'technical-debt', 'maintenance'],
         });
       }
     }
@@ -296,7 +296,7 @@ export class QualityAnalyzer extends BaseAnalyzer {
           column: line.indexOf('var') + 1,
           snippet: this.getCodeSnippet(code, lineNum + 1).snippet,
           suggestion: 'Replace "var" with "let" or "const" for better scoping',
-          tags: ['quality', 'javascript', 'modern-syntax']
+          tags: ['quality', 'javascript', 'modern-syntax'],
         });
       }
 
@@ -312,7 +312,7 @@ export class QualityAnalyzer extends BaseAnalyzer {
           column: line.search(/\b==\b/) + 1,
           snippet: this.getCodeSnippet(code, lineNum + 1).snippet,
           suggestion: 'Replace "==" with "===" to avoid type coercion issues',
-          tags: ['quality', 'javascript', 'comparison']
+          tags: ['quality', 'javascript', 'comparison'],
         });
       }
     }
@@ -339,7 +339,7 @@ export class QualityAnalyzer extends BaseAnalyzer {
           column: line.indexOf('print') + 1,
           snippet: this.getCodeSnippet(code, lineNum + 1).snippet,
           suggestion: 'Replace print() with appropriate logging calls',
-          tags: ['quality', 'python', 'logging']
+          tags: ['quality', 'python', 'logging'],
         });
       }
 
@@ -355,7 +355,7 @@ export class QualityAnalyzer extends BaseAnalyzer {
           column: line.indexOf('except'),
           snippet: this.getCodeSnippet(code, lineNum + 1).snippet,
           suggestion: 'Catch specific exceptions to avoid hiding unexpected errors',
-          tags: ['quality', 'python', 'exception-handling']
+          tags: ['quality', 'python', 'exception-handling'],
         });
       }
     }
@@ -382,7 +382,7 @@ export class QualityAnalyzer extends BaseAnalyzer {
           column: line.indexOf('System.out.println') + 1,
           snippet: this.getCodeSnippet(code, lineNum + 1).snippet,
           suggestion: 'Replace with appropriate logging calls (e.g., log4j, SLF4J)',
-          tags: ['quality', 'java', 'logging']
+          tags: ['quality', 'java', 'logging'],
         });
       }
     }
@@ -396,11 +396,11 @@ export class QualityAnalyzer extends BaseAnalyzer {
 
     // Simple regex patterns for different languages
     const functionPatterns = [
-      /function\s+(\w+)\s*\(/g,  // JavaScript function
-      /(\w+)\s*:\s*\([^)]*\)\s*=>/g,  // JavaScript arrow function
-      /def\s+(\w+)\s*\(/g,  // Python function
-      /public\s+\w+\s+(\w+)\s*\(/g,  // Java method
-      /private\s+\w+\s+(\w+)\s*\(/g   // Java method
+      /function\s+(\w+)\s*\(/g, // JavaScript function
+      /(\w+)\s*:\s*\([^)]*\)\s*=>/g, // JavaScript arrow function
+      /def\s+(\w+)\s*\(/g, // Python function
+      /public\s+\w+\s+(\w+)\s*\(/g, // Java method
+      /private\s+\w+\s+(\w+)\s*\(/g, // Java method
     ];
 
     for (let lineNum = 0; lineNum < lines.length; lineNum++) {
@@ -415,7 +415,7 @@ export class QualityAnalyzer extends BaseAnalyzer {
             line: lineNum + 1,
             column: match.index + 1,
             body: this.extractFunctionBody(lines, lineNum),
-            hasDocumentation: this.hasDocumentation(lines, lineNum)
+            hasDocumentation: this.hasDocumentation(lines, lineNum),
           });
         }
       }
@@ -429,9 +429,9 @@ export class QualityAnalyzer extends BaseAnalyzer {
     const lines = code.split('\n');
 
     const classPatterns = [
-      /class\s+(\w+)/g,  // JavaScript/Python class
-      /public\s+class\s+(\w+)/g,  // Java class
-      /private\s+class\s+(\w+)/g  // Java class
+      /class\s+(\w+)/g, // JavaScript/Python class
+      /public\s+class\s+(\w+)/g, // Java class
+      /private\s+class\s+(\w+)/g, // Java class
     ];
 
     for (let lineNum = 0; lineNum < lines.length; lineNum++) {
@@ -445,7 +445,7 @@ export class QualityAnalyzer extends BaseAnalyzer {
             name: className,
             line: lineNum + 1,
             column: match.index + 1,
-            hasDocumentation: this.hasDocumentation(lines, lineNum)
+            hasDocumentation: this.hasDocumentation(lines, lineNum),
           });
         }
       }
@@ -493,12 +493,25 @@ export class QualityAnalyzer extends BaseAnalyzer {
   calculateCyclomaticComplexity(code) {
     let complexity = 1; // Base complexity
 
-    const decisionPoints = [
-      'if', 'else if', 'while', 'for', 'case', 'catch', '&&', '||', '?', ':'
-    ];
+    const decisionPoints = ['if', 'else if', 'while', 'for', 'case', 'catch', '&&', '||', '?', ':'];
 
     for (const point of decisionPoints) {
-      const regex = new RegExp(`\\b${point.replace(' ', '\\s+')}\\b`, 'gi');
+      const escaped = point.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      let pattern;
+
+      if (/\s/.test(point.trim())) {
+        const parts = point
+          .trim()
+          .split(/\s+/)
+          .map(part => `\\b${part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
+        pattern = parts.join('\\s+');
+      } else if (/^\w+$/.test(point)) {
+        pattern = `\\b${escaped}\\b`;
+      } else {
+        pattern = escaped;
+      }
+
+      const regex = new RegExp(pattern, 'g');
       const matches = code.match(regex);
       if (matches) {
         complexity += matches.length;

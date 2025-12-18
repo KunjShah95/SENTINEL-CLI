@@ -252,7 +252,7 @@ export class Config {
       );
       this.config.ai.providers = providers;
       // Persist the sanitized config to avoid reintroducing secrets later.
-      this.save().catch(() => {});
+      this.save().catch(() => { });
     }
   }
 
@@ -273,6 +273,10 @@ export class Config {
   }
 
   getAnalyzers() {
+    // Check environment variable first (set by CLI --analyzers flag)
+    if (process.env.SENTINEL_ANALYZERS) {
+      return process.env.SENTINEL_ANALYZERS.split(',').map(a => a.trim()).filter(Boolean);
+    }
     return this.get('analysis.enabledAnalyzers', []);
   }
 

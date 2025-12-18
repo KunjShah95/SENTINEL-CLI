@@ -1,420 +1,621 @@
 #!/usr/bin/env node
 
+/* eslint-disable no-console */
+
 import { Command } from 'commander';
 import chalk from 'chalk';
-import inquirer from 'inquirer';
-import ora from 'ora';
 import path from 'path';
 import { promises as fs } from 'fs';
+import http from 'http';
+import sirv from 'sirv';
 import { fileURLToPath } from 'url';
-
-import Config from './config/config.js';
-import GitUtils from './git/gitUtils.js';
-import { SecurityAnalyzer } from './analyzers/securityAnalyzer.js';
-import { QualityAnalyzer } from './analyzers/qualityAnalyzer.js';
-import { BugAnalyzer } from './analyzers/bugAnalyzer.js';
-import { PerformanceAnalyzer } from './analyzers/performanceAnalyzer.js';
-import ReportGenerator from './output/reportGenerator.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Removed static imports for robustness
+import { CodeReviewBot } from './bot.js';
+import runSentinelConsole from './cli/sentinelConsole.js';
+import Config from './config/config.js';
+
 const program = new Command();
-const config = new Config();
-const gitUtils = new GitUtils();
 
-class CodeReviewBot {
-  constructor() {
-    this.analyzers = [];
-    this.reportGenerator = new ReportGenerator();
+const pickGradient = (gradientLib, name = 'aqua') => {
+  const lib = gradientLib || null;
+  if (!lib) return null;
+  const key = (name || '').toLowerCase();
+  switch (key) {
+    case 'fire':
+      return lib(['#ff7b00', '#ff0058']);
+    case 'rainbow':
+      return lib(['red', 'yellow', 'green', 'cyan', 'blue', 'magenta']);
+    case 'mono':
+      return lib(['#7d8ca3', '#c7d2e5']);
+    case 'aurora':
+      return lib(['#4285F4', '#9B72CB', '#D96570']);
+    case 'aqua':
+    default:
+      return lib(['#00d4ff', '#0066ff']);
+  }
+};
+
+const padCenter = (lines, width) => {
+  if (!width) return lines;
+  return lines.map(line => {
+    const pad = Math.max(0, Math.floor((width - line.length) / 2));
+    return ' '.repeat(pad) + line;
+  });
+};
+
+const buildBannerArt = (text, font, figletLib) => {
+  if (!figletLib) return text;
+  try {
+    return figletLib.textSync(text, { horizontalLayout: 'full', font });
+  } catch (_err) {
+    return text;
+  }
+};
+
+const displayBanner = async (options = {}) => {
+  console.log('');
+  const {
+    bannerMessage = 'SENTINEL',
+    bannerFont = 'Standard',
+    bannerGradient = 'aqua',
+    bannerWidth,
+    bannerColor = true,
+  } = options;
+
+  let figletLib = null;
+  let gradientLib = null;
+  try {
+    const figletMod = await import('figlet');
+    figletLib = figletMod.default || figletMod;
+  } catch (_err) {
+    figletLib = null;
+  }
+  try {
+    const gradientMod = await import('gradient-string');
+    gradientLib = gradientMod.default || gradientMod;
+  } catch (_err) {
+    gradientLib = null;
   }
 
-  async initialize() {
-    try {
-      await config.load();
-      await config.validate();
-      
-      // Initialize analyzers
-      const enabledAnalyzers = config.getAnalyzers();
-      
-      if (enabledAnalyzers.includes('security')) {
-        this.analyzers.push(new SecurityAnalyzer(config));
-      }
-      
-      if (enabledAnalyzers.includes('quality')) {
-        this.analyzers.push(new QualityAnalyzer(config));
-      }
-      
-      if (enabledAnalyzers.includes('bugs')) {
-        this.analyzers.push(new BugAnalyzer(config));
-      }
-      
-      if (enabledAnalyzers.includes('performance')) {
-        this.analyzers.push(new PerformanceAnalyzer(config));
-      }
+  const art = buildBannerArt(bannerMessage, bannerFont, figletLib);
+  const lines = padCenter(String(art).split('\n'), bannerWidth || process.stdout.columns || 80);
+  const gradient = bannerColor ? pickGradient(gradientLib, bannerGradient) : null;
 
-      console.log(chalk.green('✓') + ' Code Review Bot initialized successfully');
-    } catch (error) {
-      console.error(chalk.red('✗') + ` Failed to initialize: ${error.message}`);
-      process.exit(1);
-    }
+  for (const line of lines) {
+    if (gradient) console.log(gradient(line));
+    else console.log(line);
   }
 
-  async runAnalysis(options = {}) {
-    const spinner = ora('Running code analysis...').start();
-    
-    try {
-      // Get files to analyze
-      const files = await this.getFilesToAnalyze(options);
-      
-      if (files.length === 0) {
-        spinner.warn('No files to analyze');
-        return;
-      }
+  const subtitle = `${bannerMessage} — AI-Powered Code Guardian · ${new Date().getFullYear()}`;
+  const paddedSubtitle = padCenter([subtitle], bannerWidth || process.stdout.columns || 80)[0];
+  if (bannerColor && chalk) console.log(chalk.gray.bold(paddedSubtitle));
+  else console.log(paddedSubtitle);
+  console.log('');
+};
 
-      spinner.text = `Analyzing ${files.length} files...`;
+program
+  .name('sentinel')
+  .description(`Sentinel CLI – AI-Powered Code Guardian
 
-      // Run all analyzers
-      const allIssues = [];
-      
-      for (const analyzer of this.analyzers) {
-        const issues = await analyzer.analyze(files, {
-          commit: options.commit,
-          branch: options.branch,
-          staged: options.staged
-        });
-        
-        allIssues.push(...issues);
-        spinner.text = `${analyzer.getName()}: ${issues.length} issues found`;
-      }
-
-      // Generate report
-      const report = await this.reportGenerator.generate(allIssues, {
-        format: options.format || 'console',
-        outputFile: options.output,
-        includeSnippets: options.snippets !== false
+  A comprehensive code review tool with:
+  • Security scanning (XSS, SQL injection, secrets)
+  • Code quality analysis
+  • Dependency vulnerability checking
+  • TypeScript & React-specific analysis
+  • API security scanning
+  • GitHub PR integration
+  • Slack/Discord notifications
+  • SARIF output for GitHub Security`)
+  .version('1.3.0')
+  .option('--banner-message <text>', 'Banner text', 'SENTINEL')
+  .option('--banner-font <name>', 'Figlet font name', 'Standard')
+  .option('--banner-gradient <name>', 'Banner gradient: aqua|fire|rainbow|aurora|mono', 'aqua')
+  .option('--banner-width <number>', 'Banner width for centering', v => parseInt(v, 10))
+  .option('--no-banner-color', 'Disable banner gradients')
+  .hook('preAction', async (thisCommand, actionCommand) => {
+    // Commander runs hooks for each command in the chain (root + subcommand).
+    // Only print the banner once for the leaf/action command.
+    const isRoot = thisCommand?.name?.() === 'sentinel';
+    if (isRoot && thisCommand?.args?.length) return;
+    if (actionCommand && thisCommand !== actionCommand) return;
+    const isRootNoSubcommand =
+      thisCommand?.name?.() === 'sentinel' && (!thisCommand.args || thisCommand.args.length === 0);
+    if (isRootNoSubcommand) return; // default action handles banner when no subcommand
+    // Show banner only for main commands, avoid cluttering precise outputs like JSON
+    const opts = thisCommand.optsWithGlobals
+      ? thisCommand.optsWithGlobals()
+      : { ...program.opts(), ...thisCommand.opts() };
+    if (!opts.format || opts.format === 'console') {
+      await displayBanner({
+        bannerMessage: opts.bannerMessage,
+        bannerFont: opts.bannerFont,
+        bannerGradient: opts.bannerGradient,
+        bannerWidth: opts.bannerWidth,
+        bannerColor: opts.bannerColor !== false,
       });
-
-      spinner.succeed('Analysis complete');
-
-      // Display results
-      if (options.format === 'console' || !options.format) {
-        this.displayResults(allIssues);
-      }
-
-      return report;
-
-    } catch (error) {
-      spinner.fail('Analysis failed');
-      throw error;
     }
-  }
+  });
 
-  async getFilesToAnalyze(options) {
-    const files = [];
-    
-    try {
-      if (options.commit) {
-        // Analyze specific commit
-        const changes = await gitUtils.getCommitChanges(options.commit);
-        const parsedFiles = gitUtils.parseDiff(changes.diff);
-        
-        for (const file of parsedFiles) {
-          if (file.path !== 'unknown') {
-            const content = await gitUtils.getFileContentAtCommit(file.path, options.commit);
-            if (content) {
-              files.push({
-                path: file.path,
-                content: content,
-                type: 'commit'
-              });
-            }
-          }
-        }
-      } else if (options.branch) {
-        // Analyze branch changes
-        const changes = await gitUtils.getBranchDiff('main', options.branch);
-        const parsedFiles = gitUtils.parseDiff(changes.diff);
-        
-        for (const file of parsedFiles) {
-          if (file.path !== 'unknown') {
-            const content = await gitUtils.getFileContent(file.path);
-            if (content) {
-              files.push({
-                path: file.path,
-                content: content,
-                type: 'branch'
-              });
-            }
-          }
-        }
-      } else if (options.staged) {
-        // Analyze staged changes
-        const changes = await gitUtils.getStagedChanges();
-        const parsedFiles = gitUtils.parseDiff(changes.diff);
-        
-        for (const file of parsedFiles) {
-          if (file.path !== 'unknown') {
-            const content = await fs.readFile(file.path, 'utf8');
-            files.push({
-              path: file.path,
-              content: content,
-              type: 'staged'
-            });
-          }
-        }
-      } else {
-        // Analyze latest commit
-        const changes = await gitUtils.getLatestCommitChanges();
-        if (changes.files.length > 0) {
-          const parsedFiles = gitUtils.parseDiff(changes.diff);
-          
-          for (const file of parsedFiles) {
-            if (file.path !== 'unknown') {
-              const content = await gitUtils.getFileContent(file.path);
-              if (content) {
-                files.push({
-                  path: file.path,
-                  content: content,
-                  type: 'commit'
-                });
-              }
-            }
-          }
-        }
-      }
-
-    } catch (error) {
-      console.warn(chalk.yellow('⚠') + ` Could not get files from git: ${error.message}`);
-      return [];
-    }
-
-    // Filter files based on configuration
-    return files.filter(file => {
-      return this.analyzers[0]?.shouldAnalyzeFile(file.path) ?? true;
-    });
-  }
-
-  displayResults(issues) {
-    if (issues.length === 0) {
-      console.log(chalk.green('🎉 No issues found! Great job!'));
-      return;
-    }
-
-    // Group issues by severity
-    const groupedIssues = {
-      critical: issues.filter(issue => issue.severity === 'critical'),
-      high: issues.filter(issue => issue.severity === 'high'),
-      medium: issues.filter(issue => issue.severity === 'medium'),
-      low: issues.filter(issue => issue.severity === 'low'),
-      info: issues.filter(issue => issue.severity === 'info')
-    };
-
-    // Display summary
-    console.log('\n' + chalk.bold('📊 Code Review Summary'));
-    console.log('─'.repeat(50));
-    
-    for (const [severity, issues] of Object.entries(groupedIssues)) {
-      if (issues.length > 0) {
-        const color = this.getSeverityColor(severity);
-        const icon = this.getSeverityIcon(severity);
-        console.log(`${icon} ${color(severity.toUpperCase())}: ${issues.length} issues`);
-      }
-    }
-
-    console.log(`\n${chalk.bold('Total Issues:')} ${issues.length}`);
-
-    // Display detailed issues
-    console.log('\n' + chalk.bold('🔍 Detailed Issues'));
-    console.log('─'.repeat(50));
-
-    for (const [severity, severityIssues] of Object.entries(groupedIssues)) {
-      if (severityIssues.length === 0) continue;
-      
-      const color = this.getSeverityColor(severity);
-      const icon = this.getSeverityIcon(severity);
-      
-      console.log(`\n${icon} ${color(severity.toUpperCase())} Issues:`);
-      console.log('─'.repeat(30));
-      
-      for (const issue of severityIssues) {
-        this.displayIssue(issue, color);
-      }
-    }
-
-    // Display suggestions
-    const suggestions = issues.filter(issue => issue.suggestion).length;
-    if (suggestions > 0) {
-      console.log(`\n💡 ${chalk.bold('Fix Suggestions:')} ${suggestions} issues have suggestions available`);
-    }
-  }
-
-  displayIssue(issue, color) {
-    console.log(`\n${color('⚠')} ${chalk.bold(issue.title)}`);
-    console.log(`   ${chalk.gray(issue.message)}`);
-    console.log(`   ${chalk.gray(`File: ${issue.file}:${issue.line}${issue.column ? ':' + issue.column : ''}`)}`);
-    console.log(`   ${chalk.gray(`Type: ${issue.type}, Analyzer: ${issue.analyzer}`)}`);
-    
-    if (issue.snippet && issue.snippet.length > 0) {
-      console.log(`   ${chalk.gray('Code:')}`);
-      console.log(`   ${chalk.gray('```')}`);
-      console.log(`   ${chalk.gray(issue.snippet.split('\n').map(line => '   ' + line).join('\n'))}`);
-      console.log(`   ${chalk.gray('```')}`);
-    }
-    
-    if (issue.suggestion) {
-      console.log(`   ${chalk.blue('💡 Suggestion:')} ${issue.suggestion}`);
-    }
-    
-    console.log('');
-  }
-
-  getSeverityColor(severity) {
-    const colors = {
-      critical: chalk.red,
-      high: chalk.red,
-      medium: chalk.yellow,
-      low: chalk.blue,
-      info: chalk.gray
-    };
-    return colors[severity] || chalk.gray;
-  }
-
-  getSeverityIcon(severity) {
-    const icons = {
-      critical: '🔴',
-      high: '🟠',
-      medium: '🟡',
-      low: '🔵',
-      info: 'ℹ️'
-    };
-    return icons[severity] || 'ℹ️';
-  }
-
-  async setupConfiguration() {
-    const questions = [
-      {
-        type: 'checkbox',
-        name: 'analyzers',
-        message: 'Which analyzers would you like to enable?',
-        choices: [
-          { name: 'Security Analyzer (detects vulnerabilities)', value: 'security', checked: true },
-          { name: 'Quality Analyzer (checks code quality)', value: 'quality', checked: true },
-          { name: 'Bug Analyzer (finds common bugs)', value: 'bugs', checked: true },
-          { name: 'Performance Analyzer (identifies performance issues)', value: 'performance', checked: true }
-        ]
-      },
-      {
-        type: 'confirm',
-        name: 'blocking',
-        message: 'Should the bot block commits with critical issues?',
-        default: false
-      },
-      {
-        type: 'list',
-        name: 'format',
-        message: 'Default output format?',
-        choices: [
-          { name: 'Console (colored text output)', value: 'console', checked: true },
-          { name: 'JSON (machine-readable)', value: 'json' },
-          { name: 'HTML (web report)', value: 'html' },
-          { name: 'Markdown (documentation)', value: 'markdown' }
-        ],
-        default: 'console'
-      }
-    ];
-
-    const answers = await inquirer.prompt(questions);
-    
-    // Update configuration
-    config.set('analysis.enabledAnalyzers', answers.analyzers);
-    config.set('integrations.precommit.blocking', answers.blocking);
-    config.set('output.format', answers.format);
-    
-    await config.save();
-    
-    console.log(chalk.green('✓') + ' Configuration saved successfully!');
-  }
-
-  async showStats() {
-    const spinner = ora('Gathering repository statistics...').start();
-    
-    try {
-      const stats = await gitUtils.getRepositoryStats();
-      const totalIssues = await this.getTotalIssuesCount();
-      
-      spinner.succeed('Statistics gathered');
-      
-      console.log('\n' + chalk.bold('📈 Repository Statistics'));
-      console.log('─'.repeat(50));
-      console.log(`${chalk.cyan('Current Branch:')} ${stats.currentBranch}`);
-      console.log(`${chalk.cyan('Total Commits:')} ${stats.totalCommits}`);
-      console.log(`${chalk.cyan('Files Modified:')} ${stats.modified}`);
-      console.log(`${chalk.cyan('Files Staged:')} ${stats.staged}`);
-      console.log(`${chalk.cyan('Untracked Files:')} ${stats.untracked}`);
-      console.log(`${chalk.cyan('Issues Found:')} ${totalIssues}`);
-      console.log(`${chalk.cyan('Analysis Time:')} Last run: ${new Date().toLocaleString()}`);
-      
-    } catch (error) {
-      spinner.fail('Failed to gather statistics');
-      console.error(chalk.red(error.message));
-    }
-  }
-
-  async getTotalIssuesCount() {
-    try {
-      const files = await this.getFilesToAnalyze({});
-      let totalIssues = 0;
-      
-      for (const analyzer of this.analyzers) {
-        await analyzer.analyze(files, {});
-        totalIssues += analyzer.getIssues().length;
-      }
-      
-      return totalIssues;
-    } catch (error) {
-      return 0;
-    }
-  }
-}
-
-// CLI Commands
-program
-  .name('smart-code-review-bot')
-  .description('An intelligent automated code review bot with AI-powered analysis')
-  .version('1.0.0');
+// Show banner when no subcommand is provided (default help path)
+program.action(async (_args, command) => {
+  const opts = command?.optsWithGlobals ? command.optsWithGlobals() : program.opts();
+  await displayBanner({
+    bannerMessage: opts.bannerMessage,
+    bannerFont: opts.bannerFont,
+    bannerGradient: opts.bannerGradient,
+    bannerWidth: opts.bannerWidth,
+    bannerColor: opts.bannerColor !== false,
+  });
+  command.outputHelp();
+});
 
 program
-  .command('analyze')
+  .command('analyze [files...]')
   .description('Analyze code for issues')
   .option('-c, --commit <hash>', 'Analyze specific commit')
   .option('-b, --branch <name>', 'Analyze branch changes')
   .option('-s, --staged', 'Analyze staged changes only')
-  .option('-f, --format <format>', 'Output format (console|json|html|markdown)')
+  .option('-f, --format <format>', 'Output format (console|json|html|markdown|sarif|junit)')
   .option('-o, --output <file>', 'Output file path')
   .option('--no-snippets', 'Disable code snippets in output')
-  .action(async (options) => {
-    const bot = new CodeReviewBot();
-    await bot.initialize();
-    await bot.runAnalysis(options);
+  .option(
+    '-a, --analyzers <list>',
+    'Comma-separated list of analyzers to run (security,quality,bugs,performance,dependency,accessibility,typescript,react,api,secrets,docker,kubernetes,custom)',
+    'security,quality,bugs,performance'
+  )
+  .option('--all-analyzers', 'Enable all available analyzers')
+  .option('--save-history', 'Save analysis to trend history')
+  .option('--silent', 'Suppress output (useful for scripting)')
+  .action(async (files, options) => {
+    try {
+      // Handle analyzer selection
+      if (options.allAnalyzers) {
+        process.env.SENTINEL_ANALYZERS = 'security,quality,bugs,performance,dependency,accessibility,typescript,react,api,secrets,docker,kubernetes,custom';
+      } else if (options.analyzers) {
+        process.env.SENTINEL_ANALYZERS = options.analyzers;
+      }
+
+      const bot = new CodeReviewBot();
+      await bot.initialize();
+      const result = await bot.runAnalysis({ ...options, files });
+
+      // Save to history if requested
+      if (options.saveHistory && result.issues) {
+        try {
+          const { TrendTracker } = await import('./utils/analytics.js');
+          const tracker = new TrendTracker();
+          await tracker.save(result.issues);
+          if (!options.silent) {
+            console.log(chalk.gray('📊 Analysis saved to trend history'));
+          }
+        } catch (e) {
+          // History save failed, not critical
+        }
+      }
+
+      // Handle SARIF format
+      if (options.format === 'sarif' && result.issues) {
+        const { SarifGenerator } = await import('./output/sarifGenerator.js');
+        const sarif = new SarifGenerator();
+        const outputPath = options.output || 'sentinel-results.sarif';
+        await sarif.saveToFile(result.issues, outputPath);
+        if (!options.silent) {
+          console.log(chalk.green('✓') + ` SARIF report saved to ${outputPath}`);
+        }
+      }
+    } catch (error) {
+      console.error(chalk.red('Analysis failed:'), error.message);
+      process.exit(1);
+    }
+  });
+
+// PRESET: Quick security audit
+program
+  .command('security-audit')
+  .description('Run comprehensive security scan (security + api + secrets + dependency)')
+  .option('-o, --output <file>', 'Output file path')
+  .option('-f, --format <format>', 'Output format', 'console')
+  .action(async options => {
+    try {
+      process.env.SENTINEL_ANALYZERS = 'security,api,secrets,dependency';
+      const bot = new CodeReviewBot();
+      await bot.initialize();
+
+      console.log(chalk.bold.red('🔒 Running Security Audit...'));
+      console.log(chalk.gray('Analyzers: security, api, secrets, dependency\n'));
+
+      await bot.runAnalysis(options);
+    } catch (error) {
+      console.error(chalk.red('Security audit failed:'), error.message);
+      process.exit(1);
+    }
+  });
+
+// PRESET: Full scan
+program
+  .command('full-scan')
+  .description('Run all available analyzers')
+  .option('-o, --output <file>', 'Output file path')
+  .option('-f, --format <format>', 'Output format', 'console')
+  .option('--save-history', 'Save to trend history')
+  .action(async options => {
+    try {
+      process.env.SENTINEL_ANALYZERS = 'security,quality,bugs,performance,dependency,accessibility,typescript,react,api,secrets,custom';
+      const bot = new CodeReviewBot();
+      await bot.initialize();
+
+      console.log(chalk.bold.magenta('🚀 Running Full Scan...'));
+      console.log(chalk.gray('All analyzers enabled\n'));
+
+      const result = await bot.runAnalysis(options);
+
+      if (options.saveHistory && result.issues) {
+        const { TrendTracker } = await import('./utils/analytics.js');
+        const tracker = new TrendTracker();
+        await tracker.save(result.issues);
+        console.log(chalk.gray('📊 Saved to trend history'));
+      }
+    } catch (error) {
+      console.error(chalk.red('Full scan failed:'), error.message);
+      process.exit(1);
+    }
+  });
+
+// PRESET: Pre-commit check (fast, focused)
+program
+  .command('pre-commit')
+  .description('Quick pre-commit check on staged files')
+  .option('--block', 'Exit with error if critical issues found')
+  .action(async options => {
+    try {
+      process.env.SENTINEL_ANALYZERS = 'security,bugs,secrets';
+      const bot = new CodeReviewBot();
+      await bot.initialize();
+
+      console.log(chalk.bold.yellow('⚡ Pre-commit Check...'));
+
+      const result = await bot.runAnalysis({ staged: true, silent: false });
+
+      if (options.block && result.issues) {
+        const criticalCount = result.issues.filter(
+          i => i.severity === 'critical' || i.severity === 'high'
+        ).length;
+
+        if (criticalCount > 0) {
+          console.log(chalk.red(`\n❌ Commit blocked: ${criticalCount} critical/high issues found`));
+          process.exit(1);
+        }
+      }
+
+      console.log(chalk.green('✅ Pre-commit check passed'));
+    } catch (error) {
+      console.error(chalk.red('Pre-commit check failed:'), error.message);
+      process.exit(1);
+    }
+  });
+
+// PRESET: Frontend analysis (React + TypeScript + Accessibility)
+program
+  .command('frontend')
+  .description('Frontend-focused analysis (React + TypeScript + Accessibility)')
+  .option('-o, --output <file>', 'Output file path')
+  .option('-f, --format <format>', 'Output format', 'console')
+  .action(async options => {
+    try {
+      process.env.SENTINEL_ANALYZERS = 'quality,bugs,typescript,react,accessibility';
+      const bot = new CodeReviewBot();
+      await bot.initialize();
+
+      console.log(chalk.bold.blue('🎨 Frontend Analysis...'));
+      console.log(chalk.gray('Analyzers: quality, bugs, typescript, react, accessibility\n'));
+
+      await bot.runAnalysis(options);
+    } catch (error) {
+      console.error(chalk.red('Frontend analysis failed:'), error.message);
+      process.exit(1);
+    }
+  });
+
+// PRESET: Backend/API analysis
+program
+  .command('backend')
+  .description('Backend-focused analysis (Security + API + Performance)')
+  .option('-o, --output <file>', 'Output file path')
+  .option('-f, --format <format>', 'Output format', 'console')
+  .action(async options => {
+    try {
+      process.env.SENTINEL_ANALYZERS = 'security,bugs,performance,api,secrets,dependency';
+      const bot = new CodeReviewBot();
+      await bot.initialize();
+
+      console.log(chalk.bold.green('🔧 Backend Analysis...'));
+      console.log(chalk.gray('Analyzers: security, bugs, performance, api, secrets, dependency\n'));
+
+      await bot.runAnalysis(options);
+    } catch (error) {
+      console.error(chalk.red('Backend analysis failed:'), error.message);
+      process.exit(1);
+    }
+  });
+
+// PRESET: Container security (Docker + Kubernetes)
+program
+  .command('container')
+  .description('Container security analysis (Docker + Kubernetes)')
+  .option('-o, --output <file>', 'Output file path')
+  .option('-f, --format <format>', 'Output format', 'console')
+  .action(async options => {
+    try {
+      process.env.SENTINEL_ANALYZERS = 'docker,kubernetes,security';
+      const bot = new CodeReviewBot();
+      await bot.initialize();
+
+      console.log(chalk.bold.cyan('🐳 Container Security Analysis...'));
+      console.log(chalk.gray('Analyzers: docker, kubernetes, security\n'));
+
+      await bot.runAnalysis(options);
+    } catch (error) {
+      console.error(chalk.red('Container analysis failed:'), error.message);
+      process.exit(1);
+    }
+  });
+
+// NEW: Diff (staged) review
+program
+  .command('diff')
+  .description('Review staged changes only (pre-commit friendly)')
+  .option('-f, --format <format>', 'Output format (console|json|html|markdown|sarif|junit)', 'console')
+  .option('-o, --output <file>', 'Output file path')
+  .option('--no-snippets', 'Disable code snippets in output')
+  .action(async options => {
+    try {
+      const bot = new CodeReviewBot();
+      await bot.initialize();
+
+      console.log(chalk.cyan('📄 Reviewing staged changes...'));
+
+      const result = await bot.runAnalysis({ ...options, staged: true });
+
+      // Optional SARIF handling when requested
+      if (options.format === 'sarif' && result?.issues) {
+        const { SarifGenerator } = await import('./output/sarifGenerator.js');
+        const sarif = new SarifGenerator();
+        const outputPath = options.output || 'sentinel-results.sarif';
+        await sarif.saveToFile(result.issues, outputPath);
+        console.log(chalk.green('✓') + ` SARIF report saved to ${outputPath}`);
+      }
+    } catch (error) {
+      console.error(chalk.red('Diff review failed:'), error.message);
+      process.exit(1);
+    }
+  });
+
+// NEW: Full project review (alias of full-scan)
+program
+  .command('full')
+  .description('Run all analyzers across the project')
+  .option('-o, --output <file>', 'Output file path')
+  .option('-f, --format <format>', 'Output format', 'console')
+  .option('--save-history', 'Save to trend history')
+  .action(async options => {
+    try {
+      process.env.SENTINEL_ANALYZERS = 'security,quality,bugs,performance,dependency,accessibility,typescript,react,api,secrets,custom';
+      const bot = new CodeReviewBot();
+      await bot.initialize();
+
+      console.log(chalk.bold.magenta('🚀 Running Full Scan...'));
+      console.log(chalk.gray('All analyzers enabled\n'));
+
+      const result = await bot.runAnalysis(options);
+
+      if (options.saveHistory && result.issues) {
+        const { TrendTracker } = await import('./utils/analytics.js');
+        const tracker = new TrendTracker();
+        await tracker.save(result.issues);
+        console.log(chalk.gray('📊 Saved to trend history'));
+      }
+    } catch (error) {
+      console.error(chalk.red('Full scan failed:'), error.message);
+      process.exit(1);
+    }
+  });
+
+// NEW: CI-friendly runner
+program
+  .command('ci')
+  .description('CI-friendly analysis (JSON output, fail on severity)')
+  .option('-f, --format <format>', 'Output format (console|json|sarif|junit)', 'json')
+  .option('-o, --output <file>', 'Output file path')
+  .option('--fail-on <level>', 'Fail on severity level or above (critical|high|medium|low|info|none)', 'high')
+  .option('--staged', 'Analyze staged changes only')
+  .action(async options => {
+    try {
+      const severityRank = {
+        critical: 0,
+        high: 1,
+        medium: 2,
+        low: 3,
+        info: 4,
+        none: 5,
+      };
+
+      const failLevel = (options.failOn || 'high').toLowerCase();
+      const failRank = severityRank[failLevel] ?? severityRank.high;
+
+      const bot = new CodeReviewBot();
+      await bot.initialize();
+
+      console.log(chalk.cyan('🤖 Running CI analysis...'));
+
+      const result = await bot.runAnalysis({ ...options, format: options.format, silent: true });
+      const issues = result?.issues || [];
+
+      // Build formatted output for CI consumers
+      let reportOutput = result?.report;
+
+      if (options.format === 'json') {
+        reportOutput = JSON.stringify(issues, null, 2);
+      } else if (options.format === 'sarif') {
+        const { SarifGenerator } = await import('./output/sarifGenerator.js');
+        const sarif = new SarifGenerator();
+        reportOutput = JSON.stringify(sarif.generate(issues), null, 2);
+      }
+
+      // Write output if requested
+      if (options.output && reportOutput) {
+        await fs.writeFile(options.output, reportOutput, 'utf8');
+        console.log(chalk.green('✓') + ` Report saved to ${options.output}`);
+      } else if (reportOutput && options.format !== 'console') {
+        console.log(reportOutput);
+      }
+
+      // Evaluate severity threshold
+      let highestRank = severityRank.none;
+      for (const issue of issues) {
+        const rank = severityRank[issue.severity] ?? severityRank.none;
+        highestRank = Math.min(highestRank, rank);
+      }
+
+      if (highestRank <= failRank) {
+        const highest = Object.keys(severityRank).find(key => severityRank[key] === highestRank);
+        console.log(chalk.red(`❌ CI check failed (highest severity: ${highest || 'unknown'})`));
+        process.exit(1);
+      }
+
+      console.log(chalk.green('✓ CI check passed'));
+    } catch (error) {
+      console.error(chalk.red('CI analysis failed:'), error.message);
+      process.exit(1);
+    }
+  });
+
+// NEW: List available analyzers
+program
+  .command('list-analyzers')
+  .alias('analyzers')
+  .description('List all available analyzers and their descriptions')
+  .action(() => {
+    console.log('\n' + chalk.bold.cyan('🔍 Available Sentinel Analyzers'));
+    console.log(chalk.gray('─'.repeat(60)) + '\n');
+
+    const analyzers = [
+      {
+        name: 'security',
+        description: 'Core security scanning (XSS, SQL injection, etc.)',
+        default: true,
+      },
+      {
+        name: 'quality',
+        description: 'Code quality analysis (complexity, maintainability)',
+        default: true,
+      },
+      {
+        name: 'bugs',
+        description: 'Common bug detection (null checks, logic errors)',
+        default: true,
+      },
+      {
+        name: 'performance',
+        description: 'Performance issues (memory leaks, N+1 queries)',
+        default: true,
+      },
+      {
+        name: 'dependency',
+        description: 'Vulnerable npm/pip/gem packages + npm audit',
+        alias: 'deps',
+        default: false,
+      },
+      {
+        name: 'accessibility',
+        description: 'WCAG compliance (alt text, ARIA, labels)',
+        alias: 'a11y',
+        default: false,
+      },
+      {
+        name: 'typescript',
+        description: 'TypeScript anti-patterns (any, @ts-ignore)',
+        alias: 'ts',
+        default: false,
+      },
+      {
+        name: 'react',
+        description: 'React/JSX issues (hooks rules, missing keys)',
+        alias: 'jsx',
+        default: false,
+      },
+      {
+        name: 'api',
+        description: 'API security (CORS, JWT, rate limiting)',
+        alias: 'api-security',
+        default: false,
+      },
+      {
+        name: 'secrets',
+        description: 'Exposed credentials and API keys',
+        alias: 'env',
+        default: false,
+      },
+      {
+        name: 'custom',
+        description: 'User-defined rules from .sentinelrules.yaml',
+        default: false,
+      },
+    ];
+
+    for (const analyzer of analyzers) {
+      const badge = analyzer.default ? chalk.green('[DEFAULT]') : chalk.gray('[OPTIONAL]');
+      const alias = analyzer.alias ? chalk.gray(` (alias: ${analyzer.alias})`) : '';
+      console.log(`  ${chalk.bold.white(analyzer.name)}${alias}`);
+      console.log(`    ${badge} ${analyzer.description}`);
+      console.log('');
+    }
+
+    console.log(chalk.gray('─'.repeat(60)));
+    console.log('\n' + chalk.bold('Usage Examples:'));
+    console.log(chalk.gray('  sentinel analyze --analyzers security,typescript,react'));
+    console.log(chalk.gray('  sentinel analyze --all-analyzers'));
+    console.log(chalk.gray('  sentinel analyze -a security,api,secrets'));
+    console.log('');
   });
 
 program
   .command('setup')
   .description('Setup configuration wizard')
   .action(async () => {
-    const bot = new CodeReviewBot();
-    await bot.initialize();
-    await bot.setupConfiguration();
+    try {
+      const bot = new CodeReviewBot();
+      await bot.initialize();
+      await bot.setupConfiguration();
+    } catch (error) {
+      console.error(chalk.red('Setup failed:'), error.message);
+    }
   });
 
 program
   .command('stats')
   .description('Show repository statistics')
   .action(async () => {
-    const bot = new CodeReviewBot();
-    await bot.initialize();
-    await bot.showStats();
+    try {
+      const bot = new CodeReviewBot();
+      await bot.initialize();
+      const result = await bot.showStats();
+
+      console.log('\n' + chalk.bold('📈 Repository Statistics'));
+      console.log('─'.repeat(50));
+      console.log(`${chalk.cyan('Current Branch:')} ${result.stats.currentBranch}`);
+      console.log(`${chalk.cyan('Total Commits:')} ${result.stats.totalCommits}`);
+      console.log(`${chalk.cyan('Files Modified:')} ${result.stats.modified}`);
+      console.log(`${chalk.cyan('Files Staged:')} ${result.stats.staged}`);
+      console.log(`${chalk.cyan('Untracked Files:')} ${result.stats.untracked}`);
+      console.log(`${chalk.cyan('Issues Found:')} ${result.totalIssues}`);
+      console.log(`${chalk.cyan('Analysis Time:')} Last run: ${new Date().toLocaleString()}`);
+    } catch (error) {
+      console.error(chalk.red('Stats failed:'), error.message);
+    }
   });
 
 program
@@ -422,9 +623,652 @@ program
   .description('Install pre-commit hooks')
   .action(async () => {
     console.log(chalk.yellow('Installing pre-commit hooks...'));
-    // Implementation for hook installation
-    console.log(chalk.green('✓') + ' Pre-commit hooks installed successfully!');
+    try {
+      const hooksDir = path.resolve(process.cwd(), '.git', 'hooks');
+      const hookPath = path.join(hooksDir, 'pre-commit');
+
+      try {
+        await fs.mkdir(hooksDir, { recursive: true });
+      } catch (e) {
+        // Ignore if exists
+      }
+
+      const hookScript = `#!/bin/sh
+# Sentinel Pre-commit Hook
+echo "🤖 Running Sentinel on staged files..."
+# Ensure we map to the bin execution or npm run
+# Assuming npm run review maps to "node src/cli.js analyze"
+if npm run review -- --staged --format console; then
+    echo "✅ Sentinel passed!"
+    exit 0
+else
+    echo "❌ Sentinel found blocking issues! Please fix them before committing."
+    exit 1
+fi
+`;
+
+      await fs.writeFile(hookPath, hookScript, { mode: 0o700 });
+      console.log(chalk.green('✓') + ' Pre-commit hook installed at ' + hookPath);
+    } catch (error) {
+      console.error(chalk.red('✗') + ' Failed to install hooks: ' + error.message);
+    }
   });
 
-// Parse command line arguments
+const collectAssignments = (value, previous) => {
+  previous.push(value);
+  return previous;
+};
+
+const parseAssignment = (assignment, type = 'model') => {
+  if (!assignment || !assignment.includes('=')) {
+    throw new Error(`Invalid ${type} assignment "${assignment}". Use id=value.`);
+  }
+  const [id, rawValue] = assignment.split('=').map(part => part.trim());
+  if (!id || !rawValue) {
+    throw new Error(`Invalid ${type} assignment "${assignment}". Use id=value.`);
+  }
+  return { id, value: rawValue };
+};
+
+const parseIdList = value => {
+  if (!value) return [];
+  return value
+    .split(',')
+    .map(item => item.trim())
+    .filter(Boolean);
+};
+
+program
+  .command('models')
+  .description('List and configure Sentinel AI providers')
+  .option('--enable <ids>', 'Enable provider IDs (comma-separated)')
+  .option('--disable <ids>', 'Disable provider IDs (comma-separated)')
+  .option('--model <id=model>', 'Set provider model (repeatable)', collectAssignments, [])
+  .option(
+    '--weight <id=weight>',
+    'Set provider inference weight (repeatable)',
+    collectAssignments,
+    []
+  )
+  .option('--env <id=ENV>', 'Set API key environment variable (repeatable)', collectAssignments, [])
+  .option('--strip-secrets <ids>', 'Remove inline API keys for provider IDs (comma-separated)')
+  .action(async options => {
+    const config = new Config();
+    await config.load();
+    const aiConfig = config.get('ai') || {};
+    const providers = Array.isArray(aiConfig.providers) ? [...aiConfig.providers] : [];
+
+    if (providers.length === 0) {
+      console.log(
+        chalk.yellow('No AI providers configured yet. Run `node src/cli.js setup` first.')
+      );
+      return;
+    }
+
+    const getProvider = id => providers.find(provider => provider.id === id);
+    let mutated = false;
+
+    for (const id of parseIdList(options.enable)) {
+      const provider = getProvider(id);
+      if (provider) {
+        if (!provider.enabled) {
+          provider.enabled = true;
+          mutated = true;
+          console.log(chalk.green(`Enabled ${id}`));
+        }
+      } else {
+        console.log(chalk.yellow(`Unknown provider id "${id}"`));
+      }
+    }
+
+    for (const id of parseIdList(options.disable)) {
+      const provider = getProvider(id);
+      if (provider) {
+        if (provider.enabled !== false) {
+          provider.enabled = false;
+          mutated = true;
+          console.log(chalk.yellow(`Disabled ${id}`));
+        }
+      } else {
+        console.log(chalk.yellow(`Unknown provider id "${id}"`));
+      }
+    }
+
+    for (const assignment of options.model || []) {
+      try {
+        const { id, value } = parseAssignment(assignment, 'model');
+        const provider = getProvider(id);
+        if (!provider) {
+          console.log(chalk.yellow(`Unknown provider id "${id}"`));
+          continue;
+        }
+        if (provider.model !== value) {
+          provider.model = value;
+          mutated = true;
+          console.log(chalk.green(`Set model for ${id} -> ${value}`));
+        }
+      } catch (error) {
+        console.log(chalk.red(error.message));
+      }
+    }
+
+    for (const assignment of options.weight || []) {
+      try {
+        const { id, value } = parseAssignment(assignment, 'weight');
+        const provider = getProvider(id);
+        if (!provider) {
+          console.log(chalk.yellow(`Unknown provider id "${id}"`));
+          continue;
+        }
+        const weight = Number(value);
+        if (Number.isNaN(weight) || weight <= 0 || weight > 1) {
+          console.log(
+            chalk.red(`Invalid weight "${value}" for ${id}. Use a number between 0 and 1.`)
+          );
+          continue;
+        }
+        if (provider.weight !== weight) {
+          provider.weight = weight;
+          mutated = true;
+          console.log(chalk.green(`Set weight for ${id} -> ${weight}`));
+        }
+      } catch (error) {
+        console.log(chalk.red(error.message));
+      }
+    }
+
+    for (const assignment of options.env || []) {
+      try {
+        const { id, value } = parseAssignment(assignment, 'environment variable');
+        const provider = getProvider(id);
+        if (!provider) {
+          console.log(chalk.yellow(`Unknown provider id "${id}"`));
+          continue;
+        }
+        if (provider.apiKeyEnv !== value) {
+          provider.apiKeyEnv = value;
+          if (provider.apiKey) {
+            delete provider.apiKey;
+            console.log(
+              chalk.yellow(
+                `Removed inline API key for ${id}. Environment variable will be used instead.`
+              )
+            );
+          }
+          mutated = true;
+          console.log(chalk.green(`Set API key env for ${id} -> ${value}`));
+        }
+      } catch (error) {
+        console.log(chalk.red(error.message));
+      }
+    }
+
+    for (const id of parseIdList(options.stripSecrets)) {
+      const provider = getProvider(id);
+      if (!provider) {
+        console.log(chalk.yellow(`Unknown provider id "${id}"`));
+        continue;
+      }
+      if (provider.apiKey) {
+        delete provider.apiKey;
+        mutated = true;
+        console.log(
+          chalk.green(
+            `Removed inline API key for ${id}. Ensure ${provider.apiKeyEnv || 'an appropriate env var'} is set at runtime.`
+          )
+        );
+      }
+    }
+
+    if (mutated) {
+      config.set('ai.providers', providers);
+      await config.save();
+      console.log(chalk.green('\nSaved Sentinel AI provider configuration.\n'));
+    }
+
+    const inlineKeyProviders = providers.filter(provider => provider.apiKey);
+    if (inlineKeyProviders.length > 0) {
+      console.log(
+        chalk.red(
+          '⚠️  Sentinel Tip: Some providers still have API keys stored in .codereviewrc.json.\n' +
+          '    Consider running `sentinel models --env id=ENV_VAR --strip-secrets id` to rely on environment variables.'
+        )
+      );
+    }
+
+    console.log(chalk.bold('AI Providers'));
+    console.log(chalk.gray('──────────────────────────────────────────'));
+    providers.forEach(provider => {
+      console.log(
+        `${chalk.cyan(provider.id)} ${provider.enabled === false ? chalk.red('[disabled]') : chalk.green('[enabled]')}`
+      );
+      console.log(`  Provider  : ${provider.provider}`);
+      console.log(`  Model     : ${provider.model || 'default'}`);
+      console.log(`  Weight    : ${provider.weight ?? '0.33'}`);
+      let keyStatus = 'not set';
+      if (provider.apiKey) {
+        keyStatus = chalk.bgRed.white(' inline key stored (discouraged) ');
+      } else if (provider.apiKeyEnv) {
+        keyStatus = `env ${provider.apiKeyEnv}`;
+      }
+      console.log(`  API Key   : ${keyStatus}`);
+      console.log('');
+    });
+  });
+
+program
+  .command('chat [prompt...]')
+  .description('Launch a Sentinel interactive assistant console')
+  .option('-p, --prompt <text>', 'Run a single prompt then exit')
+  .option('--persona <text>', 'Override the Sentinel persona instructions')
+  .action(async (promptArgs, options) => {
+    const inlinePrompt =
+      options.prompt ||
+      (Array.isArray(promptArgs) && promptArgs.length ? promptArgs.join(' ') : null);
+    await runSentinelConsole({ ...options, prompt: inlinePrompt });
+  });
+
+// NEW: GitHub PR Review Command
+program
+  .command('review-pr <pr-url>')
+  .description('Analyze code and post review to a GitHub PR')
+  .option('-f, --format <format>', 'Output format (console|json)', 'console')
+  .option('--dry-run', 'Analyze but do not post to GitHub')
+  .action(async (prUrl, options) => {
+    try {
+      const { GitHubIntegration } = await import('./integrations/github.js');
+      const bot = new CodeReviewBot();
+      await bot.initialize();
+
+      console.log(chalk.cyan('🔍 Analyzing code for PR review...'));
+
+      // Run analysis on staged or latest commit
+      const { issues } = await bot.runAnalysis({ format: 'json', silent: true });
+
+      if (options.dryRun) {
+        console.log(chalk.yellow('🔸 Dry run mode - not posting to GitHub'));
+        console.log(chalk.white(`Found ${issues.length} issues`));
+        if (options.format === 'json') {
+          console.log(JSON.stringify(issues, null, 2));
+        }
+        return;
+      }
+
+      const github = new GitHubIntegration();
+      const result = await github.postReview(prUrl, issues);
+
+      console.log(chalk.green('✓') + ` Posted review to ${prUrl}`);
+      console.log(chalk.gray(`  Issues: ${result.issuesPosted}, Inline comments: ${result.inlineComments}`));
+    } catch (error) {
+      console.error(chalk.red('PR Review failed:'), error.message);
+      process.exit(1);
+    }
+  });
+
+// NEW: Auto-Fix Command
+program
+  .command('fix [files...]')
+  .description('Automatically fix common issues in code')
+  .option('--type <types>', 'Comma-separated fix types (or "all")', 'all')
+  .option('--dry-run', 'Show what would be fixed without making changes')
+  .option('-s, --staged', 'Fix only staged files')
+  .action(async (files, options) => {
+    try {
+      const { AutoFixer } = await import('./utils/autoFixer.js');
+      const bot = new CodeReviewBot();
+      await bot.initialize();
+
+      console.log(chalk.cyan('🔧 Running auto-fix...'));
+
+      // Get files to fix
+      const filesToFix = await bot.getFilesToAnalyze({
+        files: files.length > 0 ? files : undefined,
+        staged: options.staged,
+      });
+
+      if (filesToFix.length === 0) {
+        console.log(chalk.yellow('No files to fix'));
+        return;
+      }
+
+      const fixer = new AutoFixer();
+      const fixTypes = options.type.split(',').map(t => t.trim());
+
+      // Apply fixes
+      const results = await fixer.applyFixesToFiles(filesToFix, fixTypes);
+
+      if (results.length === 0) {
+        console.log(chalk.green('✨ No issues to auto-fix!'));
+        return;
+      }
+
+      // Write or show dry-run results
+      await fixer.writeFixedFiles(results, options.dryRun);
+      const summary = fixer.generateSummary(results);
+
+      if (options.dryRun) {
+        console.log(chalk.yellow('🔸 Dry run - no files modified'));
+      } else {
+        console.log(chalk.green('✓ Fixes applied'));
+      }
+
+      console.log(chalk.white(`  Files: ${summary.totalFiles}`));
+      console.log(chalk.white(`  Total fixes: ${summary.totalFixes}`));
+
+      for (const [type, count] of Object.entries(summary.byType)) {
+        console.log(chalk.gray(`    • ${type}: ${count}`));
+      }
+    } catch (error) {
+      console.error(chalk.red('Auto-fix failed:'), error.message);
+      process.exit(1);
+    }
+  });
+
+// NEW: Workspace/Monorepo Analysis Command
+program
+  .command('analyze-workspace')
+  .description('Analyze all packages in a monorepo workspace')
+  .option('-f, --format <format>', 'Output format (console|json|html|markdown)', 'console')
+  .option('-o, --output <file>', 'Output file path')
+  .action(async options => {
+    try {
+      console.log(chalk.cyan('📦 Detecting workspace packages...'));
+
+      // Try to find workspace configuration
+      let workspaces = [];
+
+      // Check package.json workspaces
+      try {
+        const pkgContent = await fs.readFile(path.resolve('package.json'), 'utf8');
+        const pkg = JSON.parse(pkgContent);
+        if (pkg.workspaces) {
+          workspaces = Array.isArray(pkg.workspaces) ? pkg.workspaces : pkg.workspaces.packages || [];
+        }
+      } catch (e) {
+        // No package.json or no workspaces
+      }
+
+      // Check pnpm-workspace.yaml
+      if (workspaces.length === 0) {
+        try {
+          const pnpmContent = await fs.readFile(path.resolve('pnpm-workspace.yaml'), 'utf8');
+          const match = pnpmContent.match(/packages:\s*\n((?:\s+-\s+.+\n?)+)/);
+          if (match) {
+            workspaces = match[1]
+              .split('\n')
+              .map(line => line.replace(/^\s*-\s*/, '').trim())
+              .filter(Boolean);
+          }
+        } catch (e) {
+          // No pnpm-workspace.yaml
+        }
+      }
+
+      if (workspaces.length === 0) {
+        console.log(chalk.yellow('No workspaces found. Running standard analysis...'));
+        const bot = new CodeReviewBot();
+        await bot.initialize();
+        await bot.runAnalysis(options);
+        return;
+      }
+
+      console.log(chalk.green(`Found ${workspaces.length} workspace patterns`));
+
+      // Expand glob patterns and analyze each
+      const allIssues = [];
+
+      for (const workspace of workspaces) {
+        const workspacePath = path.resolve(workspace.replace(/\/\*$/, ''));
+        console.log(chalk.gray(`  Analyzing: ${workspacePath}`));
+
+        try {
+          const bot = new CodeReviewBot();
+          await bot.initialize();
+          const { issues } = await bot.runAnalysis({
+            ...options,
+            silent: true,
+          });
+          allIssues.push(...issues.map(i => ({ ...i, workspace })));
+        } catch (e) {
+          console.warn(chalk.yellow(`    Skipped: ${e.message}`));
+        }
+      }
+
+      console.log(chalk.bold(`\n📊 Total issues across workspaces: ${allIssues.length}`));
+
+      // Group by workspace for summary
+      const byWorkspace = {};
+      for (const issue of allIssues) {
+        byWorkspace[issue.workspace] = (byWorkspace[issue.workspace] || 0) + 1;
+      }
+
+      for (const [ws, count] of Object.entries(byWorkspace)) {
+        console.log(chalk.gray(`  ${ws}: ${count} issues`));
+      }
+    } catch (error) {
+      console.error(chalk.red('Workspace analysis failed:'), error.message);
+      process.exit(1);
+    }
+  });
+
+// NEW: Send notifications
+program
+  .command('notify')
+  .description('Send analysis results to Slack or Discord')
+  .option('--slack', 'Send to Slack (requires SLACK_WEBHOOK_URL)')
+  .option('--discord', 'Send to Discord (requires DISCORD_WEBHOOK_URL)')
+  .option('--project <name>', 'Project name for notification', 'Project')
+  .option('--branch <name>', 'Branch name', 'main')
+  .action(async options => {
+    try {
+      const { SlackNotifier, DiscordNotifier } = await import('./integrations/notifications.js');
+      const bot = new CodeReviewBot();
+      await bot.initialize();
+
+      console.log(chalk.cyan('🔍 Running analysis...'));
+      const { issues } = await bot.runAnalysis({ format: 'json', silent: true });
+
+      const notifyOptions = {
+        projectName: options.project,
+        branch: options.branch,
+      };
+
+      if (options.slack) {
+        console.log(chalk.cyan('📤 Sending to Slack...'));
+        const slack = new SlackNotifier();
+        await slack.notify(issues, notifyOptions);
+        console.log(chalk.green('✓') + ' Sent to Slack');
+      }
+
+      if (options.discord) {
+        console.log(chalk.cyan('📤 Sending to Discord...'));
+        const discord = new DiscordNotifier();
+        await discord.notify(issues, notifyOptions);
+        console.log(chalk.green('✓') + ' Sent to Discord');
+      }
+
+      if (!options.slack && !options.discord) {
+        console.log(chalk.yellow('No notification target specified. Use --slack or --discord'));
+      }
+    } catch (error) {
+      console.error(chalk.red('Notification failed:'), error.message);
+      process.exit(1);
+    }
+  });
+
+// NEW: SARIF output for GitHub Security
+program
+  .command('sarif')
+  .description('Generate SARIF report for GitHub Security tab')
+  .option('-o, --output <file>', 'Output file path', 'sentinel-results.sarif')
+  .action(async options => {
+    try {
+      const { SarifGenerator } = await import('./output/sarifGenerator.js');
+      const bot = new CodeReviewBot();
+      await bot.initialize();
+
+      console.log(chalk.cyan('🔍 Running analysis...'));
+      const { issues } = await bot.runAnalysis({ format: 'json', silent: true });
+
+      const sarif = new SarifGenerator();
+      await sarif.saveToFile(issues, options.output);
+
+      console.log(chalk.green('✓') + ` SARIF report saved to ${options.output}`);
+      console.log(chalk.gray('  Upload to GitHub: gh code-scanning upload-sarif --sarif ' + options.output));
+    } catch (error) {
+      console.error(chalk.red('SARIF generation failed:'), error.message);
+      process.exit(1);
+    }
+  });
+
+// NEW: Trend analysis
+program
+  .command('trends')
+  .description('View historical analysis trends')
+  .option('--save', 'Save current analysis to history')
+  .option('--limit <number>', 'Number of history entries to show', '10')
+  .action(async options => {
+    try {
+      const { TrendTracker } = await import('./utils/analytics.js');
+      const tracker = new TrendTracker();
+
+      if (options.save) {
+        const bot = new CodeReviewBot();
+        await bot.initialize();
+        console.log(chalk.cyan('🔍 Running analysis...'));
+        const { issues } = await bot.runAnalysis({ format: 'json', silent: true });
+
+        await tracker.save(issues);
+        console.log(chalk.green('✓') + ' Analysis saved to history');
+      }
+
+      const trends = await tracker.analyzeTrends();
+
+      console.log('\n' + chalk.bold('📈 Sentinel Trend Analysis'));
+      console.log(chalk.gray('─'.repeat(50)));
+
+      if (trends.trend === 'insufficient_data') {
+        console.log(chalk.yellow('Not enough data points. Run `sentinel trends --save` after each analysis.'));
+      } else {
+        const trendEmoji = trends.trend === 'improving' ? '📉' : trends.trend === 'worsening' ? '📈' : '➡️';
+        const trendColor = trends.trend === 'improving' ? chalk.green : trends.trend === 'worsening' ? chalk.red : chalk.gray;
+
+        console.log(`${trendEmoji} Trend: ${trendColor(trends.trend.toUpperCase())}`);
+        console.log(`📊 Current Issues: ${chalk.bold(trends.current)}`);
+        console.log(`📅 Data Points: ${trends.dataPoints}`);
+        console.log(`🔄 Short-term Change: ${trends.shortTermChange >= 0 ? '+' : ''}${trends.shortTermChange}`);
+        console.log(`🔄 Long-term Change: ${trends.longTermChange >= 0 ? '+' : ''}${trends.longTermChange}`);
+        console.log('');
+        console.log(chalk.gray('Recent History:'));
+
+        const limit = parseInt(options.limit, 10) || 10;
+        for (const entry of trends.history.slice(0, limit)) {
+          const date = new Date(entry.date).toLocaleDateString();
+          const critical = entry.critical > 0 ? chalk.red(`${entry.critical}C `) : '';
+          const high = entry.high > 0 ? chalk.yellow(`${entry.high}H `) : '';
+          console.log(`  ${date}: ${critical}${high}${entry.total} total`);
+        }
+      }
+      console.log('');
+    } catch (error) {
+      console.error(chalk.red('Trend analysis failed:'), error.message);
+      process.exit(1);
+    }
+  });
+
+// NEW: Git blame integration
+program
+  .command('blame')
+  .description('Analyze issues with git blame attribution')
+  .option('-f, --format <format>', 'Output format (console|json)', 'console')
+  .option('-o, --output <file>', 'Output file path')
+  .action(async options => {
+    try {
+      const { GitBlameIntegration } = await import('./utils/analytics.js');
+      const bot = new CodeReviewBot();
+      await bot.initialize();
+
+      console.log(chalk.cyan('🔍 Running analysis...'));
+      const { issues } = await bot.runAnalysis({ format: 'json', silent: true });
+
+      console.log(chalk.cyan('🔎 Enriching with git blame...'));
+      const blameIntegration = new GitBlameIntegration();
+      const enrichedIssues = await blameIntegration.enrichIssuesWithBlame(issues);
+      const authorReport = blameIntegration.generateAuthorReport(enrichedIssues);
+
+      if (options.format === 'json') {
+        const output = JSON.stringify({ issues: enrichedIssues, byAuthor: authorReport }, null, 2);
+        if (options.output) {
+          await fs.writeFile(options.output, output, 'utf8');
+          console.log(chalk.green('✓') + ` Report saved to ${options.output}`);
+        } else {
+          console.log(output);
+        }
+      } else {
+        console.log('\n' + chalk.bold('👥 Issues by Author'));
+        console.log(chalk.gray('─'.repeat(50)));
+
+        for (const author of authorReport) {
+          const critical = author.counts.critical > 0 ? chalk.red(`${author.counts.critical}C `) : '';
+          const high = author.counts.high > 0 ? chalk.yellow(`${author.counts.high}H `) : '';
+          console.log(`\n${chalk.bold(author.author)} (${author.email})`);
+          console.log(`  Issues: ${critical}${high}${author.issues.length} total`);
+
+          // Show top 3 issues
+          for (const issue of author.issues.slice(0, 3)) {
+            const emoji = issue.severity === 'critical' ? '🛑' : issue.severity === 'high' ? '🔶' : '🔷';
+            console.log(`  ${emoji} ${issue.title} (${issue.file}:${issue.line})`);
+          }
+          if (author.issues.length > 3) {
+            console.log(chalk.gray(`  ... and ${author.issues.length - 3} more`));
+          }
+        }
+        console.log('');
+      }
+    } catch (error) {
+      console.error(chalk.red('Blame analysis failed:'), error.message);
+      process.exit(1);
+    }
+  });
+
+// NEW: Dashboard Command
+program
+  .command('dashboard')
+  .description('Launch the Sentinel web dashboard')
+  .option('-p, --port <number>', 'Port to run the dashboard on', '3000')
+  .action(async options => {
+    try {
+      const port = parseInt(options.port, 10);
+      const distPath = path.resolve(__dirname, '..', 'frontend', 'build');
+
+      // Check if dist exists
+      try {
+        await fs.access(distPath);
+      } catch (e) {
+        console.log(chalk.yellow('⚠️  Dashboard build not found. Building now...'));
+        const { execSync } = await import('child_process');
+        const frontendPath = path.resolve(__dirname, '..', 'frontend');
+        execSync('npm run build', { cwd: frontendPath, stdio: 'inherit' });
+      }
+
+      const assets = sirv(distPath, {
+        single: true,
+        dev: false,
+      });
+
+      const server = http.createServer((req, res) => {
+        assets(req, res);
+      });
+
+      server.listen(port, () => {
+        console.log(chalk.bold.green('🚀 Sentinel Dashboard is live!'));
+        console.log(chalk.cyan(`🔗 http://localhost:${port}`));
+        console.log(chalk.gray('Press Ctrl+C to stop'));
+      });
+    } catch (error) {
+      console.error(chalk.red('Failed to launch dashboard:'), error.message);
+      process.exit(1);
+    }
+  });
+
 program.parse();
