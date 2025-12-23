@@ -8,7 +8,7 @@
  * Note: Adjust model names and SDK calls to match the OpenAI SDK version in use.
  */
 
-const { OpenAI } = require("openai");
+import OpenAI from 'openai';
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 class ScannerAgent {
@@ -46,7 +46,7 @@ class FixerAgent {
 class ValidatorAgent {
   constructor(client) { this.client = client; }
 
-  async run(fixedCode, tests = []) {
+  async run(fixedCode) {
     const prompt = `You are a validator. Determine whether the following changes fix the reported issues. Provide a JSON object: { valid: boolean, details: string }.\n\nCode:\n${fixedCode}`;
     const res = await this.client.chat.completions.create({
       model: "gpt-4o-mini",
@@ -74,4 +74,4 @@ async function runDebugCycle(filePath, fileContent) {
   return results;
 }
 
-module.exports = { runDebugCycle, ScannerAgent, FixerAgent, ValidatorAgent };
+export { runDebugCycle, ScannerAgent, FixerAgent, ValidatorAgent };

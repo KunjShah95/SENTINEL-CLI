@@ -44,6 +44,7 @@ export class TeamAnnotations {
             this.annotations = new Map(Object.entries(data.annotations || {}));
             console.log(`📝 Loaded ${this.annotations.size} annotations`);
         } catch (error) {
+            console.warn(`TeamAnnotations: failed to load annotations (${this.annotationsFile}): ${error.message}`);
             this.annotations = new Map();
         }
     }
@@ -59,6 +60,7 @@ export class TeamAnnotations {
             this.suppressions = new Map(Object.entries(data.suppressions || {}));
             console.log(`🔇 Loaded ${this.suppressions.size} suppressions`);
         } catch (error) {
+            console.warn(`TeamAnnotations: failed to load suppressions (${this.suppressionsFile}): ${error.message}`);
             this.suppressions = new Map();
         }
     }
@@ -74,6 +76,7 @@ export class TeamAnnotations {
             this.assignments = new Map(Object.entries(data.assignments || {}));
             console.log(`👥 Loaded ${this.assignments.size} assignments`);
         } catch (error) {
+            console.warn(`TeamAnnotations: failed to load assignments (${this.assignmentsFile}): ${error.message}`);
             this.assignments = new Map();
         }
     }
@@ -655,9 +658,9 @@ export class TeamAnnotations {
 
         try {
             await Promise.all([
-                fs.unlink(this.annotationsFile).catch(() => { }),
-                fs.unlink(this.suppressionsFile).catch(() => { }),
-                fs.unlink(this.assignmentsFile).catch(() => { }),
+                fs.unlink(this.annotationsFile).catch(err => console.warn(`TeamAnnotations: failed to remove ${this.annotationsFile}: ${err.message}`)),
+                fs.unlink(this.suppressionsFile).catch(err => console.warn(`TeamAnnotations: failed to remove ${this.suppressionsFile}: ${err.message}`)),
+                fs.unlink(this.assignmentsFile).catch(err => console.warn(`TeamAnnotations: failed to remove ${this.assignmentsFile}: ${err.message}`)),
             ]);
 
             return { success: true };

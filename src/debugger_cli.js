@@ -4,18 +4,22 @@
  * Simple CLI to run the multi-agent debugger on a file or directory.
  */
 
-const fs = require('fs');
-const path = require('path');
-const glob = require('glob');
-const { runDebugCycle } = require('./multi_agent_debugger');
+import fs from 'fs';
+import glob from 'glob';
+import { fileURLToPath } from 'url';
+import path from 'path';
+import { runDebugCycle } from './multi_agent_debugger.js';
 
-async function processFile(filePath) {
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+export async function processFile(filePath) {
   const code = fs.readFileSync(filePath, 'utf8');
   const results = await runDebugCycle(filePath, code);
   return { file: filePath, results };
 }
 
-async function run(target) {
+export async function run(target) {
   const stats = fs.existsSync(target) ? fs.statSync(target) : null;
   const outputs = [];
   if (!stats) {
@@ -37,9 +41,7 @@ async function run(target) {
   console.log(JSON.stringify({ timestamp: new Date().toISOString(), target, outputs }, null, 2));
 }
 
-if (require.main === module) {
+if (process.argv[1] === __filename) {
   const target = process.argv[2] || process.cwd();
   run(target).catch(err => { console.error(err); process.exitCode = 1; });
 }
-
-module.exports = { run, processFile };

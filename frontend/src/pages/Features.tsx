@@ -1,48 +1,18 @@
-import { useEffect, useRef } from 'react';
-import { FeatureCard } from '../components/FeatureCard';
-import { 
-  Brain, 
-  Shield, 
-  Bug, 
-  Lock, 
-  FileSearch, 
-  Package, 
-  GitBranch, 
-  FileCheck, 
-  Zap, 
-  Code, 
-  Puzzle, 
-  Terminal,
-  AlertTriangle,
-  CheckCircle2,
-  BarChart3,
-  Download,
-  MessageSquare,
-  Wrench,
-  History,
-  Bell,
-  Layout,
-  Database,
-  Container,
-  Globe,
-  Users,
-  Trello
-} from 'lucide-react';
+
+import { useRef, useEffect } from 'react';
+import { Bot, Shield, Zap, GitBranch, ArrowRight, Check, Code2, Terminal, MessageSquare } from 'lucide-react';
 
 export function Features() {
   const revealRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add('active');
-          }
-        });
-      },
-      { threshold: 0.1 }
-    );
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('active');
+        }
+      });
+    }, { threshold: 0.1 });
 
     revealRefs.current.forEach((ref) => {
       if (ref) observer.observe(ref);
@@ -58,316 +28,176 @@ export function Features() {
   };
 
   return (
-    <div className="pt-20 overflow-x-hidden">
+    <div className="pt-20 min-h-screen bg-gray-950 font-sans overflow-x-hidden">
+
       {/* Hero */}
-      <section className="relative py-32 px-6">
-        <div className="absolute inset-0 grid-background opacity-30" />
-        <div className="max-w-7xl mx-auto text-center relative z-10 reveal" ref={addToRefs}>
+      <section className="py-24 px-6 text-center">
+        <div className="max-w-4xl mx-auto reveal" ref={addToRefs}>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-bold uppercase tracking-wider mb-8">
+            <Bot className="w-3 h-3" />
+            <span>AI V2 Engine</span>
+          </div>
           <h1 className="text-5xl md:text-7xl font-bold mb-8 tracking-tight">
-            Comprehensive <span className="text-gradient">Security Features</span>
+            Review code like a <br /><span className="text-gradient">Superhuman</span>
           </h1>
-          <p className="text-xl text-gray-400 max-w-3xl mx-auto leading-relaxed">
-            SENTINEL provides enterprise-grade security analysis with the simplicity of a CLI tool. 
-            Every feature is designed to catch vulnerabilities before they reach production.
+          <p className="text-xl text-gray-400 max-w-2xl mx-auto leading-relaxed">
+            SENTINEL replaces hours of manual code review with seconds of AI analysis.
+            It's not just a linter—it's an intelligent teammate.
           </p>
         </div>
       </section>
 
-      {/* AI Review Engine */}
+      {/* Feature 1: The Review Workflow (Zig) */}
       <section className="py-24 px-6">
-        <div className="max-w-7xl mx-auto">
-          <div className="mb-16 reveal" ref={addToRefs}>
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">AI Review Engine</h2>
-            <p className="text-xl text-gray-400">
-              Advanced language models trained on security best practices
-            </p>
+        <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-16 items-center">
+          <div className="order-2 lg:order-1 reveal" ref={addToRefs}>
+            <div className="relative rounded-2xl bg-[#0d1117] border border-gray-800 p-8 shadow-2xl">
+              {/* Abstract Timeline Visualization */}
+              <div className="space-y-8 relative">
+                <div className="absolute left-6 top-4 bottom-4 w-0.5 bg-gray-800" />
+                {[
+                  { icon: GitBranch, color: "text-gray-400", title: "Pull Request Created", time: "1m ago" },
+                  { icon: Bot, color: "text-emerald-400", title: "SENTINEL Analysis", time: "Just now", active: true },
+                  { icon: MessageSquare, color: "text-blue-400", title: "3 Issues Found", time: "Pending" },
+                ].map((step, i) => (
+                  <div key={i} className="relative flex items-center gap-4">
+                    <div className={`relative z-10 w-12 h-12 rounded-full border bg-gray-900 flex items-center justify-center ${step.active ? 'border-emerald-500 shadow-lg shadow-emerald-500/20' : 'border-gray-800'}`}>
+                      <step.icon className={`w-5 h-5 ${step.color}`} />
+                    </div>
+                    <div>
+                      <div className={`font-bold ${step.active ? 'text-white' : 'text-gray-500'}`}>{step.title}</div>
+                      <div className="text-xs text-gray-600 font-mono">{step.time}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
-          
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 reveal" ref={addToRefs}>
-            <FeatureCard 
-              icon={Brain}
-              title="Multi-LLM Support"
-              description="Choose from GPT-4, Claude, Gemini, or run local models for maximum privacy"
-            />
-            <FeatureCard 
-              icon={Code}
-              title="Context-Aware Analysis"
-              description="AI understands your codebase structure and identifies complex vulnerabilities"
-            />
-            <FeatureCard 
-              icon={Zap}
-              title="Smart Caching"
-              description="Only re-analyzes changed files, saving time and API costs"
-            />
-            <FeatureCard 
-              icon={FileSearch}
-              title="Deep Code Review"
-              description="Analyzes data flow, authentication patterns, and business logic flaws"
-            />
-            <FeatureCard 
-              icon={CheckCircle2}
-              title="False Positive Reduction"
-              description="AI learns from your codebase to minimize noise and focus on real issues"
-            />
-            <FeatureCard 
-              icon={Terminal}
-              title="Explainable Results"
-              description="Every finding includes detailed explanation and remediation guidance"
-            />
+          <div className="order-1 lg:order-2 reveal" ref={addToRefs}>
+            <h3 className="text-sm font-bold text-emerald-500 uppercase tracking-widest mb-4">Seamless Integration</h3>
+            <h2 className="text-4xl font-bold mb-6">Works where you work.</h2>
+            <p className="text-lg text-gray-400 leading-relaxed mb-8">
+              Connect Sentinel to your GitHub or GitLab repositories. It automatically scans every new PR,
+              leaving comments just like a human reviewer would—but faster and more thorough.
+            </p>
+            <ul className="space-y-4">
+              {['Zero configuration required', 'Comments directly on the diff', 'Smart filtering of noise'].map(item => (
+                <li key={item} className="flex items-center gap-3 text-gray-300">
+                  <Check className="w-5 h-5 text-emerald-500" />
+                  {item}
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
       </section>
 
-      {/* Security & Vulnerabilities */}
-      <section className="py-24 px-6 bg-gray-950/50 relative">
-        <div className="absolute top-0 left-0 w-full h-px bg-linear-to-r from-transparent via-gray-800 to-transparent" />
-        <div className="max-w-7xl mx-auto">
-          <div className="mb-16 reveal" ref={addToRefs}>
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">Security & Vulnerability Detection</h2>
-            <p className="text-xl text-gray-400">
-              Comprehensive coverage of OWASP Top 10 and beyond
+      {/* Feature 2: Context Awareness (Zag) */}
+      <section className="py-24 px-6 bg-gray-900/20 border-y border-white/5">
+        <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-16 items-center">
+          <div className="reveal" ref={addToRefs}>
+            <h3 className="text-sm font-bold text-blue-500 uppercase tracking-widest mb-4">Context Aware</h3>
+            <h2 className="text-4xl font-bold mb-6">It understands your logic.</h2>
+            <p className="text-lg text-gray-400 leading-relaxed mb-8">
+              Traditional tools look for regex matches. Sentinel understands data flow and business logic.
+              It knows that `isUserAdmin` needs to be checked before `deleteDatabase`.
             </p>
+            <div className="flex gap-4">
+              <div className="px-6 py-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 font-bold">
+                Detects Logic Bugs
+              </div>
+              <div className="px-6 py-3 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400 font-bold">
+                API Misuse
+              </div>
+            </div>
           </div>
-          
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 reveal" ref={addToRefs}>
-            <FeatureCard 
-              icon={Shield}
-              title="Injection Attacks"
-              description="Detect SQL, NoSQL, command, and LDAP injection vulnerabilities"
-            />
-            <FeatureCard 
-              icon={Lock}
-              title="Authentication Issues"
-              description="Find broken authentication, session management, and access control flaws"
-            />
-            <FeatureCard 
-              icon={AlertTriangle}
-              title="Sensitive Data Exposure"
-              description="Identify hardcoded secrets, API keys, and insecure data handling"
-            />
-            <FeatureCard 
-              icon={Bug}
-              title="XXE & Deserialization"
-              description="Catch unsafe XML parsing and insecure deserialization patterns"
-            />
-            <FeatureCard 
-              icon={FileCheck}
-              title="Security Misconfiguration"
-              description="Detect insecure defaults, unnecessary features, and misconfigurations"
-            />
-            <FeatureCard 
-              icon={Code}
-              title="XSS Prevention"
-              description="Find cross-site scripting vulnerabilities in frontend and backend code"
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* CI/CD & Automation */}
-      <section className="py-24 px-6">
-        <div className="max-w-7xl mx-auto">
-          <div className="mb-16 reveal" ref={addToRefs}>
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">CI/CD & Automation</h2>
-            <p className="text-xl text-gray-400">
-              Seamlessly integrate into your development pipeline
-            </p>
-          </div>
-          
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 reveal" ref={addToRefs}>
-            <FeatureCard 
-              icon={GitBranch}
-              title="GitHub Actions"
-              description="Pre-built actions for automatic security checks on every PR"
-            />
-            <FeatureCard 
-              icon={GitBranch}
-              title="GitLab CI/CD"
-              description="Native integration with GitLab pipelines and security dashboards"
-            />
-            <FeatureCard 
-              icon={GitBranch}
-              title="Jenkins & CircleCI"
-              description="Easy integration with popular CI/CD platforms via CLI"
-            />
-            <FeatureCard 
-              icon={Terminal}
-              title="Pre-commit Hooks"
-              description="Catch issues before they're committed with Git hooks integration"
-            />
-            <FeatureCard 
-              icon={Zap}
-              title="Fail-Fast Mode"
-              description="Configure thresholds to block deployments with critical issues"
-            />
-            <FeatureCard 
-              icon={FileCheck}
-              title="Status Checks"
-              description="Automatic pass/fail status for pull request merge protection"
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* Reports & Outputs */}
-      <section className="py-24 px-6 bg-gray-950/50 relative">
-        <div className="absolute top-0 left-0 w-full h-px bg-linear-to-r from-transparent via-gray-800 to-transparent" />
-        <div className="max-w-7xl mx-auto">
-          <div className="mb-16 reveal" ref={addToRefs}>
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">Reports & Outputs</h2>
-            <p className="text-xl text-gray-400">
-              Flexible reporting for developers and security teams
-            </p>
-          </div>
-          
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 reveal" ref={addToRefs}>
-            <FeatureCard 
-              icon={FileCheck}
-              title="JSON Export"
-              description="Machine-readable format for automation and custom tooling"
-            />
-            <FeatureCard 
-              icon={BarChart3}
-              title="HTML Reports"
-              description="Beautiful, interactive reports with charts and filtering"
-            />
-            <FeatureCard 
-              icon={FileSearch}
-              title="Markdown Output"
-              description="Perfect for documentation and GitHub issue creation"
-            />
-            <FeatureCard 
-              icon={Download}
-              title="SARIF Format"
-              description="Standard format for integration with security dashboards"
-            />
-            <FeatureCard 
-              icon={Terminal}
-              title="Console Pretty Print"
-              description="Color-coded terminal output with severity indicators"
-            />
-            <FeatureCard 
-              icon={BarChart3}
-              title="Trend Analysis"
-              description="Track security metrics over time with historical data"
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* Advanced AI & Interactive */}
-      <section className="py-24 px-6">
-        <div className="max-w-7xl mx-auto">
-          <div className="mb-16 reveal" ref={addToRefs}>
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">Advanced AI & Interactive</h2>
-            <p className="text-xl text-gray-400">
-              Interactive tools for deeper code understanding and automated fixes
-            </p>
-          </div>
-          
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 reveal" ref={addToRefs}>
-            <FeatureCard 
-              icon={MessageSquare}
-              title="Interactive AI Chat"
-              description="Chat with your codebase. Ask questions about security, logic, or refactoring."
-            />
-            <FeatureCard 
-              icon={Wrench}
-              title="AI-Powered Auto-Fix"
-              description="Automatically generate and apply fixes for identified security vulnerabilities."
-            />
-            <FeatureCard 
-              icon={Brain}
-              title="Code Refactoring"
-              description="Get AI suggestions for improving code structure, readability, and performance."
-            />
-            <FeatureCard 
-              icon={History}
-              title="Historical Trends"
-              description="Save analysis snapshots and track your security posture over time."
-            />
-            <FeatureCard 
-              icon={Terminal}
-              title="Interactive TUI"
-              description="Rich terminal interface for browsing issues and applying fixes (Coming Soon)."
-            />
-            <FeatureCard 
-              icon={Layout}
-              title="Web Dashboard"
-              description="Visual analytics and team metrics in a beautiful web interface (Coming Soon)."
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* Infrastructure & Ecosystem */}
-      <section className="py-24 px-6 bg-gray-950/50 relative">
-        <div className="absolute top-0 left-0 w-full h-px bg-linear-to-r from-transparent via-gray-800 to-transparent" />
-        <div className="max-w-7xl mx-auto">
-          <div className="mb-16 reveal" ref={addToRefs}>
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">Infrastructure & Ecosystem</h2>
-            <p className="text-xl text-gray-400">
-              Securing your entire stack from code to container
-            </p>
-          </div>
-          
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 reveal" ref={addToRefs}>
-            <FeatureCard 
-              icon={Container}
-              title="Docker Security"
-              description="Scan Dockerfiles for best practices and insecure configurations."
-            />
-            <FeatureCard 
-              icon={Database}
-              title="API Schema Validation"
-              description="Validate GraphQL and REST API schemas for security and breaking changes."
-            />
-            <FeatureCard 
-              icon={Globe}
-              title="SBOM Generation"
-              description="Generate Software Bill of Materials (CycloneDX/SPDX) for compliance."
-            />
-            <FeatureCard 
-              icon={Bell}
-              title="Smart Notifications"
-              description="Get instant alerts on Slack or Discord for critical security findings."
-            />
-            <FeatureCard 
-              icon={Users}
-              title="Team Annotations"
-              description="Collaborate with your team by adding comments and suppressing false positives."
-            />
-            <FeatureCard 
-              icon={Trello}
-              title="Issue Tracker Sync"
-              description="Sync findings directly with Jira, Linear, or GitHub Issues."
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* CTA */}
-      <section className="py-32 px-6">
-        <div className="max-w-5xl mx-auto relative">
-          <div className="absolute inset-0 bg-emerald-600 rounded-3xl blur-3xl opacity-10" />
-          <div className="relative bg-linear-to-br from-emerald-600 to-blue-700 rounded-3xl p-12 md:p-20 text-center overflow-hidden">
-            <div className="relative z-10 reveal" ref={addToRefs}>
-              <h2 className="text-4xl md:text-6xl font-bold mb-8 text-white">Start Using These Features Today</h2>
-              <p className="text-xl mb-12 text-emerald-100 max-w-2xl mx-auto leading-relaxed">
-                All features included in the open source version. No premium tiers, no limitations.
-              </p>
-              <a 
-                href="https://github.com/sentinel-cli" 
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-block px-10 py-4 rounded-xl bg-white text-emerald-600 font-bold hover:bg-emerald-50 transition-all shadow-xl"
-              >
-                View on GitHub
-              </a>
+          <div className="reveal" ref={addToRefs}>
+            <div className="relative rounded-2xl bg-[#0d1117] border border-gray-800 p-6 shadow-2xl font-mono text-sm">
+              <div className="flex gap-2 mb-4 text-xs text-gray-500 border-b border-gray-800 pb-2">
+                <span>user.ts</span>
+              </div>
+              <div className="space-y-1">
+                <div className="text-gray-500">24 | function deleteUser(id) {"{"}</div>
+                <div className="text-gray-500">25 |   // AI Warning: Missing authorization check</div>
+                <div className="bg-rose-500/10 text-gray-200 border-l-2 border-rose-500 pl-2">26 |   db.users.delete(id);</div>
+                <div className="text-gray-500">27 | {"}"}</div>
+              </div>
+              <div className="mt-4 p-3 rounded bg-blue-500/10 border border-blue-500/20 text-blue-300 text-xs">
+                <span className="font-bold block mb-1">🤖 Sentinel Analysis:</span>
+                Function `deleteUser` is exported but lacks an authorization check. Ensure user has `admin` role.
+              </div>
             </div>
           </div>
         </div>
       </section>
+
+      {/* Feature 3: Auto-Fix (Zig) */}
+      <section className="py-24 px-6">
+        <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-16 items-center">
+          <div className="order-2 lg:order-1 reveal" ref={addToRefs}>
+            <div className="relative rounded-2xl bg-[#0d1117] border border-gray-800 p-8 shadow-2xl overflow-hidden group">
+              <div className="absolute top-0 right-0 p-4 bg-emerald-600 text-white font-bold text-xs rounded-bl-2xl">
+                Fixed automatically
+              </div>
+              <div className="font-mono text-sm text-gray-400 mb-2">Before</div>
+              <div className="bg-red-500/10 p-3 rounded border border-red-500/20 mb-4 text-red-200 line-through">
+                const token = "sk_live_12345";
+              </div>
+              <div className="font-mono text-sm text-gray-400 mb-2">After</div>
+              <div className="bg-emerald-500/10 p-3 rounded border border-emerald-500/20 text-emerald-300">
+                const token = process.env.STRIPE_KEY;
+              </div>
+              <div className="mt-6 flex justify-center">
+                <button className="px-6 py-2 bg-emerald-600 rounded-lg text-white font-bold text-sm shadow-lg shadow-emerald-600/20 group-hover:scale-105 transition-transform">
+                  Accept Changes
+                </button>
+              </div>
+            </div>
+          </div>
+          <div className="order-1 lg:order-2 reveal" ref={addToRefs}>
+            <h3 className="text-sm font-bold text-purple-500 uppercase tracking-widest mb-4">Automated Remediation</h3>
+            <h2 className="text-4xl font-bold mb-6">Don't just find bugs. Fix them.</h2>
+            <p className="text-lg text-gray-400 leading-relaxed mb-8">
+              Sentinel doesn't just complain. It knows how to fix common security issues and bad practices.
+              With one click, you can commit the suggested fix directly to your branch.
+            </p>
+            <div className="grid grid-cols-2 gap-4">
+              {['XSS Prevention', 'Dependency Updates', 'Secret Removal', 'Type Fixes'].map((tag) => (
+                <div key={tag} className="flex items-center gap-2 text-sm text-gray-400 bg-gray-900 border border-gray-800 px-3 py-2 rounded-lg">
+                  <Zap className="w-4 h-4 text-yellow-500" />
+                  {tag}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Additional Features Grid */}
+      <section className="py-24 px-6 bg-gray-900/30">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-16 reveal" ref={addToRefs}>
+            <h2 className="text-3xl font-bold mb-4">And so much more...</h2>
+          </div>
+          <div className="grid md:grid-cols-3 gap-8 reveal" ref={addToRefs}>
+            {[
+              { icon: Shield, title: "Dependency Scanning", desc: "Checks package.json for known CVEs using the OSV database." },
+              { icon: Terminal, title: "Universal CLI", desc: "Runs on Linux, macOS, and Windows. Single binary, no dependencies." },
+              { icon: Code2, title: "Multi-Language", desc: "Native support for JS, TS, Python, Go, Rust, and Java." },
+              { icon: MessageSquare, title: "Chat Interface", desc: "Ask questions about your codebase in natural language." },
+              { icon: GitBranch, title: "Git Hooks", desc: "Pre-commit and pre-push hooks ensure no bad code leaves your machine." },
+              { icon: Zap, title: "Performance", desc: "Scanning is 10x faster than traditional SAST tools thanks to Rust core." }
+            ].map((item, i) => (
+              <div key={i} className="p-6 rounded-2xl bg-gray-950 border border-gray-800 hover:border-gray-700 transition-all">
+                <item.icon className="w-8 h-8 text-gray-400 mb-4" />
+                <h3 className="text-xl font-bold text-white mb-2">{item.title}</h3>
+                <p className="text-sm text-gray-400 leading-relaxed">{item.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
     </div>
   );
 }

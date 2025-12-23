@@ -6,16 +6,15 @@ interface TerminalLine {
 }
 
 const sampleOutput: TerminalLine[] = [
-  { type: 'command', content: 'sentinel run --all' },
-  { type: 'output', content: '🔍 Scanning project files...' },
-  { type: 'success', content: '✓ Collected 47 files for analysis' },
-  { type: 'output', content: '🤖 Running AI security review...' },
-  { type: 'warning', content: '⚠ Potential SQL injection in auth.js:42' },
-  { type: 'warning', content: '⚠ Hardcoded secret detected in config.js:15' },
-  { type: 'success', content: '✓ No critical vulnerabilities in API routes' },
-  { type: 'success', content: '📊 Review complete: 2 issues found' },
-  { type: 'output', content: '   Critical: 0 | High: 1 | Medium: 1 | Low: 0' },
-  { type: 'output', content: '📝 Full report: ./sentinel-report.json' },
+  { type: 'command', content: 'sentinel review-pr https://github.com/org/repo/pull/123' },
+  { type: 'output', content: '🔍 Fetching PR #123 context...' },
+  { type: 'success', content: '✓ Analyzed 12 changed files' },
+  { type: 'output', content: '🤖 Thinking...' },
+  { type: 'warning', content: '⚠ Found IDOR vulnerability in users.ts' },
+  { type: 'warning', content: '⚠ Exposed API key in config.env' },
+  { type: 'success', content: '✓ Generated 3 automated fixes' },
+  { type: 'success', content: '🚀 Commented on PR #123' },
+  { type: 'output', content: '   View Report: https://sentinel.ai/report/xyz' },
 ];
 
 export function TerminalMock() {

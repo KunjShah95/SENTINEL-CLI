@@ -1,5 +1,9 @@
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const src = path.resolve(__dirname, '..', 'frontend', 'build', 'assets', 'index-DiAc6ytY.css');
 if (!fs.existsSync(src)) {

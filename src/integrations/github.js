@@ -3,11 +3,13 @@
  * GitHubIntegration - Posts Sentinel analysis results to GitHub PRs
  * Uses the GitHub REST API directly (no octokit dependency)
  */
+import rateLimiter from '../utils/rateLimiter.js';
 export class GitHubIntegration {
     constructor(options = {}) {
         this.token = options.token || process.env.GITHUB_TOKEN;
         this.baseUrl = options.baseUrl || 'https://api.github.com';
     }
+
 
     /**
      * Parse a GitHub PR URL into owner, repo, and PR number
@@ -62,7 +64,9 @@ export class GitHubIntegration {
             throw new Error('Invalid GitHub API URL');
         }
         
-        const response = await fetch(url, options);
+        const response = rateLimiter
+            ? await rateLimiter.schedule(() => fetch(url, options))
+            : await fetch(url, options);
 
         if (!response.ok) {
             const errorBody = await response.text();

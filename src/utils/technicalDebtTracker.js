@@ -37,6 +37,7 @@ export class TechnicalDebtTracker {
       this.debtData = JSON.parse(content);
     } catch (error) {
       // File doesn't exist or is corrupted
+      console.warn(`TechnicalDebtTracker: failed to load debt file (${this.debtFile}): ${error.message}`);
       this.debtData = {
         version: '1.0.0',
         lastUpdated: null,
@@ -61,6 +62,7 @@ export class TechnicalDebtTracker {
       const content = await fs.readFile(this.historyFile, 'utf8');
       this.history = JSON.parse(content);
     } catch (error) {
+      console.warn(`TechnicalDebtTracker: failed to load history file (${this.historyFile}): ${error.message}`);
       this.history = [];
     }
   }
@@ -680,8 +682,8 @@ export class TechnicalDebtTracker {
     
     try {
       await Promise.all([
-        fs.unlink(this.debtFile).catch(() => {}),
-        fs.unlink(this.historyFile).catch(() => {}),
+        fs.unlink(this.debtFile).catch(err => console.warn(`TechnicalDebtTracker: failed to remove ${this.debtFile}: ${err.message}`)),
+        fs.unlink(this.historyFile).catch(err => console.warn(`TechnicalDebtTracker: failed to remove ${this.historyFile}: ${err.message}`)),
       ]);
       
       return { success: true };

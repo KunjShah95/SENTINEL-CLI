@@ -1,4 +1,5 @@
 import axios from 'axios';
+import rateLimiter from '../utils/rateLimiter.js';
 
 let GoogleGenerativeAIClient = null;
 let GroqClient = null;
@@ -215,9 +216,11 @@ export default class LLMOrchestrator {
       payload.response_format = { type: 'json_object' };
     }
 
-    const response = await axios.post('https://api.openai.com/v1/chat/completions', payload, {
-      headers: { Authorization: `Bearer ${provider.apiKey}` },
-    });
+    const response = await rateLimiter.schedule(() =>
+      axios.post('https://api.openai.com/v1/chat/completions', payload, {
+        headers: { Authorization: `Bearer ${provider.apiKey}` },
+      })
+    );
 
     return response.data.choices[0]?.message?.content || '';
   }
@@ -258,42 +261,46 @@ export default class LLMOrchestrator {
 
   async callOpenRouter(provider, prompt, options = {}) {
     const messages = this.buildMessages(options.systemPrompt, prompt);
-    const response = await axios.post(
-      'https://openrouter.ai/api/v1/chat/completions',
-      {
-        model: provider.model || 'google/gemini-pro-1.5',
-        temperature: this.temperature,
-        max_tokens: this.maxTokens,
-        messages,
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${provider.apiKey}`,
-          'HTTP-Referer':
-            provider.metadata?.referer || 'https://github.com/KunjShah95/Sentinel-CLI',
+    const response = await rateLimiter.schedule(() =>
+      axios.post(
+        'https://openrouter.ai/api/v1/chat/completions',
+        {
+          model: provider.model || 'google/gemini-pro-1.5',
+          temperature: this.temperature,
+          max_tokens: this.maxTokens,
+          messages,
         },
-      }
+        {
+          headers: {
+            Authorization: `Bearer ${provider.apiKey}`,
+            'HTTP-Referer':
+              provider.metadata?.referer || 'https://github.com/KunjShah95/Sentinel-CLI',
+          },
+        }
+      )
     );
     return response.data.choices[0]?.message?.content || '';
   }
 
   async callAnthropic(provider, prompt, options = {}) {
-    const response = await axios.post(
-      'https://api.anthropic.com/v1/messages',
-      {
-        model: provider.model || 'claude-3-opus-20240229',
-        max_tokens: this.maxTokens,
-        temperature: this.temperature,
-        messages: [{ role: 'user', content: prompt }],
-        ...(options.systemPrompt ? { system: options.systemPrompt } : {}),
-      },
-      {
-        headers: {
-          'x-api-key': provider.apiKey,
-          'anthropic-version': '2023-06-01',
-          'Content-Type': 'application/json',
+    const response = await rateLimiter.schedule(() =>
+      axios.post(
+        'https://api.anthropic.com/v1/messages',
+        {
+          model: provider.model || 'claude-3-opus-20240229',
+          max_tokens: this.maxTokens,
+          temperature: this.temperature,
+          messages: [{ role: 'user', content: prompt }],
+          ...(options.systemPrompt ? { system: options.systemPrompt } : {}),
         },
-      }
+        {
+          headers: {
+            'x-api-key': provider.apiKey,
+            'anthropic-version': '2023-06-01',
+            'Content-Type': 'application/json',
+          },
+        }
+      )
     );
     return response.data?.content?.[0]?.text || '';
   }

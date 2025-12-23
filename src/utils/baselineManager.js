@@ -83,7 +83,8 @@ export class BaselineManager {
     try {
       await fs.access(this.baselineFile);
       return true;
-    } catch {
+    } catch (error) {
+      console.warn('Baseline access check failed:', error?.message || String(error));
       return false;
     }
   }
@@ -319,6 +320,7 @@ export class BaselineManager {
 
       return baselineFiles;
     } catch (error) {
+      console.warn('Failed to list baseline files:', error?.message || String(error));
       return [];
     }
   }

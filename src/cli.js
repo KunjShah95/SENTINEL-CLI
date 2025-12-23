@@ -9,6 +9,7 @@ import { promises as fs } from 'fs';
 import http from 'http';
 import sirv from 'sirv';
 import { fileURLToPath } from 'url';
+import { execFile } from 'child_process';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -121,12 +122,12 @@ let bannerShown = false;
 const showBannerOnce = async (command) => {
   if (bannerShown) return;
   bannerShown = true; // Set immediately to prevent race conditions from bubbling hooks
-  
+
   // Get options, handling both the root program and subcommands
   const programOpts = program.opts();
   const commandOpts = command ? command.opts() : {};
   const opts = { ...programOpts, ...commandOpts };
-  
+
   // Only show banner for console output (default)
   if (!opts.format || opts.format === 'console') {
     await displayBanner({
@@ -199,6 +200,173 @@ program
       }
     } catch (error) {
       console.error(chalk.red('Analysis failed:'), error.message);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('agents ci [input]')
+  .description('Run multi-agent analysis with CI defaults (SARIF/JUnit, gating)')
+  .option('-f, --format <format>', 'Output format (console|json|markdown|html|sarif|junit)', 'console')
+  .option('--sarif-out <file>', 'Write SARIF output to file', '.sentinel_sarif.json')
+  .option('--junit-out <file>', 'Write JUnit XML to file', '.sentinel_junit.xml')
+  .option('--fail-on <severity>', 'Fail when severity at or above threshold', 'high')
+  .option('--metrics', 'Include metrics in output', true)
+  .option('--run-tests', 'Run tests and extract coverage', true)
+  .option('--typecheck', 'Run TypeScript typecheck if tsconfig.json exists', false)
+  .option('--openapi <path>', 'Path to OpenAPI schema file')
+  .option('--graphql <path>', 'Path to GraphQL schema file')
+  .action(async (input, options) => {
+    try {
+      const orchestratorPath = path.resolve(process.cwd(), 'SENTINEL-CLI', 'agents', 'multi_agent_orchestrator.js');
+      const baseArgs = [];
+      if (input) baseArgs.push(input);
+      // Produce SARIF
+      const sarifArgs = [...baseArgs, '--sarif'];
+      if (options.failOn) sarifArgs.push('--fail-on', options.failOn);
+      if (options.metrics) sarifArgs.push('--metrics');
+      if (options.runTests) sarifArgs.push('--run-tests');
+      if (options.typecheck) sarifArgs.push('--typecheck');
+      if (options.openapi) sarifArgs.push('--openapi', options.openapi);
+      if (options.graphql) sarifArgs.push('--graphql', options.graphql);
+      sarifArgs.push('--json');
+      await showBannerOnce(program);
+      const sarifRes = await new Promise((resolve) => {
+        execFile('node', [orchestratorPath, ...sarifArgs], { cwd: process.cwd() }, (err, stdout, stderr) => {
+          resolve({ code: err && err.code ? err.code : 0, stdout, stderr });
+        });
+      });
+      if (sarifRes.stdout && options.sarifOut) {
+        await fs.writeFile(path.resolve(process.cwd(), options.sarifOut), sarifRes.stdout, 'utf8');
+        console.log(chalk.green(`Saved SARIF to ${options.sarifOut}`));
+      }
+      // Produce JUnit
+      const junitArgs = [...baseArgs, '--format', 'junit'];
+      if (options.failOn) junitArgs.push('--fail-on', options.failOn);
+      if (options.metrics) junitArgs.push('--metrics');
+      const junitRes = await new Promise((resolve) => {
+        execFile('node', [orchestratorPath, ...junitArgs], { cwd: process.cwd() }, (err, stdout, stderr) => {
+          resolve({ code: err && err.code ? err.code : 0, stdout, stderr });
+        });
+      });
+      if (junitRes.stdout && options.junitOut) {
+        await fs.writeFile(path.resolve(process.cwd(), options.junitOut), junitRes.stdout, 'utf8');
+        console.log(chalk.green(`Saved JUnit to ${options.junitOut}`));
+      }
+      // Exit code: prefer SARIF run code
+      if (sarifRes.code !== 0) {
+        process.exit(sarifRes.code);
+      }
+    } catch (error) {
+      console.error(chalk.red('Agents CI run failed:'), error.message);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('agents pr <pr-url> [input]')
+  .description('Run multi-agent analysis and post markdown summary to a GitHub PR')
+  .option('--fail-on <severity>', 'Fail when severity at or above threshold', 'high')
+  .option('--openapi <path>', 'Path to OpenAPI schema file')
+  .option('--graphql <path>', 'Path to GraphQL schema file')
+  .action(async (prUrl, input, options) => {
+    try {
+      const orchestratorPath = path.resolve(process.cwd(), 'SENTINEL-CLI', 'agents', 'multi_agent_orchestrator.js');
+      const args = [];
+      if (input) args.push(input);
+      args.push('--format', 'markdown');
+      if (options.failOn) args.push('--fail-on', options.failOn);
+      if (options.openapi) args.push('--openapi', options.openapi);
+      if (options.graphql) args.push('--graphql', options.graphql);
+      await showBannerOnce(program);
+      const runRes = await new Promise((resolve) => {
+        execFile('node', [orchestratorPath, ...args], { cwd: process.cwd() }, (err, stdout, stderr) => {
+          resolve({ code: err && err.code ? err.code : 0, stdout, stderr });
+        });
+      });
+      const markdown = runRes.stdout || '';
+      if (!markdown.trim()) {
+        console.log(chalk.yellow('No markdown output generated by agents.'));
+        if (runRes.code !== 0) process.exit(runRes.code);
+        return;
+      }
+      const { GitHubIntegration } = await import('./integrations/github.js');
+      const gh = new GitHubIntegration();
+      const { owner, repo, prNumber } = gh.parsePrUrl(prUrl);
+      await gh.postComment(owner, repo, prNumber, markdown);
+      console.log(chalk.green(`Posted agents markdown summary to ${prUrl}`));
+      if (runRes.code !== 0) {
+        process.exit(runRes.code);
+      }
+    } catch (error) {
+      console.error(chalk.red('Agents PR run failed:'), error.message);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('agents [input]')
+  .description('Run multi-agent analysis (Scanner → Fixer → Validator)')
+  .option('-f, --format <format>', 'Output format (console|json|markdown|html|sarif|junit)', 'console')
+  .option('--fail-on <severity>', 'Fail when severity at or above threshold')
+  .option('--openapi <path>', 'Path to OpenAPI schema file')
+  .option('--graphql <path>', 'Path to GraphQL schema file')
+  .option('--metrics', 'Include metrics in output')
+  .option('--run-tests', 'Run tests and extract coverage')
+  .option('--typecheck', 'Run TypeScript typecheck if tsconfig.json exists')
+  .option('--role <role>', 'Role-based verbosity (developer|reviewer|manager)', 'developer')
+  .option('--audit-out <path>', 'Append audit summary to a JSONL file')
+  .option('-o, --output <file>', 'Write output to file')
+  .action(async (input, options) => {
+    try {
+      const orchestratorPath = path.resolve(process.cwd(), 'SENTINEL-CLI', 'agents', 'multi_agent_orchestrator.js');
+      const args = [];
+      if (input) args.push(input);
+      if (options.format && options.format !== 'console') {
+        args.push('--format', options.format);
+      }
+      if (options.failOn || options.failOn === '') {
+        const val = options.failOn || '';
+        args.push('--fail-on', val);
+      }
+      if (options.openapi) {
+        args.push('--openapi', options.openapi);
+      }
+      if (options.graphql) {
+        args.push('--graphql', options.graphql);
+      }
+      if (options.metrics) args.push('--metrics');
+      if (options.runTests) args.push('--run-tests');
+      if (options.typecheck) args.push('--typecheck');
+      if (options.role) {
+        args.push('--role', options.role);
+      }
+      if (options.auditOut) {
+        args.push('--audit-out', options.auditOut);
+      }
+      const needsJson = options.format === 'json' || options.format === 'sarif';
+      if (needsJson) args.push('--json');
+      await showBannerOnce(program);
+      const res = await new Promise((resolve) => {
+        execFile('node', [orchestratorPath, ...args], { cwd: process.cwd() }, (err, stdout, stderr) => {
+          resolve({ code: err && err.code ? err.code : 0, stdout, stderr });
+        });
+      });
+      const outText = res.stdout || '';
+      if (options.output) {
+        const outPath = path.resolve(process.cwd(), options.output);
+        await fs.writeFile(outPath, outText, 'utf8');
+        console.log(chalk.green(`Saved output to ${outPath}`));
+      } else {
+        if (outText.trim().length) {
+          console.log(outText);
+        }
+      }
+      if (res.code !== 0) {
+        process.exit(res.code);
+      }
+    } catch (error) {
+      console.error(chalk.red('Agents run failed:'), error.message);
       process.exit(1);
     }
   });

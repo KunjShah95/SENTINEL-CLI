@@ -46,7 +46,7 @@ Unlike hosted SaaS solutions, Sentinel runs **entirely on your machine or CI pip
 # Install globally
 npm install -g sentinel-cli
 
-# Quick preset commands (NEW in v1.3.0)
+# Quick preset commands (NEW in v1.4.0)
 sentinel security-audit      # Full security scan
 sentinel full-scan            # All 13 analyzers
 sentinel frontend             # React + TypeScript + A11y
@@ -84,7 +84,7 @@ sentinel dashboard            # Launch local web dashboard
 **Sample Output:**
 
 ```
-🛡️ SENTINEL — AI-Powered Code Guardian v1.3.0
+🛡️ SENTINEL — AI-Powered Code Guardian v1.4.0
 
 ✔ Analyzing 12 files with 6 analyzers...
 
@@ -135,7 +135,7 @@ Summary: 1 critical, 2 high, 5 medium, 12 low issues found
 
 ---
 
-## ✨ Features (v1.3.0)
+## ✨ Features (v1.4.0)
 
 | Category | What It Does |
 |----------|--------------|

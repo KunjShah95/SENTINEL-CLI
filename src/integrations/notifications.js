@@ -184,13 +184,31 @@ export class SlackNotifier {
             payload.channel = this.channel;
         }
 
-        const response = await fetch(this.webhookUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(payload),
-        });
+        // Use shared rate limiter for outbound webhook calls
+        let response;
+        try {
+            // lazy dynamic import to avoid potential CJS/ESM mismatch
+            const limiterModule = await import('../utils/rateLimiter.js');
+            const limiter = limiterModule && limiterModule.default ? limiterModule.default : null;
+            response = limiter
+                ? await limiter.schedule(() => fetch(this.webhookUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                }))
+                : await fetch(this.webhookUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+        } catch (e) {
+            // Fallback to direct fetch if import fails
+            response = await fetch(this.webhookUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+        }
 
         if (!response.ok) {
             const errorText = await response.text();
@@ -321,13 +339,29 @@ export class DiscordNotifier {
             payload.avatar_url = this.avatarUrl;
         }
 
-        const response = await fetch(this.webhookUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(payload),
-        });
+        // Use shared rate limiter for outbound webhook calls
+        let response;
+        try {
+            const limiterModule = await import('../utils/rateLimiter.js');
+            const limiter = limiterModule && limiterModule.default ? limiterModule.default : null;
+            response = limiter
+                ? await limiter.schedule(() => fetch(this.webhookUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                }))
+                : await fetch(this.webhookUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+        } catch (e) {
+            response = await fetch(this.webhookUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+        }
 
         if (!response.ok) {
             const errorText = await response.text();

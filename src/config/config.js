@@ -252,7 +252,7 @@ export class Config {
       );
       this.config.ai.providers = providers;
       // Persist the sanitized config to avoid reintroducing secrets later.
-      this.save().catch(() => { });
+        this.save().catch(err => console.warn(`Config: failed to save sanitized config: ${err.message}`));
     }
   }
 

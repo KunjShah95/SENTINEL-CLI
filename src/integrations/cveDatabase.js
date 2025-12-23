@@ -1,4 +1,5 @@
 import axios from 'axios';
+import rateLimiter from '../utils/rateLimiter.js';
 import fs from 'fs/promises';
 import path from 'path';
 import { EventEmitter } from 'events';
@@ -85,13 +86,13 @@ export class CVEDatabaseIntegration extends EventEmitter {
   async testConnectivity() {
     try {
       // Test GitHub Advisory API
-      await axios.get(`${this.githubAdvisoryUrl}/database`, {
+      await rateLimiter.schedule(() => axios.get(`${this.githubAdvisoryUrl}/database`, {
         headers: {
           'User-Agent': 'Sentinel-CLI/1.3.0',
           'Accept': 'application/vnd.github+json'
         },
         timeout: 10000
-      });
+      }));
       
       console.log('🔗 GitHub Advisory Database: Connected');
     } catch (error) {
@@ -223,7 +224,7 @@ export class CVEDatabaseIntegration extends EventEmitter {
     
     try {
       // Query GitHub Security Advisories API
-      const response = await axios.get(`${this.githubAdvisoryUrl}`, {
+      const response = await rateLimiter.schedule(() => axios.get(`${this.githubAdvisoryUrl}`, {
         params: {
           ecosystem: ecosystem.toUpperCase(),
           package: packageName,
@@ -235,7 +236,7 @@ export class CVEDatabaseIntegration extends EventEmitter {
           'Accept': 'application/vnd.github+json'
         },
         timeout: 15000
-      });
+      }));
 
       if (response.data && response.data.length > 0) {
         for (const advisory of response.data) {
@@ -622,13 +623,13 @@ export class CVEDatabaseIntegration extends EventEmitter {
       params.apiKey = this.realTimeFeeds.nvd.apiKey;
     }
     
-    const response = await axios.get(this.nvdUrl, {
+    const response = await rateLimiter.schedule(() => axios.get(this.nvdUrl, {
       params,
       headers: {
         'User-Agent': 'Sentinel-CLI/1.3.0',
       },
       timeout: 30000,
-    });
+    }));
     
     return response.data.vulnerabilities || [];
   }
@@ -637,7 +638,7 @@ export class CVEDatabaseIntegration extends EventEmitter {
    * Fetch CVEs from OSV
    */
   async fetchOSVCVEs(since) {
-    const response = await axios.post(this.osvUrl, {
+    const response = await rateLimiter.schedule(() => axios.post(this.osvUrl, {
       query: {
         modified: {
           from: since,
@@ -649,7 +650,7 @@ export class CVEDatabaseIntegration extends EventEmitter {
         'User-Agent': 'Sentinel-CLI/1.3.0',
       },
       timeout: 30000,
-    });
+    }));
     
     return response.data.vulns || [];
   }
