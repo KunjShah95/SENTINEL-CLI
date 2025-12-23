@@ -17,7 +17,7 @@ test('markdown format outputs heading', async () => {
 });
 
 test('sarif output contains version', async () => {
-  const res = await runNode(["const token='ghp_123456789012345678901234567890123456';", '--sarif']);
+  const res = await runNode(["const token='ghp_123.......';", '--sarif']);
   expect(res.stdout.includes('"version": "2.1.0"')).toBe(true);
 });
 
