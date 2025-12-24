@@ -2,7 +2,20 @@
   "version": 2,
   "name": "sentinel-cli-website",
   "routes": [
-    { "handle": "filesystem" },
-    { "src": "\\/(.*)", "dest": "frontend/build/index.html" }
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "^/assets/(.*)",
+      "dest": "/frontend/build/assets/$1"
+    },
+    {
+      "src": "^/sentinel-preview.png",
+      "dest": "/frontend/build/sentinel-preview.png"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/frontend/build/index.html"
+    }
   ]
 }
