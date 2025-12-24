@@ -4,7 +4,7 @@ import { ArrowRight, Terminal, Github, CheckCircle2, Bot, ShieldAlert, Sparkles,
 import { Link } from 'react-router-dom';
 import { TerminalMock } from '../components/TerminalMock';
 import { PRComment } from '../components/PRComment';
-import { Showcase } from '../components/Showcase';
+
 
 export function Home() {
   const revealRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -108,18 +108,6 @@ export function Home() {
         </div>
       </section>
 
-      {/* Trust Ticker */}
-      <section className="py-10 border-y border-white/5 bg-black/20 backdrop-blur-sm">
-        <div className="max-w-7xl mx-auto px-6 text-center">
-          <p className="text-sm font-mono text-gray-500 uppercase tracking-widest mb-8">Trusted by security teams at</p>
-          <div className="flex flex-wrap justify-center gap-12 md:gap-20 opacity-50 grayscale hover:grayscale-0 transition-all duration-700">
-            {/* Simple Text Placeholders for Logos to keep it generic but 'techy' */}
-            {['ACME Corp', 'Vercel', 'Stripe', 'Supabase', 'Shopify'].map((brand) => (
-              <span key={brand} className="text-xl font-bold font-display text-white">{brand}</span>
-            ))}
-          </div>
-        </div>
-      </section>
 
       {/* Feature Value Props */}
       <section className="py-32 px-6">
@@ -166,9 +154,6 @@ export function Home() {
           </div>
         </div>
       </section>
-
-      {/* Social Showcase */}
-      <Showcase />
 
       {/* Integration CTA */}
       <section className="py-24 px-6 relative overflow-hidden">
