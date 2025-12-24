@@ -4,6 +4,7 @@ import { ArrowRight, Terminal, Github, CheckCircle2, Bot, ShieldAlert, Sparkles,
 import { Link } from 'react-router-dom';
 import { TerminalMock } from '../components/TerminalMock';
 import { PRComment } from '../components/PRComment';
+import { Showcase } from '../components/Showcase';
 
 export function Home() {
   const revealRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -165,6 +166,9 @@ export function Home() {
           </div>
         </div>
       </section>
+
+      {/* Social Showcase */}
+      <Showcase />
 
       {/* Integration CTA */}
       <section className="py-24 px-6 relative overflow-hidden">
