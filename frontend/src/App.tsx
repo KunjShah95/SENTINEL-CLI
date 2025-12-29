@@ -8,8 +8,8 @@ import { Docs } from './pages/Docs';
 import { Changelog } from './pages/Changelog';
 import { Playground } from './pages/Playground';
 import { Blog } from './pages/Blog';
-import { Config } from './pages/Config';
 import { Analytics } from "@vercel/analytics/react"
+
 
 
 export default function App() {
@@ -25,7 +25,6 @@ export default function App() {
           <Route path="/changelog" element={<Changelog />} />
           <Route path="/playground" element={<Playground />} />
           <Route path="/blog" element={<Blog />} />
-          <Route path="/config" element={<Config />} />
         </Routes>
         <Footer />
         <Analytics />

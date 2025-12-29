@@ -22,11 +22,33 @@ export function Footer() {
               Catch vulnerabilities, review pull requests, and fix bugs before they merge.
             </p>
             <div className="flex gap-4">
-              {[Github, Twitter, Linkedin].map((Icon, i) => (
-                <a key={i} href="#" className="p-2 rounded-lg bg-white/5 hover:bg-emerald-500/10 hover:text-emerald-400 text-gray-400 transition-all border border-white/5 hover:border-emerald-500/20">
-                  <Icon className="w-4 h-4" />
-                </a>
-              ))}
+              <a
+                href="https://github.com/KunjShah95/SENTINEL-CLI"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-2 rounded-lg bg-white/5 hover:bg-emerald-500/10 hover:text-emerald-400 text-gray-400 transition-all border border-white/5 hover:border-emerald-500/20"
+                aria-label="GitHub"
+              >
+                <Github className="w-4 h-4" />
+              </a>
+              <a
+                href="https://x.com/kunjshah_dev"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-2 rounded-lg bg-white/5 hover:bg-emerald-500/10 hover:text-emerald-400 text-gray-400 transition-all border border-white/5 hover:border-emerald-500/20"
+                aria-label="Twitter/X"
+              >
+                <Twitter className="w-4 h-4" />
+              </a>
+              <a
+                href="https://www.linkedin.com/in/kunjshah05"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-2 rounded-lg bg-white/5 hover:bg-emerald-500/10 hover:text-emerald-400 text-gray-400 transition-all border border-white/5 hover:border-emerald-500/20"
+                aria-label="LinkedIn"
+              >
+                <Linkedin className="w-4 h-4" />
+              </a>
             </div>
           </div>
 
