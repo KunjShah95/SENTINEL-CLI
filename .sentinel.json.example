@@ -1,0 +1,65 @@
+{
+  "data": {
+    "directory": ".sentinel"
+  },
+  "providers": {
+    "openai": {
+      "apiKey": "your-openai-api-key",
+      "disabled": false
+    },
+    "anthropic": {
+      "apiKey": "your-anthropic-api-key",
+      "disabled": false
+    },
+    "gemini": {
+      "apiKey": "your-gemini-api-key",
+      "disabled": false
+    },
+    "groq": {
+      "apiKey": "your-groq-api-key",
+      "disabled": false
+    },
+    "openrouter": {
+      "apiKey": "your-openrouter-api-key",
+      "disabled": false
+    },
+    "copilot": {
+      "disabled": true
+    }
+  },
+  "agents": {
+    "coder": {
+      "model": "gpt-4o-mini",
+      "maxTokens": 5000
+    },
+    "task": {
+      "model": "claude-3-5-sonnet-20241022",
+      "maxTokens": 5000
+    },
+    "title": {
+      "model": "gpt-4o-mini",
+      "maxTokens": 80
+    }
+  },
+  "shell": {
+    "path": "/bin/bash",
+    "args": ["-l"]
+  },
+  "mcpServers": {
+    "example": {
+      "type": "stdio",
+      "command": "path/to/mcp-server",
+      "env": [],
+      "args": []
+    }
+  },
+  "lsp": {
+    "typescript": {
+      "disabled": false,
+      "command": "typescript-language-server"
+    }
+  },
+  "debug": false,
+  "debugLSP": false,
+  "autoCompact": true
+}

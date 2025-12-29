@@ -111,7 +111,7 @@ program
   • GitHub PR integration
   • Slack/Discord notifications
   • SARIF output for GitHub Security`)
-  .version('1.6.0')
+  .version('1.8.0')
   .option('--banner-message <text>', 'Banner text', 'SENTINEL')
   .option('--banner-font <name>', 'Figlet font name', 'Standard')
   .option('--banner-gradient <name>', 'Banner gradient: aqua|fire|rainbow|aurora|mono', 'aqua')
@@ -143,6 +143,130 @@ const showBannerOnce = async (command) => {
 program.hook('preAction', async (thisCommand) => {
   await showBannerOnce(thisCommand);
 });
+
+// ========================================
+// AUTH COMMAND - Primary way to configure API keys
+// ========================================
+program
+  .command('auth [subcommand] [provider]')
+  .description('Configure API keys for AI providers')
+  .addHelpText('after', `
+Subcommands:
+  login       Interactive API key setup (default)
+  status      Show configured providers
+  logout      Clear all API keys
+  set <name>  Set a specific provider's key
+
+Examples:
+  sentinel auth              # Start interactive setup
+  sentinel auth status       # Check configured providers
+  sentinel auth set openai   # Set OpenAI API key
+  sentinel auth logout       # Clear all keys
+
+Configuration:
+  Sentinel looks for .sentinel.json in:
+  1. Current directory (highest priority)
+  2. $XDG_CONFIG_HOME/sentinel/
+  3. $HOME/ (global config)
+`)
+  .action(async (subcommand, provider) => {
+    try {
+      const { runAuthCommand } = await import('./cli/authCommand.js');
+      const args = [subcommand, provider].filter(Boolean);
+      await runAuthCommand(args);
+    } catch (error) {
+      console.error(chalk.red('Auth failed:'), error.message);
+    }
+  });
+
+program
+  .command('config')
+  .description('Manage Sentinel configuration')
+  .option('--set <key>=<value>', 'Set a configuration value')
+  .option('--get <key>', 'Get a configuration value')
+  .option('--list', 'Show current configuration (API keys are masked)')
+  .option('--open', 'Open configuration file in default editor')
+  .option('--path', 'Show configuration file path')
+  .action(async (options) => {
+    try {
+      const { configManager } = await import('./config/configManager.js');
+      await configManager.load();
+
+      if (options.path) {
+        console.log(configManager.configPath || configManager.getDefaultConfigPath());
+        return;
+      }
+
+      if (options.open) {
+        const { exec } = await import('child_process');
+        const configPath = configManager.configPath || configManager.getDefaultConfigPath();
+        const opener = process.platform === 'win32' ? 'start ""' : process.platform === 'darwin' ? 'open' : 'xdg-open';
+        exec(`${opener} "${configPath}"`);
+        console.log(chalk.green(`Opening ${configPath}...`));
+        return;
+      }
+
+      if (options.list) {
+        console.log(chalk.cyan('Sentinel Configuration:'));
+        console.log(chalk.gray(`File: ${configManager.configPath || 'Not yet created'}`));
+        console.log('');
+        // Show masked config to protect API keys
+        console.log(JSON.stringify(configManager.getMaskedConfig(), null, 2));
+        return;
+      }
+
+      if (options.get) {
+        const value = configManager.get(options.get);
+        if (value !== null) {
+          console.log(typeof value === 'object' ? JSON.stringify(value, null, 2) : value);
+        } else {
+          console.log(chalk.yellow(`Key not found: ${options.get}`));
+        }
+        return;
+      }
+
+      if (options.set) {
+        const [key, value] = options.set.split('=');
+        if (!key || value === undefined) {
+          console.error(chalk.red('Invalid format. Use --set key=value'));
+          return;
+        }
+
+        // Handle boolean conversion
+        let finalValue = value;
+        if (value.toLowerCase() === 'true') finalValue = true;
+        else if (value.toLowerCase() === 'false') finalValue = false;
+        else if (!isNaN(value) && value.trim() !== '') finalValue = Number(value);
+
+        configManager.set(key, finalValue);
+        const savedPath = await configManager.save();
+        console.log(chalk.green(`✓ Set ${key} = ${finalValue}`));
+        console.log(chalk.gray(`Saved to: ${savedPath}`));
+        return;
+      }
+
+      // No options provided - show help and redirect to auth
+      console.log(chalk.bold('Sentinel Configuration'));
+      console.log('');
+      console.log(chalk.gray('Config file locations (in order of priority):'));
+      console.log(chalk.gray('  1. ./.sentinel.json (project-local)'));
+      console.log(chalk.gray('  2. $XDG_CONFIG_HOME/sentinel/.sentinel.json'));
+      console.log(chalk.gray('  3. $HOME/.sentinel.json (global)'));
+      console.log('');
+      console.log(chalk.bold('Commands:'));
+      console.log('  sentinel config --list      Show current configuration');
+      console.log('  sentinel config --get <key> Get a specific value');
+      console.log('  sentinel config --set k=v   Set a configuration value');
+      console.log('  sentinel config --open      Open config file in editor');
+      console.log('  sentinel config --path      Show config file path');
+      console.log('');
+      console.log(chalk.cyan('💡 To configure API keys, use: sentinel auth'));
+      console.log('');
+
+    } catch (error) {
+      console.error(chalk.red('Config failed:'), error.message);
+    }
+  });
 
 program
   .command('analyze [files...]')
@@ -1414,7 +1538,41 @@ program
         dev: false,
       });
 
-      const server = http.createServer((req, res) => {
+      const server = http.createServer(async (req, res) => {
+        // API Routes
+        if (req.url === '/api/config' && req.method === 'GET') {
+          try {
+            const { configManager } = await import('./config/configManager.js');
+            await configManager.load();
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(configManager.config));
+            return;
+          } catch (err) {
+            res.writeHead(500);
+            res.end(JSON.stringify({ error: err.message }));
+            return;
+          }
+        }
+
+        if (req.url === '/api/config' && req.method === 'POST') {
+          let body = '';
+          req.on('data', chunk => body += chunk);
+          req.on('end', async () => {
+            try {
+              const { configManager } = await import('./config/configManager.js');
+              const newConfig = JSON.parse(body);
+              await configManager.save(newConfig);
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ success: true }));
+            } catch (err) {
+              res.writeHead(500);
+              res.end(JSON.stringify({ error: err.message }));
+            }
+          });
+          return;
+        }
+
+        // Static files
         assets(req, res);
       });
 

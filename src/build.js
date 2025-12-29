@@ -54,10 +54,13 @@ class BuildTool {
       'bot.js',
       'demo.js',
       'analyzers',
+      'cli',
       'config',
       'git',
-      'output',
+      'integrations',
       'llm',
+      'output',
+      'utils',
     ];
 
     for (const item of filesToCopy) {
@@ -66,13 +69,13 @@ class BuildTool {
         console.warn(`⚠️  Skipping potentially unsafe item: ${item}`);
         continue;
       }
-      
+
       const srcPath = path.resolve(this.srcDir, item);
       const destPath = path.resolve(this.distDir, item);
-      
+
       // Validate paths are within expected directories
-      if (!srcPath.startsWith(path.resolve(this.srcDir)) || 
-          !destPath.startsWith(path.resolve(this.distDir))) {
+      if (!srcPath.startsWith(path.resolve(this.srcDir)) ||
+        !destPath.startsWith(path.resolve(this.distDir))) {
         console.warn(`⚠️  Skipping unsafe path: ${item}`);
         continue;
       }
@@ -95,7 +98,7 @@ class BuildTool {
 
   async copyDirectory(srcDir, destDir) {
     await fs.mkdir(destDir, { recursive: true });
-    
+
     let items;
     try {
       items = await fs.readdir(srcDir);
@@ -110,13 +113,13 @@ class BuildTool {
         console.warn(`⚠️  Skipping potentially unsafe item: ${item}`);
         continue;
       }
-      
+
       const srcPath = path.resolve(srcDir, item);
       const destPath = path.resolve(destDir, item);
-      
+
       // Validate paths are within expected directories
-      if (!srcPath.startsWith(path.resolve(srcDir)) || 
-          !destPath.startsWith(path.resolve(destDir))) {
+      if (!srcPath.startsWith(path.resolve(srcDir)) ||
+        !destPath.startsWith(path.resolve(destDir))) {
         console.warn(`⚠️  Skipping unsafe path: ${item}`);
         continue;
       }

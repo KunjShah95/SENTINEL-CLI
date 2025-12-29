@@ -21,6 +21,7 @@ import {
 
 const sections = [
   { id: 'installation', label: 'Installation', icon: Download },
+  { id: 'auth', label: 'Authentication', icon: Lock },
   { id: 'core', label: 'Core Commands', icon: Terminal },
   { id: 'presets', label: 'Presets', icon: Zap },
   { id: 'integrations', label: 'Integrations', icon: GitBranch },
@@ -244,6 +245,56 @@ export function Docs() {
                 </div>
               )}
 
+              {/* Authentication */}
+              {activeSection === 'auth' && (
+                <div className="space-y-12 animate-in fade-in duration-500">
+                  <div className="border-b border-gray-800 pb-8">
+                    <h1 className="text-4xl md:text-5xl font-bold mb-6 text-white tracking-tight">Authentication</h1>
+                    <p className="text-xl text-gray-400 leading-relaxed max-w-2xl">
+                      Securely manage your AI provider API keys. Sentinel supports multi-provider setup with local encryption.
+                    </p>
+                  </div>
+
+                  <div className="space-y-12">
+                    <section>
+                      <h3 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
+                        <Lock className="w-6 h-6 text-emerald-500" />
+                        Interactive Login
+                      </h3>
+                      <p className="text-gray-400 mb-4">
+                        The easiest way to get started. Run the interactive wizard to set up keys for OpenAI, Anthropic, Gemini, Groq, and OpenRouter.
+                      </p>
+                      <CodeBlock
+                        code="sentinel auth"
+                        id="auth-login"
+                      />
+                    </section>
+
+                    <section>
+                      <h3 className="text-2xl font-bold text-white mb-4">Check Status</h3>
+                      <p className="text-gray-400 mb-4">
+                        View which providers are currently configured and verify their connectivity.
+                      </p>
+                      <CodeBlock
+                        code="sentinel auth status"
+                        id="auth-status"
+                      />
+                    </section>
+
+                    <section>
+                      <h3 className="text-2xl font-bold text-white mb-4">Sign Out</h3>
+                      <p className="text-gray-400 mb-4">
+                        Clear all stored API keys from your local and global configuration.
+                      </p>
+                      <CodeBlock
+                        code="sentinel auth logout"
+                        id="auth-logout"
+                      />
+                    </section>
+                  </div>
+                </div>
+              )}
+
               {/* Core Commands */}
               {activeSection === 'core' && (
                 <div className="space-y-12 animate-in fade-in duration-500">
@@ -410,29 +461,42 @@ sentinel full-scan"
 
                   <div className="space-y-12">
                     <section>
-                      <h3 className="text-2xl font-bold text-white mb-4">AI Model Management</h3>
-                      <p className="text-gray-400 mb-4">Configure which LLM providers Sentinel uses for analysis and fixing.</p>
-                      <CodeBlock
-                        code="# Switch standard provider
-sentinel models --enable openai --model openai=gpt-4
-
-# Use open source models via Groq
-sentinel models --enable groq --model groq=llama3-70b-8192
-
-# Configure API keys (stored safely in .env)
-sentinel models --env openai=OPENAI_API_KEY"
-                        id="config-models"
-                      />
+                      <h3 className="text-2xl font-bold text-white mb-4">Configuration Locations</h3>
+                      <p className="text-gray-400 mb-4">Sentinel looks for <code>.sentinel.json</code> in three locations (in order of priority):</p>
+                      <div className="grid gap-4 mb-8">
+                        <div className="p-4 rounded-xl bg-gray-900 border border-gray-800">
+                          <span className="text-emerald-400 font-bold mr-2">1.</span>
+                          <code className="text-sm text-gray-300">./.sentinel.json</code>
+                          <span className="text-gray-500 ml-4">— Project-local (highest priority)</span>
+                        </div>
+                        <div className="p-4 rounded-xl bg-gray-900 border border-gray-800">
+                          <span className="text-emerald-400 font-bold mr-2">2.</span>
+                          <code className="text-sm text-gray-300">$XDG_CONFIG_HOME/sentinel/.sentinel.json</code>
+                        </div>
+                        <div className="p-4 rounded-xl bg-gray-900 border border-gray-800">
+                          <span className="text-emerald-400 font-bold mr-2">3.</span>
+                          <code className="text-sm text-gray-300">$HOME/.sentinel.json</code>
+                          <span className="text-gray-500 ml-4">— Global user config</span>
+                        </div>
+                      </div>
                     </section>
 
                     <section>
-                      <h3 className="text-2xl font-bold text-white mb-4">Custom Rules (.sentinelrules.yaml)</h3>
-                      <p className="text-gray-400 mb-4">Define custom regex-based rules to enforce team standards.</p>
+                      <h3 className="text-2xl font-bold text-white mb-4">Manual Editing</h3>
+                      <p className="text-gray-400 mb-4">You can manually edit the JSON config to customize agent behavior and system settings.</p>
                       <CodeBlock
-                        code={`rules:
-  - id: no-console-log\n    pattern: "console\\\\.log"\n    message: "No console.log in production code"\n    severity: warning\n    filePattern: "\\\\.(js|ts)$"\n    \n  - id: no-eval\n    pattern: "eval\\\\("\n    severity: error\n    message: "Eval is evil. Do not use."`}
-                        language="yaml"
-                        id="config-rules"
+                        code={`{
+  "providers": {
+    "openai": { "apiKey": "sk-...", "disabled": false },
+    "gemini": { "apiKey": "AI...", "disabled": false }
+  },
+  "agents": {
+    "coder": { "model": "gpt-4o-mini", "maxTokens": 5000 }
+  },
+  "debug": false
+}`}
+                        language="json"
+                        id="config-json"
                       />
                     </section>
                   </div>
@@ -608,7 +672,7 @@ sentinel trends --from "30 days ago"`}
               )}
 
               {/* Fallback for other sections */}
-              {!['installation', 'core', 'agents', 'dashboard', 'presets', 'config', 'cicd', 'integrations', 'notifications', 'reporting', 'faq'].includes(activeSection) && (
+              {!['installation', 'auth', 'core', 'agents', 'dashboard', 'presets', 'config', 'cicd', 'integrations', 'notifications', 'reporting', 'faq'].includes(activeSection) && (
                 <div className="flex flex-col items-center justify-center py-20 text-center animate-in zoom-in-95 duration-500">
                   <div className="relative mb-8">
                     <div className="absolute inset-0 bg-emerald-500/20 blur-xl rounded-full" />

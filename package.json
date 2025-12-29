@@ -1,22 +1,26 @@
 {
   "name": "sentinel-cli",
-  "version": "1.6.0",
+  "version": "1.8.0",
   "description": "Sentinel - AI-Powered Code Guardian: Automated code review with security scanning, dependency analysis, accessibility checks, TypeScript/React analysis, API security, secrets detection, and multi-LLM integration",
   "main": "src/index.js",
   "type": "module",
   "bin": {
-    "sentinel": "src/cli.js"
+    "sentinel": "./src/cli.js"
   },
   "files": [
     "src/**/*",
     "dist/**/*",
     "frontend/build/**/*",
     "README.md",
-    ".env.example"
+    ".env.example",
+    ".sentinel.json.example"
   ],
   "scripts": {
-    "start": "node src/index.js",
-    "dev": "node --watch src/index.js",
+    "start": "node src/cli.js",
+    "launch": "node src/cli.js dashboard",
+    "dev": "node --watch src/cli.js",
+    "auth": "node src/cli.js auth",
+    "config": "node src/cli.js config",
     "review": "node src/cli.js analyze",
     "security": "node src/cli.js security-audit",
     "full-scan": "node src/cli.js full-scan",
@@ -35,7 +39,8 @@
     "deploy": "npm run build:frontend && npx vercel --prod",
     "demo": "node src/demo.js",
     "prepublishOnly": "npm run lint && npm run build:all",
-    "postversion": "git push && git push --tags"
+    "postversion": "git push && git push --tags",
+    "postinstall": "echo \"\n✨ Sentinel CLI installed! Run 'sentinel auth' to configure your API keys or 'sentinel dashboard' to see the UI.\n\""
   },
   "keywords": [
     "code-review",

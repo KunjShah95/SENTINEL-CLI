@@ -1,6 +1,5 @@
 import { promises as fs } from 'fs';
 import path from 'path';
-import os from 'os';
 
 /**
  * Environment Loader for Sentinel CLI
@@ -20,7 +19,6 @@ export class EnvLoader {
         if (this.loaded) return;
 
         const localEnvPath = path.join(process.cwd(), '.env');
-        const globalEnvPath = path.join(os.homedir(), '.sentinel', '.env');
 
         let loadedAny = false;
 
@@ -36,23 +34,34 @@ export class EnvLoader {
             }
         }
 
-        // 2. Try Global (Fallback)
+        // 3. Try Sentinel JSON Config (New System)
         try {
-            const globalContent = await fs.readFile(globalEnvPath, 'utf8');
-            this.applyEnvVars(this.parseEnvContent(globalContent));
-            if (!loadedAny) {
-                // only log if we didn't load local, to avoid noise
-                // or maybe we want to know global loaded too? 
-                // If local loaded, global vars only fill gaps.
-                // Let's just log if we loaded something new or if it's the primary source.
+            const { configManager } = await import('./configManager.js');
+            await configManager.load();
+
+            if (configManager.config?.providers) {
+                const providerMap = {
+                    openai: 'OPENAI_API_KEY',
+                    anthropic: 'ANTHROPIC_API_KEY',
+                    gemini: 'GEMINI_API_KEY',
+                    groq: 'GROQ_API_KEY',
+                    openrouter: 'OPENROUTER_API_KEY'
+                };
+
+                Object.entries(providerMap).forEach(([provider, envKey]) => {
+                    const apiKey = configManager.getApiKey(provider);
+                    if (apiKey && !process.env[envKey]) {
+                        process.env[envKey] = apiKey;
+                        loadedAny = true;
+                    }
+                });
             }
-            loadedAny = true;
         } catch (error) {
-            // Ignore missing global config
+            // Ignore missing or malformed sentinel config
         }
 
-        if (!loadedAny) {
-            console.log('ℹ️  No .env file found (checked local and global ~/.sentinel/) - using system environment variables');
+        if (!loadedAny && !this.loaded) {
+            // Only log if we haven't successfully loaded anything yet
         }
 
         this.loaded = true;

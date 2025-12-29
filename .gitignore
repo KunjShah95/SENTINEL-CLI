@@ -9,6 +9,7 @@ node_modules
 # Configuration with secrets
 .codereviewrc.json
 .codereview-cache.json
+.sentinel.json
 
 # Reports and output
 report.html

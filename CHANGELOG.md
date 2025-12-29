@@ -5,7 +5,35 @@ All notable changes to Sentinel CLI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.5.0] - 2025-12-23
+## [1.8.0] - 2025-12-29
+
+### 🚀 New Features
+
+#### Unified Configuration System
+- **Interactive Auth** - Added `sentinel auth` command for seamless API key management.
+- **Multi-Location Config** - Sentinel now searches for `.sentinel.json` in local project, `$XDG_CONFIG_HOME`, and `$HOME`.
+- **Gemini Support** - First-class integration for Google's Gemini AI.
+- **Secure Storage** - Config files are created with restricted permissions (`0o600`) and automatically ignored by Git.
+
+#### Dashboard Improvements
+- **Premium UI** - Refreshed Web Dashboard with enhanced gradients and streamlined navigation.
+- **Provider View** - Real-time configuration status for all AI providers.
+
+### 🔧 Improvements
+- **Build Pipeline** - Overhauled `src/build.js` for robust NPM packaging.
+- **Doc Site** - Updated frontend documentation with comprehensive Authentication and Configuration guides.
+- **Post-Install Hook** - Added user guidance after global installation.
+
+---
+
+## [1.7.0] - 2025-12-28
+
+### 🚀 Updates
+- Optimized build performance and cleaned up frontend dependencies.
+- Improved dashboard responsiveness.
+
+---
+
 
 ### 🔧 Fixes
 - Hotfix: Version bump to resolve npm registry conflict with v1.4.0.

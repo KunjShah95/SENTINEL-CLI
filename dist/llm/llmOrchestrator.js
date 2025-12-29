@@ -40,16 +40,15 @@ export default class LLMOrchestrator {
           },
         ];
 
+
+
     return configuredProviders
       .map((providerConfig, index) => {
         const envKey = providerConfig.apiKeyEnv || ENV_FALLBACKS[providerConfig.provider];
-        const apiKey = envKey ? process.env[envKey] : undefined;
+        let apiKey = envKey ? process.env[envKey] : undefined;
 
-        if (providerConfig.enabled !== false && providerConfig.provider !== 'local' && !apiKey) {
-          console.warn(
-            `Provider "${providerConfig.id || providerConfig.provider}" is enabled but ${envKey || 'an API key env var'} is not set. It will be skipped.`
-          );
-        }
+        // Note: SentinelManager keys are handled in bot.js and passed via config or we can check them here 
+        // if we make this method async or use a cached version.
 
         return {
           id: providerConfig.id || `${providerConfig.provider || 'provider'}-${index}`,

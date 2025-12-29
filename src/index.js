@@ -1,6 +1,7 @@
 import { CodeReviewBot } from './bot.js';
 import Config from './config/config.js';
 import GitUtils from './git/gitUtils.js';
+import { configManager } from './config/configManager.js';
 
 export default CodeReviewBot;
-export { Config, GitUtils };
+export { Config, GitUtils, configManager };

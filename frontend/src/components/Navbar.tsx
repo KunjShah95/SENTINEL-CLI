@@ -29,7 +29,8 @@ export function Navbar() {
               { name: 'Features', path: '/features' },
               { name: 'How It Works', path: '/how-it-works' },
               { name: 'Playground', path: '/playground' },
-              { name: 'Docs', path: '/docs' }
+              { name: 'Docs', path: '/docs' },
+              { name: 'Settings', path: '/config' }
             ].map((link) => (
               <Link
                 key={link.path}

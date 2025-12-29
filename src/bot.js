@@ -2,7 +2,6 @@ import chalk from 'chalk';
 import ora from 'ora';
 import { promises as fs } from 'fs';
 import path from 'path';
-import os from 'os';
 
 import Config from './config/config.js';
 import GitUtils from './git/gitUtils.js';
@@ -35,6 +34,15 @@ export class CodeReviewBot {
     try {
       await config.load();
       await config.validate();
+
+      // Load global config and inject API keys into environment if missing
+      try {
+        const { configManager } = await import('./config/configManager.js');
+        await configManager.load();
+        configManager.injectEnvVars();
+      } catch (globalConfigError) {
+        // Silently continue if global config fails
+      }
 
       // Initialize analyzers
       const enabledAnalyzers = config.getAnalyzers();
@@ -486,13 +494,13 @@ export class CodeReviewBot {
         {
           type: 'list',
           name: 'provider',
-          message: 'Select AI Provider (set the matching environment variable separately):',
+          message: 'Select AI Provider:',
           choices: [
-            { name: 'OpenAI (GPT-3.5/4) - OPENAI_API_KEY', value: 'openai' },
-            { name: 'Anthropic (Claude) - ANTHROPIC_API_KEY', value: 'anthropic' },
-            { name: 'Google (Gemini) - GEMINI_API_KEY', value: 'gemini' },
-            { name: 'Groq (Llama3/Mixtral) - GROQ_API_KEY', value: 'groq' },
-            { name: 'OpenRouter (Various Models) - OPENROUTER_API_KEY', value: 'openrouter' },
+            { name: 'OpenAI (GPT-3.5/4)', value: 'openai' },
+            { name: 'Anthropic (Claude)', value: 'anthropic' },
+            { name: 'Google (Gemini)', value: 'gemini' },
+            { name: 'Groq (Llama3/Mixtral)', value: 'groq' },
+            { name: 'OpenRouter (Various Models)', value: 'openrouter' },
           ],
           default: 'openai',
         },
@@ -505,92 +513,29 @@ export class CodeReviewBot {
       ];
       aiSettings = await inquirer.prompt(aiQuestions);
 
-      // Ask for storage preference
-      const { storageScope } = await inquirer.prompt([{
-        type: 'list',
-        name: 'storageScope',
-        message: 'Where should we save your API key?',
-        choices: [
-          { name: 'Local Project (.env in current folder)', value: 'local' },
-          { name: 'Global Configuration (~/.sentinel/.env)', value: 'global' }
-        ],
-        default: 'local'
-      }]);
-
-      // Automate .env creation
       if (aiSettings.apiKey) {
-        const envVarMap = {
-          openai: 'OPENAI_API_KEY',
-          anthropic: 'ANTHROPIC_API_KEY',
-          gemini: 'GEMINI_API_KEY',
-          groq: 'GROQ_API_KEY',
-          openrouter: 'OPENROUTER_API_KEY',
-        };
-        const envKey = envVarMap[aiSettings.provider];
-        const envContent = `\n${envKey}=${aiSettings.apiKey}\n`;
-
-        let envPath;
-        if (storageScope === 'global') {
-          const homeDir = os.homedir();
-          const configDir = path.join(homeDir, '.sentinel');
-          // Ensure dir exists
-          try {
-            await fs.mkdir(configDir, { recursive: true });
-          } catch (e) {
-            console.warn(chalk.yellow('⚠ Failed to create config directory:'), e.message);
-          }
-          envPath = path.join(configDir, '.env');
-        } else {
-          envPath = path.resolve(process.cwd(), '.env');
-        }
-
         try {
-          // Append or Write with restricted permissions (0o600)
-          try {
-            await fs.appendFile(envPath, envContent, { mode: 0o600 });
-          } catch (appendError) {
-            // If file doesn't exist or other error, try writing new
-            await fs.writeFile(envPath, envContent, { mode: 0o600 });
-          }
+          const { default: sentinelManager } = await import('./config/sentinelManager.js');
+          const globalConfig = await sentinelManager.load();
 
-          // Double check permissions (especially for existing files where append might not change mode)
-          try { await fs.chmod(envPath, 0o600); } catch (e) { /* ignore windows/fs errors */ }
+          if (!globalConfig.providers) globalConfig.providers = {};
 
-          console.log(chalk.green('✓') + ` API Key for ${aiSettings.provider} saved to ${storageScope} .env file`);
-          if (storageScope === 'global') {
-            console.log(chalk.gray(`  (File path: ${envPath})`));
-            console.log(chalk.gray(`  (Permissions set to 600 - Read/Write by owner only)`));
-          }
+          const p = aiSettings.provider;
+          if (!globalConfig.providers[p]) globalConfig.providers[p] = { apiKey: '', disabled: false };
+          globalConfig.providers[p].apiKey = aiSettings.apiKey;
+          globalConfig.providers[p].disabled = false;
 
+          await sentinelManager.save(globalConfig);
+          console.log(chalk.green('✓') + ` API Key for ${aiSettings.provider} saved to global config (~/.sentinel/config.json)`);
         } catch (error) {
-          console.error(chalk.red('✗') + ` Failed to save API Key: ${error.message}`);
-        }
-
-        // Ensure .env is in .gitignore (ONLY IF LOCAL)
-        if (storageScope === 'local') {
-          try {
-            const gitignorePath = path.resolve(process.cwd(), '.gitignore');
-            let gitignoreContent = '';
-            try {
-              gitignoreContent = await fs.readFile(gitignorePath, 'utf8');
-            } catch (ignored) {
-              // if file doesn't exist, we'll create it
-            }
-
-            if (!gitignoreContent.includes('.env')) {
-              await fs.appendFile(gitignorePath, '\n.env\n');
-              console.log(chalk.green('✓') + ' Added .env to .gitignore');
-            }
-          } catch (gitErr) {
-            // Ignore gitignore errors
-          }
+          console.error(chalk.red('✗') + ` Failed to save API Key to global config: ${error.message}`);
         }
       } else {
         console.log(chalk.yellow('⚠ No API key provided. You will need to set it manually.'));
       }
     }
 
-    // Update configuration
+    // Update project-local configuration
     config.set('analysis.enabledAnalyzers', answers.analyzers);
     config.set('integrations.precommit.blocking', answers.blocking);
     config.set('output.format', answers.format);
@@ -602,7 +547,7 @@ export class CodeReviewBot {
       // Set default models based on provider
       let model = 'gpt-3.5-turbo';
       if (aiSettings.provider === 'anthropic') model = 'claude-3-opus-20240229';
-      if (aiSettings.provider === 'gemini') model = 'gemini-pro';
+      if (aiSettings.provider === 'gemini') model = 'gemini-1.5-flash';
       if (aiSettings.provider === 'groq') model = 'llama3-70b-8192';
 
       config.set('ai.model', model);
@@ -611,7 +556,7 @@ export class CodeReviewBot {
     }
 
     await config.save();
-    console.log(chalk.green('✓') + ' Configuration saved successfully!');
+    console.log(chalk.green('✓') + ' Project configuration saved successfully!');
     return true;
   }
 

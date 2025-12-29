@@ -27,12 +27,18 @@ npm link
 ### Initial Setup
 
 ```bash
-# Interactive configuration wizard
-sentinel setup
+# 🔑 PRIMARY AUTHENTICATION (Recommended)
+# Interactive wizard for API keys (OpenAI, Anthropic, Gemini, Groq, OpenRouter)
+sentinel auth
 
-# Copy environment template
-cp .env.example .env
-# Edit .env with your API keys
+# Check which providers are configured
+sentinel auth status
+
+# Clear all stored credentials
+sentinel auth logout
+
+# Set a specific provider's key
+sentinel auth set openai
 
 # Install pre-commit hooks
 sentinel install-hooks
@@ -177,43 +183,48 @@ sentinel analyze --analyzers security,secrets,typescript,react,api
 | `performance` | `--analyzers performance` | Performance issues and optimization |
 | `custom` | `--analyzers custom` | Custom rules from .sentinelrules.yaml |
 
----
-
 ## 🤖 AI Model Management
 
 ### Provider Configuration
 
+The modern way to manage providers is via the interactive **`auth`** command.
+
 ```bash
-# List current AI providers and status
-sentinel models
+# Start interactive setup
+sentinel auth
 
-# Enable specific providers
-sentinel models --enable openai
-sentinel models --enable openai,gemini
-sentinel models --enable groq,openrouter
+# Quick status check
+sentinel auth status
 
-# Disable providers
-sentinel models --disable gemini
-sentinel models --disable groq,openrouter,anthropic
+# Sign out / clear keys
+sentinel auth logout
+```
 
+For advanced configuration, you can edit your `.sentinel.json` file.
+
+```json
+{
+  "providers": {
+    "openai": { "apiKey": "sk-...", "disabled": false },
+    "gemini": { "apiKey": "AI...", "disabled": false }
+  },
+  "agents": {
+    "coder": { "model": "gpt-4o-mini", "maxTokens": 5000 }
+  }
+}
+```
+
+### Legacy Model Control
+
+While `auth` is recommended, these flags still work for direct model selection:
+
+```bash
 # Set model for specific provider
-sentinel models --model openai=gpt-4
-sentinel models --model openai=gpt-3.5-turbo
-sentinel models --model gemini=gemini-pro
-sentinel models --model groq=llama3-70b-8192
-
-# Set provider weights for ensemble analysis
-sentinel models --weight openai=0.7
-sentinel models --weight openai=0.5 --weight gemini=0.5
-sentinel models --weight groq=0.4 --weight openai=0.3 --weight gemini=0.3
+sentinel analyze --model openai=gpt-4
+sentinel analyze --model gemini=gemini-pro
 
 # Configure environment variable names
-sentinel models --env openai=OPENAI_API_KEY
-sentinel models --env gemini=GOOGLE_API_KEY
-sentinel models --env groq=GROQ_API_KEY
-
-# Remove inline API keys from output
-sentinel models --strip-secrets openai,gemini
+sentinel analyze --env openai=OPENAI_API_KEY
 ```
 
 ### Environment Setup

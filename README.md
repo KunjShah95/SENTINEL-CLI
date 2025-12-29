@@ -46,45 +46,31 @@ Unlike hosted SaaS solutions, Sentinel runs **entirely on your machine or CI pip
 # Install globally
 npm install -g sentinel-cli
 
-# Quick preset commands (NEW in v1.4.0)
+# Configure your API keys (interactive setup)
+sentinel auth
+
+# Quick preset commands (NEW in v1.8.0)
 sentinel security-audit      # Full security scan
 sentinel full-scan            # All 13 analyzers
 sentinel frontend             # React + TypeScript + A11y
-sentinel full                # Alias for full-scan (all analyzers)
 sentinel backend              # Security + API + Performance
-sentinel container            # Docker + Kubernetes security (NEW)
+sentinel launch               # Launch local web dashboard
 sentinel pre-commit --block   # Pre-commit check
-sentinel diff                 # Staged diff review
 sentinel ci --fail-on high    # CI-friendly run, exits on severity
 
-# Analysis commands
+# Analysis
 sentinel analyze
 sentinel analyze --staged
-sentinel analyze --analyzers security,typescript,react
-sentinel analyze --format junit --output sentinel-report.xml
 
-# Output formats
-sentinel analyze --format json --output report.json
-sentinel sarif --output results.sarif  # GitHub Security
-
-# Auto-fix common issues
-sentinel fix
-sentinel fix --dry-run
-
-# GitHub PR integration
-sentinel review-pr https://github.com/owner/repo/pull/123
-
-# Interactive AI assistant
-sentinel chat
-
-# Web Dashboard (NEW)
-sentinel dashboard            # Launch local web dashboard
+# Web Dashboard
+sentinel dashboard            # (or use 'sentinel launch')
+```
 ```
 
 **Sample Output:**
 
 ```
-🛡️ SENTINEL — AI-Powered Code Guardian v1.4.0
+🛡️ SENTINEL — AI-Powered Code Guardian v1.8.0
 
 ✔ Analyzing 12 files with 6 analyzers...
 
@@ -157,46 +143,65 @@ Summary: 1 critical, 2 high, 5 medium, 12 low issues found
 
 ---
 
-## 🔧 Configuration Examples
+## 🔧 Configuration
 
-### Automated Setup (Recommended)
-Run the interactive setup wizard to configure your AI providers and settings. This will automatically manage your keys securely (stored locally or globally).
+### Quick Setup (Recommended)
+
+The fastest way to get started is with the interactive auth command:
 
 ```bash
-sentinel setup
+sentinel auth
 ```
 
-### Manual Configuration
-If you prefer setting environment variables manually (e.g., in CI/CD pipelines):
+This will:
+- ✅ Prompt you for API keys for each provider (OpenAI, Anthropic, Gemini, Groq, OpenRouter)
+- ✅ Save them securely to `~/.sentinel.json` (readable only by you)
+- ✅ Never send your keys anywhere except to the AI providers
 
-**OpenAI (GPT-4o-mini):**
+**Other auth commands:**
+
+```bash
+sentinel auth status     # See which providers are configured
+sentinel auth set openai # Set just one provider
+sentinel auth logout     # Clear all API keys
+```
+
+### Configuration File
+
+Sentinel looks for `.sentinel.json` in these locations (in order of priority):
+
+1. `./.sentinel.json` (project-local - highest priority)
+2. `$XDG_CONFIG_HOME/sentinel/.sentinel.json`
+3. `$HOME/.sentinel.json` (global config)
+
+**Example `.sentinel.json`:**
+
+```json
+{
+  "providers": {
+    "openai": { "apiKey": "sk-...", "disabled": false },
+    "anthropic": { "apiKey": "sk-ant-...", "disabled": false },
+    "gemini": { "apiKey": "AI...", "disabled": false },
+    "groq": { "apiKey": "gsk_...", "disabled": false },
+    "openrouter": { "apiKey": "sk-or-...", "disabled": false }
+  },
+  "agents": {
+    "coder": { "model": "gpt-4o-mini", "maxTokens": 5000 }
+  },
+  "debug": false
+}
+```
+
+### Environment Variables (for CI/CD)
+
+If you prefer environment variables (e.g., in CI/CD pipelines):
 
 ```bash
 export OPENAI_API_KEY="sk-..."
-sentinel analyze --format console
-```
-
-**Groq (Llama 3 - fastest):**
-
-```bash
-export GROQ_API_KEY="gsk_..."
-sentinel analyze --format console
-```
-
-**Google Gemini:**
-
-```bash
-export GEMINI_API_KEY="AI..."
-sentinel analyze --format console
-```
-
-**Multiple providers (ensemble mode):**
-
-```bash
-export OPENAI_API_KEY="sk-..."
 export GROQ_API_KEY="gsk_..."
 export GEMINI_API_KEY="AI..."
-sentinel analyze  # Uses all available providers, merges results
+export ANTHROPIC_API_KEY="sk-ant-..."
+sentinel analyze  # Uses all available providers
 ```
 
 ### Running Specific Checks Only
