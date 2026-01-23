@@ -285,6 +285,11 @@ program
   .option('--all-analyzers', 'Enable all available analyzers')
   .option('--save-history', 'Save analysis to trend history')
   .option('--silent', 'Suppress output (useful for scripting)')
+  .option('--pr <base-branch>', 'Analyze PR/diff against a base branch')
+  .option('--fail-on <severity>', 'Fail when severity at or above threshold')
+  .option('--baseline <file>', 'Load baseline issues JSON to compare')
+  .option('--baseline-save <file>', 'Save current issues as baseline JSON')
+  .option('--new-only', 'Only report issues not present in baseline')
   .action(async (files, options) => {
     try {
       // Handle analyzer selection
@@ -296,7 +301,45 @@ program
 
       const bot = new CodeReviewBot();
       await bot.initialize();
-      const result = await bot.runAnalysis({ ...options, files });
+      let result = await bot.runAnalysis({ ...options, files });
+
+      // Baseline comparison
+      let baselineSet = null;
+      const normalize = (issue) =>
+        `${(issue.file || '').toLowerCase()}:${issue.line || 0}:${(issue.title || '').toLowerCase()}`;
+      if (options.baseline) {
+        try {
+          const baselinePath = path.resolve(process.cwd(), options.baseline);
+          const baselineText = await fs.readFile(baselinePath, 'utf8');
+          const baselineIssues = JSON.parse(baselineText);
+          baselineSet = new Set(baselineIssues.map(normalize));
+          const newIssues = (result.issues || []).filter(i => !baselineSet.has(normalize(i)));
+          if (options.newOnly) {
+            result = { ...result, issues: newIssues };
+          }
+        } catch (e) {
+          console.warn(chalk.yellow('⚠') + ` Could not load baseline: ${e.message}`);
+        }
+      }
+
+      // Save baseline if requested
+      if (options.baselineSave && result.issues) {
+        try {
+          const baselineOut = path.resolve(process.cwd(), options.baselineSave);
+          const baselineData = result.issues.map(i => ({
+            file: i.file,
+            line: i.line,
+            title: i.title,
+            severity: i.severity,
+          }));
+          await fs.writeFile(baselineOut, JSON.stringify(baselineData, null, 2), 'utf8');
+          if (!options.silent) {
+            console.log(chalk.green('✓') + ` Baseline saved to ${baselineOut}`);
+          }
+        } catch (e) {
+          console.warn(chalk.yellow('⚠') + ` Could not save baseline: ${e.message}`);
+        }
+      }
 
       // Save to history if requested
       if (options.saveHistory && result.issues) {
@@ -320,6 +363,19 @@ program
         await sarif.saveToFile(result.issues, outputPath);
         if (!options.silent) {
           console.log(chalk.green('✓') + ` SARIF report saved to ${outputPath}`);
+        }
+      }
+
+      // Fail-on severity gating for CI
+      if (options.failOn && result && result.issues) {
+        const order = ['info', 'low', 'medium', 'high', 'critical'];
+        const idx = order.indexOf(String(options.failOn).toLowerCase());
+        if (idx !== -1) {
+          const failing = result.issues.filter(i => order.indexOf(String(i.severity).toLowerCase()) >= idx);
+          if (failing.length > 0) {
+            console.error(chalk.red(`✗ ${failing.length} issues at or above '${options.failOn}'`));
+            process.exit(1);
+          }
         }
       }
     } catch (error) {

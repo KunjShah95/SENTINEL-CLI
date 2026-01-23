@@ -1,0 +1,2360 @@
+[
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 292,
+    "title": "Eval Usage",
+    "severity": "high"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 297,
+    "title": "Eval Usage",
+    "severity": "high"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 298,
+    "title": "Eval Usage",
+    "severity": "high"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 292,
+    "title": "eval() Usage",
+    "severity": "high"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 297,
+    "title": "eval() Usage",
+    "severity": "high"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 298,
+    "title": "eval() Usage",
+    "severity": "high"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 100,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 136,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 140,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 142,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 145,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 154,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 158,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 177,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 179,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 182,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 184,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 193,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 194,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 195,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 198,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 207,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 211,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 212,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 224,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 225,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 226,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 229,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 231,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 240,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 244,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 245,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 252,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 253,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 254,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 257,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 268,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 270,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 273,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 274,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 275,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 282,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 286,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 287,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 289,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 290,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 294,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 299,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 300,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 302,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 310,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 315,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 316,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 318,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 324,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 328,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 329,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 331,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 332,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 337,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 339,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 342,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 343,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 344,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 345,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 353,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 354,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 355,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 358,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 359,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 360,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 361,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 369,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 371,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 374,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 375,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 377,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 385,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 386,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 387,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 390,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 391,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 392,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 393,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 402,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 406,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 407,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 409,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 410,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 414,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 415,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 416,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 419,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 420,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 422,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 430,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 431,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 432,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 435,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 436,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 438,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 445,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 449,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 450,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 452,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 453,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 457,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 458,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 459,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 462,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 463,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 465,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 473,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 474,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 475,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 478,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 479,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 481,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 488,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 492,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 493,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 495,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 496,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 500,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 501,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 502,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 505,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 506,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 508,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 515,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 519,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 520,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 522,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 523,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 541,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 542,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 543,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 546,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 547,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 549,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 556,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 561,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 572,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 573,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 581,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 595,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 603,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 604,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 612,
+    "title": "Code Duplication",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 1,
+    "title": "Low Maintainability Index",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 1,
+    "title": "Low Documentation Coverage",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 40,
+    "title": "Inconsistent Naming Convention",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 76,
+    "title": "Inconsistent Naming Convention",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 79,
+    "title": "Inconsistent Naming Convention",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 101,
+    "title": "Inconsistent Naming Convention",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 106,
+    "title": "Inconsistent Naming Convention",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 110,
+    "title": "Inconsistent Naming Convention",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 159,
+    "title": "Inconsistent Naming Convention",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 160,
+    "title": "Inconsistent Naming Convention",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 166,
+    "title": "Inconsistent Naming Convention",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 212,
+    "title": "Inconsistent Naming Convention",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 215,
+    "title": "Inconsistent Naming Convention",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 245,
+    "title": "Inconsistent Naming Convention",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 248,
+    "title": "Inconsistent Naming Convention",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 287,
+    "title": "Inconsistent Naming Convention",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 290,
+    "title": "Inconsistent Naming Convention",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 329,
+    "title": "Inconsistent Naming Convention",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 332,
+    "title": "Inconsistent Naming Convention",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 333,
+    "title": "Inconsistent Naming Convention",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 407,
+    "title": "Inconsistent Naming Convention",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 410,
+    "title": "Inconsistent Naming Convention",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 450,
+    "title": "Inconsistent Naming Convention",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 453,
+    "title": "Inconsistent Naming Convention",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 493,
+    "title": "Inconsistent Naming Convention",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 496,
+    "title": "Inconsistent Naming Convention",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 520,
+    "title": "Inconsistent Naming Convention",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 523,
+    "title": "Inconsistent Naming Convention",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 561,
+    "title": "Inconsistent Naming Convention",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 573,
+    "title": "Inconsistent Naming Convention",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 595,
+    "title": "Inconsistent Naming Convention",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 604,
+    "title": "Inconsistent Naming Convention",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 628,
+    "title": "Inconsistent Naming Convention",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 629,
+    "title": "Inconsistent Naming Convention",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 650,
+    "title": "Inconsistent Naming Convention",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 651,
+    "title": "Inconsistent Naming Convention",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 665,
+    "title": "Inconsistent Naming Convention",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 669,
+    "title": "Inconsistent Naming Convention",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 680,
+    "title": "Inconsistent Naming Convention",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 681,
+    "title": "Inconsistent Naming Convention",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 250,
+    "title": "Debug Statement in Code",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 251,
+    "title": "Debug Statement in Code",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 266,
+    "title": "Technical Debt Marker",
+    "severity": "info"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 267,
+    "title": "Technical Debt Marker",
+    "severity": "info"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 272,
+    "title": "Technical Debt Marker",
+    "severity": "info"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 292,
+    "title": "Dangerous eval() Usage",
+    "severity": "high"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 297,
+    "title": "Dangerous eval() Usage",
+    "severity": "high"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 298,
+    "title": "Dangerous eval() Usage",
+    "severity": "high"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 308,
+    "title": "Deprecated with() Statement",
+    "severity": "high"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 313,
+    "title": "Deprecated with() Statement",
+    "severity": "high"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 314,
+    "title": "Deprecated with() Statement",
+    "severity": "high"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 319,
+    "title": "Deprecated with() Statement",
+    "severity": "high"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 376,
+    "title": "Debugger Statement",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 378,
+    "title": "Debugger Statement",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 412,
+    "title": "Outdated Variable Declaration",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 418,
+    "title": "Outdated Variable Declaration",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 421,
+    "title": "Outdated Variable Declaration",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 423,
+    "title": "Outdated Variable Declaration",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 526,
+    "title": "Outdated Variable Declaration",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 220,
+    "title": "Array Index Out of Bounds",
+    "severity": "high"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 221,
+    "title": "Array Index Out of Bounds",
+    "severity": "high"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 217,
+    "title": "Missing Break Statement",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 228,
+    "title": "Missing Break Statement",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 336,
+    "title": "Assignment in Condition",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 428,
+    "title": "Assignment in Condition",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 429,
+    "title": "Assignment in Condition",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 632,
+    "title": "Assignment in Condition",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 633,
+    "title": "Assignment in Condition",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 639,
+    "title": "Assignment in Condition",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 6,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 10,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 11,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 17,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 19,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 22,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 23,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 30,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 31,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 32,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 33,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 34,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 35,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 36,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 37,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 40,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 46,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 47,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 50,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 53,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 59,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 76,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 79,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 81,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 89,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 101,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 106,
+    "title": "Potential Null Array Access",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 110,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 113,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 121,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 126,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 128,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 137,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 140,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 144,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 159,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 160,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 166,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 177,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 193,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 212,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 215,
+    "title": "Potential Null Array Access",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 220,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 221,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 224,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 232,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 245,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 248,
+    "title": "Potential Null Array Access",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 252,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 259,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 260,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 268,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 272,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 272,
+    "title": "Potential Null Array Access",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 287,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 290,
+    "title": "Potential Null Array Access",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 294,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 301,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 302,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 310,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 317,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 318,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 329,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 332,
+    "title": "Potential Null Array Access",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 333,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 337,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 345,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 353,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 361,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 369,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 376,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 377,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 385,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 389,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 389,
+    "title": "Potential Null Array Access",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 393,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 407,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 410,
+    "title": "Potential Null Array Access",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 414,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 421,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 422,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 430,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 437,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 438,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 450,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 453,
+    "title": "Potential Null Array Access",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 457,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 464,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 465,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 473,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 480,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 481,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 493,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 496,
+    "title": "Potential Null Array Access",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 500,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 507,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 508,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 520,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 523,
+    "title": "Potential Null Array Access",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 538,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 541,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 548,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 549,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 561,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 573,
+    "title": "Potential Null Array Access",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 577,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 578,
+    "title": "Potential Null Array Access",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 579,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 583,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 584,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 595,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 604,
+    "title": "Potential Null Array Access",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 608,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 609,
+    "title": "Potential Null Array Access",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 610,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 614,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 628,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 629,
+    "title": "Potential Null Array Access",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 638,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 640,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 645,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 650,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 651,
+    "title": "Potential Null Array Access",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 665,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 672,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 673,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 681,
+    "title": "Potential Null Pointer Dereference",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 31,
+    "title": "Potential Memory Leak",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 33,
+    "title": "Potential Memory Leak",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 99,
+    "title": "Potential Memory Leak",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 157,
+    "title": "Potential Memory Leak",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 584,
+    "title": "Potential Memory Leak",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 614,
+    "title": "Potential Memory Leak",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 648,
+    "title": "Potential Memory Leak",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 6,
+    "title": "Accidental Global Variable",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 22,
+    "title": "Accidental Global Variable",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 336,
+    "title": "Accidental Global Variable",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 428,
+    "title": "Accidental Global Variable",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 429,
+    "title": "Accidental Global Variable",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 437,
+    "title": "Loose Equality Comparison",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 437,
+    "title": "Accidental Global Variable",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 577,
+    "title": "Accidental Global Variable",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 608,
+    "title": "Accidental Global Variable",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 632,
+    "title": "Accidental Global Variable",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 633,
+    "title": "Accidental Global Variable",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 637,
+    "title": "Accidental Global Variable",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 639,
+    "title": "Accidental Global Variable",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 672,
+    "title": "Accidental Global Variable",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 673,
+    "title": "Accidental Global Variable",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 675,
+    "title": "Accidental Global Variable",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 677,
+    "title": "Accidental Global Variable",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 81,
+    "title": "Array Modification in Nested Loop",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 113,
+    "title": "Array Modification in Nested Loop",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 193,
+    "title": "Array Modification in Nested Loop",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 224,
+    "title": "Array Modification in Nested Loop",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 252,
+    "title": "Array Modification in Nested Loop",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 268,
+    "title": "Array Modification in Nested Loop",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 294,
+    "title": "Array Modification in Nested Loop",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 310,
+    "title": "Array Modification in Nested Loop",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 337,
+    "title": "Array Modification in Nested Loop",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 385,
+    "title": "Array Modification in Nested Loop",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 414,
+    "title": "Array Modification in Nested Loop",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 430,
+    "title": "Array Modification in Nested Loop",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 457,
+    "title": "Array Modification in Nested Loop",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 473,
+    "title": "Array Modification in Nested Loop",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 500,
+    "title": "Array Modification in Nested Loop",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 541,
+    "title": "Array Modification in Nested Loop",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 579,
+    "title": "Array Modification in Nested Loop",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 610,
+    "title": "Array Modification in Nested Loop",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 638,
+    "title": "Array Modification in Nested Loop",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 640,
+    "title": "Array Modification in Nested Loop",
+    "severity": "low"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 219,
+    "title": "High Cyclomatic Complexity",
+    "severity": "medium"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 292,
+    "title": "Eval Usage",
+    "severity": "high"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 297,
+    "title": "Eval Usage",
+    "severity": "high"
+  },
+  {
+    "file": "src\\analyzers\\qualityAnalyzer.js",
+    "line": 298,
+    "title": "Eval Usage",
+    "severity": "high"
+  }
+]

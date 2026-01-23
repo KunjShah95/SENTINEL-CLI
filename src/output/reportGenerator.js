@@ -29,23 +29,26 @@ export default class ReportGenerator {
     let output;
 
     switch (format) {
-    case 'console':
-      output = this.generateConsoleReport(report);
-      break;
-    case 'json':
-      output = JSON.stringify(report, null, 2);
-      break;
-    case 'junit':
-      output = this.generateJUnitReport(report);
-      break;
-    case 'html':
-      output = this.generateHtmlReport(report);
-      break;
-    case 'markdown':
-      output = this.generateMarkdownReport(report);
-      break;
-    default:
-      output = this.generateConsoleReport(report);
+      case 'console':
+        output = this.generateConsoleReport(report);
+        break;
+      case 'json':
+        output = JSON.stringify(report, null, 2);
+        break;
+      case 'junit':
+        output = this.generateJUnitReport(report);
+        break;
+      case 'html':
+        output = this.generateHtmlReport(report);
+        break;
+      case 'markdown':
+        output = this.generateMarkdownReport(report);
+        break;
+      case 'sarif':
+        output = this.generateSarifReport(report);
+        break;
+      default:
+        output = this.generateConsoleReport(report);
     }
 
     if (outputFile) {
@@ -53,6 +56,93 @@ export default class ReportGenerator {
     }
 
     return output;
+  }
+
+  generateSarifReport(report) {
+    const sarif = {
+      $schema: "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+      version: "2.1.0",
+      runs: [
+        {
+          tool: {
+            driver: {
+              name: "Sentinel CLI",
+              version: "1.8.0",
+              informationUri: "https://github.com/KunjShah95/Sentinel-CLI",
+              rules: this.extractRules(report.issues)
+            }
+          },
+          results: report.issues.map(issue => ({
+            ruleId: issue.title.toLowerCase().replace(/\s+/g, '-'),
+            level: this.mapSeverityToSarifLevel(issue.severity),
+            message: {
+              text: issue.message
+            },
+            locations: [
+              {
+                physicalLocation: {
+                  artifactLocation: {
+                    uri: issue.file
+                  },
+                  region: {
+                    startLine: issue.line,
+                    startColumn: issue.column || 1
+                  }
+                }
+              }
+            ],
+            properties: {
+              suggestion: issue.suggestion,
+              type: issue.type,
+              tags: issue.tags
+            }
+          }))
+        }
+      ]
+    };
+
+    return JSON.stringify(sarif, null, 2);
+  }
+
+  extractRules(issues) {
+    const rules = new Map();
+
+    issues.forEach(issue => {
+      const id = issue.title.toLowerCase().replace(/\s+/g, '-');
+      if (!rules.has(id)) {
+        rules.set(id, {
+          id: id,
+          shortDescription: {
+            text: issue.title
+          },
+          fullDescription: {
+            text: issue.message
+          },
+          defaultConfiguration: {
+            level: this.mapSeverityToSarifLevel(issue.severity)
+          },
+          properties: {
+            tags: issue.tags || []
+          }
+        });
+      }
+    });
+
+    return Array.from(rules.values());
+  }
+
+  mapSeverityToSarifLevel(severity) {
+    switch (severity?.toLowerCase()) {
+      case 'critical':
+      case 'high':
+        return 'error';
+      case 'medium':
+        return 'warning';
+      case 'low':
+      case 'info':
+      default:
+        return 'note';
+    }
   }
 
   generateSummary(issues) {

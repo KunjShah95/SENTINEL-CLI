@@ -77,7 +77,7 @@ export class EnhancedAIAnalyzer extends BaseAnalyzer {
    */
   async runEnhancedAIAnalysis(file, context) {
     const issues = [];
-    
+
     try {
       // Get AI providers from config
       const aiConfig = this.config.get('ai');
@@ -90,16 +90,16 @@ export class EnhancedAIAnalyzer extends BaseAnalyzer {
       
       // Execute analysis with multiple providers if configured
       const results = await this.executeMultiProviderAnalysis(prompt, aiConfig.providers);
-      
+
       // Process and enhance results
       for (const result of results) {
         const enhancedIssues = await this.processAIResult(result, file, context);
         issues.push(...enhancedIssues);
       }
-      
+
       // Apply severity scoring and prioritization
       return this.applySeverityScoring(issues);
-      
+
     } catch (error) {
       console.warn(`Enhanced AI analysis failed for ${file.path}:`, error.message);
       return issues;
@@ -473,14 +473,17 @@ class AdaptivePromptTuner {
   }
 
   getBasePrompt() {
-    return `You are an expert code security and quality analyst. Analyze code for:
-1. Security vulnerabilities and risks
-2. Code quality and maintainability issues  
-3. Performance bottlenecks
-4. Best practice violations
-5. Potential bugs and logic errors
+    return `You are a Senior Security Architect and Code Quality Expert (S-Tier). 
+Your goal is to perform a deep, comprehensive analysis of the provided code, looking for subtle bugs, security vulnerabilities, and architectural improvements.
 
-Provide detailed, actionable findings with severity levels and remediation suggestions.`;
+Analyze the code for:
+1. 🛡️ Security: Vulnerabilities (OWASP Top 10), injection risks, auth bypasses, secret exposure.
+2. 💎 Correctness: Logic errors, edge cases (null/undefined), race conditions, type safety.
+3. ⚡ Performance: N+1 queries, memory leaks, inefficient algorithms, unnecessary re-renders.
+4. 🧹 Elegance: Clean code principles, DRY, SOLID, idiomatic usage of the language.
+5. 🛡️ Robustness: Error handling, input validation, boundary checks.
+
+Think step-by-step. First, understand the code's intent. Then, simulate execution for edge cases. Finally, report issues.`;
   }
 
   getContextSpecificInstructions(context) {

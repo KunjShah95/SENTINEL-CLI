@@ -33,23 +33,25 @@ export class QualityAnalyzer extends BaseAnalyzer {
     issues.push(...this.checkDocumentation(content, filePath));
     issues.push(...this.checkNamingConventions(content, filePath));
     issues.push(...this.checkBestPractices(content, filePath));
+    issues.push(...this.checkSecurityBestPractices(content, filePath));
+    issues.push(...this.checkCodeSmells(content, filePath));
 
     // Language-specific checks
     const extension = filePath.split('.').pop()?.toLowerCase();
     switch (extension) {
-    case 'js':
-    case 'ts':
-    case 'jsx':
-    case 'tsx':
-      issues.push(...this.checkJavaScriptQuality(content, filePath));
-      issues.push(...this.checkInlineStyles(content, filePath));
-      break;
-    case 'py':
-      issues.push(...this.checkPythonQuality(content, filePath));
-      break;
-    case 'java':
-      issues.push(...this.checkJavaQuality(content, filePath));
-      break;
+      case 'js':
+      case 'ts':
+      case 'jsx':
+      case 'tsx':
+        issues.push(...this.checkJavaScriptQuality(content, filePath));
+        issues.push(...this.checkInlineStyles(content, filePath));
+        break;
+      case 'py':
+        issues.push(...this.checkPythonQuality(content, filePath));
+        break;
+      case 'java':
+        issues.push(...this.checkJavaQuality(content, filePath));
+        break;
     }
 
     // Add issues to the analyzer
@@ -280,6 +282,126 @@ export class QualityAnalyzer extends BaseAnalyzer {
     return issues;
   }
 
+  checkSecurityBestPractices(code, filePath) {
+    const issues = [];
+    const lines = code.split('\n');
+
+    for (let lineNum = 0; lineNum < lines.length; lineNum++) {
+      const line = lines[lineNum];
+
+      // Check for eval()
+      if (/\beval\s*\(/.test(line)) {
+        issues.push({
+          severity: 'high',
+          type: 'security',
+          title: 'Dangerous eval() Usage',
+          message: 'The use of eval() is dangerous and can lead to code injection attacks.',
+          file: filePath,
+          line: lineNum + 1,
+          column: line.indexOf('eval') + 1,
+          snippet: this.getCodeSnippet(code, lineNum + 1).snippet,
+          suggestion: 'Refactor to avoid dynamic code execution. Use JSON.parse() if parsing JSON.',
+          tags: ['security', 'injection', 'dangerous'],
+        });
+      }
+
+      // Check for with() statement
+      if (/\bwith\s*\(/.test(line)) {
+        issues.push({
+          severity: 'high',
+          type: 'security',
+          title: 'Deprecated with() Statement',
+          message: 'The with() statement is deprecated and potentially insecure.',
+          file: filePath,
+          line: lineNum + 1,
+          column: line.indexOf('with') + 1,
+          snippet: this.getCodeSnippet(code, lineNum + 1).snippet,
+          suggestion: 'Remove with() and access properties directly.',
+          tags: ['security', 'deprecated'],
+        });
+      }
+    }
+    return issues;
+  }
+
+  checkCodeSmells(code, filePath) {
+    const issues = [];
+    const lines = code.split('\n');
+
+    for (let lineNum = 0; lineNum < lines.length; lineNum++) {
+      const line = lines[lineNum];
+      const trimmed = line.trim();
+
+      // Empty catch block
+      if (/catch\s*\([^)]*\)\s*{\s*}/.test(trimmed) || (trimmed === '}' && lines[lineNum - 1] && /catch\s*\([^)]*\)\s*{/.test(lines[lineNum - 1].trim()))) {
+        issues.push({
+          severity: 'medium',
+          type: 'quality',
+          title: 'Empty Catch Block',
+          message: 'Empty catch block suppresses errors silently.',
+          file: filePath,
+          line: lineNum + 1,
+          column: 1,
+          snippet: this.getCodeSnippet(code, lineNum + 1).snippet,
+          suggestion: 'Handle the error or at least log it.',
+          tags: ['quality', 'error-handling', 'code-smell'],
+        });
+      }
+
+      // Empty if block
+      if (/if\s*\([^)]*\)\s*{\s*}/.test(trimmed)) {
+        issues.push({
+          severity: 'low',
+          type: 'quality',
+          title: 'Empty If Block',
+          message: 'Empty if block serves no purpose.',
+          file: filePath,
+          line: lineNum + 1,
+          column: 1,
+          snippet: this.getCodeSnippet(code, lineNum + 1).snippet,
+          suggestion: 'Remove the empty if block or implement the logic.',
+          tags: ['quality', 'code-smell'],
+        });
+      }
+
+      // Debugger statement
+      if (/\bdebugger\b/.test(line)) {
+        issues.push({
+          severity: 'medium',
+          type: 'quality',
+          title: 'Debugger Statement',
+          message: 'Debugger statement found in code.',
+          file: filePath,
+          line: lineNum + 1,
+          column: line.indexOf('debugger') + 1,
+          snippet: this.getCodeSnippet(code, lineNum + 1).snippet,
+          suggestion: 'Remove debugger statements before committing.',
+          tags: ['quality', 'debug'],
+        });
+      }
+
+      // Alert/Confirm/Prompt (mostly for non-interactive scripts, but bad practice in general codebase)
+      if (/\b(alert|confirm|prompt)\s*\(/.test(line)) {
+        issues.push({
+          severity: 'low',
+          type: 'quality',
+          title: 'Blocking Browser Interaction',
+          message: `Avoid using ${line.match(/\b(alert|confirm|prompt)\b/)[0]}() as it blocks the UI thread.`,
+          file: filePath,
+          line: lineNum + 1,
+          column: 1,
+          snippet: this.getCodeSnippet(code, lineNum + 1).snippet,
+          suggestion: 'Use a non-blocking UI modal or dialog component.',
+          tags: ['quality', 'ux'],
+        });
+      }
+
+      // Magic numbers (simple heuristic: number > 1 not in declaration)
+      // This is hard to do perfectly with regex, so skipping for now to avoid false positives.
+    }
+    return issues;
+  }
+
   checkJavaScriptQuality(code, filePath) {
     const issues = [];
     const lines = code.split('\n');
@@ -393,84 +515,84 @@ export class QualityAnalyzer extends BaseAnalyzer {
     return issues;
   }
 
-      checkInlineStyles(code, filePath) {
-        const issues = [];
-        const lines = code.split('\n');
+  checkInlineStyles(code, filePath) {
+    const issues = [];
+    const lines = code.split('\n');
 
-        for (let lineNum = 0; lineNum < lines.length; lineNum++) {
-          const line = lines[lineNum];
+    for (let lineNum = 0; lineNum < lines.length; lineNum++) {
+      const line = lines[lineNum];
 
-          // Skip lines with CSS custom properties/variables - they're legitimate for data-driven styling
-          if (/var\(\s*--|\s*--[\w-]+\s*:|as\s+React\.CSSProperties|CSS custom|CSS variables|@ts-ignore/i.test(line)) {
-            continue;
-          }
-
-          // Only flag direct CSS property assignments without dynamic values
-          // Exclude lines that are comments
-          if (line.trim().startsWith('//') || line.trim().startsWith('*')) {
-            continue;
-          }
-
-          // Check for hardcoded inline styles (not using variables)
-          const hasInlineStyle = /style\s*=\s*{/.test(line);
-          const hasColorOrDynamicValue = /indicatorColor|item\.color|itemConfig/i.test(line);
-
-          if (hasInlineStyle && !hasColorOrDynamicValue) {
-            issues.push({
-              severity: 'low',
-              type: 'quality',
-              title: 'CSS inline styles',
-              message: 'CSS inline styles should not be used, move styles to an external CSS file',
-              file: filePath,
-              line: lineNum + 1,
-              column: line.search(/style/i) + 1,
-              snippet: this.getCodeSnippet(code, lineNum + 1).snippet,
-              suggestion: 'Move styles to CSS classes or external CSS file. Exception: CSS custom properties/variables for data-driven colors are acceptable',
-              tags: ['quality', 'css', 'style'],
-            });
-          }
-        }
-
-        return issues;
+      // Skip lines with CSS custom properties/variables - they're legitimate for data-driven styling
+      if (/var\(\s*--|\s*--[\w-]+\s*:|as\s+React\.CSSProperties|CSS custom|CSS variables|@ts-ignore/i.test(line)) {
+        continue;
       }
 
-    extractFunctions(code) {
-      const functions = [];
-      const lines = code.split('\n');
-
-      // Simple regex patterns for different languages
-      const functionPatterns = [
-        /function\s+(\w+)\s*\(/g, // JavaScript function
-        /(\w+)\s*:\s*\([^)]*\)\s*=>/g, // JavaScript arrow function
-        /def\s+(\w+)\s*\(/g, // Python function
-        /public\s+\w+\s+(\w+)\s*\(/g, // Java method
-        /private\s+\w+\s+(\w+)\s*\(/g, // Java method
-      ];
-
-      for (let lineNum = 0; lineNum < lines.length; lineNum++) {
-        const line = lines[lineNum];
-
-        for (const pattern of functionPatterns) {
-          let match;
-          while ((match = pattern.exec(line)) !== null) {
-            const funcName = match[1];
-            functions.push({
-              name: funcName,
-              line: lineNum + 1,
-              column: match.index + 1,
-              body: this.extractFunctionBody(lines, lineNum),
-              hasDocumentation: this.hasDocumentation(lines, lineNum),
-            });
-          }
-        }
+      // Only flag direct CSS property assignments without dynamic values
+      // Exclude lines that are comments
+      if (line.trim().startsWith('//') || line.trim().startsWith('*')) {
+        continue;
       }
 
-      return functions;
+      // Check for hardcoded inline styles (not using variables)
+      const hasInlineStyle = /style\s*=\s*{/.test(line);
+      const hasColorOrDynamicValue = /indicatorColor|item\.color|itemConfig/i.test(line);
+
+      if (hasInlineStyle && !hasColorOrDynamicValue) {
+        issues.push({
+          severity: 'low',
+          type: 'quality',
+          title: 'CSS inline styles',
+          message: 'CSS inline styles should not be used, move styles to an external CSS file',
+          file: filePath,
+          line: lineNum + 1,
+          column: line.search(/style/i) + 1,
+          snippet: this.getCodeSnippet(code, lineNum + 1).snippet,
+          suggestion: 'Move styles to CSS classes or external CSS file. Exception: CSS custom properties/variables for data-driven colors are acceptable',
+          tags: ['quality', 'css', 'style'],
+        });
+      }
     }
 
-    extractClasses(code) {
-      const classes = [];
-      const lines = code.split('\n');
+    return issues;
+  }
+
+  extractFunctions(code) {
+    const functions = [];
+    const lines = code.split('\n');
+
+    // Simple regex patterns for different languages
+    const functionPatterns = [
+      /function\s+(\w+)\s*\(/g, // JavaScript function
+      /(\w+)\s*:\s*\([^)]*\)\s*=>/g, // JavaScript arrow function
+      /def\s+(\w+)\s*\(/g, // Python function
+      /public\s+\w+\s+(\w+)\s*\(/g, // Java method
+      /private\s+\w+\s+(\w+)\s*\(/g, // Java method
+    ];
+
+    for (let lineNum = 0; lineNum < lines.length; lineNum++) {
+      const line = lines[lineNum];
+
+      for (const pattern of functionPatterns) {
+        let match;
+        while ((match = pattern.exec(line)) !== null) {
+          const funcName = match[1];
+          functions.push({
+            name: funcName,
+            line: lineNum + 1,
+            column: match.index + 1,
+            body: this.extractFunctionBody(lines, lineNum),
+            hasDocumentation: this.hasDocumentation(lines, lineNum),
+          });
+        }
+      }
+    }
+
+    return functions;
+  }
+
+  extractClasses(code) {
+    const classes = [];
+    const lines = code.split('\n');
 
     const classPatterns = [
       /class\s+(\w+)/g, // JavaScript/Python class

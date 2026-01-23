@@ -153,6 +153,33 @@ export class ReactAnalyzer extends BaseAnalyzer {
                 message: 'CSS inline styles should not be used for static values, use CSS classes instead',
                 suggestion: 'Move static styles to CSS classes or Tailwind utility classes. Exception: using CSS custom properties (--variable-name) or CSS variables (var(--name)) for dynamic data is acceptable',
             },
+            // Target blank security
+            {
+                pattern: /target\s*=\s*['"]_blank['"](?![^>]*rel\s*=\s*['"](?:noopener|noreferrer)\s*(?:noopener|noreferrer)['"])/g,
+                severity: 'high',
+                type: 'security',
+                title: 'Unsafe target="_blank"',
+                message: 'Using target="_blank" without rel="noopener noreferrer" is a security vulnerability (tabnabbing).',
+                suggestion: 'Add rel="noopener noreferrer" to the anchor tag.',
+            },
+            // Deprecated findDOMNode
+            {
+                pattern: /findDOMNode\s*\(/g,
+                severity: 'high',
+                type: 'quality',
+                title: 'Deprecated findDOMNode',
+                message: 'findDOMNode is deprecated in StrictMode.',
+                suggestion: 'Use refs (createRef/useRef) instead.',
+            },
+            // Legacy contextTypes
+            {
+                pattern: /childContextTypes|getChildContext/g,
+                severity: 'medium',
+                type: 'quality',
+                title: 'Legacy Context API',
+                message: 'Legacy Context API is deprecated.',
+                suggestion: 'Use the new React.createContext API.',
+            }
         ];
     }
 

@@ -118,9 +118,11 @@ export class GitUtils {
           files.push(currentFile);
         }
 
-        const filePath = line.match(/diff --git a\/(.+) b\/\1/)?.[1] || 'unknown';
+        const filePath = line.match(/diff --git a\/(.+) b\/(.+)/);
+        const path = filePath ? filePath[2] : 'unknown';
+
         currentFile = {
-          path: filePath,
+          path: path,
           hunks: [],
           added: 0,
           deleted: 0,
@@ -252,6 +254,24 @@ export class GitUtils {
       };
     } catch (error) {
       throw new Error(`Failed to get branch diff: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get PR diff (changes between base branch and HEAD)
+   * Uses triple-dot syntax to find the common ancestor
+   */
+  async getPRDiff(baseBranch) {
+    try {
+      const diffOutput = await this.git.diff([`${baseBranch}...HEAD`]);
+      const files = await this.git.diff([`${baseBranch}...HEAD`, '--name-only']);
+
+      return {
+        diff: diffOutput,
+        files: files.split('\n').filter(Boolean),
+      };
+    } catch (error) {
+      throw new Error(`Failed to get PR diff against ${baseBranch}: ${error.message}`);
     }
   }
 

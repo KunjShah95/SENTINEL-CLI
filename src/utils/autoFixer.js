@@ -13,6 +13,40 @@ export class AutoFixer {
 
     initializeFixers() {
         return {
+            // Security: add rel="noopener noreferrer" to external links
+            'anchor-noopener': {
+                pattern: /<a\b[^>]*>/gi,
+                fix: (tag) => {
+                    const hasTargetBlank = /target\s*=\s*['"]_blank['"]/i.test(tag);
+                    const hasRel = /\brel\s*=\s*['"][^'"]*['"]/i.test(tag);
+                    if (hasTargetBlank && !hasRel) {
+                        return tag.replace(/>$/, ' rel="noopener noreferrer">');
+                    }
+                    return tag;
+                },
+                description: 'Add rel="noopener noreferrer" to target=_blank links',
+            },
+
+            // JS modern syntax: var -> let
+            'var-to-let': {
+                pattern: /\bvar\b(?=\s+[a-zA-Z_$][\w$]*)/g,
+                fix: 'let',
+                description: 'Replace var with let for block scoping',
+            },
+
+            // Equality: == -> ===
+            'loose-equality': {
+                pattern: /(^|[^=])==(?!=)/g,
+                fix: (m, p1) => `${p1}===`,
+                description: 'Replace == with === for strict equality',
+            },
+
+            // Inequality: != -> !==
+            'loose-inequality': {
+                pattern: /!=(?!=)/g,
+                fix: '!===',
+                description: 'Replace != with !== for strict inequality',
+            },
             // Accessibility fixes
             'missing-alt-text': {
                 pattern: /<img([^>]*?)(?<!\balt\s*=\s*["'][^"']*["'])([^>]*?)>/gi,

@@ -214,6 +214,23 @@ export class CodeReviewBot {
             }
           }
         }
+      } else if (options.pr) {
+        // Analyze PR changes
+        const changes = await gitUtils.getPRDiff(options.pr);
+        const parsedFiles = gitUtils.parseDiff(changes.diff);
+
+        for (const file of parsedFiles) {
+          if (file.path !== 'unknown') {
+            const content = await gitUtils.getFileContent(file.path);
+            if (content) {
+              files.push({
+                path: file.path,
+                content: content,
+                type: 'pr',
+              });
+            }
+          }
+        }
       } else if (options.branch) {
         // Analyze branch changes
         const changes = await gitUtils.getBranchDiff('main', options.branch);

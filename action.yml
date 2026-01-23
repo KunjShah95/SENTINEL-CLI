@@ -1,0 +1,56 @@
+name: 'Sentinel Code Review'
+description: 'AI-Powered Code Review & Security Analysis'
+author: 'Kunj Shah'
+branding:
+  icon: 'shield'
+  color: 'blue'
+inputs:
+  github_token:
+    description: 'GitHub Token for posting comments (optional)'
+    required: false
+    default: ${{ github.token }}
+  analyzers:
+    description: 'Comma-separated list of analyzers to run'
+    required: false
+    default: 'security,quality,bugs,performance'
+  fail_on_error:
+    description: 'Fail workflow if issues are found'
+    required: false
+    default: 'false'
+  output_format:
+    description: 'Output format (console, json, sarif, markdown)'
+    required: false
+    default: 'sarif'
+  files:
+    description: 'Specific files to analyze (space separated)'
+    required: false
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install Sentinel
+      run: npm install -g sentinel-cli
+      shell: bash
+
+    - name: Run Sentinel Analysis
+      run: |
+        sentinel analyze \
+          --format ${{ inputs.output_format }} \
+          --output sentinel-report.sarif \
+          --analyzers ${{ inputs.analyzers }} \
+          ${{ inputs.files }}
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github_token }}
+
+    - name: Upload SARIF Results
+      if: inputs.output_format == 'sarif'
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: sentinel-report.sarif
+        category: sentinel
