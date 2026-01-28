@@ -1,15 +1,68 @@
 
 /**
  * GitHubIntegration - Posts Sentinel analysis results to GitHub PRs
- * Uses the GitHub REST API directly (no octokit dependency)
+ * Supports GitHub.com and GitHub Enterprise with security hardening
  */
 import rateLimiter from '../utils/rateLimiter.js';
+import { SecurityError } from '../utils/errorHandler.js';
+
+// Default allowed hostnames for GitHub API
+const DEFAULT_ALLOWED_HOSTNAMES = [
+    'api.github.com',
+    'github.com'
+];
+
 export class GitHubIntegration {
     constructor(options = {}) {
         this.token = options.token || process.env.GITHUB_TOKEN;
         this.baseUrl = options.baseUrl || 'https://api.github.com';
+
+        // GitHub Enterprise support with security allowlist
+        this.allowedHostnames = options.allowedHostnames || DEFAULT_ALLOWED_HOSTNAMES;
+
+        // Add custom enterprise domains if provided
+        if (options.enterpriseDomains) {
+            const domains = Array.isArray(options.enterpriseDomains)
+                ? options.enterpriseDomains
+                : [options.enterpriseDomains];
+            this.allowedHostnames = [...this.allowedHostnames, ...domains];
+        }
+
+        // Validate base URL on construction
+        this.validateBaseUrl();
     }
 
+    /**
+     * Validate the base URL against allowlist
+     */
+    validateBaseUrl() {
+        try {
+            const parsed = new URL(this.baseUrl);
+            if (!this.isHostnameAllowed(parsed.hostname)) {
+                throw new SecurityError(
+                    `Base URL hostname '${parsed.hostname}' is not in the allowed list`,
+                    { hostname: parsed.hostname, allowedHostnames: this.allowedHostnames }
+                );
+            }
+        } catch (error) {
+            if (error instanceof SecurityError) throw error;
+            throw new SecurityError('Invalid base URL format', { baseUrl: this.baseUrl });
+        }
+    }
+
+    /**
+     * Check if hostname is in allowlist
+     */
+    isHostnameAllowed(hostname) {
+        return this.allowedHostnames.some(allowed => {
+            // Support wildcard subdomains
+            if (allowed.startsWith('*.')) {
+                const domain = allowed.substring(2);
+                return hostname.endsWith(domain);
+            }
+            return hostname === allowed;
+        });
+    }
 
     /**
      * Parse a GitHub PR URL into owner, repo, and PR number
@@ -20,7 +73,8 @@ export class GitHubIntegration {
         // Supports formats:
         // https://github.com/owner/repo/pull/123
         // github.com/owner/repo/pull/123
-        const match = prUrl.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/i);
+        // https://github.enterprise.com/owner/repo/pull/123
+        const match = prUrl.match(/github[^/]*\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/i);
         if (!match) {
             throw new Error(`Invalid GitHub PR URL: ${prUrl}`);
         }
@@ -32,7 +86,7 @@ export class GitHubIntegration {
     }
 
     /**
-     * Make an authenticated request to GitHub API
+     * Make an authenticated request to GitHub API with security validation
      */
     async request(method, endpoint, body = null) {
         if (!this.token) {
@@ -58,12 +112,38 @@ export class GitHubIntegration {
             options.body = JSON.stringify(body);
         }
 
-        // Validate URL to prevent SSRF
+        // Enhanced security validation - prevent SSRF attacks
         const parsedUrl = new URL(url);
-        if (parsedUrl.hostname !== 'api.github.com') {
-            throw new Error('Invalid GitHub API URL');
+
+        // Validate hostname against allowlist
+        if (!this.isHostnameAllowed(parsedUrl.hostname)) {
+            throw new SecurityError(
+                `API hostname '${parsedUrl.hostname}' is not allowed`,
+                {
+                    hostname: parsedUrl.hostname,
+                    allowedHostnames: this.allowedHostnames,
+                    url: url
+                }
+            );
         }
-        
+
+        // Validate protocol
+        if (parsedUrl.protocol !== 'https:') {
+            throw new SecurityError(
+                'Only HTTPS connections are allowed for GitHub API',
+                { protocol: parsedUrl.protocol, url: url }
+            );
+        }
+
+        // Prevent internal network access
+        const hostname = parsedUrl.hostname.toLowerCase();
+        if (this.isInternalNetwork(hostname)) {
+            throw new SecurityError(
+                'Cannot make requests to internal network addresses',
+                { hostname: hostname }
+            );
+        }
+
         const response = rateLimiter
             ? await rateLimiter.schedule(() => fetch(url, options))
             : await fetch(url, options);
@@ -74,6 +154,25 @@ export class GitHubIntegration {
         }
 
         return response.json();
+    }
+
+    /**
+     * Check if hostname points to internal network
+     */
+    isInternalNetwork(hostname) {
+        const internalPatterns = [
+            /^localhost$/i,
+            /^127\./,
+            /^10\./,
+            /^172\.(1[6-9]|2[0-9]|3[0-1])\./,
+            /^192\.168\./,
+            /^169\.254\./,
+            /^::1$/,
+            /^fe80:/i,
+            /^fc00:/i
+        ];
+
+        return internalPatterns.some(pattern => pattern.test(hostname));
     }
 
     /**

@@ -9,6 +9,9 @@ export class BaseAnalyzer {
       issuesFound: 0,
       executionTime: 0,
     };
+    // Configuration for parallel processing
+    this.parallelChunkSize = config?.parallelChunkSize || 10;
+    this.enableParallel = config?.enableParallel !== false;
   }
 
   /**
@@ -16,6 +19,58 @@ export class BaseAnalyzer {
    */
   async analyze(_files, _context) {
     throw new Error('analyze() must be implemented by subclass');
+  }
+
+  /**
+   * Analyze files in parallel batches for better performance
+   */
+  async analyzeFilesInParallel(files, context) {
+    if (!this.enableParallel || files.length <= 1) {
+      // Fall back to sequential processing
+      for (const file of files) {
+        if (this.shouldAnalyzeFile(file.path)) {
+          this.stats.filesAnalyzed++;
+          this.stats.linesAnalyzed += file.content.split('\n').length;
+          await this.analyzeFile(file.path, file.content, context);
+        }
+      }
+      return this.getIssues();
+    }
+
+    // Process files in parallel chunks
+    const chunks = this.chunkArray(files, this.parallelChunkSize);
+
+    for (const chunk of chunks) {
+      const promises = chunk
+        .filter(file => this.shouldAnalyzeFile(file.path))
+        .map(async (file) => {
+          this.stats.filesAnalyzed++;
+          this.stats.linesAnalyzed += file.content.split('\n').length;
+
+          try {
+            return await this.analyzeFile(file.path, file.content, context);
+          } catch (error) {
+            console.error(`Error analyzing ${file.path}:`, error.message);
+            return null;
+          }
+        });
+
+      // Wait for all files in chunk to complete
+      await Promise.allSettled(promises);
+    }
+
+    return this.getIssues();
+  }
+
+  /**
+   * Split array into chunks for parallel processing
+   */
+  chunkArray(array, size) {
+    const chunks = [];
+    for (let i = 0; i < array.length; i += size) {
+      chunks.push(array.slice(i, i + size));
+    }
+    return chunks;
   }
 
   /**

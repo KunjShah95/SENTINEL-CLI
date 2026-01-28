@@ -5,7 +5,7 @@ export function Footer() {
   return (
     <footer className="border-t border-white/5 bg-[#050505] pt-24 pb-12 relative overflow-hidden">
       {/* Background decoration */}
-      <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-emerald-900/50 to-transparent" />
+      <div className="absolute top-0 inset-x-0 h-px bg-linear-to-r from-transparent via-emerald-900/50 to-transparent" />
       <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-emerald-500/5 blur-[100px] rounded-full pointer-events-none" />
 
       <div className="max-w-7xl mx-auto px-6 relative z-10">

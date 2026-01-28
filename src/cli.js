@@ -1569,6 +1569,200 @@ program
     }
   });
 
+// ========================================
+// CACHE COMMAND - Manage analysis cache
+// ========================================
+program
+  .command('cache')
+  .description('Manage analysis cache for improved performance')
+  .option('--clear', 'Clear all cache')
+  .option('--stats', 'Show cache statistics')
+  .option('--invalidate <pattern>', 'Invalidate cache by pattern (regex)')
+  .option('--size', 'Show cache size')
+  .action(async (options) => {
+    try {
+      const { cache } = await import('./utils/cache.js');
+
+      if (options.clear) {
+        console.log(chalk.blue('🗑️  Clearing cache...'));
+        await cache.clear();
+        console.log(chalk.green('✓ Cache cleared successfully'));
+        return;
+      }
+
+      if (options.invalidate) {
+        console.log(chalk.blue(`🗑️  Invalidating cache matching: ${options.invalidate}`));
+        await cache.invalidate(options.invalidate);
+        console.log(chalk.green('✓ Cache invalidated'));
+        return;
+      }
+
+      if (options.stats || options.size || !Object.keys(options).length) {
+        const stats = cache.getStats();
+        console.log(chalk.bold.blue('\n📊 Cache Statistics\n'));
+        console.log(chalk.cyan('  Memory Size:'), `${stats.memorySize}/${stats.maxSize} entries`);
+        console.log(chalk.cyan('  Hit Rate:'), `${(stats.hitRate * 100).toFixed(2)}%`);
+        console.log(chalk.cyan('  TTL:'), `${stats.ttl}ms (${(stats.ttl / 1000 / 60).toFixed(1)} minutes)`);
+        console.log(chalk.cyan('  Enabled:'), stats.enabled ? '✓' : '✗');
+        console.log();
+      }
+    } catch (error) {
+      console.error(chalk.red('Cache error:'), error.message);
+      process.exit(1);
+    }
+  });
+
+// ========================================
+// BADGE COMMAND - Generate repository badges
+// ========================================
+program
+  .command('badge')
+  .description('Generate security score badges for your repository')
+  .option('--type <type>', 'Badge type: score|status|issues|security', 'score')
+  .option('--owner <owner>', 'Repository owner')
+  .option('--repo <repo>', 'Repository name')
+  .option('--markdown', 'Output markdown code')
+  .option('--html', 'Output HTML code')
+  .option('--server', 'Start badge API server')
+  .option('--port <port>', 'Badge server port', '3001')
+  .action(async (options) => {
+    try {
+      if (options.server) {
+        console.log(chalk.blue('🎖️  Starting Badge API Server...'));
+        const { startBadgeServer } = await import('./badgeServer.js');
+        process.env.BADGE_API_PORT = options.port;
+        startBadgeServer();
+        return;
+      }
+
+      const { BadgeGenerator } = await import('./utils/badgeGenerator.js');
+      const generator = new BadgeGenerator();
+
+      if (!options.owner || !options.repo) {
+        console.error(chalk.red('Error: --owner and --repo are required'));
+        console.log(chalk.gray('Example: sentinel badge --owner KunjShah95 --repo SENTINEL-CLI --markdown'));
+        process.exit(1);
+      }
+
+      console.log(chalk.bold.blue('\n🎖️  Repository Badges\n'));
+
+      if (options.markdown) {
+        const badges = generator.generateReadmeBadges(options.owner, options.repo);
+        console.log(chalk.cyan('Score Badge:'));
+        console.log(chalk.white(badges.score));
+        console.log();
+        console.log(chalk.cyan('Status Badge:'));
+        console.log(chalk.white(badges.status));
+        console.log();
+        console.log(chalk.cyan('Issues Badge:'));
+        console.log(chalk.white(badges.issues));
+        console.log();
+        console.log(chalk.cyan('Security Badge:'));
+        console.log(chalk.white(badges.security));
+        console.log();
+      } else if (options.html) {
+        console.log(chalk.cyan('Score Badge (HTML):'));
+        console.log(chalk.white(generator.generateHtmlBadge(options.owner, options.repo, 'score')));
+        console.log();
+      } else {
+        const badgeUrl = `https://sentinel-cli.app/badge/${options.owner}/${options.repo}/${options.type}.svg`;
+        console.log(chalk.cyan('Badge URL:'));
+        console.log(chalk.white(badgeUrl));
+        console.log();
+        console.log(chalk.gray('Add --markdown or --html for ready-to-use code'));
+      }
+    } catch (error) {
+      console.error(chalk.red('Badge error:'), error.message);
+      process.exit(1);
+    }
+  });
+
+// ========================================
+// WEBHOOK COMMAND - GitHub App webhook server
+// ========================================
+program
+  .command('webhook')
+  .description('Start GitHub App webhook server for automated PR reviews')
+  .option('--port <port>', 'Webhook server port', '3000')
+  .option('--secret <secret>', 'Webhook secret (or set GITHUB_WEBHOOK_SECRET)')
+  .option('--app-id <id>', 'GitHub App ID (or set GITHUB_APP_ID)')
+  .action(async (options) => {
+    try {
+      console.log(chalk.blue('🤖 Starting GitHub App Webhook Server...'));
+
+      // Set environment variables if provided
+      if (options.secret) process.env.GITHUB_WEBHOOK_SECRET = options.secret;
+      if (options.appId) process.env.GITHUB_APP_ID = options.appId;
+
+      const express = (await import('express')).default;
+      const { GitHubAppWebhookHandler } = await import('./integrations/githubAppWebhook.js');
+
+      const app = express();
+      const webhookHandler = new GitHubAppWebhookHandler();
+
+      app.use(express.json());
+
+      app.post('/api/github/webhook', async (req, res) => {
+        try {
+          const signature = req.headers['x-hub-signature-256'];
+          const result = await webhookHandler.handleWebhook(
+            req.headers,
+            signature,
+            JSON.stringify(req.body)
+          );
+          res.json(result);
+        } catch (error) {
+          console.error(chalk.red('Webhook error:'), error.message);
+          res.status(500).json({ error: error.message });
+        }
+      });
+
+      app.get('/health', (req, res) => {
+        res.json({ status: 'ok', service: 'sentinel-webhook' });
+      });
+
+      const port = parseInt(options.port);
+      app.listen(port, () => {
+        console.log(chalk.green(`✓ Webhook server running on port ${port}`));
+        console.log(chalk.cyan(`📡 Webhook URL: http://localhost:${port}/api/github/webhook`));
+        console.log(chalk.cyan(`🏥 Health check: http://localhost:${port}/health`));
+        console.log(chalk.gray('\nPress Ctrl+C to stop'));
+      });
+    } catch (error) {
+      console.error(chalk.red('Webhook server error:'), error.message);
+      process.exit(1);
+    }
+  });
+
+// ========================================
+// VALIDATE COMMAND - Validate configuration
+// ========================================
+program
+  .command('validate')
+  .description('Validate Sentinel configuration file')
+  .option('-c, --config <path>', 'Config file path', '.sentinelrc.json')
+  .action(async (options) => {
+    try {
+      console.log(chalk.blue('🔍 Validating configuration...'));
+
+      const configPath = path.resolve(process.cwd(), options.config);
+      const { createValidatedConfig } = await import('./config/configValidator.js');
+
+      const configData = JSON.parse(await fs.readFile(configPath, 'utf8'));
+      const validConfig = createValidatedConfig(configData);
+
+      console.log(chalk.green('✓ Configuration is valid'));
+      console.log(chalk.cyan('\nValidated Settings:'));
+      console.log(chalk.gray(`  AI Provider: ${validConfig.ai?.provider || 'default'}`));
+      console.log(chalk.gray(`  Enabled Analyzers: ${Object.keys(validConfig.analyzers || {}).filter(k => validConfig.analyzers[k]).length}`));
+      console.log();
+    } catch (error) {
+      console.error(chalk.red('✗ Configuration validation failed:'));
+      console.error(chalk.yellow(error.message));
+      process.exit(1);
+    }
+  });
+
 // NEW: Dashboard Command
 program
   .command('dashboard')

@@ -135,7 +135,80 @@ Summary: 1 critical, 2 high, 4 medium, 13 low issues
 
 ---
 
-## 6️⃣ Detailed Analyzer Reference & Example Output
+## 6️⃣ New CLI Commands (v1.8.0+)
+
+### 🗄️ Cache Management
+
+Manage the intelligent caching system for 10x faster repeated scans:
+
+```bash
+# Show cache statistics (hit rate, size, TTL)
+sentinel cache --stats
+
+# Clear all cache
+sentinel cache --clear
+
+# Invalidate cache by pattern (regex)
+sentinel cache --invalidate "src/.*\.js"
+
+# Check cache size
+sentinel cache --size
+```
+
+### 🎖️ Security Badges
+
+Generate beautiful badges for your README:
+
+```bash
+# Generate badge markdown (recommended)
+sentinel badge --owner KunjShah95 --repo SENTINEL-CLI --markdown
+
+# Generate HTML badge
+sentinel badge --owner YourOrg --repo YourRepo --html
+
+# Start badge API server (port 3001)
+sentinel badge --server --port 3001
+
+# Get badge URL only
+sentinel badge --owner YourOrg --repo YourRepo --type score
+```
+
+**Badge Types:** `score` (0-100), `status` (pass/fail), `issues` (count), `security` (analyzer status)
+
+### 🤖 GitHub App Webhook
+
+Start webhook server for automated PR reviews:
+
+```bash
+# Start webhook server (requires GitHub App setup)
+sentinel webhook --port 3000
+
+# With explicit credentials
+sentinel webhook --port 3000 --secret YOUR_SECRET --app-id 123456
+```
+
+**Supported PR Commands:**
+- `@sentinel analyze` - Run basic analysis
+- `@sentinel full-scan` - Run all analyzers
+- `@sentinel security-audit` - Security-focused scan
+
+### ✅ Config Validation
+
+Validate configuration before running scans:
+
+```bash
+# Validate default config (.sentinelrc.json)
+sentinel validate
+
+# Validate specific config file
+sentinel validate --config path/to/custom-config.json
+```
+
+> **📘 See NEW_FEATURES.md for comprehensive documentation of all new features!**
+
+---
+
+## 7️⃣ Detailed Analyzer Reference & Example Output
 
 ### Security, Bug & Secrets
 
@@ -180,7 +253,7 @@ Fix: Add USER directive (USER appuser)
 
 ---
 
-## 7️⃣ Configuration & Auth
+## 8️⃣ Configuration & Auth
 
 ### `sentinel auth` (Recommended)
 ```bash
@@ -251,7 +324,7 @@ rules:
 
 ---
 
-## 8️⃣ CI/CD & PR Integration
+## 9️⃣ CI/CD & PR Integration
 
 ### Example — GitHub Actions
 
@@ -325,7 +398,7 @@ sentinel-review:
 
 ---
 
-## 9️⃣ Deep-Dive: Docker & Kubernetes Security
+## 🔟 Deep-Dive: Docker & Kubernetes Security
 
 ### Docker
 
@@ -349,7 +422,7 @@ sentinel-review:
 
 ---
 
-## 🔟 Advanced: Automation, Notifications, & Web UI
+## 1️⃣1️⃣ Advanced: Automation, Notifications, & Web UI
 
 ### Fixing
 

@@ -1,0 +1,41 @@
+# Sentinel CLI GitHub App
+
+name: "Sentinel CLI - AI Code Guardian"
+url: "https://github.com/KunjShah95/SENTINEL-CLI"
+hook_attributes:
+  url: "https://sentinel-cli.app/api/github/webhook"
+  active: true
+redirect_url: "https://sentinel-cli.app/setup"
+setup_url: "https://sentinel-cli.app/setup"
+public: true
+default_permissions:
+  contents: read
+  pull_requests: write
+  issues: write
+  checks: write
+  statuses: write
+default_events:
+  - pull_request
+  - pull_request_review
+  - push
+  - issues
+  - check_run
+
+description: >
+  Sentinel CLI is an AI-powered code review tool that automatically analyzes your pull requests for:
+  
+  ✓ Security vulnerabilities (SQL injection, XSS, CSRF)
+  ✓ Code quality issues
+  ✓ TypeScript/React best practices
+  ✓ Accessibility (WCAG 2.1)
+  ✓ Performance bottlenecks
+  ✓ Dependency vulnerabilities
+  ✓ Secrets exposure
+  ✓ API security
+  
+  🔒 100% Private - Your code stays on your machine or GitHub
+  🤖 Multi-LLM support - OpenAI, Groq, Gemini, Anthropic
+  ⚡ Auto-fix - Automatically fix common issues
+  📊 Beautiful reports - Inline comments + summary dashboard
+  
+  Install now to start improving your code quality automatically!

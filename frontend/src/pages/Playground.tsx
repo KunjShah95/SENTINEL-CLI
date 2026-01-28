@@ -123,8 +123,8 @@ export function Playground() {
                   ))}
                 </div>
                 <form onSubmit={handleCommand} className="flex gap-2 mt-4 relative z-10">
-                  <span className="text-emerald-600 font-bold">➜</span>
-                  <input type="text" value={input} onChange={e => setInput(e.target.value)} className="flex-1 bg-transparent border-none outline-none text-emerald-400 focus:ring-0" autoFocus placeholder="Type a command..." />
+                  <label htmlFor="cli-input" className="text-emerald-600 font-bold">➜</label>
+                  <input id="cli-input" type="text" value={input} onChange={e => setInput(e.target.value)} className="flex-1 bg-transparent border-none outline-none text-emerald-400 focus:ring-0" autoFocus placeholder="Type a command..." title="CLI command input" aria-label="Enter CLI command" />
                 </form>
               </div>
             ) : (
@@ -152,6 +152,9 @@ export function Playground() {
                     onChange={(e) => setCode(e.target.value)}
                     className="absolute inset-0 w-full h-full bg-transparent text-transparent caret-emerald-500 p-6 z-10 focus:outline-none resize-none leading-6"
                     spellCheck={false}
+                    title="Code editor"
+                    aria-label="Code editor - Enter code to analyze"
+                    placeholder="Enter code to analyze..."
                   />
                   {/* Syntax Highlighting Mock */}
                   <div className="relative pointer-events-none" aria-hidden="true">

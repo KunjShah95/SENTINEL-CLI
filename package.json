@@ -1,7 +1,7 @@
 {
   "name": "sentinel-cli",
   "version": "1.8.0",
-  "description": "Sentinel - AI-Powered Code Guardian: Automated code review with security scanning, dependency analysis, accessibility checks, TypeScript/React analysis, API security, secrets detection, and multi-LLM integration",
+  "description": "🛡️ AI-Powered Code Guardian with GitHub App integration, automated PR reviews, security badges, intelligent caching, and comprehensive error handling. Supports 15+ analyzers, 3+ LLM providers (OpenAI, Gemini, Groq), and real-time webhook automation.",
   "main": "src/index.js",
   "type": "module",
   "bin": {
@@ -11,7 +11,11 @@
     "src/**/*",
     "dist/**/*",
     "frontend/build/**/*",
+    "__tests__/**/*",
+    "github-app.yml",
     "README.md",
+    "IMPROVEMENTS.md",
+    "QUICKSTART.md",
     ".env.example",
     ".sentinel.json.example"
   ],
@@ -30,12 +34,15 @@
     "install-hooks": "node src/cli.js install-hooks",
     "test": "jest --passWithNoTests",
     "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
     "lint": "eslint src/",
     "format": "prettier --write src/",
     "build": "node src/build.js",
     "build:frontend": "cd frontend && npm install && npm run build",
     "build:all": "npm run build && npm run build:frontend",
     "dashboard": "node src/cli.js dashboard",
+    "badge-server": "node src/badgeServer.js",
+    "webhook-server": "node src/webhookServer.js",
     "deploy": "npm run build:frontend && npx vercel --prod",
     "demo": "node src/demo.js",
     "prepublishOnly": "npm run lint && npm run build:all",
@@ -63,10 +70,33 @@
     "llm",
     "pre-commit",
     "devops",
-    "cicd"
+    "cicd",
+    "caching",
+    "badges",
+    "github-app",
+    "error-handling",
+    "security-score",
+    "webhook",
+    "parallel-processing",
+    "performance",
+    "config-validation",
+    "automated-pr-review",
+    "docker-security",
+    "secrets-detection",
+    "typescript",
+    "react",
+    "vue"
   ],
   "author": "Kunj Shah",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/KunjShah95/SENTINEL-CLI.git"
+  },
+  "bugs": {
+    "url": "https://github.com/KunjShah95/SENTINEL-CLI/issues"
+  },
+  "homepage": "https://github.com/KunjShah95/SENTINEL-CLI#readme",
   "dependencies": {
     "@google/generative-ai": "^0.1.3",
     "@vercel/analytics": "^1.6.1",
@@ -76,6 +106,7 @@
     "diff": "^5.1.0",
     "eslint": "^8.55.0",
     "eslint-plugin-security": "^1.7.1",
+    "express": "^4.18.2",
     "figlet": "^1.7.0",
     "gradient-string": "^2.0.2",
     "groq-sdk": "^0.3.3",
@@ -99,14 +130,6 @@
   "engines": {
     "node": ">=18.0.0"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/KunjShah95/Sentinel-CLI.git"
-  },
-  "bugs": {
-    "url": "https://github.com/KunjShah95/Sentinel-CLI/issues"
-  },
-  "homepage": "https://github.com/KunjShah95/Sentinel-CLI#readme",
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"
