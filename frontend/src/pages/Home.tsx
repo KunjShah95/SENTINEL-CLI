@@ -1,192 +1,287 @@
-
-import { useRef, useEffect } from 'react';
-import { ArrowRight, Terminal, Github, CheckCircle2, Bot, ShieldAlert, Sparkles, Code2 } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import {
+    Shield, Terminal, Github, ArrowRight, Zap, Lock, Bot,
+    FileCode, CheckCircle2, AlertTriangle, XCircle, GitBranch,
+    Cpu, Globe, Layers, Eye, ShieldCheck, Sparkles, ChevronRight,
+    Play, ExternalLink, Code2, Fingerprint, Cpu as Chip,
+    Key, Package, Cloud, Scale, RefreshCw, MessageSquare, ThumbsUp, Check
+} from 'lucide-react';
+import { FeatureCard } from '../components/FeatureCard';
 import { TerminalMock } from '../components/TerminalMock';
-import { PRComment } from '../components/PRComment';
 
+// Mapped from stitch/sentinel_cli_home_page/code.html
+const features = [
+    {
+        icon: Zap,
+        title: 'Automated Fixes',
+        description: "Don't just find bugs, fix them. Sentinel generates one-click remediation pull requests automatically.",
+        color: 'sentinel',
+    },
+    {
+        icon: RefreshCw,
+        title: 'CI/CD Integration',
+        description: 'Native plugins for GitHub Actions, GitLab CI, and Jenkins. Block insecure merges before they happen.',
+        color: 'scan',
+    },
+    {
+        icon: Scale,
+        title: 'Custom Rule Engine',
+        description: 'Write your own security policies using a simple YAML-based syntax tailored to your architecture.',
+        color: 'sentinel',
+    },
+    {
+        icon: Key,
+        title: 'Secret Scanning',
+        description: 'High-entropy scan for over 400 types of credentials, API keys, and certificates in your codebase.',
+        color: 'critical',
+    },
+    {
+        icon: Package,
+        title: 'Dependency Audit',
+        description: 'Continuously monitor third-party packages for known CVEs and license compliance issues.',
+        color: 'warning',
+    },
+    {
+        icon: Cloud,
+        title: 'IaC Protection',
+        description: 'Scan Terraform, CloudFormation, and Kubernetes manifests for infrastructure misconfigurations.',
+        color: 'info',
+    },
+];
+
+const stats = [
+    { value: '13+', label: 'Analyzers Integrated' },
+    { value: '50ms', label: 'Average Scan Time' },
+    { value: '0', label: 'False Positives' },
+    { value: '10k+', label: 'GitHub Stars' },
+];
+
+const tagCloud = [
+    "Semgrep", "TruffleHog", "Snyk", "Bandit", "Gitleaks",
+    "SonarQube", "Checkmarx", "OWASP ZAP", "Brakeman",
+    "MobSF", "Terrascan", "Hadolint", "Horusec"
+];
+
+function RadarSweep() {
+    return (
+        <div className="relative w-full max-w-[500px] aspect-square rounded-full border border-[var(--color-sentinel)]/10 flex items-center justify-center">
+            {/* Concentric Circles */}
+            <div className="absolute w-[80%] h-[80%] rounded-full border border-[var(--color-sentinel)]/10"></div>
+            <div className="absolute w-[60%] h-[60%] rounded-full border border-[var(--color-sentinel)]/10"></div>
+            <div className="absolute w-[40%] h-[40%] rounded-full border border-[var(--color-sentinel)]/10"></div>
+
+            {/* The Sweep */}
+            <div className="absolute inset-0 rounded-full animate-[radar-sweep_4s_linear_infinite]"
+                style={{ background: 'conic-gradient(from 0deg, rgba(10, 194, 163, 0.4) 0%, transparent 25%)' }}></div>
+
+            {/* Pulsing Dots */}
+            <div className="absolute top-[25%] left-[35%] w-3 h-3 bg-[var(--color-critical)] rounded-full animate-pulse shadow-[0_0_15px_var(--color-critical)]"></div>
+            <div className="absolute bottom-[30%] right-[25%] w-2 h-2 bg-[var(--color-sentinel)] rounded-full animate-pulse shadow-[0_0_15px_rgba(10,194,163,0.8)]" style={{ animationDelay: '0.5s' }}></div>
+            <div className="absolute top-[60%] left-[20%] w-2 h-2 bg-[var(--color-sentinel)] rounded-full animate-pulse" style={{ animationDelay: '1.2s' }}></div>
+            <div className="absolute top-[40%] right-[40%] w-4 h-4 bg-[var(--color-critical)] rounded-full animate-pulse shadow-[0_0_20px_var(--color-critical)]" style={{ animationDelay: '0.8s' }}></div>
+
+            {/* Center Piece */}
+            <div className="z-20 w-16 h-16 bg-[var(--color-void)] border-2 border-[var(--color-sentinel)] rounded-lg flex items-center justify-center rotate-45">
+                <Shield className="w-8 h-8 text-[var(--color-sentinel)] -rotate-45" />
+            </div>
+        </div>
+    );
+}
+
+function PRCommentPreview() {
+    return (
+        <div className="bg-[var(--color-obsidian)] border border-[var(--color-carbon)] rounded-xl overflow-hidden shadow-2xl">
+            <div className="bg-[var(--color-carbon)] px-6 py-4 flex items-center justify-between border-b border-[var(--color-sentinel)]/10">
+                <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded bg-[var(--color-sentinel)] flex items-center justify-center text-[var(--color-void)]">
+                        <Shield className="w-4 h-4" />
+                    </div>
+                    <span className="font-bold text-sm text-[var(--color-text-primary)]">sentinel-bot <span className="text-[var(--color-text-tertiary)] font-normal">commented 2 minutes ago</span></span>
+                </div>
+                <span className="bg-[var(--color-sentinel)]/20 text-[var(--color-sentinel)] text-[10px] uppercase font-black px-2 py-0.5 rounded">Security Check</span>
+            </div>
+            <div className="p-6">
+                <p className="mb-4 text-sm font-semibold text-[var(--color-critical)] flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4" />
+                    High Vulnerability Detected: SQL Injection
+                </p>
+                <p className="text-[var(--color-text-secondary)] text-sm mb-6">
+                    The user input in <code className="bg-[var(--color-carbon)] px-1 rounded text-[var(--color-text-primary)]">query_params</code> is being concatenated directly into a SQL statement. This allows attackers to bypass authentication.
+                </p>
+                {/* Diff View */}
+                <div className="rounded-lg border border-[var(--color-sentinel)]/10 overflow-hidden font-mono text-xs">
+                    <div className="bg-[var(--color-carbon)] px-4 py-2 text-[var(--color-text-secondary)] border-b border-[var(--color-sentinel)]/10">
+                        src/services/auth.py
+                    </div>
+                    <div className="p-0">
+                        <div className="bg-[var(--color-critical)]/10 text-[var(--color-critical)] px-4 py-1 flex">
+                            <span className="w-6 opacity-50">-</span>
+                            <span>cursor.execute(f"SELECT * FROM users WHERE id = {'{user_id}'}")</span>
+                        </div>
+                        <div className="bg-[var(--color-secure)]/10 text-[var(--color-secure)] px-4 py-1 flex">
+                            <span className="w-6 opacity-50">+</span>
+                            <span>cursor.execute("SELECT * FROM users WHERE id = %s", (user_id,))</span>
+                        </div>
+                    </div>
+                </div>
+                <div className="mt-8 flex gap-3">
+                    <button className="bg-[var(--color-sentinel)] text-[var(--color-void)] text-xs font-bold px-4 py-2 rounded shadow-lg hover:brightness-110 transition-all cursor-pointer">Apply Fix</button>
+                    <button className="text-[var(--color-text-tertiary)] text-xs font-bold px-4 py-2 hover:text-[var(--color-text-secondary)] transition-all cursor-pointer">Dismiss</button>
+                </div>
+            </div>
+        </div>
+    );
+}
 
 export function Home() {
-  const revealRefs = useRef<(HTMLDivElement | null)[]>([]);
+    const revealRefs = useRef<(HTMLDivElement | null)[]>([]);
 
-  // Intersection Observer for animations
-  useEffect(() => {
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add('active');
+    useEffect(() => {
+        const observer = new IntersectionObserver(
+            (entries) => {
+                entries.forEach((entry) => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('active');
+                    }
+                });
+            },
+            { threshold: 0.1, rootMargin: '0px 0px -50px 0px' }
+        );
+
+        revealRefs.current.forEach((ref) => {
+            if (ref) observer.observe(ref);
+        });
+
+        return () => observer.disconnect();
+    }, []);
+
+    const addToRefs = (el: HTMLDivElement | null) => {
+        if (el && !revealRefs.current.includes(el)) {
+            revealRefs.current.push(el);
         }
-      });
-    }, { threshold: 0.1 });
+    };
 
-    revealRefs.current.forEach((ref) => {
-      if (ref) observer.observe(ref);
-    });
+    return (
+        <main className="relative overflow-hidden bg-[var(--color-void)] min-h-screen font-body">
+            <div className="noise-overlay" />
 
-    return () => observer.disconnect();
-  }, []);
-
-  const addToRefs = (el: HTMLDivElement | null) => {
-    if (el && !revealRefs.current.includes(el)) {
-      revealRefs.current.push(el);
-    }
-  };
-
-  return (
-    <div className="min-h-screen bg-gray-950 text-white selection:bg-emerald-500/30 font-sans overflow-x-hidden pt-20">
-
-      {/* Background Ambience */}
-      <div className="fixed inset-0 z-0 pointer-events-none">
-        <div className="absolute inset-0 grid-background opacity-[0.1]" />
-        <div className="absolute -top-[500px] left-1/2 -translate-x-1/2 w-[1000px] h-[1000px] bg-emerald-500/10 blur-[120px] rounded-full mix-blend-screen" />
-      </div>
-
-      {/* Hero Section */}
-      <section className="relative z-10 pt-20 pb-32 px-6">
-        <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-16 items-center">
-
-          {/* Hero Content (Left) */}
-          <div className="space-y-8 reveal" ref={addToRefs}>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold uppercase tracking-wider backdrop-blur-md animate-pulse-glow">
-              <Sparkles className="w-3 h-3" />
-              <span>AI Agent V2.4 Now Live</span>
-            </div>
-
-            <h1 className="text-5xl md:text-7xl font-bold tracking-tight leading-[1.1]">
-              Your AI Security <br />
-              <span className="text-gradient">Pair Programmer</span>.
-            </h1>
-
-            <p className="text-xl text-gray-400 leading-relaxed max-w-lg">
-              Automated code reviews, vulnerability scanning, and 1-click fixes.
-              Running locally in your CLI or automatically on every Pull Request.
-            </p>
-
-            <div className="flex flex-wrap gap-4">
-              <Link to="/docs" className="flex items-center gap-2 px-8 py-4 rounded-xl bg-emerald-600 text-white font-bold hover:bg-emerald-500 transition-all shadow-lg shadow-emerald-500/20 group">
-                <Github className="w-5 h-5" />
-                <span>Add to GitHub</span>
-              </Link>
-              <Link to="/features" className="flex items-center gap-2 px-8 py-4 rounded-xl bg-gray-900 text-white font-bold border border-gray-800 hover:bg-gray-800 hover:border-gray-700 transition-all group">
-                <Terminal className="w-5 h-5 text-gray-400 group-hover:text-emerald-400 transition-colors" />
-                <span>Install CLI</span>
-                <ArrowRight className="w-4 h-4 ml-auto opacity-0 group-hover:opacity-100 transition-all transform group-hover:translate-x-1" />
-              </Link>
-            </div>
-
-            <div className="flex items-center gap-6 pt-4 text-sm text-gray-500">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                <span>Free for Open Source</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                <span>No data retention</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Hero Visuals (Right) */}
-          <div className="relative reveal delay-200" ref={addToRefs}>
-            {/* Abstract Glow behind */}
-            <div className="absolute inset-0 bg-emerald-500/20 blur-[80px] rounded-full mix-blend-screen opacity-50 pointer-events-none" />
-
-            {/* Composition */}
-            <div className="relative">
-              {/* Layer 1: Terminal (Back) */}
-              <div className="transform translate-y-12 scale-95 opacity-80 blur-[1px] transition-all hover:translate-y-8 hover:opacity-100 hover:blur-0 duration-500">
-                <TerminalMock />
-              </div>
-
-              {/* Layer 2: PR Comment (Front/Floating) */}
-              <div className="absolute -bottom-12 -right-4 md:-right-24 w-[90%] md:w-[28rem] shadow-2xl animate-float z-50 pointer-events-auto">
-                <PRComment />
-              </div>
-            </div>
-          </div>
-
-        </div>
-      </section>
-
-
-      {/* Feature Value Props */}
-      <section className="py-32 px-6">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-24 reveal" ref={addToRefs}>
-            <h2 className="text-4xl md:text-5xl font-bold mb-6">Security that feels like <span className="text-emerald-400">magic</span></h2>
-            <p className="text-xl text-gray-400 max-w-2xl mx-auto">
-              We combined static analysis, dependency scanning, and LLMs to create
-              the world's most comprehensive code review agent.
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-8">
-            {[
-              {
-                icon: Bot,
-                title: "AI Context Awareness",
-                desc: "Unlike traditional linters, SENTINEL understands your business logic and data flow to find complex vulnerabilities.",
-                color: "emerald"
-              },
-              {
-                icon: ShieldAlert,
-                title: "Zero False Positives",
-                desc: "Our multi-pass validation engine ensures that you only get alerted on real issues that matter.",
-                color: "rose"
-              },
-              {
-                icon: Code2,
-                title: "Instant Auto-Fixes",
-                desc: "Don't just find bugs—fix them. SENTINEL opens PRs with complete, tested code solutions.",
-                color: "blue"
-              }
-            ].map((feature, i) => (
-              <div key={i} className="reveal group p-8 rounded-3xl bg-gray-900/40 border border-white/5 hover:border-emerald-500/20 transition-all hover:-translate-y-1 duration-300" ref={addToRefs}>
-                <div className={`w-12 h-12 rounded-2xl bg-${feature.color}-500/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-500`}>
-                  <feature.icon className={`w-6 h-6 text-${feature.color}-400`} />
+            {/* Hero Section */}
+            <section className="relative pt-20 pb-32 overflow-hidden">
+                <div className="max-w-7xl mx-auto px-6 grid lg:grid-cols-2 gap-16 items-center">
+                    {/* Hero Content */}
+                    <div className="z-10 reveal" ref={addToRefs}>
+                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-[var(--color-sentinel)]/30 bg-[var(--color-sentinel)]/5 text-[var(--color-sentinel)] text-xs font-bold tracking-widest uppercase mb-6">
+                            <span className="relative flex h-2 w-2">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--color-sentinel)] opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-[var(--color-sentinel)]"></span>
+                            </span>
+                            AI-Powered Code Guardian
+                        </div>
+                        <h1 className="font-['Syne'] text-6xl md:text-7xl leading-tight mb-6 text-[var(--color-text-primary)]">
+                            Your AI Security <br />
+                            <span className="text-[var(--color-sentinel)]">Pair Programmer</span>
+                        </h1>
+                        <p className="text-xl text-[var(--color-text-secondary)] max-w-xl mb-10 leading-relaxed">
+                            Sentinel CLI scans your code in real-time, detecting vulnerabilities before they reach production. Automated fixes meet enterprise-grade security.
+                        </p>
+                        <div className="flex flex-wrap gap-4 mb-12">
+                            <Link to="/docs" className="bg-[var(--color-sentinel)] text-[var(--color-void)] font-bold px-8 py-4 rounded-lg hover:shadow-[0_0_30px_rgba(10,194,163,0.4)] transition-all inline-flex items-center justify-center">
+                                Get Started Free
+                            </Link>
+                            <a href="https://github.com/KunjShah95/SENTINEL-CLI" target="_blank" rel="noopener noreferrer" className="border border-[var(--color-carbon)] text-[var(--color-text-secondary)] hover:border-[var(--color-sentinel)] hover:text-[var(--color-text-primary)] px-8 py-4 rounded-lg font-bold transition-all flex items-center gap-2">
+                                <Github className="w-5 h-5" />
+                                View on GitHub
+                            </a>
+                        </div>
+                        {/* Tag Cloud */}
+                        <div className="flex flex-wrap gap-2 max-w-xl">
+                            {tagCloud.map((tag, i) => (
+                                <span key={i} className="px-3 py-1 border border-[var(--color-sentinel)]/20 rounded bg-[var(--color-sentinel)]/5 text-xs text-[var(--color-text-tertiary)]">
+                                    {tag}
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+                    {/* Radar Visualization */}
+                    <div className="relative flex justify-center items-center reveal" ref={addToRefs}>
+                        <RadarSweep />
+                    </div>
                 </div>
-                <h3 className="text-xl font-bold text-white mb-3 font-display">{feature.title}</h3>
-                <p className="text-gray-400 leading-relaxed text-sm">
-                  {feature.desc}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+            </section>
 
-      {/* Integration CTA */}
-      <section className="py-24 px-6 relative overflow-hidden">
-        <div className="absolute inset-0 bg-emerald-900/10" />
-        <div className="absolute inset-0 bg-gradient-to-b from-gray-950 via-transparent to-gray-950" />
+            {/* Stats Bar */}
+            <section className="max-w-7xl mx-auto px-6 mb-32 reveal" ref={addToRefs}>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+                    {stats.map((stat, i) => (
+                        <div key={i} className="p-8 rounded-xl bg-[var(--color-sentinel)]/5 border border-[var(--color-sentinel)]/10 backdrop-blur-sm group hover:bg-[var(--color-sentinel)]/10 transition-colors">
+                            <div className="text-4xl font-['Syne'] bg-gradient-to-br from-[var(--color-sentinel)] to-emerald-400 bg-clip-text text-transparent mb-2">
+                                {stat.value}
+                            </div>
+                            <div className="text-[var(--color-text-tertiary)] uppercase tracking-widest text-xs font-bold">
+                                {stat.label}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </section>
 
-        <div className="max-w-5xl mx-auto text-center relative z-10 reveal" ref={addToRefs}>
-          <div className="inline-block p-4 rounded-full bg-emerald-500/20 mb-8 animate-pulse">
-            <ShieldAlert className="w-12 h-12 text-emerald-400" />
-          </div>
+            {/* Terminal Demo */}
+            {/* Added a relative container with z-10 ensures it sits above any absolute bg elements if any */}
+            <section className="max-w-4xl mx-auto px-6 mb-32 reveal z-10 relative" ref={addToRefs}>
+                <TerminalMock />
+            </section>
 
-          <h2 className="text-4xl md:text-6xl font-bold mb-8 tracking-tight">
-            Stop vulnerabilities <br />
-            <span className="text-emerald-400">before they merge.</span>
-          </h2>
+            {/* Feature Grid */}
+            <section className="max-w-7xl mx-auto px-6 mb-32">
+                <div className="text-center mb-16 reveal" ref={addToRefs}>
+                    <h2 className="font-['Syne'] text-4xl mb-4 text-[var(--color-text-primary)]">Engineered for DevSecOps</h2>
+                    <div className="w-24 h-1 bg-[var(--color-sentinel)] mx-auto"></div>
+                </div>
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    {features.map((feature, index) => (
+                        <div key={index} className="reveal relative z-10" ref={addToRefs}>
+                            <FeatureCard
+                                icon={feature.icon}
+                                title={feature.title}
+                                description={feature.description}
+                                color={feature.color}
+                            />
+                        </div>
+                    ))}
+                </div>
+            </section>
 
-          <p className="text-xl text-gray-400 mb-12 max-w-2xl mx-auto">
-            Join 10,000+ developers who sleep better at night knowing SENTINEL is guarding their codebase.
-          </p>
+            {/* PR Comment Preview */}
+            <section className="max-w-5xl mx-auto px-6 mb-32 reveal" ref={addToRefs}>
+                <PRCommentPreview />
+                <div className="mt-6 text-center text-[var(--color-text-tertiary)] text-sm italic">
+                    Integrating directly into your GitHub workflow for zero-friction security.
+                </div>
+            </section>
 
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link to="/docs" className="flex items-center justify-center gap-2 w-full sm:w-auto px-8 py-4 bg-white text-gray-950 font-bold rounded-xl hover:bg-emerald-400 transition-colors shadow-lg shadow-white/10 hover:shadow-emerald-400/20">
-              <Terminal className="w-5 h-5" />
-              <span>Get Started Now</span>
-            </Link>
-            <a href="https://github.com/KunjShah95/SENTINEL-CLI" target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 w-full sm:w-auto px-8 py-4 bg-gray-950 text-white border border-gray-800 font-bold rounded-xl hover:bg-gray-900 transition-colors hover:border-gray-700">
-              <Github className="w-5 h-5" />
-              <span>View Source</span>
-            </a>
-          </div>
-        </div>
-      </section>
-
-    </div>
-  );
+            {/* CTA Section */}
+            <section className="max-w-7xl mx-auto px-6 mb-32 reveal" ref={addToRefs}>
+                <div className="bg-gradient-to-r from-[var(--color-sentinel)] to-emerald-600 rounded-3xl p-12 md:p-20 relative overflow-hidden text-center">
+                    <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '30px 30px' }}></div>
+                    <div className="relative z-10">
+                        <h2 className="font-['Syne'] text-4xl md:text-6xl text-[var(--color-void)] mb-8">
+                            Ready to secure <br className="hidden md:block" /> your pipeline?
+                        </h2>
+                        <div className="flex flex-col sm:flex-row justify-center gap-4">
+                            <Link to="/docs" className="bg-[var(--color-void)] text-[var(--color-text-primary)] font-bold px-10 py-5 rounded-xl hover:scale-105 transition-transform cursor-pointer inline-flex items-center justify-center">
+                                Get Started for Free
+                            </Link>
+                            <Link to="/contact" className="bg-transparent border-2 border-[var(--color-void)]/20 text-[var(--color-void)] font-bold px-10 py-5 rounded-xl hover:bg-[var(--color-void)]/5 transition-colors cursor-pointer inline-flex items-center justify-center">
+                                Book a Demo
+                            </Link>
+                        </div>
+                        <p className="mt-8 text-[var(--color-void)]/60 text-sm font-medium uppercase tracking-tighter">
+                            No credit card required • Unlimited scans for Open Source
+                        </p>
+                    </div>
+                </div>
+            </section>
+        </main>
+    );
 }

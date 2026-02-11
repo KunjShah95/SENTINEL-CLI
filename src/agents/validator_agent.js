@@ -1,7 +1,7 @@
 // Validator Agent: checks whether fixes address the reported issues
 // Uses a lightweight syntax check on the fixed code and basic sanity checks.
 
-function validateFix(code, fixedCode, errors) {
+function validateFix(code, fixedCode, _errors) {
   const details = [];
   try {
     // If fixedCode can be parsed, syntax is valid

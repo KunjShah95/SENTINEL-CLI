@@ -5,7 +5,6 @@
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 const fs = require('fs');
-const path = require('path');
 
 async function readCodeFromInput(input) {
   if (!input) return '';
@@ -86,7 +85,7 @@ async function main() {
       runs: [
         {
           tool: { driver: { name: 'Sentinel CLI', informationUri: 'https://example.com' } },
-          results: errors.map((e, idx) => ({
+          results: errors.map((e) => ({
             ruleId: e.type,
             message: { text: e.message },
             level: (e.severity === 'critical' || e.severity === 'high') ? 'error' : 'warning'
@@ -104,7 +103,7 @@ async function main() {
     if (errors.length === 0) {
       console.log('- No errors detected');
     } else {
-      errors.forEach((e, idx) => {
+      errors.forEach((e) => {
         console.log(`- **${e.type}**: ${e.message}` + (e.line ? ` (line ${e.line})` : ''));
       });
     }

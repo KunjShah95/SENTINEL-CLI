@@ -144,8 +144,8 @@ export const Config: React.FC = () => {
         <button
             onClick={() => setActiveTab(id)}
             className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all ${activeTab === id
-                ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30'
-                : 'text-gray-400 hover:text-white hover:bg-white/5'
+                ? 'bg-[var(--color-sentinel)]/20 text-[var(--color-sentinel)] border border-[var(--color-sentinel)]/30'
+                : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-void-surface)]'
                 }`}
         >
             <Icon size={18} />
@@ -157,18 +157,18 @@ export const Config: React.FC = () => {
         <div className="pt-24 pb-12 px-4 max-w-6xl mx-auto">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent flex items-center gap-3">
-                        <Settings className="text-blue-500" /> Sentinel Configuration
+                    <h1 className="text-3xl font-bold bg-gradient-to-r from-[var(--color-text-primary)] to-[var(--color-text-muted)] bg-clip-text text-transparent flex items-center gap-3 font-['Syne']">
+                        <Settings className="text-[var(--color-sentinel)]" /> Sentinel Configuration
                     </h1>
-                    <p className="text-gray-400 mt-2">Manage your AI providers, agents, and system settings.</p>
+                    <p className="text-[var(--color-text-secondary)] mt-2">Manage your AI providers, agents, and system settings.</p>
                 </div>
 
                 <button
                     onClick={handleSave}
                     disabled={loading}
                     className={`flex items-center space-x-2 px-6 py-2.5 rounded-full font-semibold transition-all ${saved
-                        ? 'bg-emerald-500 text-white'
-                        : 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-600/20'
+                        ? 'bg-[var(--color-sentinel)] text-[var(--color-void)]'
+                        : 'bg-[var(--color-sentinel)] hover:brightness-110 text-[var(--color-void)] shadow-lg shadow-[var(--color-sentinel)]/20'
                         }`}
                 >
                     {loading ? (
@@ -187,7 +187,7 @@ export const Config: React.FC = () => {
                 </button>
             </div>
 
-            <div className="flex flex-wrap gap-2 mb-8 p-1 bg-white/5 rounded-xl border border-white/10 w-fit">
+            <div className="flex flex-wrap gap-2 mb-8 p-1 bg-[var(--color-void-surface)] rounded-xl border border-[var(--color-border-subtle)] w-fit">
                 <TabButton id="providers" icon={Key} label="AI Providers" />
                 <TabButton id="agents" icon={Cpu} label="Agents" />
                 <TabButton id="system" icon={Terminal} label="System" />
@@ -202,13 +202,13 @@ export const Config: React.FC = () => {
                         className="grid grid-cols-1 md:grid-cols-2 gap-6"
                     >
                         {['openai', 'anthropic', 'gemini', 'groq', 'openrouter'].map((p) => (
-                            <div key={p} className="p-6 rounded-2xl bg-white/5 border border-white/10 hover:border-white/20 transition-all backdrop-blur-sm">
+                            <div key={p} className="p-6 rounded-2xl bg-[var(--color-void-surface)] border border-[var(--color-border-subtle)] hover:border-[var(--color-sentinel)]/30 transition-all backdrop-blur-sm">
                                 <div className="flex justify-between items-center mb-4">
                                     <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                                            <Key className="text-blue-400" size={20} />
+                                        <div className="w-10 h-10 rounded-lg bg-[var(--color-sentinel)]/10 flex items-center justify-center">
+                                            <Key className="text-[var(--color-sentinel)]" size={20} />
                                         </div>
-                                        <h3 className="font-bold text-lg capitalize">{p}</h3>
+                                        <h3 className="font-bold text-lg capitalize text-[var(--color-text-primary)]">{p}</h3>
                                     </div>
                                     <label className="relative inline-flex items-center cursor-pointer">
                                         <input
@@ -227,11 +227,11 @@ export const Config: React.FC = () => {
                                         value={(config.providers as any)[p].apiKey}
                                         onChange={(e) => updateProvider(p, 'apiKey', e.target.value)}
                                         placeholder={`Enter ${p} API Key`}
-                                        className="w-full bg-black/40 border border-white/10 rounded-lg py-2.5 pl-4 pr-10 focus:outline-none focus:border-blue-500/50 transition-all font-mono text-sm"
+                                        className="w-full bg-[var(--color-void-deep)] border border-[var(--color-border-subtle)] text-[var(--color-text-primary)] rounded-lg py-2.5 pl-4 pr-10 focus:outline-none focus:border-[var(--color-sentinel)]/50 transition-all font-mono text-sm placeholder-[var(--color-text-tertiary)]"
                                     />
                                     <button
                                         onClick={() => toggleKey(p)}
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)]"
                                     >
                                         {showKeys[p] ? <EyeOff size={18} /> : <Eye size={18} />}
                                     </button>
@@ -239,13 +239,13 @@ export const Config: React.FC = () => {
                             </div>
                         ))}
 
-                        <div className="p-6 rounded-2xl bg-white/5 border border-white/10 hover:border-white/20 transition-all backdrop-blur-sm">
+                        <div className="p-6 rounded-2xl bg-[var(--color-void-surface)] border border-[var(--color-border-subtle)] hover:border-[var(--color-sentinel)]/30 transition-all backdrop-blur-sm">
                             <div className="flex justify-between items-center mb-4">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-                                        <Shield className="text-emerald-400" size={20} />
+                                    <div className="w-10 h-10 rounded-lg bg-[var(--color-sentinel)]/10 flex items-center justify-center">
+                                        <Shield className="text-[var(--color-sentinel)]" size={20} />
                                     </div>
-                                    <h3 className="font-bold text-lg">GitHub Copilot</h3>
+                                    <h3 className="font-bold text-lg text-[var(--color-text-primary)]">GitHub Copilot</h3>
                                 </div>
                                 <label className="relative inline-flex items-center cursor-pointer">
                                     <input
@@ -269,31 +269,30 @@ export const Config: React.FC = () => {
                         className="grid grid-cols-1 md:grid-cols-3 gap-6"
                     >
                         {['coder', 'task', 'title'].map((a) => (
-                            <div key={a} className="p-6 rounded-2xl bg-white/5 border border-white/10 hover:border-white/20 transition-all">
+                            <div key={a} className="p-6 rounded-2xl bg-[var(--color-void-surface)] border border-[var(--color-border-subtle)] hover:border-[var(--color-sentinel)]/30 transition-all">
                                 <div className="flex items-center gap-3 mb-6">
-                                    <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
-                                        <Cpu className="text-purple-400" size={20} />
+                                    <div className="w-10 h-10 rounded-lg bg-[var(--color-scan)]/10 flex items-center justify-center">
+                                        <Cpu className="text-[var(--color-scan)]" size={20} />
                                     </div>
-                                    <h3 className="font-bold text-lg capitalize">{a} Agent</h3>
+                                    <h3 className="font-bold text-lg capitalize text-[var(--color-text-primary)]">{a} Agent</h3>
                                 </div>
-
                                 <div className="space-y-4">
                                     <div>
-                                        <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5 ml-1">Model</label>
+                                        <label className="block text-xs font-semibold text-[var(--color-text-tertiary)] uppercase mb-1.5 ml-1">Model</label>
                                         <input
                                             type="text"
                                             value={(config.agents as any)[a].model}
                                             onChange={(e) => updateAgent(a, 'model', e.target.value)}
-                                            className="w-full bg-black/40 border border-white/10 rounded-lg py-2 px-3 focus:outline-none focus:border-purple-500/50 transition-all text-sm"
+                                            className="w-full bg-[var(--color-void-deep)] border border-[var(--color-border-subtle)] text-[var(--color-text-primary)] rounded-lg py-2 px-3 focus:outline-none focus:border-[var(--color-sentinel)]/50 transition-all text-sm font-mono"
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5 ml-1">Max Tokens</label>
+                                        <label className="block text-xs font-semibold text-[var(--color-text-tertiary)] uppercase mb-1.5 ml-1">Max Tokens</label>
                                         <input
                                             type="number"
                                             value={(config.agents as any)[a].maxTokens}
                                             onChange={(e) => updateAgent(a, 'maxTokens', parseInt(e.target.value))}
-                                            className="w-full bg-black/40 border border-white/10 rounded-lg py-2 px-3 focus:outline-none focus:border-purple-500/50 transition-all text-sm"
+                                            className="w-full bg-[var(--color-void-deep)] border border-[var(--color-border-subtle)] text-[var(--color-text-primary)] rounded-lg py-2 px-3 focus:outline-none focus:border-[var(--color-sentinel)]/50 transition-all text-sm font-mono"
                                         />
                                     </div>
                                 </div>
@@ -308,43 +307,43 @@ export const Config: React.FC = () => {
                         animate={{ opacity: 1, y: 0 }}
                         className="space-y-6"
                     >
-                        <div className="p-6 rounded-2xl bg-white/5 border border-white/10">
-                            <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
-                                <ShellIcon className="text-gray-400" size={20} /> Shell Settings
+                        <div className="p-6 rounded-2xl bg-[var(--color-void-surface)] border border-[var(--color-border-subtle)]">
+                            <h3 className="font-bold text-lg mb-4 flex items-center gap-2 text-[var(--color-text-primary)]">
+                                <ShellIcon className="text-[var(--color-text-secondary)]" size={20} /> Shell Settings
                             </h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
-                                    <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5 ml-1">Shell Path</label>
+                                    <label className="block text-xs font-semibold text-[var(--color-text-tertiary)] uppercase mb-1.5 ml-1">Shell Path</label>
                                     <input
                                         type="text"
                                         value={config.shell.path}
                                         onChange={(e) => setConfig(prev => ({ ...prev, shell: { ...prev.shell, path: e.target.value } }))}
-                                        className="w-full bg-black/40 border border-white/10 rounded-lg py-2.5 px-4 focus:outline-none focus:border-blue-500/50 transition-all font-mono text-sm"
+                                        className="w-full bg-[var(--color-void-deep)] border border-[var(--color-border-subtle)] text-[var(--color-text-primary)] rounded-lg py-2.5 px-4 focus:outline-none focus:border-[var(--color-sentinel)]/50 transition-all font-mono text-sm"
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5 ml-1">Arguments (comma separated)</label>
+                                    <label className="block text-xs font-semibold text-[var(--color-text-tertiary)] uppercase mb-1.5 ml-1">Arguments (comma separated)</label>
                                     <input
                                         type="text"
                                         value={config.shell.args.join(', ')}
                                         onChange={(e) => setConfig(prev => ({ ...prev, shell: { ...prev.shell, args: e.target.value.split(',').map(s => s.trim()) } }))}
-                                        className="w-full bg-black/40 border border-white/10 rounded-lg py-2.5 px-4 focus:outline-none focus:border-blue-500/50 transition-all font-mono text-sm"
+                                        className="w-full bg-[var(--color-void-deep)] border border-[var(--color-border-subtle)] text-[var(--color-text-primary)] rounded-lg py-2.5 px-4 focus:outline-none focus:border-[var(--color-sentinel)]/50 transition-all font-mono text-sm"
                                     />
                                 </div>
                             </div>
                         </div>
 
-                        <div className="p-6 rounded-2xl bg-white/5 border border-white/10">
-                            <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
-                                <Database className="text-gray-400" size={20} /> Data Directory
+                        <div className="p-6 rounded-2xl bg-[var(--color-void-surface)] border border-[var(--color-border-subtle)]">
+                            <h3 className="font-bold text-lg mb-4 flex items-center gap-2 text-[var(--color-text-primary)]">
+                                <Database className="text-[var(--color-text-secondary)]" size={20} /> Data Directory
                             </h3>
                             <div>
-                                <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5 ml-1">Directory Name</label>
+                                <label className="block text-xs font-semibold text-[var(--color-text-tertiary)] uppercase mb-1.5 ml-1">Directory Name</label>
                                 <input
                                     type="text"
                                     value={config.data.directory}
                                     onChange={(e) => setConfig(prev => ({ ...prev, data: { ...prev.data, directory: e.target.value } }))}
-                                    className="w-full bg-black/40 border border-white/10 rounded-lg py-2.5 px-4 focus:outline-none focus:border-blue-500/50 transition-all font-mono text-sm"
+                                    className="w-full bg-[var(--color-void-deep)] border border-[var(--color-border-subtle)] text-[var(--color-text-primary)] rounded-lg py-2.5 px-4 focus:outline-none focus:border-[var(--color-sentinel)]/50 transition-all font-mono text-sm"
                                 />
                             </div>
                         </div>
@@ -357,10 +356,10 @@ export const Config: React.FC = () => {
                         animate={{ opacity: 1, y: 0 }}
                         className="space-y-4"
                     >
-                        <div className="p-6 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between">
+                        <div className="p-6 rounded-2xl bg-[var(--color-void-surface)] border border-[var(--color-border-subtle)] flex items-center justify-between">
                             <div>
-                                <h3 className="font-bold text-lg">Debug Mode</h3>
-                                <p className="text-gray-400 text-sm">Enable verbose logging and stack traces for troubleshooting.</p>
+                                <h3 className="font-bold text-lg text-[var(--color-text-primary)]">Debug Mode</h3>
+                                <p className="text-[var(--color-text-tertiary)] text-sm">Enable verbose logging and stack traces for troubleshooting.</p>
                             </div>
                             <label className="relative inline-flex items-center cursor-pointer">
                                 <input
@@ -373,10 +372,10 @@ export const Config: React.FC = () => {
                             </label>
                         </div>
 
-                        <div className="p-6 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between">
+                        <div className="p-6 rounded-2xl bg-[var(--color-void-surface)] border border-[var(--color-border-subtle)] flex items-center justify-between">
                             <div>
-                                <h3 className="font-bold text-lg">Auto Compact</h3>
-                                <p className="text-gray-400 text-sm">Automatically compact history and cache periodically.</p>
+                                <h3 className="font-bold text-lg text-[var(--color-text-primary)]">Auto Compact</h3>
+                                <p className="text-[var(--color-text-tertiary)] text-sm">Automatically compact history and cache periodically.</p>
                             </div>
                             <label className="relative inline-flex items-center cursor-pointer">
                                 <input
@@ -389,7 +388,7 @@ export const Config: React.FC = () => {
                             </label>
                         </div>
 
-                        <div className="mt-8 p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex gap-3">
+                        <div className="mt-8 p-4 rounded-xl bg-[var(--color-sentinel)]/10 border border-[var(--color-sentinel)]/20 text-[var(--color-sentinel)] flex gap-3">
                             <Shield size={20} className="shrink-0" />
                             <p className="text-sm">
                                 <strong>Security:</strong> API keys are stored locally on your system in <code>.sentinel.json</code> (Home directory or local project).

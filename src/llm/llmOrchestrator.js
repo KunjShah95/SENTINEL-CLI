@@ -1,5 +1,5 @@
 import axios from 'axios';
-import rateLimiter from '../utils/rateLimiter.js';
+import enhancedRateLimiter from '../utils/enhancedRateLimiter.js';
 
 let GoogleGenerativeAIClient = null;
 let GroqClient = null;
@@ -215,7 +215,7 @@ export default class LLMOrchestrator {
       payload.response_format = { type: 'json_object' };
     }
 
-    const response = await rateLimiter.schedule(() =>
+    const response = await enhancedRateLimiter.schedule('openai', () =>
       axios.post('https://api.openai.com/v1/chat/completions', payload, {
         headers: { Authorization: `Bearer ${provider.apiKey}` },
       })
@@ -231,14 +231,17 @@ export default class LLMOrchestrator {
     }
     const groq = new GroqClient({ apiKey: provider.apiKey });
     const messages = this.buildMessages(options.systemPrompt, prompt);
-    const response = await groq.chat.completions.create({
-      model: provider.model || 'llama3-70b-8192',
-      temperature: this.temperature,
-      max_tokens: this.maxTokens,
-      messages,
-      ...(options.responseFormat === 'json_object'
-        ? { response_format: { type: 'json_object' } }
-        : {}),
+
+    const response = await enhancedRateLimiter.schedule('groq', async () => {
+      return await groq.chat.completions.create({
+        model: provider.model || 'llama3-70b-8192',
+        temperature: this.temperature,
+        max_tokens: this.maxTokens,
+        messages,
+        ...(options.responseFormat === 'json_object'
+          ? { response_format: { type: 'json_object' } }
+          : {}),
+      });
     });
     return response.choices[0]?.message?.content || '';
   }
@@ -253,14 +256,17 @@ export default class LLMOrchestrator {
     const finalPrompt = options.systemPrompt
       ? `${options.systemPrompt}\n\nUser:\n${prompt}`
       : prompt;
-    const result = await model.generateContent(finalPrompt);
-    const response = await result.response;
+
+    const response = await enhancedRateLimiter.schedule('gemini', async () => {
+      const result = await model.generateContent(finalPrompt);
+      return await result.response;
+    });
     return response.text();
   }
 
   async callOpenRouter(provider, prompt, options = {}) {
     const messages = this.buildMessages(options.systemPrompt, prompt);
-    const response = await rateLimiter.schedule(() =>
+    const response = await enhancedRateLimiter.schedule('openrouter', () =>
       axios.post(
         'https://openrouter.ai/api/v1/chat/completions',
         {
@@ -282,7 +288,7 @@ export default class LLMOrchestrator {
   }
 
   async callAnthropic(provider, prompt, options = {}) {
-    const response = await rateLimiter.schedule(() =>
+    const response = await enhancedRateLimiter.schedule('anthropic', () =>
       axios.post(
         'https://api.anthropic.com/v1/messages',
         {

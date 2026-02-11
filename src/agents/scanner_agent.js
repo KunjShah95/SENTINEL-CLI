@@ -5,7 +5,7 @@ const extractLineFromError = (err) => {
   if (!err) return null;
   // Typical Node.js stack trace format: at <anonymous>:LINE:COL
   if (err.stack) {
-    const m = err.stack.match(/:(\d+):\d+/);
+    const m = err.stack.match(/:(.+):.+/);
     if (m && m[1]) return parseInt(m[1], 10);
   }
   if (typeof err.lineNumber === 'number') return err.lineNumber;
@@ -24,7 +24,7 @@ async function scanCode(code) {
   }
 
   // Heuristic: warn about potential risky constructs
-  if (typeof code === 'string' && /eval\s*\(/.test(code)) {
+  if (typeof code === 'string' && /eval.*./.test(code)) {
     errors.push({ type: 'SecurityRisk', message: 'Usage of eval() detected', line: null });
   }
 
@@ -38,7 +38,7 @@ async function scanCode(code) {
       }
 
       // Generic token/secret pattern (looks for common keywords followed by an assignment)
-      const tokenPattern = /(?:\b(api_key|apiKey|token|secret|password|passwd)\b)\s*[:=]\s*['\"]?[A-Za-z0-9\-_.\\/]{8,}['\"]?/i;
+      const tokenPattern = /(?:b(api_key|apiKey|token|secret|password|passwd)b).*[:=].*['.]?[A-Za-z0-9._../]{8,}['.]?/i;
       if (tokenPattern.test(code)) {
         errors.push({ type: 'SecretLeak', message: 'Potential secret or token detected', line: null, severity: 'high' });
       }
@@ -53,7 +53,7 @@ async function scanCode(code) {
     // Some environments may provide a google AI SDK via google-ai-sdk
     const googleAi = (() => {
       try {
-        // eslint-disable-next-line import/no-extraneous-dependencies
+        // eslint-disable-next-line no-unused-vars
         return require('google-ai-sdk');
       } catch (err) {
         return null;

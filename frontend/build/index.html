@@ -4,16 +4,17 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Sentinel CLI | AI-Powered Security & Code Review Assistant</title>
+  <title>Sentinel CLI | AI-Powered Security & Code Review</title>
   <meta name="description"
     content="Secure your codebase with Sentinel CLI. AI-driven security auditing, instant vulnerability detection, and automated 1-click fixes for your pull requests." />
-  <meta name="theme-color" content="#020617" />
+  <meta name="theme-color" content="#030712" />
+  <meta name="color-scheme" content="dark" />
 
   <!-- Open Graph / Facebook -->
   <meta property="og:site_name" content="Sentinel CLI" />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://sentinel-cli.vercel.app/" />
-  <meta property="og:title" content="Sentinel CLI - Your AI Security Pair Programmer" />
+  <meta property="og:title" content="Sentinel CLI — Your AI Security Pair Programmer" />
   <meta property="og:description"
     content="Automated code reviews, vulnerability scanning, and 1-click fixes. Running locally in your CLI or automatically on every Pull Request." />
   <meta property="og:image" content="https://sentinel-cli.vercel.app/sentinel-preview.png" />
@@ -25,21 +26,61 @@
   <!-- Twitter -->
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:url" content="https://sentinel-cli.vercel.app/" />
-  <meta name="twitter:title" content="Sentinel CLI - Your AI Security Pair Programmer" />
+  <meta name="twitter:title" content="Sentinel CLI — Your AI Security Pair Programmer" />
   <meta name="twitter:description"
     content="Automated code reviews, vulnerability scanning, and 1-click fixes. Running locally in your CLI or automatically on every Pull Request." />
   <meta name="twitter:image" content="https://sentinel-cli.vercel.app/sentinel-preview.png" />
   <meta name="twitter:image:alt" content="Sentinel CLI - AI Security Pair Programmer" />
 
+  <!-- Preconnect to font origins -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://api.fontshare.com" crossorigin>
+
+  <!-- Premium Typography Stack -->
+  <!-- Syne: Extended geometric display face — industrial, authoritative -->
+  <!-- Satoshi: Refined humanist body — readable, modern -->
   <link
-    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap"
+    href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
     rel="stylesheet">
-  <script type="module" crossorigin src="/assets/index-o21WFyeO.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-CDc6mmH4.css">
+  <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700,900&display=swap" rel="stylesheet">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+  <style>
+    /* Critical CSS for above-the-fold content */
+    :root {
+      --color-void: oklch(8% 0.01 260);
+    }
+
+    html {
+      background-color: var(--color-void);
+    }
+
+    body {
+      margin: 0;
+      background-color: var(--color-void);
+    }
+
+    /* Prevent FOUC */
+    #root {
+      opacity: 0;
+      animation: fadeIn 0.3s ease 0.1s forwards;
+    }
+
+    @keyframes fadeIn {
+      to {
+        opacity: 1;
+      }
+    }
+  </style>
+  <script type="module" crossorigin src="/assets/index-ChiZq4e1.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-D22ClwfQ.css">
 </head>
 
 <body>
   <div id="root"></div>
 </body>
+
+</html>

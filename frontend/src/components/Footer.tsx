@@ -1,102 +1,140 @@
-import { Shield, Github, Twitter, Linkedin, Heart } from 'lucide-react';
+import { Shield, Github, Twitter, Linkedin, Youtube, Mail, ArrowRight, Heart } from 'lucide-react';
 import { Link } from 'react-router-dom';
+
+const footerLinks = {
+  Product: [
+    { name: 'Features', path: '/features' },
+    { name: 'How It Works', path: '/how-it-works' },
+    { name: 'Playground', path: '/playground' },
+    { name: 'Changelog', path: '/changelog' },
+    { name: 'Roadmap', path: '/changelog' },
+  ],
+  Resources: [
+    { name: 'Documentation', path: '/docs' },
+    { name: 'API Reference', path: '/docs' },
+    { name: 'Examples', path: '/playground' },
+    { name: 'Security', path: '/docs' },
+    { name: 'Status', path: '/contact' },
+  ],
+  Company: [
+    { name: 'About', path: '/' },
+    { name: 'Blog', path: '/blog' },
+    { name: 'Contact', path: '/contact' },
+  ],
+  Legal: [
+    { name: 'Privacy', path: '/docs' },
+    { name: 'Terms', path: '/docs' },
+    { name: 'Licenses', path: '/docs' },
+  ],
+};
+
+const socialLinks = [
+  { name: 'GitHub', icon: Github, href: 'https://github.com/KunjShah95/SENTINEL-CLI' },
+  { name: 'Twitter', icon: Twitter, href: 'https://twitter.com' },
+  { name: 'LinkedIn', icon: Linkedin, href: 'https://linkedin.com' },
+  { name: 'YouTube', icon: Youtube, href: 'https://youtube.com' },
+];
 
 export function Footer() {
   return (
-    <footer className="border-t border-white/5 bg-[#050505] pt-24 pb-12 relative overflow-hidden">
-      {/* Background decoration */}
-      <div className="absolute top-0 inset-x-0 h-px bg-linear-to-r from-transparent via-emerald-900/50 to-transparent" />
-      <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-emerald-500/5 blur-[100px] rounded-full pointer-events-none" />
+    <footer className="relative bg-[var(--color-obsidian)] border-t border-[var(--color-carbon)] overflow-hidden font-body">
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-[var(--color-sentinel)]/5 blur-[100px] rounded-full" />
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-[var(--color-info)]/5 blur-[100px] rounded-full" />
+      </div>
 
-      <div className="max-w-7xl mx-auto px-6 relative z-10">
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-12 lg:gap-24 mb-20">
-
-          {/* Brand Column */}
-          <div className="md:col-span-12 lg:col-span-4 space-y-6">
-            <Link to="/" className="flex items-center gap-3">
-              <Shield className="w-8 h-8 text-emerald-500" />
-              <span className="font-bold text-2xl tracking-tighter text-white font-display">SENTINEL</span>
-            </Link>
-            <p className="text-gray-400 text-sm leading-relaxed max-w-sm">
-              Your AI-powered pair programmer and security guardian.
-              Catch vulnerabilities, review pull requests, and fix bugs before they merge.
-            </p>
-            <div className="flex gap-4">
-              <a
-                href="https://github.com/KunjShah95/SENTINEL-CLI"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="p-2 rounded-lg bg-white/5 hover:bg-emerald-500/10 hover:text-emerald-400 text-gray-400 transition-all border border-white/5 hover:border-emerald-500/20"
-                aria-label="GitHub"
-              >
-                <Github className="w-4 h-4" />
-              </a>
-              <a
-                href="https://x.com/kunjshah_dev"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="p-2 rounded-lg bg-white/5 hover:bg-emerald-500/10 hover:text-emerald-400 text-gray-400 transition-all border border-white/5 hover:border-emerald-500/20"
-                aria-label="Twitter/X"
-              >
-                <Twitter className="w-4 h-4" />
-              </a>
-              <a
-                href="https://www.linkedin.com/in/kunjshah05"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="p-2 rounded-lg bg-white/5 hover:bg-emerald-500/10 hover:text-emerald-400 text-gray-400 transition-all border border-white/5 hover:border-emerald-500/20"
-                aria-label="LinkedIn"
-              >
-                <Linkedin className="w-4 h-4" />
-              </a>
-            </div>
-          </div>
-
-          {/* Links Columns */}
-          <div className="md:col-span-4 lg:col-span-2">
-            <h4 className="font-bold text-white mb-6">Product</h4>
-            <ul className="space-y-4 text-sm text-gray-400">
-              <li><Link to="/features" className="hover:text-emerald-400 transition-colors">Features</Link></li>
-              <li><Link to="/pricing" className="hover:text-emerald-400 transition-colors">Pricing</Link></li>
-              <li><Link to="/integrations" className="hover:text-emerald-400 transition-colors">Integrations</Link></li>
-              <li><Link to="/changelog" className="hover:text-emerald-400 transition-colors">Changelog</Link></li>
-            </ul>
-          </div>
-
-          <div className="md:col-span-4 lg:col-span-2">
-            <h4 className="font-bold text-white mb-6">Resources</h4>
-            <ul className="space-y-4 text-sm text-gray-400">
-              <li><Link to="/docs" className="hover:text-emerald-400 transition-colors">Documentation</Link></li>
-              <li><Link to="/api" className="hover:text-emerald-400 transition-colors">API Reference</Link></li>
-              <li><Link to="/blog" className="hover:text-emerald-400 transition-colors">Blog</Link></li>
-              <li><Link to="/community" className="hover:text-emerald-400 transition-colors">Community</Link></li>
-            </ul>
-          </div>
-
-          <div className="md:col-span-4 lg:col-span-4">
-            <h4 className="font-bold text-white mb-6">Stay Updated</h4>
+      <div className="relative z-10 max-w-7xl mx-auto px-6 py-16">
+        <div className="mb-16 p-8 md:p-12 rounded-3xl bg-[var(--color-void)]/40 border border-[var(--color-carbon)] relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-[var(--color-sentinel)]/5 via-transparent to-[var(--color-info)]/5" />
+          <div className="relative flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
             <div className="space-y-4">
-              <p className="text-sm text-gray-400">Join our newsletter for the latest security insights.</p>
-              <div className="flex gap-2">
+              <h3 className="text-2xl md:text-3xl font-bold text-[var(--color-text-primary)] font-display">
+                Stay updated with Sentinel
+              </h3>
+              <p className="text-[var(--color-text-secondary)] max-w-md">
+                Get the latest features, security updates, and developer tips delivered to your inbox.
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+              <div className="relative flex-1 md:w-72">
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--color-text-tertiary)]" />
                 <input
                   type="email"
-                  placeholder="Enter email"
-                  className="flex-1 bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm text-white focus:border-emerald-500/50 focus:outline-none transition-colors"
+                  placeholder="Enter your email"
+                  className="w-full pl-12 pr-4 py-3.5 rounded-xl bg-[var(--color-obsidian)] border border-[var(--color-carbon)] text-[var(--color-text-primary)] placeholder-[var(--color-text-tertiary)] focus:outline-none focus:border-[var(--color-sentinel)]/50 focus:ring-1 focus:ring-[var(--color-sentinel)]/50 transition-all"
                 />
-                <button className="px-4 py-2 bg-emerald-600 rounded-lg text-white font-bold text-sm hover:bg-emerald-500 transition-colors">
-                  Subscribe
-                </button>
               </div>
+              <button className="btn-primary whitespace-nowrap">
+                <span>Subscribe</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
             </div>
           </div>
         </div>
 
-        <div className="pt-8 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-6 text-xs text-gray-500">
-          <p>© 2025 Sentinel AI. All rights reserved.</p>
-          <div className="flex gap-2 items-center">
-            <span>Made with</span>
-            <Heart className="w-3 h-3 text-red-500 fill-red-500" />
-            <span>for secure code.</span>
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-8 mb-12">
+          <div className="col-span-2">
+            <Link to="/" className="flex items-center gap-3 group mb-6">
+              <div className="relative">
+                <div className="absolute inset-0 bg-[var(--color-sentinel)] blur-lg opacity-20 group-hover:opacity-40 transition-opacity" />
+                <div className="relative p-2.5 rounded-xl bg-gradient-to-br from-[var(--color-obsidian)] to-[var(--color-void)] border border-[var(--color-carbon)] group-hover:border-[var(--color-sentinel)]/30 transition-all">
+                  <Shield className="w-5 h-5 text-[var(--color-sentinel)]" />
+                </div>
+              </div>
+              <div className="flex flex-col">
+                <span className="font-bold text-xl tracking-tight text-[var(--color-text-primary)] font-display leading-none">SENTINEL</span>
+                <span className="text-[9px] text-[var(--color-sentinel)]/80 font-mono tracking-[0.2em] uppercase">AI Security</span>
+              </div>
+            </Link>
+            <p className="text-[var(--color-text-secondary)] text-sm leading-relaxed mb-6 max-w-xs">
+              AI-powered code security that catches vulnerabilities before they reach production.
+            </p>
+            <div className="flex gap-3">
+              {socialLinks.map((social) => (
+                <a
+                  key={social.name}
+                  href={social.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-2.5 rounded-lg bg-[var(--color-obsidian)] border border-[var(--color-carbon)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:border-[var(--color-sentinel)]/30 hover:bg-[var(--color-void)] transition-all"
+                  aria-label={social.name}
+                >
+                  <social.icon className="w-4 h-4" />
+                </a>
+              ))}
+            </div>
+          </div>
+
+          {Object.entries(footerLinks).map(([category, links]) => (
+            <div key={category}>
+              <h4 className="font-semibold text-[var(--color-text-primary)] mb-4">{category}</h4>
+              <ul className="space-y-3">
+                {links.map((link) => (
+                  <li key={link.name}>
+                    <Link
+                      to={link.path}
+                      className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
+                    >
+                      {link.name}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+
+        <div className="pt-8 border-t border-[var(--color-carbon)] flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-6 text-sm text-[var(--color-text-tertiary)]">
+            <span>© 2024 Sentinel CLI</span>
+            <span className="hidden md:inline">•</span>
+            <span className="hidden md:inline">Made with <Heart className="w-3 h-3 inline text-[var(--color-critical)] fill-[var(--color-critical)] mx-1" /> by developers, for developers</span>
+          </div>
+          <div className="flex items-center gap-4">
+            <span className="badge badge-sentinel">
+              <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-sentinel)] animate-pulse" />
+              <span>All systems operational</span>
+            </span>
           </div>
         </div>
       </div>

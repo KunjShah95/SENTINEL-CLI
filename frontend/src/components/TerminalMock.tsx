@@ -39,35 +39,35 @@ export function TerminalMock() {
 
   const getLineColor = (type: string) => {
     switch (type) {
-      case 'command': return 'text-emerald-400 font-bold';
-      case 'success': return 'text-emerald-400';
-      case 'warning': return 'text-amber-400';
-      case 'error': return 'text-rose-400';
-      default: return 'text-gray-400';
+      case 'command': return 'text-[var(--color-sentinel)] font-bold';
+      case 'success': return 'text-[var(--color-secure)]';
+      case 'warning': return 'text-[var(--color-warning)]';
+      case 'error': return 'text-[var(--color-critical)]';
+      default: return 'text-[var(--color-text-secondary)]';
     }
   };
 
   return (
-    <div className="terminal-glow rounded-2xl bg-gray-950 border border-gray-800 overflow-hidden shadow-2xl">
-      <div className="flex items-center justify-between px-5 py-4 border-b border-gray-800 bg-gray-900/50">
+    <div className="terminal-glow rounded-2xl bg-[var(--color-void)] border border-[var(--color-carbon)] overflow-hidden shadow-2xl">
+      <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--color-carbon)] bg-[var(--color-obsidian)]">
         <div className="flex gap-2">
-          <div className="w-3 h-3 rounded-full bg-rose-500/20 border border-rose-500/50" />
-          <div className="w-3 h-3 rounded-full bg-amber-500/20 border border-amber-500/50" />
-          <div className="w-3 h-3 rounded-full bg-emerald-500/20 border border-emerald-500/50" />
+          <div className="w-3 h-3 rounded-full bg-[var(--color-critical)]/20 border border-[var(--color-critical)]/50" />
+          <div className="w-3 h-3 rounded-full bg-[var(--color-warning)]/20 border border-[var(--color-warning)]/50" />
+          <div className="w-3 h-3 rounded-full bg-[var(--color-secure)]/20 border border-[var(--color-secure)]/50" />
         </div>
-        <div className="text-[10px] font-mono text-gray-500 uppercase tracking-widest">sentinel-cli — bash</div>
+        <div className="text-[10px] font-mono text-[var(--color-text-tertiary)] uppercase tracking-widest">sentinel-cli — bash</div>
         <div className="w-12" /> {/* Spacer */}
       </div>
       <div className="p-8 font-mono text-sm min-h-95 leading-relaxed">
         {visibleLines.map((line, index) => (
           <div key={index} className={`flex gap-3 mb-2 ${getLineColor(line.type)}`}>
-            {line.type === 'command' && <span className="text-emerald-600">$</span>}
-            <span className={line.type === 'command' ? 'text-gray-200' : ''}>{line.content}</span>
+            {line.type === 'command' && <span className="text-[var(--color-sentinel)]">$</span>}
+            <span className={line.type === 'command' ? 'text-[var(--color-text-primary)]' : ''}>{line.content}</span>
           </div>
         ))}
         <div className="flex gap-3 items-center">
-          <span className="text-emerald-600">$</span>
-          <span className="w-2 h-5 bg-emerald-500 animate-pulse" />
+          <span className="text-[var(--color-sentinel)]">$</span>
+          <span className="w-2 h-5 bg-[var(--color-sentinel)] animate-pulse" />
         </div>
       </div>
     </div>

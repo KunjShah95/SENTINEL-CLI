@@ -1,164 +1,181 @@
-import React from 'react';
-import { BookOpen, Clock, User, ArrowRight, Search, Tag } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
+import { Search, ArrowRight, Shield, Globe, Code } from 'lucide-react';
 
-const posts = [
+const articles = [
   {
     id: 1,
-    title: 'Automating Security Fixes with AI: A Deep Dive',
-    excerpt: 'How we built the SENTINEL Auto-Fix engine to handle complex vulnerability remediation without breaking builds.',
-    author: 'Sarah Chen',
-    date: 'June 12, 2024',
-    readTime: '8 min read',
-    category: 'Engineering',
-    image: 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&q=80&w=800'
+    title: "The Future of AI-Driven Patching: Automating Remediation at Scale",
+    summary: "Explore how large language models are being trained to not only identify vulnerabilities but to safely generate pull requests that fix them across legacy codebases.",
+    author: "Alex Thorne",
+    date: "Oct 24, 2023",
+    readTime: "8 min read",
+    category: "Research",
+    image: "https://lh3.googleusercontent.com/aida-public/AB6AXuAuuoLgsBtYtYvporCwUZ6eTiN-gXkIraLDYRf__vJxJKQsKZwJI5LF1kkrP_Q8c19yzizjPJ_H3FrP7u6br7NqUHrbJNiiZexQiNSeoYwLPKRNAkKQD-YvE2mfq1XQhYkjyxikIMe9VtccVUYedzSvS-5WYfcXo59TWEbGiCEZlUs6k55Tv_vQxoTOM8sGAgj9wWxpGmHKZvqA4crx05C8ripZrrmKHqeDul0n8ZgabeSwF_3o3rhEYllUunIFo1Q5ztSX9xAFyLU"
   },
   {
     id: 2,
-    title: 'The State of Dependency Security in 2024',
-    excerpt: 'Analyzing over 1 million open-source packages to identify emerging trends in supply chain attacks.',
-    author: 'Marcus Thorne',
-    date: 'May 28, 2024',
-    readTime: '12 min read',
-    category: 'Research',
-    image: 'https://images.unsplash.com/photo-1558494949-ef010cbdcc51?auto=format&fit=crop&q=80&w=800'
+    title: "Hardening your CLI Workflows: Preventing Supply Chain Attacks",
+    summary: "A deep dive into the latest attack vectors targeting CI/CD pipelines and how to implement zero-trust principles in your local development environment.",
+    author: "Sarah Chen",
+    date: "Oct 20, 2023",
+    readTime: "12 min read",
+    category: "Security",
+    image: "https://lh3.googleusercontent.com/aida-public/AB6AXuBscjMnSzsveGH5YKXam_F7qho86t2wqs3yA91VFNzmHHUGa8YQtlLLhW-2-tOIvxrJk1vdyLJLz1qq5-086U8VedHGKC7Q3SfRx1zfFE13a51wP1WlRdIk-K0LbYJ3_EffzhmpjKlPDyWSlz7nVqIqhd5yDnW5sBtl0QW4g5ExXfvmhN5By8zFWI8L06HmpNh5nrSg6ji7shkgyOcObNY4uKDesAPX-ynLYftYQKNINm_yZ8kzKn9sg9ecOTTKhfXSoxQo6RKiU28"
   },
   {
     id: 3,
-    title: 'Securing Your CI/CD Pipeline with SENTINEL',
-    excerpt: 'A step-by-step guide to integrating automated security gates into GitHub Actions and GitLab CI.',
-    author: 'Elena Rodriguez',
-    date: 'May 15, 2024',
-    readTime: '6 min read',
-    category: 'Tutorial',
-    image: 'https://images.unsplash.com/photo-1614064641938-3bbee52942c7?auto=format&fit=crop&q=80&w=800'
+    title: "Setting Up Sentinel CLI with GitHub Actions",
+    summary: "A step-by-step guide to integrating Sentinel's automated security scans into your GitHub workflow for instant feedback on every commit.",
+    author: "Marcus Wright",
+    date: "Oct 15, 2023",
+    readTime: "5 min read",
+    category: "Tutorial",
+    image: "https://lh3.googleusercontent.com/aida-public/AB6AXuAH4KE1u9ygnQ2uKtsdDAsit16HSpt6pj3YiARU-NcumgjgRUmaQ1lNLISJWhj9U-tHo1fU3rhq4IjaB3Ay-8hBqWX_Z9QV3OQVB2474__l8yeZ6qmCauTQY2F8aKFsyYabYDkgkrfmBSmioPfCKcrmIumV-QlhBxz_Kqq9ujqy0wVIxG1f_XMdAyu8saW4T2tuCR-JES1vqkpLWk8udw_JqcxYB6TLSgoXTSfMmRJPSrEfbSvGt1CmwALvpdnlrqv7dBrQicTH4_A"
   },
   {
     id: 4,
-    title: 'Detecting Zero-Day Vulnerabilities in Node.js',
-    excerpt: 'Using static analysis and behavioral patterns to identify potential exploits before they are disclosed.',
-    author: 'David Kim',
-    date: 'April 30, 2024',
-    readTime: '10 min read',
-    category: 'Security',
-    image: 'https://images.unsplash.com/photo-1563986768609-322da13575f3?auto=format&fit=crop&q=80&w=800'
+    title: "The Performance Cost of Security: Optimization Strategies",
+    summary: "Security scans don't have to slow down your builds. Learn how Sentinel CLI achieves near-instant analysis through intelligent caching and differential scanning.",
+    author: "Jordan Lee",
+    date: "Oct 12, 2023",
+    readTime: "10 min read",
+    category: "Engineering",
+    image: "https://lh3.googleusercontent.com/aida-public/AB6AXuCrOZzZYBnAMtC7ucaHRZYQJncAkSikqym9Ymt8SihqTcAwZQ2kyj9ujxEv7VVeDqZynqRUbkxuc4xxBhd8R4t0LURSkEwQzLU-YWTL2KoETfbuHJWyeIfnkAz6x39X2rUTeFhT6j7e1A3nNePCtTzRsm9qPDDl3VMkPfLz7BJqDZEZHuTK15T430fYZ73iaxB3qRqPevvYxTc4rqKha8ug9-lgHDe_Pvz3qCxK-lcYygpjwgU3tKnyFd3QUIvKQcFREQseU3CcO_k"
   }
 ];
 
-export function Blog() {
-  return (
-    <div className="pt-20 min-h-screen bg-gray-950">
-      {/* Hero Section */}
-      <section className="py-24 border-b border-gray-900">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="max-w-3xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold uppercase tracking-wider mb-6">
-              <BookOpen className="w-3 h-3" />
-              Sentinel Blog
-            </div>
-            <h1 className="text-5xl md:text-6xl font-bold text-white mb-6 tracking-tight">
-              Security <span className="text-emerald-500">Insights</span> & Guides
-            </h1>
-            <p className="text-xl text-gray-400 leading-relaxed">
-              Deep dives into security research, engineering challenges, and best practices for modern development teams.
-            </p>
-          </div>
-        </div>
-      </section>
+const filters = ["All", "Engineering", "Research", "Tutorial", "Security"];
 
-      {/* Search & Filter */}
-      <section className="py-8 bg-gray-900/30 sticky top-20 z-40 backdrop-blur-md border-b border-gray-900">
-        <div className="max-w-7xl mx-auto px-6 flex flex-wrap items-center justify-between gap-6">
-          <div className="flex gap-2">
-            {['All', 'Engineering', 'Research', 'Tutorial', 'Security'].map((cat) => (
-              <button 
-                key={cat}
-                className="px-4 py-2 rounded-full text-sm font-medium border border-gray-800 text-gray-400 hover:text-white hover:border-emerald-500/50 transition-all"
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
-          <div className="relative w-full md:w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-            <input 
-              type="text" 
-              placeholder="Search articles..."
-              className="w-full bg-gray-950 border border-gray-800 rounded-xl py-2 pl-10 pr-4 text-sm text-gray-300 focus:outline-none focus:border-emerald-500/50 transition-all"
-            />
+export function Blog() {
+  const [activeFilter, setActiveFilter] = useState("All");
+
+  return (
+    <div className="min-h-screen bg-[var(--color-void)] text-[var(--color-text-primary)] font-body">
+
+      {/* Hero Section */}
+      <header className="relative pt-24 pb-16 overflow-hidden">
+        <div className="absolute inset-0 -z-10 opacity-20 pointer-events-none">
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full bg-[radial-gradient(circle_at_center,rgba(10,194,163,0.15)_0%,transparent_70%)]"></div>
+        </div>
+        <div className="max-w-7xl mx-auto px-6 text-center">
+          <span className="inline-block px-3 py-1 bg-[var(--color-sentinel)]/10 border border-[var(--color-sentinel)]/20 text-[var(--color-sentinel)] rounded-full text-xs font-bold tracking-widest uppercase mb-6">
+            Sentinel Blog
+          </span>
+          <h1 className="font-['Syne'] text-5xl md:text-7xl font-bold tracking-tight mb-6 text-[var(--color-text-primary)]">
+            Security Insights <br /> <span className="text-[var(--color-text-secondary)]">& Guides</span>
+          </h1>
+          <p className="max-w-2xl mx-auto text-[var(--color-text-secondary)] text-lg">
+            Expert analysis on AI-driven code security, automated vulnerability detection, and DevSecOps best practices for the modern engineering stack.
+          </p>
+        </div>
+      </header>
+
+      {/* Sticky Filter Bar */}
+      <div className="sticky top-16 md:top-20 z-30 bg-[var(--color-void)]/95 backdrop-blur-md border-y border-[var(--color-sentinel)]/10">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between py-4 gap-4">
+            <div className="flex flex-wrap gap-2">
+              {filters.map((filter) => (
+                <button
+                  key={filter}
+                  onClick={() => setActiveFilter(filter)}
+                  className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${activeFilter === filter
+                    ? 'bg-[var(--color-sentinel)] text-[var(--color-void)]'
+                    : 'border border-[var(--color-sentinel)]/20 hover:border-[var(--color-sentinel)] text-[var(--color-text-secondary)]'
+                    }`}
+                >
+                  {filter}
+                </button>
+              ))}
+            </div>
+            <div className="relative group">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-text-tertiary)] group-focus-within:text-[var(--color-sentinel)] transition-colors" />
+              <input
+                className="bg-[var(--color-sentinel)]/5 border border-[var(--color-sentinel)]/20 rounded-lg pl-10 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-sentinel)]/50 w-full md:w-64 transition-all text-[var(--color-text-primary)] placeholder:text-[var(--color-text-tertiary)] font-display"
+                placeholder="Search articles..."
+                type="text"
+              />
+            </div>
           </div>
         </div>
-      </section>
+      </div>
 
       {/* Blog Grid */}
-      <section className="py-24">
+      <main className="max-w-7xl mx-auto px-6 py-16">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+          {articles.map((article) => (
+            <article key={article.id} className="group cursor-pointer">
+              <Link to="/blog/article" className="relative overflow-hidden rounded-xl aspect-[16/9] mb-6 border border-[var(--color-sentinel)]/10 block">
+                <img
+                  src={article.image}
+                  alt={article.title}
+                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                />
+                <div className="absolute top-4 left-4">
+                  <span className="bg-[var(--color-void)]/80 backdrop-blur-md text-[var(--color-sentinel)] px-3 py-1 rounded text-xs font-bold uppercase border border-[var(--color-sentinel)]/30">
+                    {article.category}
+                  </span>
+                </div>
+              </Link>
+              <div className="space-y-3">
+                <div className="flex items-center gap-4 text-xs font-medium text-[var(--color-text-tertiary)] uppercase tracking-wider">
+                  <span>{article.readTime}</span>
+                  <span className="w-1 h-1 bg-[var(--color-sentinel)] rounded-full"></span>
+                  <span>{article.author}</span>
+                  <span className="w-1 h-1 bg-[var(--color-sentinel)] rounded-full"></span>
+                  <span>{article.date}</span>
+                </div>
+                <h3 className="text-2xl font-bold transition-colors text-[var(--color-text-primary)] group-hover:text-[var(--color-sentinel)] font-['Syne']">
+                  {article.title}
+                </h3>
+                <p className="text-[var(--color-text-secondary)] line-clamp-2 leading-relaxed">
+                  {article.summary}
+                </p>
+                <Link to="/blog/article" className="inline-flex items-center gap-2 text-[var(--color-sentinel)] font-bold text-sm group-hover:underline">
+                  Read Article
+                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                </Link>
+              </div>
+            </article>
+          ))}
+        </div>
+        <div className="mt-20 flex justify-center">
+          <button className="border border-[var(--color-sentinel)]/30 hover:bg-[var(--color-sentinel)]/5 px-8 py-3 rounded-lg font-bold transition-colors text-[var(--color-text-primary)] cursor-pointer">
+            Load More Articles
+          </button>
+        </div>
+      </main>
+
+      {/* Newsletter Section */}
+      <section className="bg-[var(--color-sentinel)] py-16">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="grid md:grid-cols-2 gap-12">
-            {posts.map((post) => (
-              <article key={post.id} className="group cursor-pointer">
-                <div className="relative aspect-video rounded-3xl overflow-hidden mb-8 border border-gray-800">
-                  <img 
-                    src={post.image} 
-                    alt={post.title}
-                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                  />
-                  <div className="absolute top-4 left-4">
-                    <span className="px-3 py-1 rounded-full bg-emerald-600 text-white text-[10px] font-bold uppercase tracking-wider">
-                      {post.category}
-                    </span>
-                  </div>
-                </div>
-                
-                <div className="space-y-4">
-                  <div className="flex items-center gap-4 text-xs text-gray-500 font-medium">
-                    <div className="flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5" />
-                      {post.readTime}
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <User className="w-3.5 h-3.5" />
-                      {post.author}
-                    </div>
-                    <span>{post.date}</span>
-                  </div>
-                  
-                  <h2 className="text-2xl font-bold text-white group-hover:text-emerald-400 transition-colors leading-tight">
-                    {post.title}
-                  </h2>
-                  
-                  <p className="text-gray-400 leading-relaxed">
-                    {post.excerpt}
-                  </p>
-                  
-                  <div className="pt-4 flex items-center gap-2 text-sm font-bold text-white group-hover:gap-4 transition-all">
-                    Read Article
-                    <ArrowRight className="w-4 h-4 text-emerald-500" />
-                  </div>
-                </div>
-              </article>
-            ))}
+          <div className="flex flex-col md:flex-row items-center justify-between gap-10">
+            <div className="max-w-xl">
+              <h2 className="text-[var(--color-void)] text-3xl md:text-4xl font-bold mb-4 font-['Syne']">Stay ahead of the threats.</h2>
+              <p className="text-[var(--color-void)]/80 text-lg">
+                Get the latest security research, tutorials, and Sentinel CLI updates delivered directly to your inbox every week.
+              </p>
+            </div>
+            <div className="w-full md:w-auto">
+              <form className="flex flex-col sm:flex-row gap-3" onSubmit={(e) => e.preventDefault()}>
+                <input
+                  className="px-6 py-4 rounded-lg bg-[var(--color-void)] text-[var(--color-text-primary)] border-none focus:ring-2 focus:ring-[var(--color-text-primary)]/20 min-w-[300px] placeholder:text-[var(--color-text-tertiary)]"
+                  placeholder="Enter your email"
+                  type="email"
+                />
+                <button className="bg-[var(--color-text-primary)] text-[var(--color-void)] font-bold px-8 py-4 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer" type="submit">
+                  Join
+                </button>
+              </form>
+              <p className="mt-3 text-sm text-[var(--color-void)]/60 text-center sm:text-left">
+                No spam. Unsubscribe at any time.
+              </p>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Newsletter */}
-      <section className="py-24 bg-emerald-600">
-        <div className="max-w-7xl mx-auto px-6 text-center">
-          <h2 className="text-3xl font-bold text-white mb-6">Get security insights in your inbox</h2>
-          <p className="text-emerald-100 mb-10 max-w-2xl mx-auto">
-            Join 5,000+ developers who receive our weekly digest on security research and SENTINEL updates.
-          </p>
-          <form className="max-w-md mx-auto flex gap-4">
-            <input 
-              type="email" 
-              placeholder="Enter your email"
-              className="flex-1 px-6 py-4 rounded-2xl bg-white/10 border border-white/20 text-white placeholder-emerald-200 focus:outline-none focus:bg-white/20 transition-all"
-            />
-            <button className="px-8 py-4 rounded-2xl bg-white text-emerald-600 font-bold hover:bg-emerald-50 transition-all">
-              Subscribe
-            </button>
-          </form>
-        </div>
-      </section>
     </div>
   );
 }

@@ -8,6 +8,9 @@ import { Docs } from './pages/Docs';
 import { Changelog } from './pages/Changelog';
 import { Playground } from './pages/Playground';
 import { Blog } from './pages/Blog';
+import { Article } from './pages/Article';
+import { Contact } from './pages/Contact';
+import { Contact2 } from './pages/Contact2';
 import { Analytics } from "@vercel/analytics/react"
 
 
@@ -15,7 +18,7 @@ import { Analytics } from "@vercel/analytics/react"
 export default function App() {
   return (
     <Router>
-      <div className="min-h-screen bg-gray-950 text-white selection:bg-emerald-500/30">
+      <div className="min-h-screen bg-[var(--color-void)] text-[var(--color-text-primary)]">
         <Navbar />
         <Routes>
           <Route path="/" element={<Home />} />
@@ -25,6 +28,9 @@ export default function App() {
           <Route path="/changelog" element={<Changelog />} />
           <Route path="/playground" element={<Playground />} />
           <Route path="/blog" element={<Blog />} />
+          <Route path="/blog/article" element={<Article />} />
+          <Route path="/contact" element={<Contact />} />
+          <Route path="/contact/success" element={<Contact2 />} />
         </Routes>
         <Footer />
         <Analytics />
