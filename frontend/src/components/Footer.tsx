@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Shield, Github, Twitter, Linkedin, Youtube, Mail, ArrowRight, Heart } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -36,6 +37,14 @@ const socialLinks = [
 ];
 
 export function Footer() {
+  const [subscribed, setSubscribed] = useState(false);
+
+  const handleSubscribe = (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubscribed(true);
+    setTimeout(() => setSubscribed(false), 5000);
+  };
+
   return (
     <footer className="relative bg-[var(--color-obsidian)] border-t border-[var(--color-carbon)] overflow-hidden font-body">
       <div className="absolute inset-0 pointer-events-none">
@@ -56,18 +65,30 @@ export function Footer() {
               </p>
             </div>
             <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-              <div className="relative flex-1 md:w-72">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--color-text-tertiary)]" />
-                <input
-                  type="email"
-                  placeholder="Enter your email"
-                  className="w-full pl-12 pr-4 py-3.5 rounded-xl bg-[var(--color-obsidian)] border border-[var(--color-carbon)] text-[var(--color-text-primary)] placeholder-[var(--color-text-tertiary)] focus:outline-none focus:border-[var(--color-sentinel)]/50 focus:ring-1 focus:ring-[var(--color-sentinel)]/50 transition-all"
-                />
-              </div>
-              <button className="btn-primary whitespace-nowrap">
-                <span>Subscribe</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
+              {!subscribed ? (
+                <form onSubmit={handleSubscribe} className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                  <div className="relative flex-1 md:w-72">
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--color-text-tertiary)]" />
+                    <input
+                      type="email"
+                      required
+                      placeholder="Enter your email"
+                      className="w-full pl-12 pr-4 py-3.5 rounded-xl bg-[var(--color-obsidian)] border border-[var(--color-carbon)] text-[var(--color-text-primary)] placeholder-[var(--color-text-tertiary)] focus:outline-none focus:border-[var(--color-sentinel)]/50 focus:ring-1 focus:ring-[var(--color-sentinel)]/50 transition-all font-display"
+                    />
+                  </div>
+                  <button type="submit" className="btn-primary whitespace-nowrap cursor-pointer">
+                    <span>Subscribe</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </form>
+              ) : (
+                <div className="flex items-center gap-3 px-6 py-3.5 rounded-xl bg-[var(--color-sentinel)]/10 border border-[var(--color-sentinel)]/30 text-[var(--color-sentinel)] animate-in zoom-in duration-300">
+                  <span className="font-bold flex items-center gap-2">
+                    <Shield className="w-5 h-5" />
+                    Subscribed successfully!
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
     Share2, MessageCircle, Github, ArrowRight, Calendar, Clock, CheckCircle2, Copy, Twitter, Bell
 } from 'lucide-react';
@@ -86,15 +87,31 @@ export function Article() {
                             <div className="pt-8 border-t border-[var(--color-sentinel)]/10">
                                 <h4 className="text-xs font-mono uppercase tracking-[0.3em] text-[var(--color-sentinel)]/60 mb-6">Spread the word</h4>
                                 <div className="flex flex-col gap-4">
-                                    <button className="flex items-center gap-3 text-[var(--color-text-tertiary)] hover:text-[var(--color-sentinel)] transition-colors text-sm font-medium">
+                                    <button
+                                        onClick={() => {
+                                            navigator.clipboard.writeText(window.location.href);
+                                            alert('Link copied to clipboard!');
+                                        }}
+                                        className="flex items-center gap-3 text-[var(--color-text-tertiary)] hover:text-[var(--color-sentinel)] transition-colors text-sm font-medium cursor-pointer"
+                                    >
                                         <Copy className="w-5 h-5" /> Copy Link
                                     </button>
-                                    <button className="flex items-center gap-3 text-[var(--color-text-tertiary)] hover:text-[var(--color-sentinel)] transition-colors text-sm font-medium">
+                                    <a
+                                        href="https://twitter.com/intent/tweet?text=Check out this article on AI security!"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-3 text-[var(--color-text-tertiary)] hover:text-[var(--color-sentinel)] transition-colors text-sm font-medium cursor-pointer"
+                                    >
                                         <Twitter className="w-5 h-5" /> Twitter (X)
-                                    </button>
-                                    <button className="flex items-center gap-3 text-[var(--color-text-tertiary)] hover:text-[var(--color-sentinel)] transition-colors text-sm font-medium">
+                                    </a>
+                                    <a
+                                        href="https://github.com/KunjShah95/SENTINEL-CLI"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-3 text-[var(--color-text-tertiary)] hover:text-[var(--color-sentinel)] transition-colors text-sm font-medium cursor-pointer"
+                                    >
                                         <Github className="w-5 h-5" /> GitHub Repo
-                                    </button>
+                                    </a>
                                 </div>
                             </div>
                         </div>
@@ -204,9 +221,9 @@ export function Article() {
                             <h2 className="text-3xl font-bold text-[var(--color-text-primary)] mb-2 font-['Syne']">Continue Reading</h2>
                             <p className="text-[var(--color-text-secondary)]">Expand your security knowledge with our latest research.</p>
                         </div>
-                        <a className="text-[var(--color-sentinel)] font-bold flex items-center gap-2 hover:gap-3 transition-all cursor-pointer text-sm tracking-widest uppercase">
+                        <Link to="/blog" className="text-[var(--color-sentinel)] font-bold flex items-center gap-2 hover:gap-3 transition-all cursor-pointer text-sm tracking-widest uppercase">
                             View All Articles <ArrowRight className="w-4 h-4" />
-                        </a>
+                        </Link>
                     </div>
                     <div className="grid md:grid-cols-2 gap-8">
                         {/* Card 1 */}

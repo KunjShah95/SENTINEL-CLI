@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Download,
   Terminal,
@@ -56,6 +57,8 @@ export function Docs() {
   const [searchQuery, setSearchQuery] = useState('');
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [configFormat, setConfigFormat] = useState<'yaml' | 'json'>('yaml');
+  const navigate = useNavigate();
   const revealRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   useEffect(() => {
@@ -164,7 +167,10 @@ export function Docs() {
               <div className="p-4 rounded-xl bg-[var(--color-obsidian)] border border-[var(--color-sentinel)]/20">
                 <p className="text-xs font-display font-bold text-[var(--color-sentinel)] mb-2">Need Help?</p>
                 <p className="text-[11px] text-[var(--color-text-secondary)] mb-3">Our engineers are available 24/7 for enterprise support.</p>
-                <a className="text-[11px] font-bold text-[var(--color-text-primary)] flex items-center gap-1 hover:underline cursor-pointer">
+                <a
+                  onClick={() => navigate('/contact')}
+                  className="text-[11px] font-bold text-[var(--color-text-primary)] flex items-center gap-1 hover:underline cursor-pointer"
+                >
                   Contact Support <ChevronRight className="w-3 h-3" />
                 </a>
               </div>
@@ -294,12 +300,22 @@ export function Docs() {
                     </p>
 
                     <div className="rounded-xl border border-[var(--color-sentinel)]/10 bg-[var(--color-sentinel)]/5 p-1 mb-6 flex w-fit">
-                      <button className="py-2 px-4 rounded-lg bg-[var(--color-sentinel)] text-[var(--color-void)] font-bold text-xs uppercase tracking-widest font-display">YAML</button>
-                      <button className="py-2 px-4 rounded-lg text-[var(--color-text-tertiary)] font-bold text-xs uppercase tracking-widest font-display hover:text-[var(--color-text-primary)] transition-colors">JSON</button>
+                      <button
+                        onClick={() => setConfigFormat('yaml')}
+                        className={`py-2 px-4 rounded-lg font-bold text-xs uppercase tracking-widest font-display transition-all ${configFormat === 'yaml' ? 'bg-[var(--color-sentinel)] text-[var(--color-void)]' : 'text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)]'}`}
+                      >
+                        YAML
+                      </button>
+                      <button
+                        onClick={() => setConfigFormat('json')}
+                        className={`py-2 px-4 rounded-lg font-bold text-xs uppercase tracking-widest font-display transition-all ${configFormat === 'json' ? 'bg-[var(--color-sentinel)] text-[var(--color-void)]' : 'text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)]'}`}
+                      >
+                        JSON
+                      </button>
                     </div>
 
                     <CodeBlock
-                      code={`version: "1.2"
+                      code={configFormat === 'yaml' ? `version: "1.2"
 project:
   id: "prod-001"
   engine: "gpt-4-security"
@@ -309,9 +325,22 @@ analysis:
     - "**/tests/*"
     - "**/vendor/*"
 output:
-  format: "sarif"`}
-                      id="config-yaml"
-                      language="yaml"
+  format: "sarif"` : `{
+  "version": "1.2",
+  "project": {
+    "id": "prod-001",
+    "engine": "gpt-4-security"
+  },
+  "analysis": {
+    "depth": "deep",
+    "ignore": ["**/tests/*", "**/vendor/*"]
+  },
+  "output": {
+    "format": "sarif"
+  }
+}`}
+                      id={`config-${configFormat}`}
+                      language={configFormat}
                     />
 
                     <div className="mt-12 grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -358,17 +387,31 @@ output:
 
               {/* Pagination */}
               <div className="flex justify-between items-center py-12 border-t border-[var(--color-sentinel)]/10 mt-12">
-                <button className="group text-left">
+                <button
+                  onClick={() => {
+                    const idx = flattenSections.findIndex(s => s.id === activeSection);
+                    if (idx > 0) setActiveSection(flattenSections[idx - 1].id);
+                  }}
+                  className="group text-left disabled:opacity-30"
+                  disabled={activeSection === flattenSections[0].id}
+                >
                   <span className="block text-[10px] font-display font-bold text-[var(--color-text-tertiary)] uppercase mb-1">Previous</span>
-                  <span className="flex items-center gap-2 text-lg font-bold group-hover:text-[var(--color-sentinel)] transition-colors text-[var(--color-text-secondary)]">
+                  <span className="flex items-center gap-2 text-lg font-bold group-hover:not-disabled:text-[var(--color-sentinel)] transition-colors text-[var(--color-text-secondary)]">
                     <ChevronRight className="w-4 h-4 rotate-180" />
-                    Introduction
+                    {flattenSections[flattenSections.findIndex(s => s.id === activeSection) - 1]?.label || 'Start'}
                   </span>
                 </button>
-                <button className="group text-right" onClick={() => setActiveSection('quick-start')}>
+                <button
+                  onClick={() => {
+                    const idx = flattenSections.findIndex(s => s.id === activeSection);
+                    if (idx < flattenSections.length - 1) setActiveSection(flattenSections[idx + 1].id);
+                  }}
+                  className="group text-right disabled:opacity-30"
+                  disabled={activeSection === flattenSections[flattenSections.length - 1].id}
+                >
                   <span className="block text-[10px] font-display font-bold text-[var(--color-text-tertiary)] uppercase mb-1">Next</span>
-                  <span className="flex items-center gap-2 text-lg font-bold group-hover:text-[var(--color-sentinel)] transition-colors text-[var(--color-text-secondary)] justify-end">
-                    Quick Start
+                  <span className="flex items-center gap-2 text-lg font-bold group-hover:not-disabled:text-[var(--color-sentinel)] transition-colors text-[var(--color-text-secondary)] justify-end">
+                    {flattenSections[flattenSections.findIndex(s => s.id === activeSection) + 1]?.label || 'End'}
                     <ChevronRight className="w-4 h-4" />
                   </span>
                 </button>

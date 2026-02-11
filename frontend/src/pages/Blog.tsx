@@ -49,6 +49,21 @@ const filters = ["All", "Engineering", "Research", "Tutorial", "Security"];
 
 export function Blog() {
   const [activeFilter, setActiveFilter] = useState("All");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [subscribed, setSubscribed] = useState(false);
+
+  const filteredArticles = articles.filter(article => {
+    const matchesFilter = activeFilter === "All" || article.category === activeFilter;
+    const matchesSearch = article.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      article.summary.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesFilter && matchesSearch;
+  });
+
+  const handleSubscribe = (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubscribed(true);
+    setTimeout(() => setSubscribed(false), 5000);
+  };
 
   return (
     <div className="min-h-screen bg-[var(--color-void)] text-[var(--color-text-primary)] font-body">
@@ -80,7 +95,7 @@ export function Blog() {
                 <button
                   key={filter}
                   onClick={() => setActiveFilter(filter)}
-                  className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${activeFilter === filter
+                  className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all cursor-pointer ${activeFilter === filter
                     ? 'bg-[var(--color-sentinel)] text-[var(--color-void)]'
                     : 'border border-[var(--color-sentinel)]/20 hover:border-[var(--color-sentinel)] text-[var(--color-text-secondary)]'
                     }`}
@@ -95,6 +110,8 @@ export function Blog() {
                 className="bg-[var(--color-sentinel)]/5 border border-[var(--color-sentinel)]/20 rounded-lg pl-10 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-sentinel)]/50 w-full md:w-64 transition-all text-[var(--color-text-primary)] placeholder:text-[var(--color-text-tertiary)] font-display"
                 placeholder="Search articles..."
                 type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
           </div>
@@ -103,48 +120,64 @@ export function Blog() {
 
       {/* Blog Grid */}
       <main className="max-w-7xl mx-auto px-6 py-16">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-          {articles.map((article) => (
-            <article key={article.id} className="group cursor-pointer">
-              <Link to="/blog/article" className="relative overflow-hidden rounded-xl aspect-[16/9] mb-6 border border-[var(--color-sentinel)]/10 block">
-                <img
-                  src={article.image}
-                  alt={article.title}
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                />
-                <div className="absolute top-4 left-4">
-                  <span className="bg-[var(--color-void)]/80 backdrop-blur-md text-[var(--color-sentinel)] px-3 py-1 rounded text-xs font-bold uppercase border border-[var(--color-sentinel)]/30">
-                    {article.category}
-                  </span>
-                </div>
-              </Link>
-              <div className="space-y-3">
-                <div className="flex items-center gap-4 text-xs font-medium text-[var(--color-text-tertiary)] uppercase tracking-wider">
-                  <span>{article.readTime}</span>
-                  <span className="w-1 h-1 bg-[var(--color-sentinel)] rounded-full"></span>
-                  <span>{article.author}</span>
-                  <span className="w-1 h-1 bg-[var(--color-sentinel)] rounded-full"></span>
-                  <span>{article.date}</span>
-                </div>
-                <h3 className="text-2xl font-bold transition-colors text-[var(--color-text-primary)] group-hover:text-[var(--color-sentinel)] font-['Syne']">
-                  {article.title}
-                </h3>
-                <p className="text-[var(--color-text-secondary)] line-clamp-2 leading-relaxed">
-                  {article.summary}
-                </p>
-                <Link to="/blog/article" className="inline-flex items-center gap-2 text-[var(--color-sentinel)] font-bold text-sm group-hover:underline">
-                  Read Article
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+        {filteredArticles.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+            {filteredArticles.map((article) => (
+              <article key={article.id} className="group cursor-pointer">
+                <Link to="/blog/article" className="relative overflow-hidden rounded-xl aspect-[16/9] mb-6 border border-[var(--color-sentinel)]/10 block">
+                  <img
+                    src={article.image}
+                    alt={article.title}
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                  />
+                  <div className="absolute top-4 left-4">
+                    <span className="bg-[var(--color-void)]/80 backdrop-blur-md text-[var(--color-sentinel)] px-3 py-1 rounded text-xs font-bold uppercase border border-[var(--color-sentinel)]/30">
+                      {article.category}
+                    </span>
+                  </div>
                 </Link>
-              </div>
-            </article>
-          ))}
-        </div>
-        <div className="mt-20 flex justify-center">
-          <button className="border border-[var(--color-sentinel)]/30 hover:bg-[var(--color-sentinel)]/5 px-8 py-3 rounded-lg font-bold transition-colors text-[var(--color-text-primary)] cursor-pointer">
-            Load More Articles
-          </button>
-        </div>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-4 text-xs font-medium text-[var(--color-text-tertiary)] uppercase tracking-wider">
+                    <span>{article.readTime}</span>
+                    <span className="w-1 h-1 bg-[var(--color-sentinel)] rounded-full"></span>
+                    <span>{article.author}</span>
+                    <span className="w-1 h-1 bg-[var(--color-sentinel)] rounded-full"></span>
+                    <span>{article.date}</span>
+                  </div>
+                  <h3 className="text-2xl font-bold transition-colors text-[var(--color-text-primary)] group-hover:text-[var(--color-sentinel)] font-['Syne']">
+                    {article.title}
+                  </h3>
+                  <p className="text-[var(--color-text-secondary)] line-clamp-2 leading-relaxed">
+                    {article.summary}
+                  </p>
+                  <Link to="/blog/article" className="inline-flex items-center gap-2 text-[var(--color-sentinel)] font-bold text-sm group-hover:underline">
+                    Read Article
+                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  </Link>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-20 bg-[var(--color-sentinel)]/5 rounded-2xl border border-[var(--color-sentinel)]/10">
+            <h3 className="text-2xl font-bold text-[var(--color-text-secondary)] font-['Syne'] mb-2">No articles found</h3>
+            <p className="text-[var(--color-text-tertiary)]">Try adjusting your search or filter settings.</p>
+            <button
+              onClick={() => { setActiveFilter("All"); setSearchQuery(""); }}
+              className="mt-6 text-[var(--color-sentinel)] font-bold hover:underline cursor-pointer"
+            >
+              Reset All Filters
+            </button>
+          </div>
+        )}
+
+        {filteredArticles.length > 0 && (
+          <div className="mt-20 flex justify-center">
+            <button className="border border-[var(--color-sentinel)]/30 hover:bg-[var(--color-sentinel)]/5 px-8 py-3 rounded-lg font-bold transition-colors text-[var(--color-text-primary)] cursor-pointer">
+              Load More Articles
+            </button>
+          </div>
+        )}
       </main>
 
       {/* Newsletter Section */}
@@ -158,16 +191,24 @@ export function Blog() {
               </p>
             </div>
             <div className="w-full md:w-auto">
-              <form className="flex flex-col sm:flex-row gap-3" onSubmit={(e) => e.preventDefault()}>
-                <input
-                  className="px-6 py-4 rounded-lg bg-[var(--color-void)] text-[var(--color-text-primary)] border-none focus:ring-2 focus:ring-[var(--color-text-primary)]/20 min-w-[300px] placeholder:text-[var(--color-text-tertiary)]"
-                  placeholder="Enter your email"
-                  type="email"
-                />
-                <button className="bg-[var(--color-text-primary)] text-[var(--color-void)] font-bold px-8 py-4 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer" type="submit">
-                  Join
-                </button>
-              </form>
+              {!subscribed ? (
+                <form className="flex flex-col sm:flex-row gap-3" onSubmit={handleSubscribe}>
+                  <input
+                    className="px-6 py-4 rounded-lg bg-[var(--color-void)] text-[var(--color-text-primary)] border-none focus:ring-2 focus:ring-[var(--color-text-primary)]/20 min-w-[300px] placeholder:text-[var(--color-text-tertiary)]"
+                    placeholder="Enter your email"
+                    type="email"
+                    required
+                  />
+                  <button className="bg-[var(--color-text-primary)] text-[var(--color-void)] font-bold px-8 py-4 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer" type="submit">
+                    Join
+                  </button>
+                </form>
+              ) : (
+                <div className="bg-[var(--color-void)] px-8 py-6 rounded-lg text-center animate-in zoom-in duration-300">
+                  <span className="text-[var(--color-sentinel)] text-xl font-bold font-['Syne'] block mb-1">WELCOME TO THE SQUAD_</span>
+                  <p className="text-[var(--color-text-secondary)] text-sm uppercase tracking-widest font-mono">ENCRYPTED CONNECTION ESTABLISHED.</p>
+                </div>
+              )}
               <p className="mt-3 text-sm text-[var(--color-void)]/60 text-center sm:text-left">
                 No spam. Unsubscribe at any time.
               </p>
@@ -175,6 +216,7 @@ export function Blog() {
           </div>
         </div>
       </section>
+
 
     </div>
   );

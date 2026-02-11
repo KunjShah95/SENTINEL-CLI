@@ -126,8 +126,8 @@ function PRCommentPreview() {
                     </div>
                 </div>
                 <div className="mt-8 flex gap-3">
-                    <button className="bg-[var(--color-sentinel)] text-[var(--color-void)] text-xs font-bold px-4 py-2 rounded shadow-lg hover:brightness-110 transition-all cursor-pointer">Apply Fix</button>
-                    <button className="text-[var(--color-text-tertiary)] text-xs font-bold px-4 py-2 hover:text-[var(--color-text-secondary)] transition-all cursor-pointer">Dismiss</button>
+                    <Link to="/playground" className="bg-[var(--color-sentinel)] text-[var(--color-void)] text-xs font-bold px-4 py-2 rounded shadow-lg hover:brightness-110 transition-all cursor-pointer inline-block">Apply Fix</Link>
+                    <button className="text-[var(--color-text-tertiary)] text-xs font-bold px-4 py-2 hover:text-[var(--color-text-secondary)] transition-all cursor-pointer" onClick={(e) => (e.target as HTMLButtonElement).innerText = 'Dismissed'}>Dismiss</button>
                 </div>
             </div>
         </div>

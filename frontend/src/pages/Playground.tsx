@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import {
-  Play, Shield, Zap, Search, Bug, Terminal, Activity, FileCode, CheckCircle2, AlertTriangle, ArrowRight
+  Play, Shield, Zap, Search, Bug, Terminal, Activity, FileCode, CheckCircle2, AlertTriangle, ArrowRight, RefreshCw
 } from 'lucide-react';
 
-const VULNERABLE_CODE_SNIPPET = `const express = require('express');
+const SNIPPETS: Record<string, string> = {
+  security: `const express = require('express');
 const db = require('../db');
 const router = express.Router();
 
@@ -20,12 +22,119 @@ router.get('/profile/:id', async (req, res) => {
   } catch (err) {
     res.status(500).send('Server Error');
   }
-});`;
+});`,
+  typescript: `interface User {
+  id: string;
+  name: string;
+}
+
+function processUser(user: any) {
+  // TYPE ERROR: Unsafe assignment from 'any'
+  const name: string = user.metadata.name;
+  
+  // Potential runtime crash if user.metadata is undefined
+  console.log(\`Processing \${name}\`);
+}`,
+  performance: `function calculateTotal(items) {
+  let total = 0;
+  // PERFORMANCE: Inefficient loop with O(n^2) complexity
+  for (let i = 0; i < items.length; i++) {
+    for (let j = 0; j < items.length; j++) {
+      if (items[i].id === items[j].id) {
+        total += items[i].price;
+      }
+    }
+  }
+  return total;
+}`,
+  'react audit': `import { useState, useEffect } from 'react';
+
+function UserProfile({ userId }) {
+  const [user, setUser] = useState(null);
+
+  // REACT AUDIT: Missing dependency in useEffect
+  useEffect(() => {
+    fetch(\`/api/users/\${userId}\`)
+      .then(res => res.json())
+      .then(data => setUser(data));
+  }, []); // userId should be here
+
+  return <div>{user?.name}</div>;
+}`,
+  compliance: `// GDPR COMPLIANCE: Storing PII in plain text logs
+function logUserAction(user, action) {
+  console.log(\`User \${user.email} (SSN: \${user.ssn}) performed \${action}\`);
+  saveToAuditLog({
+    user: user.email,
+    timestamp: new Date(),
+    action
+  });
+}`
+};
+
+const SCAN_RESULTS: Record<string, any> = {
+  security: {
+    id: 'SNT-042-SQLI',
+    type: 'SQL Injection',
+    location: 'line 14',
+    message: "User input from 'req.params.id' is directly concatenated into a SQL string. An attacker can manipulate the query logic.",
+    fix: "const user = await db.execute('SELECT * FROM users WHERE id = ?', [id]);",
+    replacement: "    const user = await db.execute('SELECT * FROM users WHERE id = ?', [id]);",
+    targetLine: "    const user = await db.execute(query);" // We'll simplify the replacement for demo
+  },
+  typescript: {
+    id: 'SNT-TS-001',
+    type: 'Unsafe Any Type',
+    location: 'line 6',
+    message: "Variable 'user' is typed as 'any', bypassing TypeScript's type safety checks.",
+    fix: "function processUser(user: User) {",
+    replacement: "function processUser(user: User) {",
+    targetLine: "function processUser(user: any) {"
+  }
+};
 
 export function Playground() {
   const [activeTab, setActiveTab] = useState('security');
-  const [code, setCode] = useState(VULNERABLE_CODE_SNIPPET);
-  const [isRunning, setIsRunning] = useState(false);
+  const [code, setCode] = useState(SNIPPETS.security);
+  const [isScanning, setIsScanning] = useState(false);
+  const [hasScanned, setHasScanned] = useState(false);
+  const [isFixed, setIsFixed] = useState(false);
+
+  const handleTabChange = (tab: string) => {
+    const tabKey = tab.toLowerCase();
+    setActiveTab(tabKey);
+    setCode(SNIPPETS[tabKey] || SNIPPETS.security);
+    setHasScanned(false);
+    setIsFixed(false);
+  };
+
+  const runScan = () => {
+    setIsScanning(true);
+    setHasScanned(false);
+    setIsFixed(false);
+
+    // Simulate scan delay
+    setTimeout(() => {
+      setIsScanning(false);
+      setHasScanned(true);
+    }, 1500);
+  };
+
+  const applyFix = () => {
+    const result = SCAN_RESULTS[activeTab];
+    if (result && !isFixed) {
+      // Very crude replacement for demo purposes
+      const lines = code.split('\n');
+      const newLines = lines.map(line => {
+        if (line.includes('const query =')) return null; // Remove the vulnerable query line for SQLi
+        if (line.includes(result.targetLine)) return result.replacement;
+        return line;
+      }).filter(line => line !== null) as string[];
+
+      setCode(newLines.join('\n'));
+      setIsFixed(true);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[var(--color-void)] text-[var(--color-text-primary)] font-body">
@@ -54,7 +163,7 @@ export function Playground() {
             {['Security', 'TypeScript', 'Performance', 'React Audit', 'Compliance'].map((tab) => (
               <button
                 key={tab}
-                onClick={() => setActiveTab(tab.toLowerCase())}
+                onClick={() => handleTabChange(tab)}
                 className={`flex items-center gap-2 px-4 py-2 rounded font-semibold whitespace-nowrap transition-all ${activeTab === tab.toLowerCase()
                   ? 'bg-[var(--color-sentinel)] text-[var(--color-void)]'
                   : 'text-[var(--color-text-secondary)] hover:text-[var(--color-sentinel)] hover:bg-[var(--color-sentinel)]/10'
@@ -97,18 +206,24 @@ export function Playground() {
                 </div>
               </div>
               <div className="text-[10px] font-bold text-[var(--color-sentinel)] px-2 py-0.5 border border-[var(--color-sentinel)]/30 rounded font-mono">
-                JS/EXPRESS
+                {activeTab.toUpperCase()}
               </div>
             </div>
             <div className="flex-1 overflow-auto p-4 font-mono text-sm leading-relaxed relative">
               <textarea
                 value={code}
-                onChange={(e) => setCode(e.target.value)}
+                onChange={(e) => {
+                  setCode(e.target.value);
+                  setHasScanned(false);
+                  setIsFixed(false);
+                }}
                 className="w-full h-full bg-transparent text-[var(--color-text-secondary)] resize-none outline-none font-mono"
                 spellCheck={false}
               />
               {/* Decorative highlights matching the vulnerable lines in snippet */}
-              <div className="absolute top-[188px] left-0 w-full h-[64px] bg-[var(--color-critical)]/10 border-l-2 border-[var(--color-critical)] pointer-events-none"></div>
+              {!isFixed && activeTab === 'security' && (
+                <div className="absolute top-[188px] left-0 w-full h-[64px] bg-[var(--color-critical)]/10 border-l-2 border-[var(--color-critical)] pointer-events-none"></div>
+              )}
             </div>
           </div>
 
@@ -126,48 +241,85 @@ export function Playground() {
             </div>
             <div className="flex-1 overflow-auto p-6 font-mono text-sm">
               <div className="mb-4">
-                <span className="text-[var(--color-sentinel)] font-bold">sentinel@playground:~$</span> <span className="text-[var(--color-text-primary)]">sentinel scan --profile security</span>
+                <span className="text-[var(--color-sentinel)] font-bold">sentinel@playground:~$</span> <span className="text-[var(--color-text-primary)]">sentinel scan --profile {activeTab}</span>
               </div>
+
               <div className="space-y-2">
-                <div className="text-[var(--color-text-tertiary)] flex items-center gap-2">
-                  <Activity className="w-3 h-3" /> Initializing Sentinel Engine v4.2.1...
-                </div>
-                <div className="text-[var(--color-text-tertiary)] flex items-center gap-2">
-                  <Search className="w-3 h-3 text-[var(--color-info)]" /> Indexing 42 source files...
-                </div>
-                <div className="text-[var(--color-text-tertiary)] flex items-center gap-2">
-                  <Zap className="w-3 h-3 text-[var(--color-info)]" /> Performing Semantic Analysis...
-                </div>
-
-                <div className="mt-6 pt-4 border-t border-[var(--color-sentinel)]/10">
-                  <div className="text-[var(--color-critical)] font-bold flex items-center gap-2">
-                    <AlertTriangle className="w-4 h-4" /> CRITICAL VULNERABILITY FOUND
-                  </div>
-                  <div className="pl-6 mt-2 space-y-1">
-                    <div className="text-[var(--color-text-secondary)]"><span className="text-[var(--color-text-tertiary)]">ID:</span> SNT-042-SQLI</div>
-                    <div className="text-[var(--color-text-secondary)]"><span className="text-[var(--color-text-tertiary)]">Type:</span> SQL Injection</div>
-                    <div className="text-[var(--color-text-secondary)]"><span className="text-[var(--color-text-tertiary)]">Location:</span> server/routes/users.js:14</div>
-                    <div className="text-[var(--color-text-tertiary)] mt-2 bg-[var(--color-critical)]/5 border-l-2 border-[var(--color-critical)] p-2 italic text-xs">
-                      "User input from 'req.params.id' is directly concatenated into a SQL string. An attacker can manipulate the query logic."
+                {isScanning ? (
+                  <>
+                    <div className="text-[var(--color-text-tertiary)] flex items-center gap-2 animate-pulse">
+                      <RefreshCw className="w-3 h-3 animate-spin" /> Initializing Sentinel Engine v4.2.1...
                     </div>
-                  </div>
-                </div>
-
-                <div className="mt-6">
-                  <div className="text-[var(--color-sentinel)] font-bold flex items-center gap-2">
-                    <Zap className="w-4 h-4" /> SUGGESTED FIX (Auto-Apply Available)
-                  </div>
-                  <div className="pl-6 mt-2">
-                    <div className="text-[var(--color-text-tertiary)] mb-1 text-xs">Replace line 14 with:</div>
-                    <div className="bg-[var(--color-sentinel)]/5 p-2 rounded text-[var(--color-sentinel)] border border-[var(--color-sentinel)]/10 text-xs">
-                      const user = await db.execute('SELECT * FROM users WHERE id = ?', [id]);
+                    <div className="text-[var(--color-text-tertiary)] flex items-center gap-2">
+                      <Search className="w-3 h-3 text-[var(--color-info)]" /> Indexing source files...
                     </div>
+                  </>
+                ) : hasScanned ? (
+                  <>
+                    <div className="text-[var(--color-text-tertiary)] flex items-center gap-2 text-xs">
+                      <CheckCircle2 className="w-3 h-3 text-[var(--color-success)]" /> Ready for review.
+                    </div>
+
+                    {!isFixed && SCAN_RESULTS[activeTab] ? (
+                      <div className="mt-6 pt-4 border-t border-[var(--color-sentinel)]/10">
+                        <div className="text-[var(--color-critical)] font-bold flex items-center gap-2">
+                          <AlertTriangle className="w-4 h-4" /> CRITICAL VULNERABILITY FOUND
+                        </div>
+                        <div className="pl-6 mt-2 space-y-1">
+                          <div className="text-[var(--color-text-secondary)]"><span className="text-[var(--color-text-tertiary)]">ID:</span> {SCAN_RESULTS[activeTab].id}</div>
+                          <div className="text-[var(--color-text-secondary)]"><span className="text-[var(--color-text-tertiary)]">Type:</span> {SCAN_RESULTS[activeTab].type}</div>
+                          <div className="text-[var(--color-text-secondary)]"><span className="text(--color-text-tertiary)]">Location:</span> {SCAN_RESULTS[activeTab].location}</div>
+                          <div className="text-[var(--color-text-tertiary)] mt-2 bg-[var(--color-critical)]/5 border-l-2 border-[var(--color-critical)] p-2 italic text-xs">
+                            "{SCAN_RESULTS[activeTab].message}"
+                          </div>
+                        </div>
+
+                        <div className="mt-6">
+                          <div className="text-[var(--color-sentinel)] font-bold flex items-center gap-2">
+                            <Zap className="w-4 h-4" /> SUGGESTED FIX
+                          </div>
+                          <div className="pl-6 mt-2">
+                            <div className="bg-[var(--color-sentinel)]/5 p-2 rounded text-[var(--color-sentinel)] border border-[var(--color-sentinel)]/10 text-xs font-mono mb-3">
+                              {SCAN_RESULTS[activeTab].fix}
+                            </div>
+                            <button
+                              onClick={applyFix}
+                              className="bg-[var(--color-sentinel)] text-[var(--color-void)] px-4 py-2 rounded text-xs font-bold hover:brightness-110 transition-all cursor-pointer flex items-center gap-2"
+                            >
+                              <Play className="w-3 h-3" /> APPLY AUTO-FIX
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : isFixed ? (
+                      <div className="mt-6 pt-4 border-t border-[var(--color-sentinel)]/10">
+                        <div className="text-[var(--color-success)] font-bold flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4" /> SCAN CLEAN - NO VULNERABILITIES FOUND
+                        </div>
+                        <p className="text-[var(--color-text-secondary)] pl-6 mt-2">
+                          All security checks passed. No issues detected in the current snippet.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="mt-6 pt-4 border-t border-[var(--color-sentinel)]/10">
+                        <div className="text-[var(--color-success)] font-bold flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4" /> SCAN COMPLETE
+                        </div>
+                        <p className="text-[var(--color-text-secondary)] pl-6 mt-2 ml-1">
+                          Analysis completed. No critical issues found for this category in the interactive demo.
+                        </p>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="text-[var(--color-text-tertiary)] italic">
+                    Press "RUN SCAN" to analyze the code snippet...
                   </div>
-                </div>
+                )}
 
                 <div className="mt-4 flex items-center gap-2 text-[var(--color-text-secondary)]">
                   <span>sentinel@playground:~$</span>
-                  <span className="w-2 h-4 bg-[var(--color-sentinel)] animate-pulse"></span>
+                  {!isScanning && <span className="w-2 h-4 bg-[var(--color-sentinel)] animate-pulse"></span>}
                 </div>
               </div>
             </div>
@@ -177,12 +329,17 @@ export function Playground() {
               <ArrowRight className="w-4 h-4 text-[var(--color-sentinel)]" />
               <input
                 className="bg-transparent border-none focus:ring-0 text-[var(--color-text-secondary)] font-mono text-sm w-full outline-none placeholder:text-[var(--color-text-tertiary)]"
-                placeholder="Type a command (e.g., 'sentinel fix')"
+                placeholder={isScanning ? "Scanning..." : "Type 'sentinel scan'"}
+                value={isScanning ? "" : hasScanned ? "sentinel scan --profile " + activeTab : ""}
                 readOnly
                 type="text"
               />
-              <button className="bg-[var(--color-sentinel)]/20 text-[var(--color-sentinel)] border border-[var(--color-sentinel)]/40 px-3 py-1 rounded-md text-xs font-bold hover:bg-[var(--color-sentinel)]/30 transition-all cursor-pointer">
-                RUN COMMAND
+              <button
+                onClick={runScan}
+                disabled={isScanning}
+                className="bg-[var(--color-sentinel)]/20 text-[var(--color-sentinel)] border border-[var(--color-sentinel)]/40 px-4 py-2 rounded-md text-xs font-bold hover:bg-[var(--color-sentinel)]/30 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isScanning ? "SCANNING..." : "RUN SCAN"}
               </button>
             </div>
           </div>
@@ -224,13 +381,13 @@ export function Playground() {
             Join 50,000+ developers who use Sentinel to ship secure code faster. Free for open source and individuals.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <button className="bg-[var(--color-sentinel)] text-[var(--color-void)] font-bold px-8 py-4 rounded-lg text-lg hover:scale-105 transition-transform flex items-center gap-2 cursor-pointer">
+            <Link to="/docs" className="bg-[var(--color-sentinel)] text-[var(--color-void)] font-bold px-8 py-4 rounded-lg text-lg hover:scale-105 transition-transform flex items-center gap-2 cursor-pointer outline-none">
               Start Free Trial
               <ArrowRight className="w-5 h-5" />
-            </button>
-            <button className="bg-[var(--color-void)] text-[var(--color-text-primary)] border border-[var(--color-sentinel)]/20 font-bold px-8 py-4 rounded-lg text-lg hover:bg-[var(--color-sentinel)]/10 transition-colors cursor-pointer">
+            </Link>
+            <a href="https://github.com/KunjShah95/SENTINEL-CLI" target="_blank" rel="noopener noreferrer" className="bg-[var(--color-void)] text-[var(--color-text-primary)] border border-[var(--color-sentinel)]/20 font-bold px-8 py-4 rounded-lg text-lg hover:bg-[var(--color-sentinel)]/10 transition-colors cursor-pointer outline-none inline-flex items-center">
               View Demo on GitHub
-            </button>
+            </a>
           </div>
         </section>
 

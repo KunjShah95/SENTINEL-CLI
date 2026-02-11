@@ -1,4 +1,5 @@
 import { useRef, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Shield, Zap, Bug, Settings, Globe, Download, FileText
 } from 'lucide-react';
@@ -217,14 +218,19 @@ export function Changelog() {
             <h3 className="text-3xl font-bold text-[var(--color-text-primary)] mb-6 font-['Syne']">Stay ahead of the threats.</h3>
             <p className="text-[var(--color-text-secondary)] mb-8 text-lg">Download the latest Sentinel CLI binaries or update your existing installation.</p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <button className="bg-[var(--color-sentinel)] text-[var(--color-void)] px-8 py-3 rounded-lg font-bold hover:bg-[var(--color-sentinel)]/90 transition-all flex items-center justify-center gap-2 cursor-pointer">
+              <a
+                href="https://github.com/KunjShah95/SENTINEL-CLI/releases"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="bg-[var(--color-sentinel)] text-[var(--color-void)] px-8 py-3 rounded-lg font-bold hover:bg-[var(--color-sentinel)]/90 transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
                 <Download className="w-5 h-5" />
                 Download v2.4.0
-              </button>
-              <button className="bg-[var(--color-obsidian)] text-[var(--color-text-primary)] px-8 py-3 rounded-lg font-bold hover:bg-[var(--color-carbon)] transition-all border border-[var(--color-carbon)] flex items-center justify-center gap-2 cursor-pointer">
+              </a>
+              <Link to="/docs" className="bg-[var(--color-obsidian)] text-[var(--color-text-primary)] px-8 py-3 rounded-lg font-bold hover:bg-[var(--color-carbon)] transition-all border border-[var(--color-carbon)] flex items-center justify-center gap-2 cursor-pointer">
                 <FileText className="w-5 h-5" />
                 Full Documentation
-              </button>
+              </Link>
             </div>
             <div className="mt-8">
               <code className="bg-[var(--color-void)] border border-[var(--color-carbon)] px-4 py-3 rounded-lg text-[var(--color-sentinel)] text-sm font-mono block w-fit mx-auto">

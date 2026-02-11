@@ -140,7 +140,10 @@ export function Contact() {
                                 <Terminal className="w-4 h-4" />
                                 EXECUTE_SEND
                             </button>
-                            <button className="border border-[var(--color-sentinel)]/30 text-[var(--color-sentinel)]/60 hover:text-[var(--color-sentinel)] hover:border-[var(--color-sentinel)] px-8 py-4 rounded-sm transition-all uppercase text-sm tracking-tighter cursor-pointer">
+                            <button
+                                onClick={() => navigate('/')}
+                                className="border border-[var(--color-sentinel)]/30 text-[var(--color-sentinel)]/60 hover:text-[var(--color-sentinel)] hover:border-[var(--color-sentinel)] px-8 py-4 rounded-sm transition-all uppercase text-sm tracking-tighter cursor-pointer"
+                            >
                                 ABORT_SESSION
                             </button>
                         </div>

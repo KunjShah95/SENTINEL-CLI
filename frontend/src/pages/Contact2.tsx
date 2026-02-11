@@ -1,4 +1,7 @@
+import { useNavigate } from 'react-router-dom';
+
 export function Contact2() {
+    const navigate = useNavigate();
     return (
         <div className="min-h-screen bg-[var(--color-void)] font-display text-[var(--color-text-primary)] selection:bg-[var(--color-sentinel)]/30 selection:text-[var(--color-sentinel)] overflow-hidden relative">
 
@@ -90,7 +93,10 @@ export function Contact2() {
                                 <div className="w-2 h-2 rounded-full bg-[var(--color-sentinel)] animate-ping"></div>
                                 <span className="text-[var(--color-sentinel)] font-bold uppercase text-xs tracking-[0.2em]">TRANSMITTING</span>
                             </div>
-                            <button className="border border-[var(--color-critical)]/30 text-[var(--color-critical)]/60 hover:text-[var(--color-critical)] hover:border-[var(--color-critical)] hover:bg-[var(--color-critical)]/5 px-10 py-3 rounded-sm transition-all uppercase text-xs tracking-tighter font-bold cursor-pointer">
+                            <button
+                                onClick={() => navigate('/')}
+                                className="border border-[var(--color-critical)]/30 text-[var(--color-critical)]/60 hover:text-[var(--color-critical)] hover:border-[var(--color-critical)] hover:bg-[var(--color-critical)]/5 px-10 py-3 rounded-sm transition-all uppercase text-xs tracking-tighter font-bold cursor-pointer"
+                            >
                                 CANCEL_TASK
                             </button>
                         </div>
