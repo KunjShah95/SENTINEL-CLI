@@ -21,6 +21,18 @@ export class SuppressionHandler {
       /\{\s*#\s*sentinel-ignore\s*#\s*\}/,
       /\{\s*#\s*sentinel-ignore-file\s*#\s*\}/,
     ];
+    
+    // Additional patterns from IssueSuppression
+    this.suppressionPatterns = {
+      ignoreNextLine: /\/\/\s*sentinel-ignore-next-line(?:\s+([\w\-,/ ]+))?/i,
+      ignoreLine: /\/\/\s*sentinel-ignore-line(?:\s+([\w\-,/ ]+))?/i,
+      ignoreFile: /\/\*\s*sentinel-ignore-file(?:\s+([\w\-,/ ]+))?\s*\*\//i,
+      disableBlock: /\/\/\s*sentinel-disable(?:\s+([\w\-,/ ]+))?/i,
+      enableBlock: /\/\/\s*sentinel-enable(?:\s+([\w\-,/ ]+))?/i,
+      hashIgnoreNextLine: /#\s*sentinel-ignore-next-line(?:\s+([\w\-,/ ]+))?/i,
+      hashIgnoreLine: /#\s*sentinel-ignore(?:\s+([\w\-,/ ]+))?/i,
+      htmlIgnore: /<!--\s*sentinel-ignore(?:\s+([\w\-,/ ]+))?\s*-->/i,
+    };
   }
 
   /**
@@ -118,6 +130,32 @@ export class SuppressionHandler {
     if (suppression.type === 'file') {
       return true;
     }
+
+    return false;
+  }
+
+  /**
+   * Parse rule IDs from suppression comment (from IssueSuppression)
+   */
+  parseRuleIds(ruleString) {
+    if (!ruleString || ruleString.trim() === '') {
+      return ['*'];
+    }
+    return ruleString
+      .split(/[,\s]+/)
+      .map(r => r.trim().toLowerCase())
+      .filter(Boolean);
+  }
+
+  /**
+   * Check if a suppression rule matches an issue rule ID (from IssueSuppression)
+   */
+  ruleMatches(suppressionRule, issueRuleId) {
+    if (suppressionRule === '*' || suppressionRule === 'all') return true;
+    
+    if (suppressionRule === issueRuleId) return true;
+    if (issueRuleId.startsWith(`${suppressionRule}/`)) return true;
+    if (issueRuleId.includes(suppressionRule + '/')) return true;
 
     return false;
   }
@@ -233,4 +271,5 @@ export class SuppressionHandler {
   }
 }
 
+export { SuppressionHandler as IssueSuppression };
 export default SuppressionHandler;
