@@ -1,297 +1,322 @@
 # 🛡️ Sentinel CLI — AI-Powered Code Guardian
 
-> **All-in-one code review tool: local-first, private, and extensible. Security, TypeScript, React, API, secrets, dependency analysis — powered by multiple LLMs.**
-
-[![npm version](https://img.shields.io/npm/v/sentinel-cli.svg?style=flat-square&color=blue)](https://www.npmjs.com/package/sentinel-cli)
-[![npm downloads](https://img.shields.io/npm/dm/sentinel-cli.svg?style=flat-square&color=green)](https://www.npmjs.com/package/sentinel-cli)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
-[![Node Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen?style=flat-square)](https://nodejs.org/)
-[![GitHub stars](https://img.shields.io/github/stars/KunjShah95/Sentinel-CLI?style=flat-square)](https://github.com/KunjShah95/Sentinel-CLI)
-[![GitHub issues](https://img.shields.io/github/issues/KunjShah95/Sentinel-CLI?style=flat-square)](https://github.com/KunjShah95/Sentinel-CLI/issues)
-
 <p align="center">
-  <b>🔒 Security</b> • <b>📦 Dependencies</b> • <b>♿ Accessibility</b> • <b>🐛 Bugs</b> • <b>⚡ Performance</b> • <b>💎 TypeScript</b> • <b>⚛️ React</b> • <b>🔑 Secrets</b> • <b>🌐 API</b> • <b>🤖 Multi-LLM</b>
+  <a href="https://www.npmjs.com/package/sentinel-cli">
+    <img src="https://img.shields.io/npm/v/sentinel-cli.svg?style=flat-square&color=blue" alt="npm version" />
+  </a>
+  <a href="https://www.npmjs.com/package/sentinel-cli">
+    <img src="https://img.shields.io/npm/dm/sentinel-cli.svg?style=flat-square&color=green" alt="npm downloads" />
+  </a>
+  <a href="https://opensource.org/licenses/MIT">
+    <img src="https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square" alt="License: MIT" />
+  </a>
+  <a href="https://nodejs.org/">
+    <img src="https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen?style=flat-square" alt="Node Version" />
+  </a>
+  <a href="https://github.com/KunjShah95/Sentinel-CLI">
+    <img src="https://img.shields.io/github/stars/KunjShah95/Sentinel-CLI?style=flat-square" alt="GitHub stars" />
+  </a>
 </p>
 
 ---
 
-## 1️⃣ Overview: What is Sentinel CLI?
+## Table of Contents
 
-**Sentinel CLI** is a _developer-first, open-source code review platform_ with a focus on privacy, power, and extensibility:
-
-- **13+ built-in analyzers:** Security, TypeScript, React, Dependency, Accessibility (A11y), API, Docker, Kubernetes, Secrets, Code Quality, Bug patterns and more
-- **AI-powered audits** — Your OpenAI/Groq/Gemini/Anthropic/OpenRouter keys, not SaaS APIs
-- **All local:** Your code and AI prompts stay on your machine (or CI), never sent out
-- **Instant setup:** One `npm i -g sentinel-cli` and `sentinel auth` to use
-- **Autofix:** Automatic fixing for common issues (console.log, missing alt, etc.)
-- **Extensible:** Custom YAML rules, integration hooks and config
-- **True private CI:** Works in CI/CD & pre-commit hooks with environment auth
-- **Beautiful dashboard:** Built-in web UI to visualize scans and trends
-
-> No lock-in. No seat-based fees. No code leaks. Just serious code & security automation.
-
----
-
-## 2️⃣ Key Features & Analyzers
-
-### 🔍 General
-
-- Local-first: Code review _without leaving your machine/server_ — no cloud uploads
-- Works for: JS, TS, React, Python, Java, Go, PHP, Ruby, Docker, K8s, Markdown, configs
-- Highly scriptable: CLI, JSON, SARIF, Markdown, Slack/Discord notifications, monorepo support
-- Multi-LLM: Use **OpenAI, Groq, Gemini, Anthropic, OpenRouter** — bring your own API key
-
-### 🧠 AI & Security
-
-| Category             | What It Detects/Does                                                        |
-|----------------------|------------------------------------------------------------------------------|
-| **Security Analysis**| SQL injection, XSS, CSRF, exposed secrets, dangerous APIs (eval, innerHTML) |
-| **Secrets Detection**| 20+ key/token regexes, passwords, high-entropy, private keys                |
-| **Dependency Scan**  | `npm audit`, CVE & license issues, unpinned/legacy versions                 |
-| **A11y/Accessibility**| WCAG 2.1 checks (alt, color, focus, heading, form)                         |
-| **TypeScript & JS**  | `any` types, `@ts-ignore`, type loopholes, code smells                      |
-| **React/JSX**        | Rules-of-hooks, missing keys, a11y, dangerous innerHTML                     |
-| **API Security**     | CORS, JWT, secrets in configs, rate limiting, leak patterns                 |
-| **Docker Analysis**  | Root user, secrets, ADD/COPY, latest tag, health checks, hardcoded creds    |
-| **K8s Manifests**    | Privilege, root, missing securityContext, resource limits, secrets          |
-| **Code Quality**     | Complexity, duplications, async/await, unreachable, risky patterns          |
-| **Performance**      | N+1s, leaks, large deps/arrays, expensive ops, missed optimizations         |
-| **Custom Rules**     | `.sentinelrules.yaml` or `.codereviewrc.json` (your patterns)               |
-| **PR Review**        | Direct GitHub PR comments, diff reviews, CI integration                     |
-| **Auto-Fix**         | Remove console.log, debugger, add alt, etc. (see details below)             |
-| **Trend Analysis**   | Track and visualize historic issue trends                                   |
+1. [Overview](#overview)
+2. [Features](#features)
+3. [Architecture](#architecture)
+4. [Quick Start](#quick-start)
+5. [Commands Reference](#commands-reference)
+6. [Configuration](#configuration)
+7. [AI Providers](#ai-providers)
+8. [Analyzers](#analyzers)
+9. [Output Formats](#output-formats)
+10. [CI/CD Integration](#cicd-integration)
+11. [Advanced Features](#advanced-features)
+12. [VS Code Extension](#vs-code-extension)
+13. [Development](#development)
+14. [Roadmap](#roadmap)
+15. [License](#license)
 
 ---
 
-## 3️⃣ Quickstart: 30-Second Setup
+## Overview
+
+**Sentinel CLI** is a comprehensive, developer-first code review platform with a focus on privacy, power, and extensibility. It provides 20+ built-in analyzers for security, code quality, dependency checking, and more—all powered by multiple LLM providers.
+
+### Core Philosophy
+
+- **Local-First**: All code and AI prompts stay on your machine, never sent to external SaaS
+- **Privacy**: Your code never leaves your environment
+- **Extensible**: Custom rules, YAML configuration, and plugin architecture
+- **Multi-LLM**: Use OpenAI, Groq, Gemini, Anthropic, or OpenRouter—bring your own API key
+
+### Supported Languages & Technologies
+
+- **JavaScript/TypeScript**: Full analysis including React, Vue, Node.js
+- **Python, Java, Go, Ruby, PHP**: Quality and security scanning
+- **Infrastructure**: Docker, Kubernetes, Terraform, CloudFormation
+- **Web**: HTML, CSS, Markdown, JSON, YAML
+- **API**: REST, GraphQL, OpenAPI schemas
+
+---
+
+## Features
+
+### 🔐 Security Analysis
+
+| Analyzer | Description |
+|----------|-------------|
+| Security Scanner | XSS, SQL injection, CSRF, command injection, dangerous APIs |
+| Secrets Detection | 20+ regex patterns for API keys, tokens, passwords, private keys |
+| Dependency Scanner | npm audit, CVE checking, license issues, unpinned versions |
+| API Security | CORS, JWT, rate limiting, hardcoded secrets in configs |
+| Environment Security | .env file analysis, secret exposure |
+| Docker Security | Root user detection, secrets in ENV, ADD/COPY, health checks |
+| Kubernetes Security | Privileged containers, securityContext, resource limits |
+| GraphQL Security | Query depth limits, introspection, sensitive data exposure |
+
+### 📊 Code Quality
+
+| Analyzer | Description |
+|----------|-------------|
+| Quality Analyzer | Complexity, maintainability, code smells |
+| Bug Analyzer | Null checks, logic errors, common mistakes |
+| Performance Analyzer | Memory leaks, N+1 queries, inefficient operations |
+| TypeScript Analyzer | `any` types, @ts-ignore, type safety issues |
+| Accessibility (A11y) | WCAG 2.1 compliance, alt text, ARIA, form labels |
+
+### ⚛️ Framework-Specific
+
+| Analyzer | Description |
+|----------|-------------|
+| React/JSX | Hooks rules, missing keys, dangerous innerHTML |
+| Vue | Composition API, template issues |
+| Go | Concurrency issues, error handling |
+| Custom | User-defined YAML rules |
+
+### 🤖 AI-Powered
+
+- **Multi-Agent Orchestration**: Scanner → Fixer → Validator pipeline
+- **RAG System**: Advanced retrieval-augmented generation for code context
+- **Semantic Search**: Natural language code search using embeddings
+- **Self-Learning**: Learns from user feedback and corrections
+- **Code Verification**: Executes and validates generated code
+
+### 🛠️ Operations
+
+- **Auto-Fix**: Automatic fixes for common issues (console.log, missing alt, etc.)
+- **Baseline Comparison**: Compare scans against a baseline
+- **Incremental Analysis**: Only analyze changed files
+- **Caching**: Intelligent caching for 10x faster repeated scans
+- **Trend Analysis**: Track issues over time
+
+---
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        Sentinel CLI                              │
+├─────────────────────────────────────────────────────────────────┤
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐│
+│  │   CLI       │  │  Config     │  │   LLM Orchestrator      ││
+│  │  (Commander)│  │  Manager    │  │   (Multi-Provider)      ││
+│  └─────────────┘  └─────────────┘  └─────────────────────────┘│
+├─────────────────────────────────────────────────────────────────┤
+│                      Core Analysis Engine                        │
+│  ┌──────────────┐  ┌──────────────┐  ┌───────────────────────┐ │
+│  │   Parallel   │  │   False      │  │   Incremental         │ │
+│  │   Processor  │  │   Positive   │  │   Analyzer            │ │
+│  │              │  │   Reducer    │  │                       │ │
+│  └──────────────┘  └──────────────┘  └───────────────────────┘ │
+├─────────────────────────────────────────────────────────────────┤
+│                    Analyzers (20+)                              │
+│  ┌────┐ ┌────┐ ┌────┐ ┌────┐ ┌────┐ ┌────┐ ┌────┐ ┌────┐    │
+│  │Sec │ │Qual│ │Bug │ │Perf│ │Dep │ │A11y│ │TS  │ │API │    │
+│  └────┘ └────┘ └────┘ └────┘ └────┘ └────┘ └────┘ └────┘    │
+│  ┌────┐ ┌────┐ ┌────┐ ┌────┐ ┌────┐ ┌────┐ ┌────┐ ┌────┐    │
+│  │Reac│ │Vue │ │Dock│ │K8s │ │Secr│ │IAc │ │GQL │ │Cust│    │
+│  └────┘ └────┘ └────┘ └────┘ └────┘ └────┘ └────┘ └────┘    │
+├─────────────────────────────────────────────────────────────────┤
+│                    Advanced Systems                             │
+│  ┌────────────┐  ┌────────────┐  ┌────────────┐              │
+│  │   RAG      │  │  Vector    │  │  Session   │              │
+│  │   System   │  │  Database  │  │  Store     │              │
+│  └────────────┘  └────────────┘  └────────────┘              │
+│  ┌────────────┐  ┌────────────┐  ┌────────────┐              │
+│  │  Learning  │  │   Threat   │  │   Cross-File│              │
+│  │  System   │  │  Modeling   │  │   Analysis  │              │
+│  └────────────┘  └────────────┘  └────────────┘              │
+├─────────────────────────────────────────────────────────────────┤
+│                    Output & Integration                         │
+│  ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐ ┌──────────────┐ │
+│  │ Console │ │  JSON  │ │ SARIF  │ │ Slack │ │  GitHub PR  │ │
+│  └────────┘ └────────┘ └────────┘ └────────┘ └──────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Key Components
+
+| Component | Purpose |
+|-----------|---------|
+| `src/core/cli.js` | Command-line interface with 30+ commands |
+| `src/core/bot.js` | Main analysis orchestrator |
+| `src/analyzers/*` | Individual analyzer implementations |
+| `src/llm/*` | Multi-provider LLM orchestration |
+| `src/rag/*` | Retrieval-augmented generation system |
+| `src/intelligence/*` | ML-powered analysis features |
+| `src/distributed/*` | Parallel processing engine |
+| `src/database/*` | Vector database for semantic search |
+| `src/context/*` | Session and learning system |
+
+---
+
+## Quick Start
+
+### Installation
 
 ```bash
+# Install globally
 npm install -g sentinel-cli
-sentinel auth         # Enter your AI provider API keys (OpenAI, Groq, etc.)
 
-# Run scans with presets or combinations:
-sentinel security-audit          # Full security scan
-sentinel full-scan               # All analyzers
-sentinel analyze                 # Scan current dir with active analyzers
-sentinel frontend                # For React + TS + A11y only
-sentinel backend                 # For Security + API + Quality
-sentinel pre-commit --block      # Block commit on high severity
-sentinel ci --fail-on high       # For CI pipelines (exit on threshold)
-sentinel dashboard               # Local dashboard UI
+# Verify installation
+sentinel --version
+
+# Or run without install
+npx sentinel-cli --help
 ```
 
-For full command list, see [All Commands](#all-commands).
-
----
-
-## 4️⃣ Output Sample
+### Configuration
 
 ```bash
-🛡️ SENTINEL — AI-Powered Code Guardian v1.8.0
-
-✔ Analyzing 17 files with 8 analyzers...
-
-┌─────────────────────────────────────────────────────────────┐
-│  CRITICAL  │ AWS Access Key ID exposed                    │
-│  File: src/config.js:45                                   │
-│  → Use env vars (dotenv) or AWS IAM roles                 │
-├─────────────────────────────────────────────────────────────┤
-│  HIGH      │ SQL injection risk                           │
-│  File: src/db/queries.js:23                               │
-│  → Use parameterized queries / ORM                        │
-├─────────────────────────────────────────────────────────────┤
-│  MEDIUM    │ 'any' type disables type safety              │
-│  File: src/utils/helpers.ts:67                            │
-│  → Use specific type or unknown                           │
-├─────────────────────────────────────────────────────────────┤
-│  MEDIUM    │ Missing useEffect deps array                 │
-│  File: src/components/Dashboard.tsx:34                    │
-│  → Add deps: [userId, fetchData]                          │
-└─────────────────────────────────────────────────────────────┘
-
-Summary: 1 critical, 2 high, 4 medium, 13 low issues
-```
-
----
-
-## 5️⃣ Why Sentinel Over SaaS & Online Reviewers?
-
-| Feature              | Sentinel CLI | CodeRabbit | Copilot | SonarCloud |
-|----------------------|:-----------:|:----------:|:-------:|:----------:|
-| 100% Local/Offline   | ✅          | ❌         | ❌      | ⚠️        |
-| Custom API Keys      | ✅          | ❌         | ❌      | ❌        |
-| Security Scanning    | ✅          | ⚠️        | ❌      | ✅        |
-| TypeScript Analysis  | ✅          | ⚠️        | ⚠️      | ✅        |
-| React / JSX          | ✅ Hooks,a11y| ❌        | ⚠️      | ❌        |
-| API Security         | ✅          | ❌         | ❌      | ⚠️        |
-| Secrets Detection    | ✅          | ⚠️        | ❌      | ✅        |
-| Dependency Checks    | ✅ npm      | ❌         | ❌      | ✅        |
-| A11y Checks          | ✅ WCAG     | ❌         | ❌      | ❌        |
-| Auto-fix             | ✅          | ❌         | ❌      | ❌        |
-| PR Reviews           | ✅ Direct   | ✅         | ❌      | ✅        |
-| Notification Hooks   | ✅ Slack/D | ❌         | ❌      | ⚠️        |
-| Monorepo Support     | ✅          | ⚠️        | ❌      | ⚠️        |
-| Free & OSS           | ✅ MIT      | ❌ Paid    | ❌ Paid | ⚠️ Free   |
-
----
-
-## 6️⃣ New CLI Commands (v1.8.0+)
-
-### 🗄️ Cache Management
-
-Manage the intelligent caching system for 10x faster repeated scans:
-
-```bash
-# Show cache statistics (hit rate, size, TTL)
-sentinel cache --stats
-
-# Clear all cache
-sentinel cache --clear
-
-# Invalidate cache by pattern (regex)
-sentinel cache --invalidate "src/.*\.js"
-
-# Check cache size
-sentinel cache --size
-```
-
-### 🎖️ Security Badges
-
-Generate beautiful badges for your README:
-
-```bash
-# Generate badge markdown (recommended)
-sentinel badge --owner KunjShah95 --repo SENTINEL-CLI --markdown
-
-# Generate HTML badge
-sentinel badge --owner YourOrg --repo YourRepo --html
-
-# Start badge API server (port 3001)
-sentinel badge --server --port 3001
-
-# Get badge URL only
-sentinel badge --owner YourOrg --repo YourRepo --type score
-```
-
-**Badge Types:** `score` (0-100), `status` (pass/fail), `issues` (count), `security` (analyzer status)
-
-### 🤖 GitHub App Webhook
-
-Start webhook server for automated PR reviews:
-
-```bash
-# Start webhook server (requires GitHub App setup)
-sentinel webhook --port 3000
-
-# With explicit credentials
-sentinel webhook --port 3000 --secret YOUR_SECRET --app-id 123456
-```
-
-**Supported PR Commands:**
-- `@sentinel analyze` - Run basic analysis
-- `@sentinel full-scan` - Run all analyzers
-- `@sentinel security-audit` - Security-focused scan
-
-### ✅ Config Validation
-
-Validate configuration before running scans:
-
-```bash
-# Validate default config (.sentinelrc.json)
-sentinel validate
-
-# Validate specific config file
-sentinel validate --config path/to/custom-config.json
-```
-
-> **📘 See NEW_FEATURES.md for comprehensive documentation of all new features!**
-
----
-
-## 7️⃣ Detailed Analyzer Reference & Example Output
-
-### Security, Bug & Secrets
-
-- SQL injection, XSS, CSRF, command injection
-- API key/token & secret detection (20+ patterns: AWS, Stripe, GitHub, JWT, etc.)
-- Dangerous JS/TS constructs (`eval`, `innerHTML`, etc.)
-- Dependency scan (CVE, license, deprecated, unpinned)
-- Static code risks: null pointer, async/await, etc.
-
-**Example:**
-```bash
-CRITICAL | AWS secret key in code
-File: src/config/secrets.js:20
-Fix: Use environment variables, never commit secrets!
-```
-
-### TypeScript/React/JS/Quality
-
-- `any` type, unsafe `@ts-ignore`, non-null, mistaken patterns
-- Rules-of-hooks in React
-- a11y (label, alt, ARIA) and semantic HTML
-- code quality: complexity, duplication, maintainability
-
-**Example:**
-```bash
-MEDIUM | 'any' disables type checking
-File: src/components/Foo.tsx:15
-Fix: Replace with explicit type
-```
-
-### Docker/Kubernetes
-
-- Root user, missing healthcheck, ADD/COPY, secrets
-- Privileged containers/contexts, missing securityContext/resource limits
-
-**Example:**
-```bash
-HIGH | Container runs as root (no USER set)
-File: Dockerfile:10
-Fix: Add USER directive (USER appuser)
-```
-
----
-
-## 8️⃣ Configuration & Auth
-
-### `sentinel auth` (Recommended)
-```bash
+# Interactive API key setup (recommended)
 sentinel auth
-```
-- Prompts and stores API keys (OpenAI, Anthropic, Groq, etc.) at `~/.sentinel.json` (mode 600)
 
-### Environment Variables
-
-All analyzers can be configured by env and overridden in CI:
-```bash
-export OPENAI_API_KEY="sk-...."
+# Or set environment variables
+export OPENAI_API_KEY="sk-..."
 export GROQ_API_KEY="gsk_..."
 export GEMINI_API_KEY="AI..."
-export ANTHROPIC_API_KEY="sk-ant-..."
-sentinel analyze
 ```
 
-### Analyzer Selection
-
-Choose one or many:
+### Basic Usage
 
 ```bash
-sentinel analyze --analyzers security,dependency,a11y,docker,kubernetes
-sentinel analyze --analyzers frontend      # React + TS + A11y
-sentinel analyze --analyzers backend       # Security + API + Dependency
+# Quick security audit
+sentinel security-audit
+
+# Full project scan
+sentinel full-scan
+
+# Analyze specific files
+sentinel analyze src/
+
+# Analyze staged changes (pre-commit)
+sentinel pre-commit --block
+
+# Frontend-focused (React + TS + A11y)
+sentinel frontend
+
+# Backend-focused (Security + API + Performance)
+sentinel backend
+
+# Container security (Docker + K8s)
+sentinel container
 ```
 
-### Custom Config
+---
 
-Create `.codereviewrc.json` for full control:
+## Commands Reference
+
+### Core Analysis
+
+| Command | Description |
+|---------|-------------|
+| `sentinel analyze [files...]` | Analyze files or directory |
+| `sentinel analyze --staged` | Analyze git staged changes |
+| `sentinel analyze --branch <name>` | Analyze branch diff |
+| `sentinel analyze --analyzers security,quality,bugs` | Specific analyzers |
+| `sentinel analyze --format json` | JSON output |
+| `sentinel analyze --fail-on high` | Exit code on severity |
+
+### Preset Scans
+
+| Command | Description |
+|---------|-------------|
+| `sentinel security-audit` | Security + API + Secrets + Dependency |
+| `sentinel full-scan` | All 20+ analyzers |
+| `sentinel frontend` | React + TypeScript + Accessibility |
+| `sentinel backend` | Security + API + Performance + Secrets |
+| `sentinel container` | Docker + Kubernetes + Security |
+| `sentinel pre-commit` | Fast pre-commit check |
+| `sentinel ci` | CI-friendly with fail-on threshold |
+
+### AI & Agents
+
+| Command | Description |
+|---------|-------------|
+| `sentinel chat [prompt]` | Interactive AI assistant |
+| `sentinel agents [input]` | Multi-agent analysis pipeline |
+| `sentinel agents-pr <pr-url>` | Run agents and post to PR |
+
+### Configuration
+
+| Command | Description |
+|---------|-------------|
+| `sentinel auth` | Configure API keys |
+| `sentinel config --list` | Show configuration |
+| `sentinel config --set key=value` | Set config value |
+| `sentinel models` | Manage AI providers |
+| `sentinel list-analyzers` | Show available analyzers |
+
+### Output & Reporting
+
+| Command | Description |
+|---------|-------------|
+| `sentinel fix [files...]` | Auto-fix common issues |
+| `sentinel fix --dry-run` | Preview fixes |
+| `sentinel sarif` | Generate SARIF report |
+| `sentinel notify --slack` | Send to Slack |
+| `sentinel trends` | Historical trend analysis |
+| `sentinel blame` | Git blame attribution |
+
+### Integration
+
+| Command | Description |
+|---------|-------------|
+| `sentinel review-pr <url>` | Post review to GitHub PR |
+| `sentinel webhook` | Start webhook server |
+| `sentinel install-hooks` | Install git pre-commit hooks |
+| `sentinel badge` | Generate security badges |
+
+### Utilities
+
+| Command | Description |
+|---------|-------------|
+| `sentinel stats` | Repository statistics |
+| `sentinel dashboard` | Web UI dashboard |
+| `sentinel cache --stats` | Cache statistics |
+| `sentinel cache --clear` | Clear cache |
+
+---
+
+## Configuration
+
+### Configuration Files (in order of priority)
+
+1. `.sentinel.json` (project-local)
+2. `$XDG_CONFIG_HOME/sentinel/.sentinel.json`
+3. `$HOME/.sentinel.json` (global)
+
+### Example Configuration
 
 ```json
 {
   "analysis": {
     "enabledAnalyzers": [
       "security", "quality", "bugs", "performance",
-      "dependency", "accessibility", "docker", "kubernetes"
+      "dependency", "accessibility", "typescript", "react",
+      "api", "secrets", "docker", "kubernetes"
     ],
     "ignoredFiles": [
       "node_modules/**", "dist/**", "*.min.js", "coverage/**"
@@ -300,35 +325,177 @@ Create `.codereviewrc.json` for full control:
   "ai": {
     "enabled": true,
     "providers": [
-      {"id": "openai", "provider": "openai", "model": "gpt-4o-mini", "enabled": true},
-      {"id": "groq", "provider": "groq", "model": "llama3-70b-8192", "enabled": true}
+      {
+        "id": "openai",
+        "provider": "openai",
+        "model": "gpt-4o-mini",
+        "enabled": true,
+        "weight": 0.4
+      },
+      {
+        "id": "groq",
+        "provider": "groq",
+        "model": "llama3-70b-8192",
+        "enabled": true,
+        "weight": 0.3
+      },
+      {
+        "id": "gemini",
+        "provider": "gemini",
+        "model": "gemini-pro",
+        "enabled": true,
+        "weight": 0.3
+      }
     ]
   },
-  "output": { "format": "console", "minSeverity": "low" }
+  "output": {
+    "format": "console",
+    "minSeverity": "low"
+  },
+  "cache": {
+    "enabled": true,
+    "ttl": 3600000
+  }
 }
 ```
 
 ### Custom Rules
 
-Add `.sentinelrules.yaml` in your project:
+Create `.sentinelrules.yaml` in your project:
 
 ```yaml
 rules:
   - id: no-console-log
     pattern: "console\\.log"
-    message: "Avoid using console.log in prod"
+    message: "Avoid using console.log in production"
     severity: warning
     filePattern: "\\.(js|ts)$"
     suggestion: "Use a proper logging library"
+
+  - id: no-eval
+    pattern: "\\beval\\s*\\("
+    message: "eval() is dangerous"
+    severity: critical
+    suggestion: "Use JSON.parse() or a safe alternative"
 ```
 
 ---
 
-## 9️⃣ CI/CD & PR Integration
+## AI Providers
 
-### Example — GitHub Actions
+### Supported Providers
 
-`.github/workflows/sentinel.yml`:
+| Provider | Environment Variable | Models |
+|----------|---------------------|--------|
+| OpenAI | `OPENAI_API_KEY` | gpt-4o, gpt-4, gpt-3.5-turbo |
+| Groq | `GROQ_API_KEY` | llama3-70b-8192, mixtral-8x7b |
+| Gemini | `GEMINI_API_KEY` | gemini-pro, gemini-flash |
+| Anthropic | `ANTHROPIC_API_KEY` | claude-3-opus, claude-3-sonnet |
+| OpenRouter | `OPENROUTER_API_KEY` | Multiple |
+
+### Managing Providers
+
+```bash
+# Show configured providers
+sentinel models
+
+# Enable/disable providers
+sentinel models --enable openai,gemini
+sentinel models --disable groq
+
+# Set weights (affects response merging)
+sentinel models --weight openai=0.5 --weight groq=0.3 --weight gemini=0.2
+
+# Use environment variables
+sentinel models --env openai=OPENAI_API_KEY
+```
+
+---
+
+## Analyzers
+
+### Available Analyzers
+
+| Name | Alias | Description | Default |
+|------|-------|-------------|---------|
+| security | sec | Core security scanning (XSS, SQLi) | ✓ |
+| quality | qual | Code quality & complexity | ✓ |
+| bugs | bug | Common bug detection | ✓ |
+| performance | perf | Performance issues | ✓ |
+| dependency | deps | npm audit, CVE checking | |
+| accessibility | a11y | WCAG compliance | |
+| typescript | ts | TypeScript anti-patterns | |
+| react | jsx | React/JSX issues | |
+| api | api-security | API security | |
+| secrets | env | Exposed credentials | |
+| docker | | Dockerfile analysis | |
+| kubernetes | k8s | K8s manifest analysis | |
+| custom | | User-defined rules | |
+
+### Using Analyzers
+
+```bash
+# Default analyzers (security, quality, bugs, performance)
+sentinel analyze
+
+# Specific analyzers
+sentinel analyze --analyzers security,typescript,react
+
+# All analyzers
+sentinel analyze --all-analyzers
+
+# Frontend preset
+sentinel analyze --analyzers quality,bugs,typescript,react,accessibility
+```
+
+---
+
+## Output Formats
+
+### Console (Default)
+
+```
+🛡️ SENTINEL — AI-Powered Code Guardian
+
+┌─────────────────────────────────────────────────────────────┐
+│  CRITICAL  │ AWS Access Key ID exposed                      │
+│  File: src/config.js:45                                     │
+│  → Use env vars (dotenv) or AWS IAM roles                  │
+├─────────────────────────────────────────────────────────────┤
+│  HIGH      │ SQL injection risk                             │
+│  File: src/db/queries.js:23                                │
+│  → Use parameterized queries / ORM                           │
+└─────────────────────────────────────────────────────────────┘
+
+Summary: 1 critical, 2 high, 4 medium, 13 low issues
+```
+
+### JSON
+
+```bash
+sentinel analyze --format json --output results.json
+```
+
+### SARIF (GitHub Security)
+
+```bash
+sentinel sarif --output results.sarif
+gh code-scanning upload-sarif --sarif results.sarif
+```
+
+### HTML/Markdown
+
+```bash
+sentinel analyze --format html --output report.html
+sentinel analyze --format markdown --output report.md
+```
+
+---
+
+## CI/CD Integration
+
+### GitHub Actions
+
 ```yaml
 name: Sentinel Code Review
 
@@ -339,45 +506,24 @@ on:
     branches: [main]
 
 jobs:
-  code-review:
+  sentinel:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: '20' }
-      - run: npm install -g sentinel-cli
-
-      - name: Analyze Security
-        run: sentinel analyze --analyzers security --format json --output security.json
-        env: { OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }} }
-
-      - name: Analyze Full
-        run: sentinel analyze --format json --output full.json
-        env: { OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }} }
-
-      - name: Block on critical
+      
+      - name: Run Sentinel
         run: |
-          if grep -q '"severity":"critical"' full.json; then exit 1; fi
-
-      - name: Upload report
-        uses: actions/upload-artifact@v4
-        with: { name: sentinel-report, path: full.json }
-```
-
-### Pre-commit Hooks Example (`husky`)
-
-```bash
-npm i --save-dev husky
-npx husky init
-echo 'sentinel analyze --staged --format console' > .husky/pre-commit
-```
-
-Manual `.git/hooks/pre-commit` example:
-```bash
-#!/bin/sh
-echo "🛡️ Sentinel pre-commit check..."
-sentinel analyze --staged --format console
-[ $? -ne 0 ] && exit 1
+          npm install -g sentinel-cli
+          sentinel analyze --format json --output results.json
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      
+      - name: Fail on critical issues
+        run: |
+          if grep -q '"severity":"critical"' results.json; then
+            echo "Critical issues found!"
+            exit 1
+          fi
 ```
 
 ### GitLab CI
@@ -392,221 +538,189 @@ sentinel-review:
   artifacts:
     reports:
       codequality: report.json
-  only:
-    - merge_requests
+```
+
+### Pre-commit Hook
+
+```bash
+# Install hooks
+sentinel install-hooks
+
+# Manual setup
+echo 'sentinel analyze --staged' > .git/hooks/pre-commit
+chmod +x .git/hooks/pre-commit
 ```
 
 ---
 
-## 🔟 Deep-Dive: Docker & Kubernetes Security
+## Advanced Features
 
-### Docker
+### RAG System
 
-- Detects `USER root`/missing USER, secrets in ENV, ADD/COPY, missing HEALTHCHECK, latest tags, privileged ports
-- Example:
-    ```bash
-    HIGH | Hardcoded secret ENV in Dockerfile:8
-    Fix: Use ARG or secret mount instead of ENV
-    ```
+Sentinel includes an advanced Retrieval-Augmented Generation system for intelligent code understanding:
 
-### K8s
+```bash
+# Start RAG pipeline
+sentinel chat "How does authentication work in this codebase?"
+```
 
-- Privileged containers, missing securityContext, lack of resource limits, hardcoded secrets, hostPath/network/IPC/hostPID
-- Example:
-    ```bash
-    CRITICAL | Privileged container
-    File: deployment.yaml:45
-    Code: privileged: true
-    Fix: Remove privileged: true or drop linux capabilities
-    ```
+Features:
+- Semantic code search
+- Context-aware responses
+- Multiple retrieval strategies (Simple, Self-RAG, CRAG, Graph, Iterative, Adaptive)
+
+### Threat Modeling
+
+```bash
+# Analyze attack surface
+sentinel analyze --analyzers security
+```
+
+Generates:
+- STRIDE threats (Spoofing, Tampering, Repudiation, Information Disclosure, DoS, Elevation of Privilege)
+- Risk scores and mitigations
+
+### Learning System
+
+Sentinel learns from your feedback:
+
+```bash
+# Mark false positive
+sentinel analyze --feedback false_positive --rule-id <rule>
+
+# Auto-suppress patterns
+sentinel analyze --learn
+```
+
+### Code Execution Sandbox
+
+Safely execute and verify generated code:
+
+- VM2 isolation
+- Worker thread execution
+- Docker-based sandboxing
+- Resource limits (CPU, memory, time)
 
 ---
 
-## 1️⃣1️⃣ Advanced: Automation, Notifications, & Web UI
+## VS Code Extension
 
-### Fixing
+The Sentinel VS Code extension brings AI-powered analysis directly into your editor.
 
-```bash
-sentinel fix              # Fixes all known autofixable issues
-sentinel fix src/*.js     # Only specified files
-sentinel fix --staged     # Only staged files
-sentinel fix --dry-run    # Preview changes
-sentinel fix --type remove-console-log,missing-alt-text
-```
+### Features
 
-### PR Review/Notifications
+- **AI Chat Interface**: Chat with multiple LLM providers
+- **Real-time Analysis**: Auto-analyze on file save
+- **Inline Diagnostics**: Issues shown directly in editor
+- **Quick Fixes**: One-click issue resolution
+- **Sidebar Panel**: Organized issue view by severity
+- **Pre-commit Hooks**: Block commits with issues
 
-```bash
-# Post review to PR (needs GITHUB_TOKEN env set)
-sentinel review-pr https://github.com/org/repo/pull/123
-
-# Send scan to Slack/Discord
-sentinel notify --slack --discord
-
-# View historic trend in dashboard
-sentinel dashboard
-```
-
-### SARIF for GitHub Security
+### Installation
 
 ```bash
-sentinel sarif --output report.sarif
-gh code-scanning upload-sarif --sarif report.sarif
-```
-
----
-
-## 📦 Installation Options
-
-### npm (Recommended)
-
-```bash
-npm install -g sentinel-cli      # Install globally
-npx sentinel-cli analyze --staged
-```
-
-### From Source
-
-```bash
-git clone https://github.com/KunjShah95/Sentinel-CLI.git
-cd Sentinel-CLI
+cd vscode-extension
 npm install
-npm link
-sentinel --help
+npm run compile
+# Press F5 to launch
 ```
 
-### Docker
+### Commands
 
-```bash
-docker build -t sentinel-cli .
-docker run --rm -v $(pwd):/workspace sentinel-cli analyze
-docker run --rm \
-  -e OPENAI_API_KEY="$OPENAI_API_KEY" \
-  -v $(pwd):/workspace \
-  sentinel-cli analyze --format json
-```
+| Command | Shortcut | Description |
+|---------|----------|-------------|
+| Sentinel: Open AI Chat | Ctrl+Shift+S | Open chat panel |
+| Sentinel: Analyze | Ctrl+Shift+A | Analyze current file |
+| Sentinel: Security Audit | - | Run security scan |
+| Sentinel: Auto-fix | - | Apply fixes |
 
 ---
 
-## 📝 All Commands
+## Development
 
-```bash
-# Core
-sentinel analyze [files...]            # Analyze files or current directory
-sentinel analyze --staged              # Analyze git staged changes
-sentinel analyze --branch feature/x    # Analyze branch diff
-sentinel analyze --commit abc123       # Analyze commit
-sentinel analyze --format console      # Pretty output (default)
-sentinel analyze --format json         # For CI/CD, linting
-sentinel analyze --format html         # HTML report
-sentinel analyze --format markdown     # MD report
+### Project Structure
 
-# Presets
-sentinel security-audit                # Security-focused scan
-sentinel full-scan                     # All analyzers
-sentinel frontend                      # React + TypeScript + A11y scan
-sentinel backend                       # Security + API + Perf
-sentinel pre-commit                    # Pre-commit check
-
-# Config/Tools
-sentinel setup                         # Quick config wizard
-sentinel models                        # Manage AI providers
-sentinel models --enable openai        # Enable/disable
-sentinel install-hooks                 # Git hooks
-
-# Advanced
-sentinel fix                           # Autofix issues
-sentinel fix --dry-run                 # Preview fixes
-sentinel review-pr                     # Analyze & review PRs
-sentinel analyze-workspace             # For monorepos
-sentinel notify                        # Slack/Discord
-sentinel trends                        # Show trends/historic analysis
-sentinel sarif                         # For GitHub/Security tab
-sentinel blame                         # Git blame context
-
-# Interactive
-sentinel chat                          # Interactive AI chat assistant
-sentinel chat "Why is this failing?"   # One-shot code question
-sentinel stats                         # Repo code stats
+```
+sentinel-cli/
+├── src/
+│   ├── agents/           # AI agents (scanner, fixer, validator)
+│   ├── analyzers/        # 20+ analyzer implementations
+│   ├── cli/              # CLI helpers
+│   ├── commands/         # Command implementations
+│   ├── config/           # Configuration management
+│   ├── context/          # Session & learning
+│   ├── core/             # Main CLI & bot
+│   ├── database/          # Vector database
+│   ├── debugger/         # Debug utilities
+│   ├── distributed/      # Parallel processing
+│   ├── evaluation/       # ML evaluation
+│   ├── execution/        # Code sandbox
+│   ├── git/              # Git utilities
+│   ├── integrations/     # GitHub, Slack, Discord
+│   ├── intelligence/     # ML/AI features
+│   ├── interactive/      # Interactive mode
+│   ├── llm/              # LLM orchestration
+│   ├── ml/               # ML utilities
+│   ├── mlops/            # ML pipelines
+│   ├── output/           # Report generators
+│   ├── rag/              # RAG system
+│   ├── search/           # Semantic search
+│   ├── server/           # Dashboard server
+│   └── utils/            # Utilities
+├── vscode-extension/    # VS Code extension
+├── __tests__/            # Test suite
+└── frontend/             # Web dashboard
 ```
 
----
+### Running Development
 
-## 🌟 Author & Motivation
-
-I’m **Kunj Shah** — passionate about AI, dev tools, and privacy-first coding.  
-Sentinel CLI exists because:
-
-- Cloud AI reviewers leak code & charge high fees per seat
-- No unified tool handles security+dependencies+a11y locally
-- I wanted **zero lock-in, zero code-leak, full customization, and extensibility**  
-- [Star Sentinel CLI](https://github.com/KunjShah95/Sentinel-CLI) if you want OSS, LLM-based, dev-owned code review!
-
----
-
-## 🤝 Contributing
-
-**Awesome contributions welcome!**
-
-- Good first PRs:
-    - Add rules for more languages (PHP, Ruby, Rust, Go, etc.)
-    - Improve accuracy/scanner coverage
-    - VS Code extension
-    - More auto-fixers & notification integrations
-    - SARIF/HTML/Slack output improvements
-
-**How to contribute:**
 ```bash
-git clone https://github.com/KunjShah95/Sentinel-CLI.git
-cd Sentinel-CLI
+# Install dependencies
 npm install
-npm run dev
+
+# Run linting
 npm run lint
+
+# Run tests
 npm run test
+
+# Watch mode
+npm run dev
+
+# Build
+npm run build
 ```
-1. Fork & branch off `main`
-2. Build, test, and commit
-3. Send PR and I’ll review!
 
 ---
 
-## 🗺️ Roadmap
+## Roadmap
 
-- [ ] VS Code extension (inline review, show severity)
-- [ ] Enhanced Gitlab/PR integration
-- [ ] Incremental/lazy monorepo analysis
-- [ ] Web-based trends dashboard
+- [ ] Enhanced GitLab/PR integration
+- [ ] Incremental monorepo analysis  
+- [ ] Web-based trends dashboard improvements
 - [ ] Advanced auto-fixers for all analyzers
-- [ ] Real-time CVE sync & package lock advisory
+- [ ] Real-time CVE sync
+- [ ] IDE plugins (IntelliJ, WebStorm)
+- [ ] More language support (Rust, Kotlin, Swift)
+- [ ] Custom plugin system
 
 ---
 
-## 📄 License
+## License
 
-**MIT** — see [LICENSE](LICENSE) for details.
+**MIT** — See [LICENSE](LICENSE) for details.
 
-_Star this repo if Sentinel helps you ship better code!_
+---
+
+## Author
+
+**Kunj Shah** — Passionate about AI, dev tools, and privacy-first coding.
+
+- GitHub: [KunjShah95](https://github.com/KunjShah95)
+- Star the repo if Sentinel helps you ship better code!
 
 ---
 
 <p align="center">
-  <a href="https://www.npmjs.com/package/sentinel-cli">
-    <img src="https://img.shields.io/npm/v/sentinel-cli?style=for-the-badge&logo=npm&color=red" alt="npm" />
-  </a>
-  &nbsp;
-  <a href="https://github.com/KunjShah95/Sentinel-CLI/stargazers">
-    <img src="https://img.shields.io/github/stars/KunjShah95/Sentinel-CLI?style=for-the-badge&logo=github&color=yellow" alt="GitHub stars" />
-  </a>
-  &nbsp;
-  <a href="https://github.com/KunjShah95/Sentinel-CLI/fork">
-    <img src="https://img.shields.io/github/forks/KunjShah95/Sentinel-CLI?style=for-the-badge&logo=github&color=blue" alt="GitHub forks" />
-  </a>
-</p>
-
-<p align="center">
-  Made with ❤️ by <a href="https://github.com/KunjShah95">Kunj Shah</a>
-</p>
-
-<p align="center">
-  <b>⭐ Star this repo if Sentinel helps you ship better code!</b>
+  <b>🛡️ Sentinel CLI — Your AI-Powered Code Guardian</b>
 </p>

@@ -1,0 +1,405 @@
+{
+  "name": "sentinel-vscode",
+  "displayName": "Sentinel AI - Code Guardian",
+  "description": "AI-powered code assistant with security analysis, multi-LLM support, and intelligent code operations. Like Cline, but for Sentinel.",
+  "version": "2.0.0",
+  "publisher": "sentinel",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Machine Learning",
+    "Programming Languages",
+    "Linters",
+    "Security",
+    "Debuggers",
+    "Testing"
+  ],
+  "keywords": [
+    "sentinel",
+    "ai",
+    "claude",
+    "openai",
+    "gemini",
+    "groq",
+    "code-review",
+    "security",
+    "assistant",
+    "chat",
+    "llm",
+    "autocomplete",
+    "refactor",
+    "fix",
+    "vulnerability",
+    "static-analysis"
+  ],
+  "activationEvents": [
+    "onStartupFinished",
+    "onCommand:sentinel.openChat",
+    "onCommand:sentinel.analyze",
+    "onView:sentinel-sidebar"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "sentinel.openChat",
+        "title": "Open AI Chat",
+        "category": "Sentinel",
+        "icon": "$(comment-discussion)"
+      },
+      {
+        "command": "sentinel.analyze",
+        "title": "Analyze Current File",
+        "category": "Sentinel",
+        "icon": "$(search)"
+      },
+      {
+        "command": "sentinel.analyzeFolder",
+        "title": "Analyze Folder",
+        "category": "Sentinel",
+        "icon": "$(search-folder)"
+      },
+      {
+        "command": "sentinel.securityAudit",
+        "title": "Security Audit",
+        "category": "Sentinel",
+        "icon": "$(shield)"
+      },
+      {
+        "command": "sentinel.fullScan",
+        "title": "Full Project Scan",
+        "category": "Sentinel",
+        "icon": "$(rocket)"
+      },
+      {
+        "command": "sentinel.autoFix",
+        "title": "Auto-fix Issues",
+        "category": "Sentinel",
+        "icon": "$(wrench)"
+      },
+      {
+        "command": "sentinel.explainCode",
+        "title": "Explain Selected Code",
+        "category": "Sentinel",
+        "icon": "$(info)"
+      },
+      {
+        "command": "sentinel.refactorCode",
+        "title": "Refactor Selected Code",
+        "category": "Sentinel",
+        "icon": "$(lightbulb)"
+      },
+      {
+        "command": "sentinel.generateTests",
+        "title": "Generate Tests",
+        "category": "Sentinel",
+        "icon": "$(beaker)"
+      },
+      {
+        "command": "sentinel.documentCode",
+        "title": "Generate Documentation",
+        "category": "Sentinel",
+        "icon": "$(book)"
+      },
+      {
+        "command": "sentinel.scanSecrets",
+        "title": "Scan for Secrets",
+        "category": "Sentinel",
+        "icon": "$(key)"
+      },
+      {
+        "command": "sentinel.preCommit",
+        "title": "Run Pre-commit Check",
+        "category": "Sentinel",
+        "icon": "$(check)"
+      },
+      {
+        "command": "sentinel.clearChat",
+        "title": "Clear Chat History",
+        "category": "Sentinel",
+        "icon": "$(clear-all)"
+      },
+      {
+        "command": "sentinel.exportChat",
+        "title": "Export Chat",
+        "category": "Sentinel",
+        "icon": "$(export)"
+      },
+      {
+        "command": "sentinel.showSettings",
+        "title": "Open Settings",
+        "category": "Sentinel",
+        "icon": "$(gear)"
+      },
+      {
+        "command": "sentinel.refreshSidebar",
+        "title": "Refresh",
+        "category": "Sentinel",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "sentinel.applyFix",
+        "title": "Apply Fix",
+        "category": "Sentinel",
+        "icon": "$(check)"
+      },
+      {
+        "command": "sentinel.ignoreIssue",
+        "title": "Ignore Issue",
+        "category": "Sentinel",
+        "icon": "$(eye-closed)"
+      },
+      {
+        "command": "sentinel.showIssueDetails",
+        "title": "Show Details",
+        "category": "Sentinel"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "sentinel-sidebar",
+          "title": "Sentinel AI",
+          "icon": "$(shield)"
+        }
+      ]
+    },
+    "views": {
+      "sentinel-sidebar": [
+        {
+          "id": "sentinel-issues",
+          "name": "Issues",
+          "when": "sentinel:hasIssues"
+        },
+        {
+          "id": "sentinel-analyzers",
+          "name": "Analyzers"
+        },
+        {
+          "id": "sentinel-chat-history",
+          "name": "Chat History"
+        }
+      ]
+    },
+    "menus": {
+      "editor/context": [
+        {
+          "command": "sentinel.explainCode",
+          "when": "editorHasSelection",
+          "group": "sentinel@1"
+        },
+        {
+          "command": "sentinel.refactorCode",
+          "when": "editorHasSelection",
+          "group": "sentinel@2"
+        },
+        {
+          "command": "sentinel.analyze",
+          "group": "sentinel@3"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "sentinel.analyzeFolder",
+          "group": "sentinel@1"
+        },
+        {
+          "command": "sentinel.securityAudit",
+          "group": "sentinel@2"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "sentinel.refreshSidebar",
+          "when": "view == sentinel-issues",
+          "group": "navigation"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "sentinel.applyFix",
+          "when": "false"
+        },
+        {
+          "command": "sentinel.ignoreIssue",
+          "when": "false"
+        },
+        {
+          "command": "sentinel.showIssueDetails",
+          "when": "false"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "sentinel.openChat",
+        "key": "ctrl+shift+s",
+        "mac": "cmd+shift+s",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "sentinel.analyze",
+        "key": "ctrl+shift+a",
+        "mac": "cmd+shift+a"
+      }
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "Sentinel AI",
+      "properties": {
+        "sentinel.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable Sentinel extension"
+        },
+        "sentinel.aiProvider": {
+          "type": "string",
+          "default": "openai",
+          "enum": [
+            "openai",
+            "gemini",
+            "groq",
+            "anthropic"
+          ],
+          "description": "AI provider for chat and analysis"
+        },
+        "sentinel.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "API key for the selected provider"
+        },
+        "sentinel.model": {
+          "type": "string",
+          "default": "gpt-4",
+          "description": "Model to use (e.g., gpt-4, gemini-pro, llama-3-70b)"
+        },
+        "sentinel.autoAnalyze": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically analyze files on save"
+        },
+        "sentinel.showInlineDecorations": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show inline issue decorations"
+        },
+        "sentinel.minSeverity": {
+          "type": "string",
+          "default": "info",
+          "enum": [
+            "info",
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ],
+          "description": "Minimum severity level to show"
+        },
+        "sentinel.analyzers": {
+          "type": "array",
+          "default": [
+            "security",
+            "quality",
+            "bugs",
+            "performance"
+          ],
+          "description": "Enabled analyzers",
+          "items": {
+            "type": "string",
+            "enum": [
+              "security",
+              "quality",
+              "bugs",
+              "performance",
+              "dependency",
+              "accessibility",
+              "typescript",
+              "react",
+              "api",
+              "secrets",
+              "docker",
+              "kubernetes",
+              "custom"
+            ]
+          }
+        },
+        "sentinel.chat.maxTokens": {
+          "type": "number",
+          "default": 4000,
+          "description": "Maximum tokens for chat responses"
+        },
+        "sentinel.chat.temperature": {
+          "type": "number",
+          "default": 0.7,
+          "minimum": 0,
+          "maximum": 2,
+          "description": "Temperature for chat responses"
+        },
+        "sentinel.chat.includeFileContext": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically include open files in chat context"
+        },
+        "sentinel.chat.enableToolUse": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable tool use (file operations, terminal commands)"
+        },
+        "sentinel.terminal.autoApprove": {
+          "type": "boolean",
+          "default": false,
+          "description": "Auto-approve terminal commands (use with caution)"
+        },
+        "sentinel.terminal.timeout": {
+          "type": "number",
+          "default": 30000,
+          "description": "Timeout for terminal commands in milliseconds"
+        },
+        "sentinel.notifications.showCritical": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show notifications for critical issues"
+        },
+        "sentinel.notifications.showHigh": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show notifications for high severity issues"
+        },
+        "sentinel.cache.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable analysis caching"
+        },
+        "sentinel.cache.ttl": {
+          "type": "number",
+          "default": 3600000,
+          "description": "Cache TTL in milliseconds"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^18.19.130",
+    "@types/vscode": "^1.74.0",
+    "@typescript-eslint/eslint-plugin": "^6.4.1",
+    "@typescript-eslint/parser": "^6.4.1",
+    "@vscode/test-electron": "^2.3.4",
+    "@vscode/vsce": "^2.15.0",
+    "eslint": "^8.47.0",
+    "typescript": "^5.1.6"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "ws": "^8.14.2"
+  }
+}
