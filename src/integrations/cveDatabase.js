@@ -63,6 +63,191 @@ export class CVEDatabaseIntegration extends EventEmitter {
     };
   }
 
+  async enrichIssue(issue, options = {}) {
+    const {
+      checkNVD = true,
+      checkOSV = true,
+      checkGitHub = true,
+    } = options;
+
+    const enriched = { ...issue };
+
+    if (!issue.dependency && !issue.package) {
+      return enriched;
+    }
+
+    const packageName = issue.dependency || issue.package;
+    const version = issue.version || '*';
+    const ecosystem = this.detectEcosystem(issue.file);
+
+    const vulnerabilities = [];
+
+    if (checkGitHub) {
+      const ghVulns = await this.queryGitHubAdvisory(packageName, version, ecosystem);
+      vulnerabilities.push(...ghVulns);
+    }
+
+    if (checkNVD) {
+      const nvdVulns = await this.queryNVD(packageName, version);
+      vulnerabilities.push(...nvdVulns);
+    }
+
+    if (checkOSV) {
+      const osvVulns = await this.queryOSV(packageName, version, ecosystem);
+      vulnerabilities.push(...osvVulns);
+    }
+
+    if (vulnerabilities.length > 0) {
+      enriched.cveData = vulnerabilities;
+      enriched.hasCVE = true;
+      enriched.cveCount = vulnerabilities.length;
+      enriched.criticalCVE = vulnerabilities.some(v => v.severity === 'CRITICAL');
+      enriched.cvssScore = Math.max(...vulnerabilities.map(v => v.cvssScore || 0), 0);
+      
+      const latestCVE = vulnerabilities.sort((a, b) => 
+        new Date(b.publishedDate) - new Date(a.publishedDate)
+      )[0];
+      
+      enriched.latestCVE = latestCVE?.cveId;
+      enriched.latestCVEDate = latestCVE?.publishedDate;
+      
+      if (options.getFix) {
+        enriched.suggestedFix = this.suggestFixForCVE(vulnerabilities, ecosystem);
+      }
+
+      this.emit('issue:enriched', {
+        issue,
+        vulnerabilities: vulnerabilities.length,
+        critical: enriched.criticalCVE,
+      });
+    } else {
+      enriched.cveData = [];
+      enriched.hasCVE = false;
+    }
+
+    return enriched;
+  }
+
+  detectEcosystem(filePath) {
+    if (!filePath) return 'npm';
+    
+    if (filePath.includes('package.json')) return 'npm';
+    if (filePath.includes('requirements.txt') || filePath.includes('setup.py')) return 'pypi';
+    if (filePath.includes('pom.xml') || filePath.includes('build.gradle')) return 'maven';
+    if (filePath.includes('Gemfile')) return 'rubygems';
+    if (filePath.includes('go.mod')) return 'go';
+    if (filePath.includes('Cargo.toml')) return 'crates.io';
+    
+    return 'npm';
+  }
+
+  suggestFixForCVE(vulnerabilities, ecosystem) {
+    const criticalVulns = vulnerabilities.filter(v => v.severity === 'CRITICAL');
+    const highestCVS = Math.max(...vulnerabilities.map(v => v.cvssScore || 0));
+    
+    const fixes = {
+      npm: 'npm audit fix',
+      pypi: 'pip install --upgrade',
+      maven: 'mvn dependency:update',
+      rubygems: 'bundle update',
+      go: 'go get -u',
+      'crates.io': 'cargo update',
+    };
+
+    return {
+      recommendedAction: criticalVulns.length > 0 || highestCVS >= 9 ? 'Update immediately' : 'Update soon',
+      command: fixes[ecosystem] || 'Update package',
+      urgency: criticalVulns.length > 0 ? 'critical' : highestCVS >= 7 ? 'high' : 'medium',
+    };
+  }
+
+  async enableRealTimeSync(options = {}) {
+    const {
+      pollInterval = 3600000,
+      onNewCVE = null,
+    } = options;
+
+    this.realTimeEnabled = true;
+    this.realTimeFeeds.nvd.pollInterval = pollInterval;
+
+    if (onNewCVE) {
+      this.on('cve:new', onNewCVE);
+    }
+
+    this.updateInterval = setInterval(async () => {
+      await this.syncLatestCVEs();
+    }, pollInterval);
+
+    await this.syncLatestCVEs();
+
+    return { success: true, pollInterval };
+  }
+
+  async syncLatestCVEs() {
+    try {
+      const newCVEs = [];
+
+      if (this.realTimeFeeds.github.enabled) {
+        const githubNew = await this.fetchLatestGitHubAdvisories();
+        newCVEs.push(...githubNew);
+      }
+
+      if (this.realTimeFeeds.nvd.enabled) {
+        const nvdNew = await this.fetchLatestNVDCVE();
+        newCVEs.push(...nvdNew);
+      }
+
+      if (newCVEs.length > 0) {
+        this.lastUpdate = new Date().toISOString();
+        await this.saveCache();
+        
+        this.emit('cve:synced', { count: newCVEs.length, timestamp: this.lastUpdate });
+        
+        for (const cve of newCVEs) {
+          this.emit('cve:new', cve);
+        }
+      }
+
+      return { count: newCVEs.length, timestamp: this.lastUpdate };
+    } catch (error) {
+      this.emit('cve:syncError', { error: error.message });
+      return { error: error.message };
+    }
+  }
+
+  async fetchLatestGitHubAdvisories() {
+    try {
+      const response = await rateLimiter.schedule(() => axios.get(this.githubAdvisoryUrl, {
+        params: { per_page: 25, sort: 'published', direction: 'desc' },
+        headers: { 'Accept': 'application/vnd.github+json' },
+        timeout: 15000,
+      }));
+
+      return (response.data || []).map(advisory => ({
+        source: 'github',
+        cveId: advisory.cve_id,
+        severity: advisory.severity,
+        summary: advisory.summary,
+        publishedAt: advisory.published_at,
+      }));
+    } catch (error) {
+      return [];
+    }
+  }
+
+  async fetchLatestNVDCVE() {
+    return [];
+  }
+
+  disableRealTimeSync() {
+    this.realTimeEnabled = false;
+    if (this.updateInterval) {
+      clearInterval(this.updateInterval);
+      this.updateInterval = null;
+    }
+    return { success: true };
+  }
+
   /**
    * Initialize the CVE database integration
    */

@@ -141,5 +141,15 @@ class EventBus extends EventEmitter {
 
 const globalEventBus = new EventBus({ maxHistorySize: 500 });
 
+const EventType = {
+  ANALYZER_COMPLETE: 'analyzer:complete',
+  ISSUE_FOUND: 'issue:found',
+  SCAN_COMPLETE: 'scan:complete',
+  SCAN_START: 'scan:start',
+  FIX_APPLIED: 'fix:applied',
+  POLICY_EVALUATED: 'policy:evaluated',
+  ERROR: 'error',
+};
+
 export default EventBus;
-export { EventBus, globalEventBus };
+export { EventBus, globalEventBus, EventType };

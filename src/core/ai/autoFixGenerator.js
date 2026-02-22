@@ -109,6 +109,36 @@ class AutoFixGenerator {
     };
   }
 
+  canAutoFix(issue) {
+    const supportedTypes = Object.keys(this.fixTemplates);
+    
+    if (issue.type && supportedTypes.includes(issue.type)) {
+      return true;
+    }
+    
+    if (issue.message) {
+      for (const type of supportedTypes) {
+        if (issue.message.toLowerCase().includes(type.replace(/-/g, ' '))) {
+          return true;
+        }
+      }
+    }
+    
+    if (issue.analyzer) {
+      const analyzerSupport = {
+        security: ['hardcoded-password', 'sql-injection', 'xss-vulnerability', 'eval-usage'],
+        quality: ['console-statement', 'unused-variable', 'var-to-const', 'loose-equality', 'magic-number'],
+        bugs: ['unused-variable', 'var-to-const'],
+        performance: [],
+      };
+      
+      const supported = analyzerSupport[issue.analyzer] || [];
+      return supported.some(s => issue.type === s);
+    }
+    
+    return false;
+  }
+
   async generateFix(issue, context = {}) {
     const timer = this.metrics.startTimer('autofix.generate');
 
@@ -167,6 +197,168 @@ class AutoFixGenerator {
       }],
       explanation: this.generateExplanation(issue, fix),
     };
+  }
+
+  async generateAdvancedFix(issue, context = {}) {
+    const fixStrategies = [
+      () => this.generateTemplateFix(issue),
+      () => this.generatePatternBasedFix(issue),
+      () => this.generateMultiStepFix(issue),
+      () => this.generateSecurityBestPracticeFix(issue),
+      () => this.llmProvider !== 'local' && this.apiKey ? this.generateLLMFix(issue, context) : null,
+    ];
+
+    for (const strategy of fixStrategies) {
+      try {
+        const fix = await strategy();
+        if (fix && fix.confidence >= (this.confidenceThreshold - 0.1)) {
+          return fix;
+        }
+      } catch (error) {
+        continue;
+      }
+    }
+
+    return null;
+  }
+
+  async generatePatternBasedFix(issue) {
+    const snippet = issue.snippet || '';
+    const fileExt = issue.file?.split('.').pop() || '';
+
+    const securityPatterns = {
+      javascript: [
+        { pattern: /dangerouslySetInnerHTML\s*=/g, replacement: '', fix: 'Avoid using dangerouslySetInnerHTML' },
+        { pattern: /\.innerHTML\s*=/g, replacement: '.textContent =', fix: 'Use textContent instead of innerHTML' },
+        { pattern: /eval\s*\(/g, replacement: 'JSON.parse(', fix: 'Replace eval with JSON.parse' },
+        { pattern: /document\.write\s*\(/g, replacement: '// Use DOM manipulation instead', fix: 'Remove document.write' },
+      ],
+      python: [
+        { pattern: /os\.system\s*\(/g, replacement: 'subprocess.run(', fix: 'Use subprocess instead of os.system' },
+        { pattern: /pickle\.loads?\s*\(/g, replacement: 'json.loads(', fix: 'Use JSON instead of pickle' },
+        { pattern: /exec\s*\(/g, replacement: '// Avoid exec', fix: 'Remove exec usage' },
+      ],
+      general: [
+        { pattern: /password\s*=\s*['"][^'"]+['"]/gi, replacement: 'password = os.getenv("PASSWORD")', fix: 'Use environment variable' },
+        { pattern: /api[_-]?key\s*=\s*['"][^'"]+['"]/gi, replacement: 'api_key = os.getenv("API_KEY")', fix: 'Use environment variable' },
+        { pattern: /secret\s*=\s*['"][^'"]+['"]/gi, replacement: 'secret = os.getenv("SECRET")', fix: 'Use environment variable' },
+      ],
+    };
+
+    const patterns = [...(securityPatterns[fileExt] || []), ...securityPatterns.general];
+
+    for (const { pattern, replacement, fix } of patterns) {
+      if (pattern.test(snippet)) {
+        return {
+          type: 'pattern-based',
+          description: fix,
+          confidence: 0.85,
+          changes: [{
+            file: issue.file,
+            line: issue.line,
+            find: snippet,
+            replace: snippet.replace(pattern, replacement),
+          }],
+          explanation: fix,
+        };
+      }
+    }
+
+    return null;
+  }
+
+  async generateMultiStepFix(issue) {
+    const multiStepFixes = {
+      'sql-injection': {
+        steps: [
+          { action: 'import', code: "import { query } from './db'" },
+          { action: 'replace', find: 'db.query', replace: 'query' },
+        ],
+        explanation: 'Replace string concatenation with parameterized query',
+        confidence: 0.8,
+      },
+      'xss-vulnerability': {
+        steps: [
+          { action: 'import', code: "import { sanitize } from './utils'" },
+          { action: 'replace', find: '.innerHTML', replace: '.textContent = sanitize(' },
+        ],
+        explanation: 'Sanitize input and use textContent',
+        confidence: 0.75,
+      },
+      'hardcoded-password': {
+        steps: [
+          { action: 'import', code: "import config from './config'" },
+          { action: 'replace', find: 'password =', replace: 'password = config.get(' },
+        ],
+        explanation: 'Load password from configuration',
+        confidence: 0.8,
+      },
+    };
+
+    const fix = multiStepFixes[issue.type];
+    if (!fix) return null;
+
+    return {
+      type: 'multi-step',
+      description: fix.explanation,
+      confidence: fix.confidence,
+      changes: fix.steps.map((step, index) => ({
+        file: issue.file,
+        line: issue.line + index,
+        action: step.action,
+        find: step.find,
+        replace: step.replace,
+        import: step.code,
+      })),
+      explanation: fix.explanation,
+    };
+  }
+
+  async generateSecurityBestPracticeFix(issue) {
+    const bestPractices = {
+      'insecure-random': {
+        pattern: /Math\.random\s*\(\s*\)/g,
+        replacement: 'crypto.getRandomValues(new Uint8Array(1))[0]',
+        imports: "import { randomBytes } from 'crypto'",
+        explanation: 'Use cryptographically secure random',
+        confidence: 0.9,
+      },
+      'weak-crypto': {
+        pattern: /md5|sha1/gi,
+        replacement: 'sha256',
+        imports: "import { createHash } from 'crypto'",
+        explanation: 'Use stronger hashing algorithm',
+        confidence: 0.85,
+      },
+      'http-url': {
+        pattern: /http:\/\//g,
+        replacement: 'https://',
+        explanation: 'Use HTTPS instead of HTTP',
+        confidence: 0.95,
+      },
+    };
+
+    const snippet = issue.snippet || '';
+
+    for (const [type, fix] of Object.entries(bestPractices)) {
+      if (issue.type?.includes(type) || fix.pattern.test(snippet)) {
+        return {
+          type: 'best-practice',
+          description: fix.explanation,
+          confidence: fix.confidence,
+          changes: [{
+            file: issue.file,
+            line: issue.line,
+            find: snippet.match(fix.pattern) ? snippet.match(fix.pattern)[0] : '',
+            replace: snippet.replace(fix.pattern, fix.replacement),
+            import: fix.imports,
+          }],
+          explanation: fix.explanation,
+        };
+      }
+    }
+
+    return null;
   }
 
   findMatch(snippet, issue) {

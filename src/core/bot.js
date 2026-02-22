@@ -11,6 +11,7 @@ import { APISecurityAnalyzer } from '../analyzers/apiSecurityAnalyzer.js';
 import { EnvSecurityAnalyzer } from '../analyzers/envSecurityAnalyzer.js';
 import { DockerAnalyzer } from '../analyzers/dockerAnalyzer.js';
 import ReportGenerator from '../output/reportGenerator.js';
+import PolicyEngine from './policy/policyEngine.js';
 
 import {
   AnalysisOrchestrator,
@@ -31,6 +32,7 @@ export class CodeReviewBot {
     this.parallelProcessor = null;
     this.falsePositiveReducer = null;
     this.featureFlags = null;
+    this.policyEngine = null;
     this.eventBus = options.eventBus || globalEventBus;
     this.metrics = options.metrics || globalMetrics;
     this.isInitialized = false;
@@ -133,6 +135,12 @@ export class CodeReviewBot {
     });
     await this.featureFlags.load();
 
+    this.policyEngine = new PolicyEngine({
+      policyDir: '.sentinel/policies',
+      enforcementMode: config.get('policy.enforcementMode', 'advisory'),
+    });
+    await this.policyEngine.loadPolicies();
+
     this.analysisOrchestrator = new AnalysisOrchestrator({
       parallelProcessor: this.parallelProcessor,
       falsePositiveReducer: this.falsePositiveReducer,
@@ -205,6 +213,63 @@ export class CodeReviewBot {
     return allIssues;
   }
 
+  async evaluatePolicies(issues, options = {}) {
+    if (!this.policyEngine || !this.policyEngine.policies.size) {
+      return null;
+    }
+
+    const context = {
+      runId: options.runId,
+      branch: options.branch,
+      commit: options.commit,
+    };
+
+    const result = this.policyEngine.evaluate(issues, context);
+
+    this.eventBus.emit('policy:evaluated', {
+      policyCount: this.policyEngine.policies.size,
+      violations: result.violations.length,
+      passed: result.passed.length,
+      score: result.score,
+    });
+
+    return result;
+  }
+
+  checkPolicyGate(policyResult, options = {}) {
+    if (!policyResult) return { shouldFail: false };
+
+    const failOnScore = options.failOnScore ?? 0;
+    const failOnSeverity = options.failOnSeverity || 'critical';
+
+    const severityOrder = ['info', 'low', 'medium', 'high', 'critical'];
+    const failSeverityIndex = severityOrder.indexOf(failOnSeverity.toLowerCase());
+
+    if (policyResult.score < failOnScore) {
+      return {
+        shouldFail: true,
+        reason: `Policy score ${policyResult.score} below threshold ${failOnScore}`,
+        policyResult,
+      };
+    }
+
+    const failingViolations = policyResult.violations.filter(v => {
+      const vIndex = severityOrder.indexOf(v.severity?.toLowerCase());
+      return vIndex >= failSeverityIndex;
+    });
+
+    if (failingViolations.length > 0) {
+      return {
+        shouldFail: true,
+        reason: `${failingViolations.length} violations at or above '${failOnSeverity}' severity`,
+        policyResult,
+        failingViolations,
+      };
+    }
+
+    return { shouldFail: false, policyResult };
+  }
+
   async shutdown() {
     if (this.analysisOrchestrator) {
       await this.analysisOrchestrator.shutdown();
@@ -229,6 +294,10 @@ export class CodeReviewBot {
       orchestrator: this.analysisOrchestrator?.getMetrics() ?? null,
       parallelProcessor: this.parallelProcessor?.getMetrics() ?? null,
       falsePositiveReducer: this.falsePositiveReducer?.getStatistics() ?? null,
+      policyEngine: {
+        loadedPolicies: this.policyEngine?.policies.size ?? 0,
+        policies: this.policyEngine?.getAllPolicies() ?? [],
+      },
       isInitialized: this.isInitialized,
     };
   }

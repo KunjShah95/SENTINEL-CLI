@@ -1,0 +1,47 @@
+id: security-policy
+name: Security Policy Pack
+description: Enforces security best practices - blocks critical/high vulnerabilities
+version: 1.0.0
+severity: error
+rules:
+  - id: no-critical-vulnerabilities
+    name: No Critical Vulnerabilities
+    message: Critical security vulnerabilities are not allowed
+    severity: critical
+    analyzer: security
+    mustNotExist: true
+    
+  - id: no-high-severity-secrets
+    name: No Secrets in Code
+    message: Secrets and credentials must not be committed
+    severity: high
+    type: secret
+    mustNotExist: true
+    
+  - id: max-medium-vulnerabilities
+    name: Maximum Medium Severity Issues
+    message: Too many medium severity security issues
+    severity: medium
+    analyzer: security
+    maxCount: 10
+    
+  - id: no-sql-injection
+    name: No SQL Injection Vulnerabilities
+    message: SQL injection vulnerabilities must be fixed
+    severity: critical
+    type: sql-injection
+    mustNotExist: true
+    
+  - id: no-command-injection
+    name: No Command Injection
+    message: Command injection vulnerabilities are not allowed
+    severity: critical
+    type: command-injection
+    mustNotExist: true
+    
+  - id: no-xss-vulnerabilities
+    name: No XSS Vulnerabilities
+    message: Cross-site scripting vulnerabilities must be addressed
+    severity: high
+    type: xss
+    mustNotExist: true

@@ -280,25 +280,20 @@ export class GitHubIntegration {
     async postReview(prUrl, issues) {
         const { owner, repo, prNumber } = this.parsePrUrl(prUrl);
 
-        // Get PR details to find the head commit SHA
         const prDetails = await this.getPrDetails(owner, repo, prNumber);
         const commitSha = prDetails.head.sha;
 
-        // Filter issues that have valid file paths (for inline comments)
         const inlineIssues = issues.filter(i => i.file && i.line);
         const reviewComments = this.formatIssuesForReview(inlineIssues);
 
-        // Post inline review if we have file-specific issues
         if (reviewComments.length > 0) {
             try {
                 await this.createReview(owner, repo, prNumber, commitSha, reviewComments);
             } catch (error) {
-                // If inline comments fail (e.g., file not in diff), fall back to summary only
                 console.warn(`Could not post inline comments: ${error.message}`);
             }
         }
 
-        // Always post a summary comment
         const summary = this.generateSummaryComment(issues);
         await this.postComment(owner, repo, prNumber, summary);
 
@@ -308,6 +303,160 @@ export class GitHubIntegration {
             issuesPosted: issues.length,
             inlineComments: reviewComments.length,
         };
+    }
+
+    async postEnhancedReview(prUrl, analysisResult) {
+        const { owner, repo, prNumber } = this.parsePrUrl(prUrl);
+        const prDetails = await this.getPrDetails(owner, repo, prNumber);
+        const commitSha = prDetails.head.sha;
+
+        const issues = analysisResult.issues || [];
+        const fixes = analysisResult.fixes || [];
+        const policyResult = analysisResult.policyResult;
+        const suppressed = analysisResult.suppressed || [];
+
+        const reviewBody = this.generateEnhancedReviewBody({
+            issues,
+            fixes,
+            policyResult,
+            suppressed,
+            stageMetrics: analysisResult.stageMetrics,
+        });
+
+        const reviewComments = this.formatIssuesForReview(issues.filter(i => i.file && i.line));
+        
+        if (reviewComments.length > 0) {
+            try {
+                await this.createReview(owner, repo, prNumber, commitSha, reviewComments, {
+                    body: reviewBody.summary,
+                    event: this.determineReviewEvent(policyResult),
+                });
+            } catch (error) {
+                console.warn(`Enhanced review failed: ${error.message}`);
+                await this.postComment(owner, repo, prNumber, reviewBody.summary);
+            }
+        } else {
+            await this.postComment(owner, repo, prNumber, reviewBody.summary);
+        }
+
+        if (reviewBody.fixes.length > 0) {
+            const fixComment = this.generateFixSuggestionComment(fixes);
+            await this.postComment(owner, repo, prNumber, fixComment);
+        }
+
+        try {
+            await this.createCheckRun(owner, repo, commitSha, {
+                status: 'completed',
+                conclusion: policyResult?.compliant ? 'success' : 'action_required',
+                output: {
+                    title: policyResult?.compliant ? 'Sentinel: All Checks Passed' : 'Sentinel: Issues Found',
+                    summary: reviewBody.summary,
+                    text: reviewBody.details,
+                },
+            });
+        } catch (error) {
+            console.warn(`Check run creation failed: ${error.message}`);
+        }
+
+        return {
+            success: true,
+            prUrl,
+            issuesCount: issues.length,
+            fixesCount: fixes.length,
+            policyCompliant: policyResult?.compliant ?? true,
+            checkRunCreated: true,
+        };
+    }
+
+    generateEnhancedReviewBody(data) {
+        const { issues, fixes, policyResult, suppressed, stageMetrics } = data;
+        
+        let summary = `## 🛡️ Sentinel Security Review\n\n`;
+        
+        const critical = issues.filter(i => i.severity === 'critical').length;
+        const high = issues.filter(i => i.severity === 'high').length;
+        const medium = issues.filter(i => i.severity === 'medium').length;
+        
+        if (critical > 0) summary += `🔴 **Critical:** ${critical} | `;
+        if (high > 0) summary += `🟠 **High:** ${high} | `;
+        if (medium > 0) summary += `🟡 **Medium:** ${medium} | `;
+        
+        summary += `\n✅ **Passed:** ${issues.length === 0 ? 'Yes' : 'No'}\n`;
+        
+        if (policyResult) {
+            summary += `\n**Policy Score:** ${policyResult.score}/100\n`;
+            summary += `**Compliant:** ${policyResult.compliant ? '✅ Yes' : '❌ No'}\n`;
+            if (policyResult.violations?.length > 0) {
+                summary += `\n**Violations:** ${policyResult.violations.length}\n`;
+            }
+        }
+
+        if (fixes.length > 0) {
+            summary += `\n**Auto-fixes Available:** ${fixes.length}\n`;
+        }
+
+        if (suppressed.length > 0) {
+            summary += `\n**Suppressed:** ${suppressed.length} (false positives)\n`;
+        }
+
+        if (stageMetrics) {
+            summary += `\n**Analysis Time:** ${Object.values(stageMetrics).reduce((sum, m) => sum + (m.duration || 0), 0)}ms\n`;
+        }
+
+        let details = `### Issue Details\n\n`;
+        for (const issue of issues.slice(0, 20)) {
+            details += `- **${issue.severity?.toUpperCase()}** [${issue.file}:${issue.line}](${issue.file}) - ${issue.message || issue.title}\n`;
+            if (issue.fix) {
+                details += `  - 💡 Fix available (${issue.fix.confidence?.toFixed(0)}% confidence)\n`;
+            }
+        }
+
+        if (issues.length > 20) {
+            details += `\n_... and ${issues.length - 20} more issues_\n`;
+        }
+
+        return { summary, details, fixes: fixes.length > 0 };
+    }
+
+    generateFixSuggestionComment(fixes) {
+        let comment = `## 🔧 Suggested Auto-Fixes\n\n`;
+        
+        for (const fix of fixes.slice(0, 10)) {
+            comment += `### Fix for ${fix.issueId || 'issue'}\n`;
+            comment += `\`\`\`\n${fix.fix?.code || 'No code available'}\n\`\`\`\n`;
+            comment += `Confidence: ${(fix.confidence * 100).toFixed(0)}%\n\n`;
+        }
+
+        if (fixes.length > 10) {
+            comment += `_... and ${fixes.length - 10} more fixes_\n`;
+        }
+
+        return comment;
+    }
+
+    determineReviewEvent(policyResult) {
+        if (!policyResult) return 'COMMENT';
+        
+        if (!policyResult.compliant) {
+            const hasBlocking = policyResult.violations?.some(v => 
+                v.severity === 'critical' || v.severity === 'high'
+            );
+            return hasBlocking ? 'REQUEST_CHANGES' : 'COMMENT';
+        }
+        
+        return 'APPROVE';
+    }
+
+    async createCheckRun(owner, repo, commitSha, options) {
+        const endpoint = `/repos/${owner}/${repo}/check-runs`;
+        
+        return this.request('POST', endpoint, {
+            name: 'Sentinel Security Scan',
+            head_sha: commitSha,
+            status: options.status,
+            conclusion: options.conclusion,
+            output: options.output,
+        });
     }
 }
 

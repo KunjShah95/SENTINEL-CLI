@@ -105,6 +105,7 @@
     "@vercel/analytics": "^1.6.1",
     "axios": "^1.6.2",
     "chalk": "^5.3.0",
+    "cline": "^2.2.2",
     "commander": "^11.1.0",
     "compression": "^1.8.1",
     "cors": "^2.8.6",

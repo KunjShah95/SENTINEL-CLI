@@ -1,0 +1,40 @@
+id: compliance-policy
+name: Compliance Policy Pack
+description: Ensures regulatory compliance - GDPR, HIPAA, SOC2 requirements
+version: 1.0.0
+severity: error
+rules:
+  - id: no-gdpr-violations
+    name: GDPR Data Protection
+    message: Code must not violate GDPR data protection requirements
+    severity: critical
+    tags: [privacy, gdpr]
+    mustNotExist: true
+    
+  - id: no-hipaa-violations
+    name: HIPAA Compliance
+    message: Code must not violate HIPAA requirements
+    severity: critical
+    tags: [hipaa, healthcare]
+    mustNotExist: true
+    
+  - id: no-pci-dss-violations
+    name: PCI-DSS Compliance
+    message: Code must comply with PCI-DSS requirements
+    severity: critical
+    tags: [pci, payment]
+    mustNotExist: true
+    
+  - id: no-hardcoded-credentials
+    name: No Hardcoded Credentials
+    message: Hardcoded credentials are not allowed
+    severity: critical
+    type: hardcoded-password
+    mustNotExist: true
+    
+  - id: secure-random-usage
+    name: Secure Random Required
+    message: Use cryptographically secure random generators
+    severity: high
+    type: insecure-random
+    mustNotExist: true

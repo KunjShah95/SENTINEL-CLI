@@ -287,6 +287,9 @@ program
   .option('--silent', 'Suppress output (useful for scripting)')
   .option('--pr <base-branch>', 'Analyze PR/diff against a base branch')
   .option('--fail-on <severity>', 'Fail when severity at or above threshold')
+  .option('--policy-enable', 'Enable policy evaluation')
+  .option('--policy-pack <name>', 'Policy pack to use (security,compliance,strict-ci)', 'security')
+  .option('--policy-fail-score <number>', 'Fail if policy score below threshold', '70')
   .option('--baseline <file>', 'Load baseline issues JSON to compare')
   .option('--baseline-save <file>', 'Save current issues as baseline JSON')
   .option('--new-only', 'Only report issues not present in baseline')
@@ -376,6 +379,57 @@ program
             console.error(chalk.red(`✗ ${failing.length} issues at or above '${options.failOn}'`));
             process.exit(1);
           }
+        }
+      }
+
+      // Policy evaluation
+      if (options.policyEnable && result.issues) {
+        try {
+          const policyResult = await bot.evaluatePolicies(result.issues, {
+            runId: result.runId,
+            branch: options.branch,
+            commit: options.commit,
+          });
+
+          if (policyResult && !options.silent) {
+            console.log(chalk.cyan('\n📋 Policy Evaluation Results:'));
+            console.log(chalk.gray(`  Score: ${policyResult.score}/100`));
+            console.log(chalk.gray(`  Compliant: ${policyResult.compliant ? 'Yes' : 'No'}`));
+            console.log(chalk.gray(`  Policies Passed: ${policyResult.passed.length}`));
+            console.log(chalk.gray(`  Violations: ${policyResult.violations.length}`));
+
+            if (policyResult.failGate) {
+              console.log(chalk.gray(`  Fail Gate: ${policyResult.failGate.shouldFail ? 'TRIGGERED' : 'PASSED'}`));
+              if (policyResult.failGate.highestSeverity !== 'none') {
+                console.log(chalk.gray(`  Highest Severity: ${policyResult.failGate.highestSeverity}`));
+              }
+            }
+
+            if (policyResult.violations.length > 0) {
+              console.log(chalk.yellow('\n⚠️ Policy Violations:'));
+              for (const v of policyResult.violations.slice(0, 5)) {
+                console.log(chalk.yellow(`  - ${v.policyName}: ${v.violations.length} violation(s)`));
+              }
+            }
+          }
+
+          // Fail on policy gate
+          if (policyResult) {
+            const policyGateResult = bot.checkPolicyGate(policyResult, {
+              failOnScore: parseInt(options.policyFailScore) || 70,
+              failOnSeverity: options.failOn || 'critical',
+            });
+
+            if (policyGateResult.shouldFail) {
+              console.error(chalk.red(`\n✗ Policy gate failed: ${policyGateResult.reason}`));
+              if (policyGateResult.failingViolations) {
+                console.error(chalk.red(`  Failing violations: ${policyGateResult.failingViolations.length}`));
+              }
+              process.exit(1);
+            }
+          }
+        } catch (policyError) {
+          console.warn(chalk.yellow(`⚠ Policy evaluation failed: ${policyError.message}`));
         }
       }
     } catch (error) {
@@ -2398,6 +2452,42 @@ program
       }
     } catch (error) {
       console.error(chalk.red('Metrics export failed:'), error.message);
+      process.exit(1);
+    }
+  });
+
+// ========================================
+// TUI COMMAND - Launch enhanced TUI
+// ========================================
+program
+  .command('tui')
+  .description('Launch the Sentinel interactive TUI')
+  .option('-m, --mode <mode>', 'TUI mode: dashboard|issues|fixes|policy|monitor', 'dashboard')
+  .option('--no-interact', 'Run TUI without interactive mode')
+  .action(async (options) => {
+    try {
+      const { EnhancedTUI } = await import('../utils/enhancedTui.js');
+      
+      console.log(chalk.cyan('🎨 Launching Sentinel TUI...'));
+      
+      const bot = new CodeReviewBot();
+      await bot.initialize();
+      
+      const { issues } = await bot.runAnalysis({ format: 'json', silent: true });
+      
+      const tui = new EnhancedTUI({ 
+        issues, 
+        currentView: options.mode,
+        interactive: options.interact 
+      });
+      
+      if (options.interact) {
+        await tui.start();
+      } else {
+        tui.render();
+      }
+    } catch (error) {
+      console.error(chalk.red('TUI failed:'), error.message);
       process.exit(1);
     }
   });

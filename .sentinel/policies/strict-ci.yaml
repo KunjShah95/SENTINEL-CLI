@@ -1,0 +1,48 @@
+id: strict-ci-policy
+name: Strict CI Policy Pack
+description: Strict policy for CI gates - fails on any security issue
+version: 1.0.0
+severity: error
+enforcementMode: error
+failGate:
+  minScore: 90
+  severityThreshold: low
+rules:
+  - id: ci-no-critical
+    name: No Critical Issues in CI
+    message: Critical issues must be fixed before merge
+    severity: critical
+    mustNotExist: true
+    
+  - id: ci-no-high
+    name: No High Issues in CI
+    message: High severity issues must be fixed or waived
+    severity: high
+    mustNotExist: true
+    
+  - id: ci-max-medium
+    name: Max Medium Issues
+    message: Maximum 5 medium issues allowed
+    severity: medium
+    maxCount: 5
+    
+  - id: ci-no-secrets
+    name: No Secrets in CI
+    message: Secrets must not be present in code
+    severity: critical
+    type: secret
+    mustNotExist: true
+    
+  - id: ci-quality-gate
+    name: Quality Gate
+    message: Quality issues must be below threshold
+    severity: warning
+    analyzer: quality
+    maxCount: 20
+    
+  - id: ci-no-test-issues-in-src
+    name: No Test Code in Source
+    message: Test files should not be in src directory
+    severity: info
+    pathPattern: ^src/.*test|spec
+    mustNotExist: true

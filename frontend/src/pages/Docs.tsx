@@ -52,6 +52,70 @@ const sections = [
   }
 ];
 
+const commandCatalog = [
+  { command: 'auth [subcommand] [provider]', description: 'Configure API keys for AI providers', category: 'Setup & Config' },
+  { command: 'config', description: 'Manage Sentinel configuration', category: 'Setup & Config' },
+  { command: 'setup', description: 'Setup configuration wizard', category: 'Setup & Config' },
+  { command: 'install-hooks', description: 'Install pre-commit hooks', category: 'Setup & Config' },
+  { command: 'validate', description: 'Validate Sentinel configuration file', category: 'Setup & Config' },
+  { command: 'status', description: 'Show Sentinel system status and statistics', category: 'Setup & Config' },
+
+  { command: 'analyze [files...]', description: 'Analyze code for issues', category: 'Analysis Core' },
+  { command: 'security-audit', description: 'Run comprehensive security scan (security + api + secrets + dependency)', category: 'Analysis Core' },
+  { command: 'full-scan', description: 'Run all available analyzers', category: 'Analysis Core' },
+  { command: 'full', description: 'Run all analyzers across the project', category: 'Analysis Core' },
+  { command: 'pre-commit', description: 'Quick pre-commit check on staged files', category: 'Analysis Core' },
+  { command: 'frontend', description: 'Frontend-focused analysis (React + TypeScript + Accessibility)', category: 'Analysis Core' },
+  { command: 'backend', description: 'Backend-focused analysis (Security + API + Performance)', category: 'Analysis Core' },
+  { command: 'container', description: 'Container security analysis (Docker + Kubernetes)', category: 'Analysis Core' },
+  { command: 'diff', description: 'Review staged changes only (pre-commit friendly)', category: 'Analysis Core' },
+  { command: 'ci', description: 'CI-friendly analysis (JSON output, fail on severity)', category: 'Analysis Core' },
+  { command: 'list-analyzers', description: 'List all available analyzers and their descriptions', alias: 'analyzers', category: 'Analysis Core' },
+  { command: 'analyze-workspace', description: 'Analyze all packages in a monorepo workspace', category: 'Analysis Core' },
+  { command: 'parallel [target]', description: 'Run parallel analysis with worker threads', category: 'Analysis Core' },
+  { command: 'parallel-status', description: 'Show parallel processing status and metrics', category: 'Analysis Core' },
+  { command: 'benchmark', description: 'Run performance benchmarks', category: 'Analysis Core' },
+
+  { command: 'agents [input]', description: 'Run multi-agent analysis (Scanner → Fixer → Validator)', category: 'AI & Agents' },
+  { command: 'agents ci [input]', description: 'Run multi-agent analysis with CI defaults (SARIF/JUnit, gating)', category: 'AI & Agents' },
+  { command: 'agents pr <pr-url> [input]', description: 'Run multi-agent analysis and post markdown summary to a GitHub PR', category: 'AI & Agents' },
+  { command: 'chat [prompt...]', description: 'Launch a Sentinel interactive assistant console', category: 'AI & Agents' },
+  { command: 'models', description: 'List and configure Sentinel AI providers', category: 'AI & Agents' },
+  { command: 'fix [files...]', description: 'Automatically fix common issues in code', category: 'AI & Agents' },
+  { command: 'fix [target]', description: 'Automatically fix detected issues', category: 'AI & Agents' },
+  { command: 'pr-description', description: 'Generate AI-powered PR descriptions', category: 'AI & Agents' },
+  { command: 'commit-msg', description: 'Get AI-powered commit message suggestions', category: 'AI & Agents' },
+  { command: 'inline-comments', description: 'Generate inline review comments for PR', category: 'AI & Agents' },
+  { command: 'test-suggestions [files...]', description: 'Generate test suggestions for files', category: 'AI & Agents' },
+  { command: 'complexity [files...]', description: 'Analyze code complexity', category: 'AI & Agents' },
+  { command: 'best-practices [files...]', description: 'Analyze code against best practices', category: 'AI & Agents' },
+  { command: 'multi-file [files...]', description: 'Analyze cross-file dependencies and architecture', category: 'AI & Agents' },
+  { command: 'pr-summary', description: 'Generate comprehensive PR summary', category: 'AI & Agents' },
+
+  { command: 'review-pr <pr-url>', description: 'Analyze code and post review to a GitHub PR', category: 'GitHub & PR' },
+  { command: 'blame', description: 'Analyze issues with git blame attribution', category: 'GitHub & PR' },
+  { command: 'webhook', description: 'Start GitHub App webhook server for automated PR reviews', category: 'GitHub & PR' },
+
+  { command: 'notify', description: 'Send analysis results to Slack or Discord', category: 'Reporting & Ops' },
+  { command: 'sarif', description: 'Generate SARIF report for GitHub Security tab', category: 'Reporting & Ops' },
+  { command: 'report [target]', description: 'Generate analysis reports', category: 'Reporting & Ops' },
+  { command: 'trends', description: 'View historical analysis trends', category: 'Reporting & Ops' },
+  { command: 'metrics', description: 'Export metrics in Prometheus format', category: 'Reporting & Ops' },
+  { command: 'badge', description: 'Generate security score badges for your repository', category: 'Reporting & Ops' },
+  { command: 'badge-server', description: 'Start the badge server', category: 'Reporting & Ops' },
+  { command: 'dashboard', description: 'Launch the Sentinel web dashboard', category: 'Reporting & Ops' },
+  { command: 'server', description: 'Start the Sentinel API server', category: 'Reporting & Ops' },
+  { command: 'cache', description: 'Manage analysis cache for improved performance', category: 'Reporting & Ops' },
+
+  { command: 'rules', description: 'Manage custom linting rules', category: 'Governance & Security' },
+  { command: 'team', description: 'Manage team workspace', category: 'Governance & Security' },
+  { command: 'features', description: 'Manage feature flags', category: 'Governance & Security' },
+  { command: 'policy', description: 'Manage security policies', category: 'Governance & Security' },
+  { command: 'scan-secrets [target]', description: 'Scan for secrets and sensitive data', category: 'Governance & Security' },
+  { command: 'secret-patterns', description: 'List all secret detection patterns', category: 'Governance & Security' },
+  { command: 'stats', description: 'Show repository statistics', category: 'Governance & Security' }
+];
+
 export function Docs() {
   const [activeSection, setActiveSection] = useState('installation');
   const [searchQuery, setSearchQuery] = useState('');
@@ -120,6 +184,20 @@ export function Docs() {
   );
 
   const flattenSections = sections.flatMap(s => s.items);
+  const normalizedSearch = searchQuery.trim().toLowerCase();
+  const filteredCommands = commandCatalog.filter((item) => {
+    if (!normalizedSearch) return true;
+    return `${item.command} ${item.description} ${item.alias || ''} ${item.category}`
+      .toLowerCase()
+      .includes(normalizedSearch);
+  });
+  const groupedCommands = filteredCommands.reduce<Record<string, typeof filteredCommands>>((groups, item) => {
+    if (!groups[item.category]) {
+      groups[item.category] = [];
+    }
+    groups[item.category].push(item);
+    return groups;
+  }, {});
 
   return (
     <div className="min-h-screen bg-[var(--color-void)] pt-16 font-body text-[var(--color-text-primary)]">
@@ -286,6 +364,55 @@ export function Docs() {
               )}
 
               {/* Configuration */}
+              {activeSection === 'core' && (
+                <div className="space-y-12 animate-in fade-in duration-500">
+                  <section id="core">
+                    <div className="flex items-center gap-4 mb-8">
+                      <div className="w-10 h-10 rounded-lg bg-[var(--color-sentinel)]/10 border border-[var(--color-sentinel)]/20 flex items-center justify-center">
+                        <Terminal className="text-[var(--color-sentinel)] w-5 h-5" />
+                      </div>
+                      <h2 className="font-['Syne'] text-3xl font-bold text-[var(--color-text-primary)]">Core Commands</h2>
+                    </div>
+
+                    <p className="mb-6 text-lg leading-relaxed text-[var(--color-text-secondary)]">
+                      Complete command list synced with the current CLI implementation.
+                    </p>
+
+                    <div className="mb-8 rounded-xl border border-[var(--color-sentinel)]/20 bg-[var(--color-sentinel)]/5 px-4 py-3 text-sm text-[var(--color-text-secondary)]">
+                      Showing <span className="text-[var(--color-sentinel)] font-bold">{filteredCommands.length}</span> commands
+                      {normalizedSearch ? ` matching "${searchQuery}"` : ''}.
+                    </div>
+
+                    <div className="space-y-10">
+                      {Object.entries(groupedCommands).map(([group, items]) => (
+                        <div key={group}>
+                          <h3 className="font-display font-bold text-sm text-[var(--color-text-tertiary)] uppercase tracking-wider mb-4">{group}</h3>
+                          <div className="grid grid-cols-1 gap-4">
+                            {items.map((item) => (
+                              <div
+                                key={`${item.command}-${item.description}`}
+                                className="p-5 rounded-xl border border-[var(--color-sentinel)]/10 bg-[var(--color-obsidian)] hover:border-[var(--color-sentinel)]/30 transition-all"
+                              >
+                                <div className="flex flex-wrap items-center gap-2 mb-2">
+                                  <span className="font-mono text-sm text-[var(--color-sentinel)]">sentinel {item.command}</span>
+                                  {item.alias && (
+                                    <span className="text-[10px] uppercase tracking-widest font-bold px-2 py-1 rounded bg-[var(--color-sentinel)]/10 text-[var(--color-sentinel)] border border-[var(--color-sentinel)]/20">
+                                      alias: {item.alias}
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-sm text-[var(--color-text-secondary)]">{item.description}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                </div>
+              )}
+
+              {/* Configuration */}
               {activeSection === 'configuration' && (
                 <div className="space-y-12 animate-in fade-in duration-500">
                   <section id="configuration">
@@ -366,7 +493,7 @@ output:
               )}
 
               {/* Fallback for others */}
-              {!['installation', 'quick-start', 'configuration'].includes(activeSection) && (
+              {!['installation', 'quick-start', 'core', 'configuration'].includes(activeSection) && (
                 <div className="space-y-12 animate-in fade-in duration-500">
                   <div className="my-16 p-8 rounded-2xl bg-gradient-to-br from-[var(--color-sentinel)]/10 to-transparent border border-[var(--color-sentinel)]/20 flex gap-6 items-start">
                     <div className="w-12 h-12 shrink-0 rounded-full bg-[var(--color-sentinel)] flex items-center justify-center">
