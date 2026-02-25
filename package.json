@@ -9,13 +9,12 @@
   },
   "files": [
     "src/**/*",
-    "dist/**/*",
     "frontend/build/**/*",
-    "__tests__/**/*",
     "github-app.yml",
     "README.md",
-    "IMPROVEMENTS.md",
-    "QUICKSTART.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "command_guide.md",
     ".env.example",
     ".sentinel.json.example"
   ],
@@ -48,7 +47,7 @@
     "bench": "node src/core/cli.js benchmark --quick",
     "deploy": "npm run build:frontend && npx vercel --prod",
     "demo": "node src/core/demo.js",
-    "prepublishOnly": "npm run lint && npm run build:all",
+    "prepublishOnly": "npm run build:frontend",
     "postversion": "git push && git push --tags",
     "postinstall": "echo \"\n✨ Sentinel CLI installed! Run 'sentinel auth' to configure your API keys or 'sentinel dashboard' to see the UI.\n\""
   },

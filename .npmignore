@@ -1,20 +1,24 @@
 # Dependencies and package management
-node_modules
+node_modules/
 package-lock.json
 yarn.lock
+pnpm-lock.yaml
 
 # Environment and secrets
 .env
 .env.*
+!.env.example
 .codereviewrc.json
 .codereview-cache.json
+.sentinel/
 
 # Reports and output
 report.html
 report.json
 report.txt
 report.md
-coverage
+coverage/
+*.coverage
 
 # Docker files
 Dockerfile
@@ -23,45 +27,77 @@ docker-compose*.yml
 .dockerignore
 
 # IDE and editor
-.idea
-.vscode
+.idea/
+.vscode/
 *.swp
 *.swo
+*.sublime-*
 
 # System files
 .DS_Store
 Thumbs.db
+*.bak
 
 # Git
-.git
+.git/
 .gitignore
+.gitattributes
 
 # GitHub files
-.github
+.github/
 
 # Build artifacts
 dist/*.map
+*.tsbuildinfo
 
 # Logs
 *.log
 npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
 # Test files
 test_*.js
 verify_*.js
 integration_test_*.js
-__tests__
+__tests__/
 *.test.js
 *.spec.js
 jest.config.js
+.jest/
 
-# Documentation (keep README.md)
+# Scripts that shouldn't be in npm package
+scripts/
+examples/
+
+# Frontend source (only include build)
+frontend/src/
+frontend/public/
+frontend/node_modules/
+frontend/.gitignore
+frontend/tsconfig*.json
+frontend/vite.config.ts
+frontend/package.json
+frontend/README.md
+
+# VS Code extension (separate package)
+vscode-extension/
+
+# Documentation (keep only essential)
+docs/
+agentskills.md
+SECURITY.md
+CODE_OF_CONDUCT.md
 
 # Misc development files
 .editorconfig
 .eslintcache
+.eslintrc*
+.prettierrc*
 *.tmp
 tmp/
 temp/
 reports/
 cache/
+vercel.json
+action.yml
