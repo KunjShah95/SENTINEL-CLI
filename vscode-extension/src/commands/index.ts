@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { SentinelService, AnalysisIssue } from '../services/sentinelService';
-import { ChatProvider } from '../providers/chatProvider';
+import { EnhancedChatProvider } from '../providers/enhancedChatProvider';
 import { SidebarProvider } from '../providers/sidebarProvider';
 import { IssueDiagnostics } from '../providers/issueDiagnostics';
 import { FileOperations } from '../utils/fileOperations';
@@ -10,7 +10,7 @@ export function registerCommands(
     context: vscode.ExtensionContext,
     services: {
         sentinelService: SentinelService;
-        chatProvider: ChatProvider;
+        chatProvider: EnhancedChatProvider;
         sidebarProvider: SidebarProvider;
         diagnostics: IssueDiagnostics;
         fileOps: FileOperations;
@@ -21,8 +21,8 @@ export function registerCommands(
 
     // Open AI Chat
     context.subscriptions.push(
-        vscode.commands.registerCommand('sentinel.openChat', () => {
-            chatProvider.open();
+        vscode.commands.registerCommand('sentinel.openChat', async () => {
+            await chatProvider.open();
         })
     );
 
@@ -305,17 +305,16 @@ export function registerCommands(
 
     // Clear chat
     context.subscriptions.push(
-        vscode.commands.registerCommand('sentinel.clearChat', () => {
-            chatProvider.open();
-            vscode.window.showInformationMessage('Use the chat UI to clear history');
+        vscode.commands.registerCommand('sentinel.clearChat', async () => {
+            await chatProvider.clearHistory();
+            vscode.window.showInformationMessage('Chat history cleared');
         })
     );
 
     // Export chat
     context.subscriptions.push(
         vscode.commands.registerCommand('sentinel.exportChat', async () => {
-            chatProvider.open();
-            vscode.window.showInformationMessage('Use the chat UI to export');
+            await chatProvider.exportChat();
         })
     );
 

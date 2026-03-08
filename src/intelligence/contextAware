@@ -1,0 +1,458 @@
+import { promises as fs } from 'fs';
+import path from 'path';
+import { glob } from 'glob';
+
+/**
+ * Context-Aware Engine
+ * Provides proactive suggestions based on code patterns and project context
+ */
+export class ContextAwareEngine {
+  constructor(projectPath = process.cwd()) {
+    this.projectPath = projectPath;
+    this.context = {};
+    this.suggestions = [];
+  }
+
+  /**
+   * Analyze project and build context
+   */
+  async analyze() {
+    const [packageJson, gitignore, tsconfig] = await Promise.all([
+      this.getPackageJson(),
+      this.getGitIgnore(),
+      this.getTSConfig(),
+      this.detectFramework(),
+      this.detectLanguage()
+    ]);
+
+    this.context = {
+      packageJson,
+      gitignore,
+      tsconfig,
+      framework: await this.detectFramework(),
+      languages: await this.detectLanguage(),
+      structure: await this.analyzeStructure()
+    };
+
+    return this.context;
+  }
+
+  async getPackageJson() {
+    try {
+      const content = await fs.readFile(path.join(this.projectPath, 'package.json'), 'utf-8');
+      return JSON.parse(content);
+    } catch {
+      return null;
+    }
+  }
+
+  async getGitIgnore() {
+    try {
+      const content = await fs.readFile(path.join(this.projectPath, '.gitignore'), 'utf-8');
+      return content.split('\n').filter(Boolean);
+    } catch {
+      return [];
+    }
+  }
+
+  async getTSConfig() {
+    try {
+      const content = await fs.readFile(path.join(this.projectPath, 'tsconfig.json'), 'utf-8');
+      return JSON.parse(content);
+    } catch {
+      return null;
+    }
+  }
+
+  async detectFramework() {
+    const pkg = await this.getPackageJson();
+    if (!pkg) return [];
+
+    const frameworks = [];
+    const deps = { ...pkg.dependencies, ...pkg.devDependencies };
+
+    if (deps.react) frameworks.push('react');
+    if (deps.vue) frameworks.push('vue');
+    if (deps['@nuxtjs']) frameworks.push('nuxt');
+    if (deps.next) frameworks.push('next');
+    if (deps.express) frameworks.push('express');
+    if (deps.fastify) frameworks.push('fastify');
+    if (deps.nestjs) frameworks.push('nest');
+    if (deps.django) frameworks.push('django');
+    if (deps.flask) frameworks.push('flask');
+    if (deps.fastapi) frameworks.push('fastapi');
+    if (deps.gin) frameworks.push('gin');
+    if (deps.rails) frameworks.push('rails');
+    if (deps.spring) frameworks.push('spring');
+
+    return frameworks;
+  }
+
+  async detectLanguage() {
+    const files = await glob('**/*.{js,ts,py,go,rs,java,cs,rb,swift,kt}', {
+      cwd: this.projectPath,
+      ignore: ['node_modules/**', 'dist/**', 'build/**']
+    });
+
+    const extCounts = {};
+    for (const file of files.slice(0, 100)) {
+      const ext = path.extname(file).slice(1);
+      extCounts[ext] = (extCounts[ext] || 0) + 1;
+    }
+
+    return Object.entries(extCounts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([lang]) => lang);
+  }
+
+  async analyzeStructure() {
+    const dirs = await fs.readdir(this.projectPath, { withFileTypes: true });
+    const structure = {
+      hasSrc: dirs.some(d => d.isDirectory() && d.name === 'src'),
+      hasLib: dirs.some(d => d.isDirectory() && d.name === 'lib'),
+      hasTest: dirs.some(d => d.isDirectory() && (d.name === 'test' || d.name === '__tests__')),
+      hasTests: dirs.some(d => d.isDirectory() && d.name === 'tests'),
+      hasDist: dirs.some(d => d.isDirectory() && d.name === 'dist'),
+      hasBuild: dirs.some(d => d.isDirectory() && d.name === 'build'),
+      hasDocs: dirs.some(d => d.isDirectory() && d.name === 'docs'),
+      hasConfig: dirs.some(d => d.isDirectory() && d.name === 'config')
+    };
+
+    return structure;
+  }
+
+  /**
+   * Generate suggestions based on context
+   */
+  async suggestActions(code = '', filePath = '') {
+    const suggestions = [];
+    
+    if (!this.context.framework) {
+      await this.analyze();
+    }
+
+    // Framework-specific suggestions
+    if (this.context.framework.includes('react')) {
+      suggestions.push(...this.getReactSuggestions(code, filePath));
+    }
+    if (this.context.framework.includes('next')) {
+      suggestions.push(...this.getNextJSSuggestions(code, filePath));
+    }
+    if (this.context.framework.includes('express')) {
+      suggestions.push(...this.getExpressSuggestions(code, filePath));
+    }
+
+    // Language-specific suggestions
+    if (this.context.languages?.includes('typescript')) {
+      suggestions.push(...this.getTypeScriptSuggestions(code, filePath));
+    }
+    if (this.context.languages?.includes('python')) {
+      suggestions.push(...this.getPythonSuggestions(code, filePath));
+    }
+
+    // Project structure suggestions
+    suggestions.push(...this.getStructureSuggestions());
+
+    // Code pattern suggestions
+    suggestions.push(...this.getCodePatternSuggestions(code, filePath));
+
+    return suggestions;
+  }
+
+  getReactSuggestions(code, filePath) {
+    const suggestions = [];
+
+    if (filePath.endsWith('.jsx') || filePath.endsWith('.tsx')) {
+      if (!code.includes('import React') && !code.includes("from 'react'")) {
+        suggestions.push({
+          type: 'import',
+          priority: 'high',
+          message: 'Add React import',
+          action: "import React from 'react';",
+          reason: 'React 17+ no longer requires explicit imports'
+        });
+      }
+
+      if (code.includes('useEffect') && !code.includes('useEffect(')) {
+        suggestions.push({
+          type: 'hook',
+          priority: 'medium',
+          message: 'Consider using useCallback for event handlers passed to children',
+          action: null,
+          reason: 'Prevents unnecessary re-renders'
+        });
+      }
+
+      if (code.includes('className=') && !code.includes('class ')) {
+        suggestions.push({
+          type: 'performance',
+          priority: 'low',
+          message: 'Consider adding key prop to mapped elements',
+          action: null,
+          reason: 'Keys help React identify changed items'
+        });
+      }
+    }
+
+    return suggestions;
+  }
+
+  getNextJSSuggestions(code, filePath) {
+    const suggestions = [];
+
+    if (filePath.includes('/pages/') || filePath.includes('/app/')) {
+      if (!code.includes('getServerSideProps') && !code.includes('getStaticProps')) {
+        suggestions.push({
+          type: 'optimization',
+          priority: 'medium',
+          message: 'Consider adding data fetching method for better performance',
+          action: null,
+          reason: 'Server-side or static generation improves SEO and performance'
+        });
+      }
+    }
+
+    if (filePath.includes('/api/')) {
+      if (!code.includes('try') || !code.includes('catch')) {
+        suggestions.push({
+          type: 'error-handling',
+          priority: 'high',
+          message: 'Add error handling to API route',
+          action: null,
+          reason: 'Prevents exposing internal errors to clients'
+        });
+      }
+    }
+
+    return suggestions;
+  }
+
+  getExpressSuggestions(code, filePath) {
+    const suggestions = [];
+
+    if (filePath.includes('/routes/') || filePath.includes('/controllers/')) {
+      if (!code.includes('async') && code.includes('await')) {
+        suggestions.push({
+          type: 'async',
+          priority: 'high',
+          message: 'Missing async keyword',
+          action: 'async ',
+          reason: 'Handlers using await must be async'
+        });
+      }
+
+      if (!code.includes('try') || !code.includes('catch')) {
+        suggestions.push({
+          type: 'error-handling',
+          priority: 'high',
+          message: 'Add try-catch for async route handlers',
+          action: null,
+          reason: 'Prevents unhandled promise rejections'
+        });
+      }
+
+      if (!code.includes('express-validator')) {
+        suggestions.push({
+          type: 'validation',
+          priority: 'medium',
+          message: 'Consider adding input validation',
+          action: null,
+          reason: 'Prevents invalid data processing'
+        });
+      }
+    }
+
+    return suggestions;
+  }
+
+  getTypeScriptSuggestions(code, filePath) {
+    const suggestions = [];
+
+    if (filePath.endsWith('.ts') || filePath.endsWith('.tsx')) {
+      if (code.includes('any') && !code.includes(': any')) {
+        suggestions.push({
+          type: 'type-safety',
+          priority: 'medium',
+          message: 'Avoid using "any" type',
+          action: null,
+          reason: 'any bypasses TypeScript type checking'
+        });
+      }
+
+      if (code.includes('// @ts-ignore') || code.includes('// @ts-nocheck')) {
+        suggestions.push({
+          type: 'type-safety',
+          priority: 'high',
+          message: 'Remove type suppression comments',
+          action: null,
+          reason: 'Address the underlying type issue instead'
+        });
+      }
+    }
+
+    return suggestions;
+  }
+
+  getPythonSuggestions(code, filePath) {
+    const suggestions = [];
+
+    if (filePath.endsWith('.py')) {
+      if (code.includes('print(') && !filePath.includes('test_')) {
+        suggestions.push({
+          type: 'best-practice',
+          priority: 'low',
+          message: 'Use logging instead of print for production',
+          action: 'import logging\nlogger = logging.getLogger(__name__)',
+          reason: 'Logging provides better control over output'
+        });
+      }
+
+      if (!code.includes('typing') && code.includes('def ')) {
+        suggestions.push({
+          type: 'type-hints',
+          priority: 'medium',
+          message: 'Consider adding type hints',
+          action: null,
+          reason: 'Improves code readability and IDE support'
+        });
+      }
+
+      if (code.includes('except:')) {
+        suggestions.push({
+          type: 'error-handling',
+          priority: 'high',
+          message: 'Avoid bare except clauses',
+          action: 'except Exception as e:',
+          reason: 'Bare except catches all exceptions including KeyboardInterrupt'
+        });
+      }
+    }
+
+    return suggestions;
+  }
+
+  getStructureSuggestions() {
+    const suggestions = [];
+
+    if (!this.context.structure?.hasTest && !this.context.structure?.hasTests) {
+      suggestions.push({
+        type: 'structure',
+        priority: 'high',
+        message: 'Add test directory',
+        action: 'mkdir __tests__',
+        reason: 'Tests improve code reliability'
+      });
+    }
+
+    if (!this.context.structure?.hasDocs) {
+      suggestions.push({
+        type: 'structure',
+        priority: 'low',
+        message: 'Consider adding documentation directory',
+        action: 'mkdir docs',
+        reason: 'Documentation helps team collaboration'
+      });
+    }
+
+    const pkg = this.context.packageJson;
+    if (pkg && !pkg.scripts?.lint) {
+      suggestions.push({
+        type: 'configuration',
+        priority: 'medium',
+        message: 'Add lint script to package.json',
+        action: '"lint": "eslint src/"',
+        reason: 'Linting catches common errors early'
+      });
+    }
+
+    if (pkg && !pkg.scripts?.format) {
+      suggestions.push({
+        type: 'configuration',
+        priority: 'low',
+        message: 'Add format script',
+        action: '"format": "prettier --write src/"',
+        reason: 'Code formatting ensures consistency'
+      });
+    }
+
+    return suggestions;
+  }
+
+  getCodePatternSuggestions(code, filePath) {
+    const suggestions = [];
+
+    // Check for secrets
+    if (code.includes('password') || code.includes('secret') || code.includes('api_key')) {
+      suggestions.push({
+        type: 'security',
+        priority: 'critical',
+        message: 'Potential hardcoded secret detected',
+        action: null,
+        reason: 'Move secrets to environment variables'
+      });
+    }
+
+    // Check for eval
+    if (code.includes('eval(')) {
+      suggestions.push({
+        type: 'security',
+        priority: 'critical',
+        message: 'eval() is dangerous',
+        action: null,
+        reason: 'eval() can execute arbitrary code'
+      });
+    }
+
+    // Check for console.log in production
+    if (code.includes('console.log') && filePath.includes('/src/')) {
+      suggestions.push({
+        type: 'cleanup',
+        priority: 'low',
+        message: 'Remove console.log for production',
+        action: null,
+        reason: 'Console statements may leak information'
+      });
+    }
+
+    return suggestions;
+  }
+
+  /**
+   * Get proactive suggestions based on recent changes
+   */
+  async analyzeRecentChanges() {
+    const suggestions = [];
+
+    // Check for uncommitted changes
+    try {
+      const git = (await import('simple-git')).default;
+      const status = await git(this.projectPath).status();
+
+      if (status.modified.length > 5) {
+        suggestions.push({
+          type: 'workflow',
+          priority: 'medium',
+          message: 'Consider breaking up large changes into smaller commits',
+          action: null,
+          reason: 'Smaller commits are easier to review'
+        });
+      }
+
+      if (status.staged.length === 0 && status.modified.length > 0) {
+        suggestions.push({
+          type: 'workflow',
+          priority: 'medium',
+          message: 'Stage your changes before committing',
+          action: 'git add .',
+          reason: 'Staging helps review what will be committed'
+        });
+      }
+    } catch {
+      // Not a git repo
+    }
+
+    return suggestions;
+  }
+}
+
+export default ContextAwareEngine;

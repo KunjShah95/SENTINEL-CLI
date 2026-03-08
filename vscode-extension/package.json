@@ -37,7 +37,8 @@
     "onStartupFinished",
     "onCommand:sentinel.openChat",
     "onCommand:sentinel.analyze",
-    "onView:sentinel-sidebar"
+    "onView:sentinel-sidebar",
+    "onView:sentinel-chat-history"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -178,7 +179,7 @@
         },
         {
           "id": "sentinel-chat-history",
-          "name": "Chat History"
+          "name": "Chat"
         }
       ]
     },

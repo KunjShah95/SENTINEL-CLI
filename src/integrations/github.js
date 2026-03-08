@@ -16,6 +16,12 @@ export class GitHubIntegration {
     constructor(options = {}) {
         this.token = options.token || process.env.GITHUB_TOKEN;
         this.baseUrl = options.baseUrl || 'https://api.github.com';
+        this.headers = {
+            Authorization: this.token ? `Bearer ${this.token}` : undefined,
+            Accept: 'application/vnd.github.v3+json',
+            'Content-Type': 'application/json',
+            'User-Agent': 'Sentinel-CLI',
+        };
 
         // GitHub Enterprise support with security allowlist
         this.allowedHostnames = options.allowedHostnames || DEFAULT_ALLOWED_HOSTNAMES;
@@ -58,7 +64,8 @@ export class GitHubIntegration {
             // Support wildcard subdomains
             if (allowed.startsWith('*.')) {
                 const domain = allowed.substring(2);
-                return hostname.endsWith(domain);
+                // Match subdomains: must have at least one subdomain part before domain
+                return hostname !== domain && hostname.endsWith('.' + domain);
             }
             return hostname === allowed;
         });
@@ -97,10 +104,8 @@ export class GitHubIntegration {
 
         const url = `${this.baseUrl}${endpoint}`;
         const headers = {
+            ...this.headers,
             Authorization: `Bearer ${this.token}`,
-            Accept: 'application/vnd.github.v3+json',
-            'Content-Type': 'application/json',
-            'User-Agent': 'Sentinel-CLI',
         };
 
         const options = {

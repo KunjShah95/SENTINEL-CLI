@@ -1,12 +1,15 @@
+import * as vscode from 'vscode';
 export interface AnalysisIssue {
-    id?: string;
+    id: string | number | {
+        value: string | number;
+        target: vscode.Uri;
+    } | undefined;
     file: string;
     line: number;
     column?: number;
     severity: 'critical' | 'high' | 'medium' | 'low' | 'info';
     title: string;
     message: string;
-    description?: string;
     suggestion?: string;
     fix?: string;
     analyzer: string;
@@ -37,6 +40,11 @@ export interface ToolCall {
         name: string;
         arguments: Record<string, any>;
     };
+}
+export interface ToolAction {
+    type: 'write' | 'execute' | 'delete';
+    file?: string;
+    content?: string;
 }
 export interface PreCommitResult {
     blocked: boolean;
@@ -84,6 +92,25 @@ export declare class SentinelService {
         response: string;
         toolCalls?: ToolCall[];
     }>;
+    chatStream(options: {
+        message: string;
+        agent?: string;
+        context?: string[];
+        history?: ChatMessage[];
+        onToken?: (token: string) => void;
+        onThinking?: (thinking: string) => void;
+        onAction?: (action: ToolAction) => Promise<boolean> | boolean;
+        onComplete?: () => void;
+        onError?: (error: string) => void;
+    }): Promise<void>;
+    semanticSearch(query: string, options?: {
+        topK?: number;
+    }): Promise<Array<{
+        file: string;
+        line: number;
+        snippet: string;
+        score: number;
+    }>>;
     explainCode(code: string, language?: string): Promise<string>;
     refactorCode(code: string, instructions?: string): Promise<{
         refactored: string;
@@ -99,6 +126,10 @@ export declare class SentinelService {
     private parseJsonOutput;
     private calculateSummary;
     private extractToolCalls;
+    private stripToolCallMarkup;
+    private convertToolCallsToActions;
+    private collectSearchFiles;
+    private countOccurrences;
     private extractCodeBlock;
     preCommitCheck(): Promise<PreCommitResult>;
     dispose(): void;

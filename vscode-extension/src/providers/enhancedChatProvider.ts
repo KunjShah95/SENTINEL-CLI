@@ -169,7 +169,7 @@ export class EnhancedChatProvider implements vscode.WebviewViewProvider {
                 },
                 onAction: async (action: Action) => {
                     // Request approval for write/execute actions
-                    if (action.type === 'write' || action.type === 'execute') {
+                    if (action.type === 'write' || action.type === 'execute' || action.type === 'delete') {
                         action.approved = await this.requestApproval(action);
                     } else {
                         action.approved = true;
@@ -185,6 +185,10 @@ export class EnhancedChatProvider implements vscode.WebviewViewProvider {
                         messageId: assistantMessage.id,
                         action
                     });
+
+                    if (action.approved) {
+                        await this.executeAction(action);
+                    }
 
                     return action.approved;
                 },
@@ -319,6 +323,13 @@ export class EnhancedChatProvider implements vscode.WebviewViewProvider {
                     terminal.show();
                 }
                 break;
+
+            case 'delete':
+                if (action.file) {
+                    await vscode.workspace.fs.delete(vscode.Uri.file(action.file), { useTrash: true });
+                    vscode.window.showInformationMessage(`Deleted ${action.file}`);
+                }
+                break;
         }
     }
 
@@ -384,13 +395,13 @@ export class EnhancedChatProvider implements vscode.WebviewViewProvider {
         ];
     }
 
-    private async clearHistory() {
+    public async clearHistory() {
         this._messages = [];
         await this.saveHistory();
         this.postMessage({ type: 'cleared' });
     }
 
-    private async exportChat() {
+    public async exportChat() {
         const content = this._messages.map(m => {
             return `### ${m.role.toUpperCase()} ${m.agent ? `[${m.agent}]` : ''}\n${m.content}\n`;
         }).join('\n---\n\n');
@@ -419,6 +430,18 @@ export class EnhancedChatProvider implements vscode.WebviewViewProvider {
 
     public reveal() {
         this._view?.show?.(true);
+    }
+
+    public async open() {
+        await vscode.commands.executeCommand('workbench.view.extension.sentinel-sidebar');
+        this.reveal();
+
+        // Focus the chat view on first open.
+        try {
+            await vscode.commands.executeCommand('sentinel-chat-history.focus');
+        } catch {
+            // Ignore focus command failures on older VS Code versions.
+        }
     }
 
     public async sendMessage(message: string) {

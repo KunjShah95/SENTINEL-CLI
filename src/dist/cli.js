@@ -145,6 +145,239 @@ program.hook('preAction', async (thisCommand) => {
 });
 
 // ========================================
+// TUI COMMAND - Modern Terminal UI (like Claude Code/OpenCode)
+// ========================================
+
+program
+  .command('tui')
+  .description('Launch the modern Terminal User Interface')
+  .option('--project <path>', 'Project path to analyze', '.')
+  .option('--theme <name>', 'Color theme: default, dark, light', 'default')
+  .option('--ai', 'Enable AI chat assistant', true)
+  .addHelpText('after', `
+Examples:
+  sentinel tui                    # Start interactive TUI
+  sentinel tui --project ./myapp  # Specify project path
+  sentinel tui --theme dark       # Dark theme
+  sentinel tui --no-ai            # Disable AI features
+
+TUI Features:
+  • Interactive chat with AI assistant
+  • File explorer and operations
+  • Shell command execution
+  • Code analysis and fixing
+  • Web search and documentation lookup
+  • Git operations
+  • Project management
+`)
+  .action(async (options) => {
+    try {
+      const { ModernTUI } = await import('../tui/modernTui.js');
+      const tui = new ModernTUI(options);
+      await tui.init();
+    } catch (error) {
+      console.error(chalk.red('TUI Error:'), error.message);
+      console.log(chalk.gray('Run "npm install" to ensure dependencies are installed.'));
+    }
+  });
+
+program
+  .command('chat [message...]')
+  .description('Quick AI chat (shorthand for TUI chat mode)')
+  .option('-m, --model <name>', 'AI model to use', 'mixtral')
+  .option('--no-stream', 'Disable streaming responses')
+  .action(async (message, options) => {
+    try {
+      const { UniversalAgent } = await import('../agents/universalAgent.js');
+      const agent = new UniversalAgent({ projectPath: process.cwd() });
+      
+      if (message && message.length > 0) {
+        const response = await agent.chat(message.join(' '), {
+          model: options.model,
+          stream: options.stream
+        });
+        console.log(chalk.cyan('Sentinel:'), response);
+      } else {
+        console.log(chalk.yellow('Enter interactive chat mode with: sentinel tui'));
+      }
+    } catch (error) {
+      console.error(chalk.red('Chat Error:'), error.message);
+    }
+  });
+
+program
+  .command('agent <task>')
+  .description('Run an autonomous agent to complete a complex task')
+  .option('-i, --iterations <n>', 'Maximum iterations', v => parseInt(v), 10)
+  .option('--model <name>', 'AI model to use')
+  .option('-v, --verbose', 'Verbose output')
+  .addHelpText('after', `
+Examples:
+  sentinel agent "fix all security vulnerabilities"
+  sentinel agent "add authentication to the API" --verbose
+  sentinel agent "write tests for user module"
+
+The agent will:
+  1. Analyze the task
+  2. Gather necessary information
+  3. Execute commands and make changes
+  4. Report results
+`)
+  .action(async (task, options) => {
+    try {
+      const { UniversalAgent } = await import('../agents/universalAgent.js');
+      const agent = new UniversalAgent({ 
+        projectPath: process.cwd(),
+        maxIterations: options.iterations
+      });
+      
+      console.log(chalk.cyan('Running agent:'), task);
+      console.log(chalk.gray('─'.repeat(50)));
+      
+      const result = await agent.run(task, { verbose: options.verbose });
+      
+      if (result.success) {
+        console.log(chalk.green('\n✓ Task completed'));
+        console.log(chalk.gray(`Iterations: ${result.iterations}`));
+      } else {
+        console.log(chalk.yellow('\n⚠ Task may be incomplete'));
+        console.log(chalk.gray(`Iterations: ${result.iterations}/${options.iterations}`));
+      }
+      
+      console.log(chalk.cyan('\nResult:'), result.result);
+    } catch (error) {
+      console.error(chalk.red('Agent Error:'), error.message);
+    }
+  });
+
+program
+  .command('exec <command>')
+  .description('Execute a shell command')
+  .option('-d, --dir <path>', 'Working directory')
+  .option('-t, --timeout <ms>', 'Timeout in milliseconds', v => parseInt(v), 60000)
+  .action(async (command, options) => {
+    try {
+      const { ShellExecutor } = await import('../utils/shellExecutor.js');
+      const shell = new ShellExecutor({ 
+        cwd: options.dir || process.cwd(),
+        timeout: options.timeout
+      });
+      
+      const result = await shell.exec(command);
+      
+      if (result.stdout) console.log(result.stdout);
+      if (result.stderr) console.log(chalk.red(result.stderr));
+      
+      process.exit(result.exitCode);
+    } catch (error) {
+      console.error(chalk.red('Exec Error:'), error.message);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('run <command>')
+  .description('Alias for exec - run a shell command')
+  .action(async (command) => {
+    const { ShellExecutor } = await import('../utils/shellExecutor.js');
+    const shell = new ShellExecutor({ cwd: process.cwd() });
+    const result = await shell.exec(command);
+    if (result.stdout) console.log(result.stdout);
+    if (result.stderr) console.log(chalk.red(result.stderr));
+    process.exit(result.exitCode);
+  });
+
+program
+  .command('search <query>')
+  .description('Search the web for information')
+  .option('-n, --num <number>', 'Number of results', v => parseInt(v), 10)
+  .option('--code', 'Search for code examples')
+  .option('--docs', 'Search for documentation')
+  .action(async (query, options) => {
+    try {
+      const { WebIntelligence } = await import('../utils/webIntelligence.js');
+      const web = new WebIntelligence();
+      
+      console.log(chalk.cyan('Searching:'), query);
+      
+      let result;
+      if (options.code) {
+        result = await web.searchCode(query);
+      } else if (options.docs) {
+        result = await web.searchDocs(query);
+      } else {
+        result = await web.search(query, { numResults: options.num });
+      }
+      
+      if (result.success && result.results.length > 0) {
+        console.log(chalk.green(`\nFound ${result.count} results:\n`));
+        result.results.forEach((r, i) => {
+          console.log(chalk.yellow(`${i + 1}. ${r.title}`));
+          console.log(chalk.gray(`   ${r.url}`));
+          if (r.snippet) {
+            console.log(chalk.white(`   ${r.snippet.slice(0, 150)}...`));
+          }
+          console.log('');
+        });
+      } else if (!result.success && result.message) {
+        console.log(chalk.yellow(result.message));
+        if (result.suggestion) {
+          console.log(chalk.gray(result.suggestion));
+        }
+      } else {
+        console.log(chalk.yellow('No results found'));
+      }
+    } catch (error) {
+      console.error(chalk.red('Search Error:'), error.message);
+    }
+  });
+
+program
+  .command('fetch <url>')
+  .description('Fetch content from a URL')
+  .option('-o, --output <file>', 'Save to file')
+  .option('-m, --max-length <n>', 'Max characters to fetch', v => parseInt(v), 50000)
+  .action(async (url, options) => {
+    try {
+      const { WebIntelligence } = await import('../utils/webIntelligence.js');
+      const web = new WebIntelligence();
+      
+      console.log(chalk.cyan('Fetching:'), url);
+      
+      const result = await web.fetch(url, { maxLength: options.maxLength });
+      
+      if (result.success) {
+        console.log(chalk.green('✓ Fetched'), chalk.gray(`${result.length} bytes`));
+        console.log(chalk.gray('─'.repeat(50)));
+        console.log(result.content);
+        
+        if (options.output) {
+          const { writeFile } = await import('fs/promises');
+          await writeFile(options.output, result.content);
+          console.log(chalk.green(`\nSaved to: ${options.output}`));
+        }
+      } else {
+        console.log(chalk.red('✗ Failed:'), result.error || `HTTP ${result.statusCode}`);
+      }
+    } catch (error) {
+      console.error(chalk.red('Fetch Error:'), error.message);
+    }
+  });
+
+program
+  .command('shell')
+  .description('Open interactive shell mode')
+  .action(async () => {
+    try {
+      const { ModernTUI } = await import('../tui/modernTui.js');
+      const tui = new ModernTUI({ mode: 'shell' });
+      await tui.init();
+    } catch (error) {
+      console.error(chalk.red('Shell Error:'), error.message);
+    }
+  });
+
+// ========================================
 // AUTH COMMAND - Primary way to configure API keys
 // ========================================
 program

@@ -40,15 +40,10 @@ export default class LLMOrchestrator {
           },
         ];
 
-
-
     return configuredProviders
       .map((providerConfig, index) => {
         const envKey = providerConfig.apiKeyEnv || ENV_FALLBACKS[providerConfig.provider];
         let apiKey = envKey ? process.env[envKey] : undefined;
-
-        // Note: SentinelManager keys are handled in bot.js and passed via config or we can check them here 
-        // if we make this method async or use a cached version.
 
         return {
           id: providerConfig.id || `${providerConfig.provider || 'provider'}-${index}`,
@@ -155,6 +150,363 @@ export default class LLMOrchestrator {
     };
   }
 
+  // ===== NEW: Streaming Support =====
+  async *streamChat(prompt, options = {}) {
+    const systemPrompt =
+      options.systemPrompt ||
+      'You are Sentinel CLI, a concise and upbeat assistant for developers.';
+
+    // Find the best provider that supports streaming
+    const provider = this.providers.find(p => p.provider === 'openai' || p.provider === 'groq');
+
+    if (!provider) {
+      // Fall back to non-streaming
+      const response = await this.chat(prompt, options);
+      yield { type: 'content', content: response.text };
+      yield { type: 'done' };
+      return;
+    }
+
+    try {
+      const stream = await this.callProviderStreaming(provider, prompt, {
+        systemPrompt,
+        ...options,
+      });
+
+      for await (const chunk of stream) {
+        yield chunk;
+      }
+    } catch (error) {
+      yield { type: 'error', content: error.message };
+    }
+  }
+
+  async callProviderStreaming(provider, prompt, options = {}) {
+    const messages = this.buildMessages(options.systemPrompt, prompt);
+
+    switch (provider.provider) {
+      case 'openai':
+        return this.streamOpenAI(provider, messages, options);
+      case 'groq':
+        return this.streamGroq(provider, messages, options);
+      default:
+        throw new Error(`Streaming not supported for provider: ${provider.provider}`);
+    }
+  }
+
+  async *streamOpenAI(provider, messages, _options = {}) {
+    const response = await axios.post(
+      'https://api.openai.com/v1/chat/completions',
+      {
+        model: provider.model || 'gpt-4o-mini',
+        temperature: this.temperature,
+        max_tokens: this.maxTokens,
+        messages,
+        stream: true,
+      },
+      {
+        headers: { Authorization: `Bearer ${provider.apiKey}` },
+        responseType: 'stream',
+      }
+    );
+
+    for await (const chunk of response.data) {
+      const lines = chunk.toString().split('\n').filter(line => line.startsWith('data: '));
+
+      for (const line of lines) {
+        const data = line.slice(6);
+        if (data === '[DONE]') {
+          yield { type: 'done' };
+          return;
+        }
+
+        try {
+          const parsed = JSON.parse(data);
+          const content = parsed.choices?.[0]?.delta?.content;
+          if (content) {
+            yield { type: 'content', content };
+          }
+        } catch (e) {
+          // Skip invalid JSON
+        }
+      }
+    }
+  }
+
+  async *streamGroq(provider, messages, _options = {}) {
+    const groq = GroqClient ? new GroqClient({ apiKey: provider.apiKey }) : await this.getGroqClient(provider.apiKey);
+
+    const response = await groq.chat.completions.create({
+      model: provider.model || 'llama3-70b-8192',
+      temperature: this.temperature,
+      max_tokens: this.maxTokens,
+      messages,
+      stream: true,
+    });
+
+    for await (const chunk of response) {
+      const content = chunk.choices?.[0]?.delta?.content;
+      if (content) {
+        yield { type: 'content', content };
+      }
+      if (chunk.choices?.[0]?.finish_reason) {
+        yield { type: 'done' };
+      }
+    }
+  }
+
+  async getGroqClient(apiKey) {
+    if (!GroqClient) {
+      const module = await import('groq-sdk');
+      GroqClient = module.default || module.Groq || module;
+    }
+    return new GroqClient({ apiKey });
+  }
+
+  // ===== NEW: Function Calling Support =====
+  async callWithFunctions(prompt, tools, options = {}) {
+    const systemPrompt = options.systemPrompt ||
+      'You are Sentinel CLI, an autonomous coding assistant. Use the provided tools to accomplish tasks.';
+
+    // Find a provider that supports function calling
+    const provider = this.providers.find(p =>
+      ['openai', 'groq', 'openrouter'].includes(p.provider)
+    );
+
+    if (!provider) {
+      return {
+        success: false,
+        error: 'Function calling requires OpenAI, Groq, or OpenRouter provider',
+        message: null,
+      };
+    }
+
+    try {
+      const toolsFormatted = this.formatToolsForProvider(tools, provider.provider);
+      const messages = this.buildMessages(systemPrompt, prompt);
+
+      let result;
+      switch (provider.provider) {
+        case 'openai':
+          result = await this.callOpenAIWithFunctions(provider, messages, toolsFormatted, options);
+          break;
+        case 'groq':
+          result = await this.callGroqWithFunctions(provider, messages, toolsFormatted, options);
+          break;
+        case 'openrouter':
+          result = await this.callOpenRouterWithFunctions(provider, messages, toolsFormatted, options);
+          break;
+        default:
+          return { success: false, error: 'Provider not supported for function calling' };
+      }
+
+      return result;
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  formatToolsForProvider(tools, _provider) {
+    // Convert our tool format to OpenAI function calling format
+    return Object.entries(tools).map(([name, tool]) => ({
+      type: 'function',
+      function: {
+        name: name,
+        description: tool.description,
+        parameters: {
+          type: 'object',
+          properties: Object.fromEntries(
+            Object.entries(tool.parameters || {}).map(([paramName, param]) => [
+              paramName,
+              { type: param.type, description: param.description }
+            ])
+          ),
+          required: Object.keys(tool.parameters || {}),
+        },
+      },
+    }));
+  }
+
+  async callOpenAIWithFunctions(provider, messages, tools, _options = {}) {
+    const response = await axios.post(
+      'https://api.openai.com/v1/chat/completions',
+      {
+        model: provider.model || 'gpt-4o-mini',
+        temperature: this.temperature,
+        max_tokens: this.maxTokens,
+        messages,
+        tools,
+        tool_choice: 'auto',
+      },
+      {
+        headers: { Authorization: `Bearer ${provider.apiKey}` },
+      }
+    );
+
+    const message = response.data.choices[0]?.message;
+
+    if (message.tool_calls && message.tool_calls.length > 0) {
+      return {
+        success: true,
+        hasFunctionCall: true,
+        functionCall: {
+          name: message.tool_calls[0].function.name,
+          arguments: JSON.parse(message.tool_calls[0].function.arguments),
+        },
+        message: message.content,
+      };
+    }
+
+    return {
+      success: true,
+      hasFunctionCall: false,
+      message: message.content,
+    };
+  }
+
+  async callGroqWithFunctions(provider, messages, tools, _options = {}) {
+    const groq = await this.getGroqClient(provider.apiKey);
+
+    const response = await groq.chat.completions.create({
+      model: provider.model || 'llama3-70b-8192',
+      temperature: this.temperature,
+      max_tokens: this.maxTokens,
+      messages,
+      tools,
+      tool_choice: 'auto',
+    });
+
+    const message = response.choices[0]?.message;
+
+    if (message.tool_calls && message.tool_calls.length > 0) {
+      return {
+        success: true,
+        hasFunctionCall: true,
+        functionCall: {
+          name: message.tool_calls[0].function.name,
+          arguments: JSON.parse(message.tool_calls[0].function.arguments),
+        },
+        message: message.content,
+      };
+    }
+
+    return {
+      success: true,
+      hasFunctionCall: false,
+      message: message.content,
+    };
+  }
+
+  async callOpenRouterWithFunctions(provider, messages, tools, _options = {}) {
+    const response = await axios.post(
+      'https://openrouter.ai/api/v1/chat/completions',
+      {
+        model: provider.model || 'openai/gpt-4o-mini',
+        temperature: this.temperature,
+        max_tokens: this.maxTokens,
+        messages,
+        tools,
+        tool_choice: 'auto',
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${provider.apiKey}`,
+          'HTTP-Referer': provider.metadata?.referer || 'https://github.com/KunjShah95/Sentinel-CLI',
+        },
+      }
+    );
+
+    const message = response.data.choices[0]?.message;
+
+    if (message.tool_calls && message.tool_calls.length > 0) {
+      return {
+        success: true,
+        hasFunctionCall: true,
+        functionCall: {
+          name: message.tool_calls[0].function.name,
+          arguments: JSON.parse(message.tool_calls[0].function.arguments),
+        },
+        message: message.content,
+      };
+    }
+
+    return {
+      success: true,
+      hasFunctionCall: false,
+      message: message.content,
+    };
+  }
+
+  // ===== Anthropic Tool Use (2024 API) =====
+  async callAnthropicWithTools(prompt, tools, _options = {}) {
+    const provider = this.providers.find(p => p.provider === 'anthropic');
+
+    if (!provider) {
+      return { success: false, error: 'Anthropic provider not configured' };
+    }
+
+    try {
+      // Convert tools to Anthropic's tool use format
+      const anthropicTools = Object.entries(tools).map(([name, tool]) => ({
+        name,
+        description: tool.description,
+        input_schema: {
+          type: 'object',
+          properties: Object.fromEntries(
+            Object.entries(tool.parameters || {}).map(([paramName, param]) => [
+              paramName,
+              { type: param.type, description: param.description }
+            ])
+          ),
+          required: Object.keys(tool.parameters || {}),
+        },
+      }));
+
+      const response = await axios.post(
+        'https://api.anthropic.com/v1/messages',
+        {
+          model: provider.model || 'claude-3-5-sonnet-20241022',
+          max_tokens: this.maxTokens,
+          temperature: this.temperature,
+          messages: [{ role: 'user', content: prompt }],
+          tools: anthropicTools,
+        },
+        {
+          headers: {
+            'x-api-key': provider.apiKey,
+            'anthropic-version': '2023-06-01',
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      const content = response.data.content;
+
+      // Check for tool use
+      const toolUse = content.find(c => c.type === 'tool_use');
+      if (toolUse) {
+        return {
+          success: true,
+          hasFunctionCall: true,
+          functionCall: {
+            name: toolUse.name,
+            arguments: toolUse.input,
+          },
+        };
+      }
+
+      // Return text content
+      const textContent = content.find(c => c.type === 'text');
+      return {
+        success: true,
+        hasFunctionCall: false,
+        message: textContent?.text || '',
+      };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
   async callProviderForFormat(provider, prompt, options = {}) {
     const started = Date.now();
     let response = '';
@@ -198,7 +550,14 @@ export default class LLMOrchestrator {
     if (systemPrompt) {
       messages.push({ role: 'system', content: systemPrompt });
     }
-    messages.push({ role: 'user', content: prompt });
+
+    // Handle both array of messages and single prompt
+    if (Array.isArray(prompt)) {
+      messages.push(...prompt);
+    } else {
+      messages.push({ role: 'user', content: prompt });
+    }
+
     return messages;
   }
 
@@ -311,7 +670,10 @@ export default class LLMOrchestrator {
   }
 
   generateLocalResponse(prompt) {
-    return `Sentinel-local: "${prompt.slice(0, 80)}"${prompt.length > 80 ? '...' : ''
+    const promptText = Array.isArray(prompt)
+      ? prompt.map(m => m.content).join(' ')
+      : prompt;
+    return `Sentinel-local: "${promptText.slice(0, 80)}"${promptText.length > 80 ? '...' : ''
       } (add API keys to get real answers).`;
   }
 
@@ -424,4 +786,18 @@ export default class LLMOrchestrator {
     const rankB = SEVERITY_ORDER[b] ?? SEVERITY_ORDER.medium;
     return rankA - rankB;
   }
+}
+
+// Singleton instance getter
+let llmInstance = null;
+
+export function getLLMOrchestrator(config = {}) {
+  if (!llmInstance || config.forceNew) {
+    llmInstance = new LLMOrchestrator(config);
+  }
+  return llmInstance;
+}
+
+export function setLLMOrchestrator(instance) {
+  llmInstance = instance;
 }

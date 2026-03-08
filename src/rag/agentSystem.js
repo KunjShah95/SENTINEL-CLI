@@ -206,11 +206,20 @@ export class AgentOrchestrator {
   }
 }
 
-// Helper function
-async function generateEmbedding(_text) {
-  // This would use the actual embedding service
-  // For now, placeholder
-  return new Array(768).fill(0).map(() => Math.random());
+// Helper function - now uses real embeddings
+let embeddingProvider = null;
+
+async function getEmbeddingProvider() {
+  if (!embeddingProvider) {
+    const { EmbeddingProvider } = await import('../search/embeddingProvider.js');
+    embeddingProvider = await EmbeddingProvider.create('tfidf');
+  }
+  return embeddingProvider;
+}
+
+async function generateEmbedding(text) {
+  const provider = await getEmbeddingProvider();
+  return await provider.generateEmbedding(text);
 }
 
 export default AgentOrchestrator;

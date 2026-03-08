@@ -289,9 +289,15 @@ export class BaseAnalyzer {
         type: 'security',
       },
       {
+        name: 'AWS Credentials',
+        pattern: /(AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY|AKIA[0-9A-Z]{16})\s*=\s*['"][^'"]+['"]/gi,
+        severity: 'critical',
+        type: 'security',
+      },
+      {
         name: 'API Key Exposure',
         pattern: /(api[_-]?key|secret[_-]?key|token)\s*=\s*['"][^'"]{20,}['"]/gi,
-        severity: 'medium',
+        severity: 'high',
         type: 'security',
       },
       {

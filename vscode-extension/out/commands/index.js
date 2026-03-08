@@ -38,8 +38,8 @@ const vscode = __importStar(require("vscode"));
 function registerCommands(context, services) {
     const { sentinelService, chatProvider, sidebarProvider, diagnostics, fileOps, terminalManager } = services;
     // Open AI Chat
-    context.subscriptions.push(vscode.commands.registerCommand('sentinel.openChat', () => {
-        chatProvider.open();
+    context.subscriptions.push(vscode.commands.registerCommand('sentinel.openChat', async () => {
+        await chatProvider.open();
     }));
     // Analyze current file
     context.subscriptions.push(vscode.commands.registerCommand('sentinel.analyze', async () => {
@@ -265,14 +265,13 @@ function registerCommands(context, services) {
         }
     }));
     // Clear chat
-    context.subscriptions.push(vscode.commands.registerCommand('sentinel.clearChat', () => {
-        chatProvider.open();
-        vscode.window.showInformationMessage('Use the chat UI to clear history');
+    context.subscriptions.push(vscode.commands.registerCommand('sentinel.clearChat', async () => {
+        await chatProvider.clearHistory();
+        vscode.window.showInformationMessage('Chat history cleared');
     }));
     // Export chat
     context.subscriptions.push(vscode.commands.registerCommand('sentinel.exportChat', async () => {
-        chatProvider.open();
-        vscode.window.showInformationMessage('Use the chat UI to export');
+        await chatProvider.exportChat();
     }));
     // Show settings
     context.subscriptions.push(vscode.commands.registerCommand('sentinel.showSettings', () => {

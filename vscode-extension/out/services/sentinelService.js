@@ -37,6 +37,8 @@ exports.SentinelService = void 0;
 const child_process_1 = require("child_process");
 const util_1 = require("util");
 const vscode = __importStar(require("vscode"));
+const path = __importStar(require("path"));
+const fs = __importStar(require("fs/promises"));
 const execAsync = (0, util_1.promisify)(child_process_1.exec);
 class SentinelService {
     outputChannel;
@@ -232,6 +234,85 @@ class SentinelService {
             throw error;
         }
     }
+    async chatStream(options) {
+        try {
+            options.onThinking?.(`Routing request to ${options.agent || 'adaptive'} agent...`);
+            const result = await this.chat(options.message, {
+                files: options.context,
+                history: options.history
+            });
+            const responseText = this.stripToolCallMarkup(result.response);
+            const tokens = responseText.match(/\S+\s*/g) || [];
+            for (const token of tokens) {
+                options.onToken?.(token);
+            }
+            const actions = this.convertToolCallsToActions(result.toolCalls || []);
+            for (const action of actions) {
+                if (options.onAction) {
+                    await options.onAction(action);
+                }
+            }
+            options.onComplete?.();
+        }
+        catch (error) {
+            options.onError?.(error.message || 'Unknown chat error');
+            throw error;
+        }
+    }
+    async semanticSearch(query, options) {
+        const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        if (!workspaceRoot) {
+            return [];
+        }
+        const topK = options?.topK || 5;
+        const files = await this.collectSearchFiles(workspaceRoot);
+        const rawTerms = query
+            .toLowerCase()
+            .split(/\s+/)
+            .map(term => term.trim())
+            .filter(Boolean);
+        const terms = rawTerms.filter(term => term.length > 2);
+        const searchTerms = terms.length > 0 ? terms : rawTerms.slice(0, 3);
+        const results = [];
+        for (const filePath of files) {
+            let content = '';
+            try {
+                content = await fs.readFile(filePath, 'utf8');
+            }
+            catch {
+                continue;
+            }
+            const lowercase = content.toLowerCase();
+            let score = 0;
+            for (const term of searchTerms) {
+                if (!term)
+                    continue;
+                score += this.countOccurrences(lowercase, term);
+            }
+            if (score === 0) {
+                continue;
+            }
+            const lines = content.split(/\r?\n/);
+            let matchLine = 1;
+            let snippet = '';
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                if (searchTerms.some(term => term && line.toLowerCase().includes(term))) {
+                    matchLine = i + 1;
+                    snippet = line.trim();
+                    break;
+                }
+            }
+            results.push({
+                file: filePath,
+                line: matchLine,
+                snippet: snippet || path.basename(filePath),
+                score
+            });
+        }
+        results.sort((a, b) => b.score - a.score);
+        return results.slice(0, topK);
+    }
     async explainCode(code, language) {
         const prompt = `Explain this ${language || ''} code:\n\n${code}`;
         const result = await this.chat(prompt);
@@ -322,6 +403,88 @@ class SentinelService {
             }
         }
         return toolCalls;
+    }
+    stripToolCallMarkup(output) {
+        return output.replace(/<tool_call>[\s\S]*?<\/tool_call>/g, '').trim();
+    }
+    convertToolCallsToActions(toolCalls) {
+        const actions = [];
+        for (const toolCall of toolCalls) {
+            const functionName = toolCall.function?.name || '';
+            const args = toolCall.function?.arguments || {};
+            if (toolCall.type === 'file_write' || functionName.includes('write')) {
+                actions.push({
+                    type: 'write',
+                    file: args.file || args.path,
+                    content: args.content || args.text || ''
+                });
+                continue;
+            }
+            if (toolCall.type === 'terminal' || functionName.includes('command') || functionName.includes('exec')) {
+                actions.push({
+                    type: 'execute',
+                    content: args.command || args.cmd || ''
+                });
+                continue;
+            }
+            if (functionName.includes('delete')) {
+                actions.push({
+                    type: 'delete',
+                    file: args.file || args.path
+                });
+            }
+        }
+        return actions;
+    }
+    async collectSearchFiles(rootPath) {
+        const includeExtensions = new Set([
+            '.js', '.jsx', '.ts', '.tsx', '.py', '.go', '.java', '.rs', '.kt', '.swift',
+            '.json', '.yaml', '.yml', '.md'
+        ]);
+        const excludedDirs = new Set([
+            'node_modules', '.git', 'dist', 'build', '.next', '.turbo', 'out', 'coverage'
+        ]);
+        const files = [];
+        const walk = async (dir) => {
+            let entries = [];
+            try {
+                entries = await fs.readdir(dir, { withFileTypes: true });
+            }
+            catch {
+                return;
+            }
+            for (const entry of entries) {
+                if (entry.isDirectory()) {
+                    if (!excludedDirs.has(entry.name)) {
+                        await walk(path.join(dir, entry.name));
+                    }
+                    continue;
+                }
+                if (!entry.isFile()) {
+                    continue;
+                }
+                const fullPath = path.join(dir, entry.name);
+                if (includeExtensions.has(path.extname(fullPath).toLowerCase())) {
+                    files.push(fullPath);
+                }
+            }
+        };
+        await walk(rootPath);
+        return files.slice(0, 500);
+    }
+    countOccurrences(content, term) {
+        if (!term)
+            return 0;
+        let count = 0;
+        let position = 0;
+        while (position < content.length) {
+            const index = content.indexOf(term, position);
+            if (index === -1)
+                break;
+            count++;
+            position = index + term.length;
+        }
+        return count;
     }
     extractCodeBlock(output) {
         // Extract code from markdown code blocks

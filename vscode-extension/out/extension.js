@@ -37,7 +37,7 @@ exports.activate = activate;
 exports.deactivate = deactivate;
 const vscode = __importStar(require("vscode"));
 const sentinelService_1 = require("./services/sentinelService");
-const chatProvider_1 = require("./providers/chatProvider");
+const enhancedChatProvider_1 = require("./providers/enhancedChatProvider");
 const sidebarProvider_1 = require("./providers/sidebarProvider");
 const fileOperations_1 = require("./utils/fileOperations");
 const terminalManager_1 = require("./utils/terminalManager");
@@ -50,17 +50,19 @@ let fileOperations;
 let terminalManager;
 let issueDiagnostics;
 function activate(context) {
-    console.log('🛡️ Sentinel AI extension is now active');
+    console.log(' Sentinel AI extension is now active');
     // Initialize services
     sentinelService = new sentinelService_1.SentinelService();
     fileOperations = new fileOperations_1.FileOperations();
     terminalManager = new terminalManager_1.TerminalManager();
     issueDiagnostics = new issueDiagnostics_1.IssueDiagnostics();
     // Initialize providers
-    chatProvider = new chatProvider_1.ChatProvider(context.extensionUri, sentinelService, fileOperations, terminalManager);
+    chatProvider = new enhancedChatProvider_1.EnhancedChatProvider(context, sentinelService, fileOperations);
     sidebarProvider = new sidebarProvider_1.SidebarProvider(context.extensionUri, sentinelService);
     // Register webview providers
     context.subscriptions.push(vscode.window.registerWebviewViewProvider('sentinel-issues', sidebarProvider, {
+        webviewOptions: { retainContextWhenHidden: true }
+    }), vscode.window.registerWebviewViewProvider('sentinel-chat-history', chatProvider, {
         webviewOptions: { retainContextWhenHidden: true }
     }));
     // Register commands
@@ -68,9 +70,9 @@ function activate(context) {
         sentinelService,
         chatProvider,
         sidebarProvider,
-        diagnostics: issueDiagnostics,
         fileOps: fileOperations,
-        terminalManager
+        terminalManager,
+        diagnostics: issueDiagnostics
     });
     // Setup file watchers for auto-analysis
     setupFileWatchers(context);

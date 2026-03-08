@@ -84,27 +84,30 @@ describe('ErrorHandler', () => {
     });
 
     it('should register custom handlers', () => {
-        const handler = jest.fn();
+        let called = false;
+        const handler = () => { called = true; };
         errorHandler.registerHandler(handler);
 
         expect(errorHandler.handlers).toContain(handler);
     });
 
     it('should execute custom handlers on error', async () => {
-        const handler = jest.fn();
+        let handlerArgs = null;
+        const handler = (...args) => {
+            handlerArgs = args;
+        };
         errorHandler.registerHandler(handler);
 
         const error = new SentinelError('Test', 'TEST', 'medium');
         await errorHandler.handle(error);
 
-        expect(handler).toHaveBeenCalledWith(
-            error,
-            expect.objectContaining({
-                message: 'Test',
-                code: 'TEST',
-                severity: 'medium'
-            })
-        );
+        expect(handlerArgs).toHaveLength(2);
+        expect(handlerArgs[0]).toBe(error);
+        expect(handlerArgs[1]).toEqual(expect.objectContaining({
+            message: 'Test',
+            code: 'TEST',
+            severity: 'medium'
+        }));
     });
 
     it('should convert regular errors to SentinelError', async () => {

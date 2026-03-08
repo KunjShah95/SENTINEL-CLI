@@ -132,12 +132,11 @@ class EnhancedChatProvider {
         try {
             // Build context from workspace
             const contextFiles = files || await this.getRelevantFiles(content);
-            const context = await this.buildContext(contextFiles);
             // Stream response from Sentinel
             await this._sentinelService.chatStream({
                 message: content,
                 agent: this._currentAgent,
-                context,
+                context: contextFiles,
                 history: this._messages.slice(-10), // Last 10 messages
                 onToken: (token) => {
                     assistantMessage.content += token;
@@ -157,7 +156,7 @@ class EnhancedChatProvider {
                 },
                 onAction: async (action) => {
                     // Request approval for write/execute actions
-                    if (action.type === 'write' || action.type === 'execute') {
+                    if (action.type === 'write' || action.type === 'execute' || action.type === 'delete') {
                         action.approved = await this.requestApproval(action);
                     }
                     else {
@@ -172,6 +171,9 @@ class EnhancedChatProvider {
                         messageId: assistantMessage.id,
                         action
                     });
+                    if (action.approved) {
+                        await this.executeAction(action);
+                    }
                     return action.approved;
                 },
                 onComplete: () => {
@@ -250,7 +252,7 @@ class EnhancedChatProvider {
             type: action.type,
             file: action.file,
             content: action.content,
-            onApprove: () => {
+            onApprove: async () => {
                 this.postMessage({
                     type: 'actionApproved',
                     action
@@ -291,6 +293,12 @@ class EnhancedChatProvider {
                     const terminal = vscode.window.createTerminal('Sentinel');
                     terminal.sendText(action.content);
                     terminal.show();
+                }
+                break;
+            case 'delete':
+                if (action.file) {
+                    await vscode.workspace.fs.delete(vscode.Uri.file(action.file), { useTrash: true });
+                    vscode.window.showInformationMessage(`Deleted ${action.file}`);
                 }
                 break;
         }
@@ -382,6 +390,17 @@ class EnhancedChatProvider {
     }
     reveal() {
         this._view?.show?.(true);
+    }
+    async open() {
+        await vscode.commands.executeCommand('workbench.view.extension.sentinel-sidebar');
+        this.reveal();
+        // Focus the chat view on first open.
+        try {
+            await vscode.commands.executeCommand('sentinel-chat-history.focus');
+        }
+        catch {
+            // Ignore focus command failures on older VS Code versions.
+        }
     }
     async sendMessage(message) {
         await this.handleUserMessage(message);

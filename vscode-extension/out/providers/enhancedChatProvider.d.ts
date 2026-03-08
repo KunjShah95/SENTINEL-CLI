@@ -33,12 +33,13 @@ export declare class EnhancedChatProvider implements vscode.WebviewViewProvider 
     private executeAction;
     private regenerateResponse;
     private getAvailableAgents;
-    private clearHistory;
-    private exportChat;
+    clearHistory(): Promise<void>;
+    exportChat(): Promise<void>;
     private saveHistory;
     private postMessage;
     private generateId;
     reveal(): void;
+    open(): Promise<void>;
     sendMessage(message: string): Promise<void>;
     selectAgent(agent: string): void;
     private _getHtmlForWebview;

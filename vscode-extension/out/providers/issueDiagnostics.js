@@ -46,7 +46,7 @@ class IssueDiagnostics {
         for (const issue of issues) {
             const uri = vscode.Uri.file(issue.file);
             const range = new vscode.Range((issue.line || 1) - 1, 0, (issue.line || 1) - 1, 1000);
-            const diagnostic = new vscode.Diagnostic(range, `${issue.title}: ${issue.description || issue.message}`, this.mapSeverity(issue.severity));
+            const diagnostic = new vscode.Diagnostic(range, `${issue.title}: ${issue.message}`, this.mapSeverity(issue.severity));
             diagnostic.code = issue.id;
             diagnostic.source = 'Sentinel';
             if (issue.fix) {

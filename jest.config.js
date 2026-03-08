@@ -1,7 +1,6 @@
 export default {
   testEnvironment: 'node',
   transform: {},
-  extensionsToTreatAsEsm: ['.js'],
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1',
   },
@@ -18,7 +17,6 @@ export default {
   coverageReporters: ['text', 'lcov', 'html'],
   testTimeout: 30000,
   passWithNoTests: true,
-  // Ignore dist folder
   testPathIgnorePatterns: [
     '/node_modules/',
     '/dist/',

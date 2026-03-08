@@ -22,6 +22,7 @@ export class RAGPipeline {
     this.options = {
       vectorDB: options.vectorDB || 'chroma',
       embeddingModel: options.embeddingModel || 'text-embedding-ada-002',
+      embeddingProvider: options.embeddingProvider || 'tfidf',
       llmModel: options.llmModel || 'gpt-4',
       topK: options.topK || 10,
       rerank: options.rerank !== false,
@@ -34,6 +35,7 @@ export class RAGPipeline {
     this.vectorDB = null;
     this.llmOrchestrator = null;
     this.distributedEngine = null;
+    this.embeddingProvider = null;
   }
 
   async initialize() {
@@ -51,6 +53,15 @@ export class RAGPipeline {
       maxWorkers: this.options.maxWorkers || 8
     });
     await this.distributedEngine.initialize();
+
+    // Initialize embedding provider
+    const { EmbeddingProvider } = await import('../utils/embeddingProvider.js');
+    this.embeddingProvider = await EmbeddingProvider.create(
+      this.options.embeddingProvider
+    );
+    if (this.embeddingProvider.initialize) {
+      await this.embeddingProvider.initialize();
+    }
 
     console.log('✅ RAG Pipeline initialized');
   }
@@ -175,20 +186,14 @@ export class RAGPipeline {
   }
 
   /**
-   * Generate embedding
+   * Generate embedding using the configured provider
    */
   async generateEmbedding(text) {
-    // Use distributed engine for parallel embedding generation
-    const taskId = await this.distributedEngine.addTask({
-      type: 'generate_embedding',
-      data: { text }
-    });
+    if (!this.embeddingProvider) {
+      throw new Error('EmbeddingProvider not initialized. Call initialize() first.');
+    }
 
-    // Wait for completion
-    await this.distributedEngine.waitForCompletion();
-
-    const result = this.distributedEngine.completedTasks.get(taskId);
-    return result.result;
+    return this.embeddingProvider.generateEmbedding(text);
   }
 
   /**

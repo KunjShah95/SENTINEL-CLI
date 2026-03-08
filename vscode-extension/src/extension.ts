@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { SentinelService } from './services/sentinelService';
-import { ChatProvider } from './providers/chatProvider';
+import { EnhancedChatProvider } from './providers/enhancedChatProvider';
 import { SidebarProvider } from './providers/sidebarProvider';
 import { FileOperations } from './utils/fileOperations';
 import { TerminalManager } from './utils/terminalManager';
@@ -8,7 +8,7 @@ import { IssueDiagnostics } from './providers/issueDiagnostics';
 import { registerCommands } from './commands';
 
 let sentinelService: SentinelService;
-let chatProvider: ChatProvider;
+let chatProvider: EnhancedChatProvider;
 let sidebarProvider: SidebarProvider;
 let fileOperations: FileOperations;
 let terminalManager: TerminalManager;
@@ -24,12 +24,15 @@ export function activate(context: vscode.ExtensionContext) {
     issueDiagnostics = new IssueDiagnostics();
 
     // Initialize providers
-    chatProvider = new ChatProvider(context.extensionUri, sentinelService, fileOperations, terminalManager);
+    chatProvider = new EnhancedChatProvider(context, sentinelService, fileOperations);
     sidebarProvider = new SidebarProvider(context.extensionUri, sentinelService);
 
     // Register webview providers
     context.subscriptions.push(
         vscode.window.registerWebviewViewProvider('sentinel-issues', sidebarProvider, {
+            webviewOptions: { retainContextWhenHidden: true }
+        }),
+        vscode.window.registerWebviewViewProvider('sentinel-chat-history', chatProvider, {
             webviewOptions: { retainContextWhenHidden: true }
         })
     );

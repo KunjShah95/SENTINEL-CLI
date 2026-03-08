@@ -190,22 +190,21 @@ ${chunk.content}`;
   }
 
   /**
-   * Get embedding from LLM
+   * Get embedding from provider
    */
   async getEmbedding(text, _orchestrator) {
-    // Simplified - in production, use actual embedding API
-    // For now, return a simple hash-based vector
-    const hash = crypto.createHash('sha256').update(text).digest();
-    const vector = Array.from(hash.slice(0, 32), byte => byte / 255);
-    return vector;
+    // Use real embedding provider instead of fake SHA-256 hashes
+    if (!this.embeddingProvider) {
+      const { EmbeddingProvider } = await import('./embeddingProvider.js');
+      this.embeddingProvider = await EmbeddingProvider.create(
+        this.options.provider || 'tfidf'
+      );
+      if (this.embeddingProvider.initialize) {
+        await this.embeddingProvider.initialize();
+      }
+    }
 
-    /* In production with OpenAI:
-    const response = await orchestrator.embeddings(text, {
-      provider: this.options.provider,
-      model: this.options.embeddingModel
-    });
-    return response.embedding;
-    */
+    return this.embeddingProvider.generateEmbedding(text);
   }
 
   /**
