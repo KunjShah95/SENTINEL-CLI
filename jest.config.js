@@ -15,6 +15,14 @@ export default {
   ],
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov', 'html'],
+  coverageThreshold: {
+    global: {
+      branches: 2,
+      functions: 3,
+      lines: 3,
+      statements: 3,
+    },
+  },
   testTimeout: 30000,
   passWithNoTests: true,
   testPathIgnorePatterns: [

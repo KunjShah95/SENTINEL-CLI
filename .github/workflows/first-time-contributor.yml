@@ -1,0 +1,79 @@
+name: First Time Contributor
+
+on:
+  pull_request:
+    types: [opened]
+
+jobs:
+  welcome:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check contributor status
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const author = pr.user.login;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            
+            const { data: prs } = await github.rest.pulls.list({
+              owner,
+              repo,
+              state: 'all',
+              per_page: 100
+            });
+            
+            const authorPrs = prs.filter(p => p.user.login === author);
+            const isFirstTime = authorPrs.length === 0;
+            const mergedCount = authorPrs.filter(p => p.merged_at !== null).length;
+            
+            if (isFirstTime) {
+              await github.rest.issues.addLabels({
+                owner,
+                repo,
+                issue_number: pr.number,
+                labels: ['first-time-contributor']
+              });
+              
+              const msg = 'Welcome to Sentinel, @' + author + '!\n\n' +
+                'Thanks for your first PR. Here is what to expect:\n' +
+                '1. Review time: I will review within 24-48 hours\n' +
+                '2. Feedback: If changes are needed, I will comment directly\n' +
+                '3. Merging: Once approved, I will merge (please do not merge yourself)\n\n' +
+                'Tips for a smooth review:\n' +
+                '- Linked an issue?\n' +
+                '- Tests pass locally?\n' +
+                '- Followed CONTRIBUTING.md?\n' +
+                '- Explained your changes clearly?\n\n' +
+                'Looking forward to your contribution!';
+              
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: pr.number,
+                body: msg
+              });
+            } else {
+              let msg = 'Welcome back, @' + author + '!';
+              
+              if (mergedCount > 0) {
+                msg = msg + ' You have contributed ' + mergedCount + ' merged PR(s) - thank you!';
+                
+                await github.rest.issues.addLabels({
+                  owner,
+                  repo,
+                  issue_number: pr.number,
+                  labels: ['returning-contributor']
+                });
+              }
+              
+              msg = msg + '\n\nThanks for another contribution! I will review shortly.';
+              
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: pr.number,
+                body: msg
+              });
+            }

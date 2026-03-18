@@ -1,0 +1,57 @@
+name: Issue Required
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize]
+
+jobs:
+  check-issue:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for linked issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const body = pr.body || '';
+            const title = pr.title || '';
+            
+            const issuePattern = /(closes|fixes|resolves|#)\s*#?(\d+)/i;
+            const hasIssueReference = issuePattern.test(body) || issuePattern.test(title);
+            
+            if (!hasIssueReference) {
+              const prNumber = pr.number;
+              const repo = context.repo;
+              
+              await github.rest.issues.addLabels({
+                owner: repo.owner,
+                repo: repo.repo,
+                issue_number: prNumber,
+                labels: ['needs-issue-link']
+              });
+              
+              await github.rest.pulls.update({
+                owner: repo.owner,
+                repo: repo.repo,
+                pull_number: prNumber,
+                state: 'closed'
+              });
+              
+              await github.rest.issues.createComment({
+                owner: repo.owner,
+                repo: repo.repo,
+                issue_number: prNumber,
+                body: `Hi! Thanks for your interest in contributing to Sentinel.
+
+This PR was closed because it doesn't link to an open issue.
+
+**Please follow this process:**
+1. Open a new issue describing the change you want to make
+2. Wait for feedback/discussion on the issue
+3. Once the issue is approved, submit your PR with a link to that issue
+
+This helps us ensure every change is discussed before code is written. Thank you for understanding!`
+              });
+              
+              console.log('PR closed - no linked issue found');
+            }

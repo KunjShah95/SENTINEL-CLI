@@ -725,6 +725,28 @@ export async function getLanguageAgent(language) {
       agent = new RubyAgent();
       break;
 
+    case 'kotlin':
+    case 'kt':
+      agent = new KotlinAgent();
+      break;
+
+    case 'swift':
+      agent = new SwiftAgent();
+      break;
+
+    case 'php':
+      agent = new PHPAgent();
+      break;
+
+    case 'c':
+      agent = new CAgent();
+      break;
+
+    case 'cpp':
+    case 'c++':
+      agent = new CppAgent();
+      break;
+
     default:
       throw new Error(`Unsupported language: ${language}`);
   }
@@ -1033,4 +1055,399 @@ export class RubyAgent extends LanguageAgent {
   async lint(_code) { return { issues: [] }; }
 }
 
-export default { getLanguageAgent, JavaScriptAgent, PythonAgent, RustAgent, JavaAgent, GoAgent, CSharpAgent, RubyAgent };
+/**
+ * Kotlin Language Agent
+ */
+export class KotlinAgent extends LanguageAgent {
+  constructor() {
+    super('kotlin');
+  }
+
+  async initialize() {
+    try {
+      const TreeSitter = (await import('tree-sitter')).default;
+      const Kotlin = (await import('tree-sitter-kotlin')).catch(() => null);
+
+      if (TreeSitter && Kotlin) {
+        this.parser = new TreeSitter();
+        try {
+          await TreeSitter.init();
+          this.parser.setLanguage(Kotlin);
+          this.useTreeSitter = true;
+        } catch (initErr) {
+          console.warn('Tree-sitter Kotlin init failed');
+          this.useTreeSitter = false;
+        }
+      }
+    } catch (error) {
+      console.warn(`⚠️  Tree-sitter Kotlin not available: ${error.message}`);
+      this.useTreeSitter = false;
+    }
+    this.initialized = true;
+  }
+
+  async parse(code) {
+    if (!this.initialized) await this.initialize();
+    if (this.useTreeSitter && this.parser) {
+      try {
+        const tree = this.parser.parse(code);
+        return { type: 'tree-sitter', tree, rootNode: tree.rootNode, success: true };
+      } catch (error) {
+        return { success: false, error: error.message };
+      }
+    }
+    return { success: false, error: 'Parser not available' };
+  }
+
+  async analyze(code) {
+    const ast = await this.parse(code);
+    if (!ast.success) return { success: false, error: ast.error };
+
+    const analysis = { classes: [], functions: [], interfaces: [], objects: [], errors: [] };
+    this.walkAST(ast.rootNode, analysis);
+    return { success: true, analysis };
+  }
+
+  walkAST(node, analysis) {
+    if (!node) return;
+    if (node.type === 'class_declaration') {
+      analysis.classes.push({ name: this.extractName(node), line: node.startPosition.row });
+    }
+    if (node.type === 'function_declaration') {
+      analysis.functions.push({ name: this.extractName(node), line: node.startPosition.row });
+    }
+    if (node.type === 'object_declaration') {
+      analysis.objects.push({ name: this.extractName(node), line: node.startPosition.row });
+    }
+    for (const child of node.children) {
+      this.walkAST(child, analysis);
+    }
+  }
+
+  extractName(_node) { return 'unknown'; }
+  async generate(_spec) { return `Generated Kotlin code for ${_spec.type}`; }
+  async refactor(_code, _transformation) { return _code; }
+  async lint(_code) { return { issues: [] }; }
+}
+
+/**
+ * Swift Language Agent
+ */
+export class SwiftAgent extends LanguageAgent {
+  constructor() {
+    super('swift');
+  }
+
+  async initialize() {
+    try {
+      const TreeSitter = (await import('tree-sitter')).default;
+      const Swift = (await import('tree-sitter-swift')).catch(() => null);
+
+      if (TreeSitter && Swift) {
+        this.parser = new TreeSitter();
+        try {
+          await TreeSitter.init();
+          this.parser.setLanguage(Swift);
+          this.useTreeSitter = true;
+        } catch (initErr) {
+          console.warn('Tree-sitter Swift init failed');
+          this.useTreeSitter = false;
+        }
+      }
+    } catch (error) {
+      console.warn(`⚠️  Tree-sitter Swift not available: ${error.message}`);
+      this.useTreeSitter = false;
+    }
+    this.initialized = true;
+  }
+
+  async parse(code) {
+    if (!this.initialized) await this.initialize();
+    if (this.useTreeSitter && this.parser) {
+      try {
+        const tree = this.parser.parse(code);
+        return { type: 'tree-sitter', tree, rootNode: tree.rootNode, success: true };
+      } catch (error) {
+        return { success: false, error: error.message };
+      }
+    }
+    return { success: false, error: 'Parser not available' };
+  }
+
+  async analyze(code) {
+    const ast = await this.parse(code);
+    if (!ast.success) return { success: false, error: ast.error };
+
+    const analysis = { classes: [], structs: [], functions: [], protocols: [], extensions: [], errors: [] };
+    this.walkAST(ast.rootNode, analysis);
+    return { success: true, analysis };
+  }
+
+  walkAST(node, analysis) {
+    if (!node) return;
+    if (node.type === 'class_declaration') {
+      analysis.classes.push({ name: this.extractName(node), line: node.startPosition.row });
+    }
+    if (node.type === 'struct_declaration') {
+      analysis.structs.push({ name: this.extractName(node), line: node.startPosition.row });
+    }
+    if (node.type === 'function_declaration') {
+      analysis.functions.push({ name: this.extractName(node), line: node.startPosition.row });
+    }
+    if (node.type === 'protocol_declaration') {
+      analysis.protocols.push({ name: this.extractName(node), line: node.startPosition.row });
+    }
+    if (node.type === 'extension_declaration') {
+      analysis.extensions.push({ name: this.extractName(node), line: node.startPosition.row });
+    }
+    for (const child of node.children) {
+      this.walkAST(child, analysis);
+    }
+  }
+
+  extractName(_node) { return 'unknown'; }
+  async generate(_spec) { return `Generated Swift code for ${_spec.type}`; }
+  async refactor(_code, _transformation) { return _code; }
+  async lint(_code) { return { issues: [] }; }
+}
+
+/**
+ * PHP Language Agent
+ */
+export class PHPAgent extends LanguageAgent {
+  constructor() {
+    super('php');
+  }
+
+  async initialize() {
+    try {
+      const TreeSitter = (await import('tree-sitter')).default;
+      const PHP = (await import('tree-sitter-php')).catch(() => null);
+
+      if (TreeSitter && PHP) {
+        this.parser = new TreeSitter();
+        try {
+          await TreeSitter.init();
+          this.parser.setLanguage(PHP);
+          this.useTreeSitter = true;
+        } catch (initErr) {
+          console.warn('Tree-sitter PHP init failed');
+          this.useTreeSitter = false;
+        }
+      }
+    } catch (error) {
+      console.warn(`⚠️  Tree-sitter PHP not available: ${error.message}`);
+      this.useTreeSitter = false;
+    }
+    this.initialized = true;
+  }
+
+  async parse(code) {
+    if (!this.initialized) await this.initialize();
+    if (this.useTreeSitter && this.parser) {
+      try {
+        const tree = this.parser.parse(code);
+        return { type: 'tree-sitter', tree, rootNode: tree.rootNode, success: true };
+      } catch (error) {
+        return { success: false, error: error.message };
+      }
+    }
+    return { success: false, error: 'Parser not available' };
+  }
+
+  async analyze(code) {
+    const ast = await this.parse(code);
+    if (!ast.success) return { success: false, error: ast.error };
+
+    const analysis = { classes: [], functions: [], traits: [], interfaces: [], errors: [] };
+    this.walkAST(ast.rootNode, analysis);
+    return { success: true, analysis };
+  }
+
+  walkAST(node, analysis) {
+    if (!node) return;
+    if (node.type === 'class_declaration') {
+      analysis.classes.push({ name: this.extractName(node), line: node.startPosition.row });
+    }
+    if (node.type === 'function_declaration') {
+      analysis.functions.push({ name: this.extractName(node), line: node.startPosition.row });
+    }
+    if (node.type === 'trait_declaration') {
+      analysis.traits.push({ name: this.extractName(node), line: node.startPosition.row });
+    }
+    if (node.type === 'interface_declaration') {
+      analysis.interfaces.push({ name: this.extractName(node), line: node.startPosition.row });
+    }
+    for (const child of node.children) {
+      this.walkAST(child, analysis);
+    }
+  }
+
+  extractName(_node) { return 'unknown'; }
+  async generate(_spec) { return `Generated PHP code for ${_spec.type}`; }
+  async refactor(_code, _transformation) { return _code; }
+  async lint(_code) { return { issues: [] }; }
+}
+
+/**
+ * C Language Agent
+ */
+export class CAgent extends LanguageAgent {
+  constructor() {
+    super('c');
+  }
+
+  async initialize() {
+    try {
+      const TreeSitter = (await import('tree-sitter')).default;
+      const C = (await import('tree-sitter-c')).catch(() => null);
+
+      if (TreeSitter && C) {
+        this.parser = new TreeSitter();
+        try {
+          await TreeSitter.init();
+          this.parser.setLanguage(C);
+          this.useTreeSitter = true;
+        } catch (initErr) {
+          console.warn('Tree-sitter C init failed');
+          this.useTreeSitter = false;
+        }
+      }
+    } catch (error) {
+      console.warn(`⚠️  Tree-sitter C not available: ${error.message}`);
+      this.useTreeSitter = false;
+    }
+    this.initialized = true;
+  }
+
+  async parse(code) {
+    if (!this.initialized) await this.initialize();
+    if (this.useTreeSitter && this.parser) {
+      try {
+        const tree = this.parser.parse(code);
+        return { type: 'tree-sitter', tree, rootNode: tree.rootNode, success: true };
+      } catch (error) {
+        return { success: false, error: error.message };
+      }
+    }
+    return { success: false, error: 'Parser not available' };
+  }
+
+  async analyze(code) {
+    const ast = await this.parse(code);
+    if (!ast.success) return { success: false, error: ast.error };
+
+    const analysis = { functions: [], structs: [], enums: [], macros: [], headers: [], errors: [] };
+    this.walkAST(ast.rootNode, analysis);
+    return { success: true, analysis };
+  }
+
+  walkAST(node, analysis) {
+    if (!node) return;
+    if (node.type === 'function_definition') {
+      analysis.functions.push({ name: this.extractName(node), line: node.startPosition.row });
+    }
+    if (node.type === 'struct_specifier') {
+      analysis.structs.push({ name: this.extractName(node), line: node.startPosition.row });
+    }
+    if (node.type === 'enum_specifier') {
+      analysis.enums.push({ name: this.extractName(node), line: node.startPosition.row });
+    }
+    if (node.type === 'preproc_include' || node.type === 'preproc_def') {
+      const text = node.text || '';
+      if (text.includes('.h')) analysis.headers.push({ file: text, line: node.startPosition.row });
+      else analysis.macros.push({ name: text.split(' ')[1], line: node.startPosition.row });
+    }
+    for (const child of node.children) {
+      this.walkAST(child, analysis);
+    }
+  }
+
+  extractName(_node) { return 'unknown'; }
+  async generate(_spec) { return `Generated C code for ${_spec.type}`; }
+  async refactor(_code, _transformation) { return _code; }
+  async lint(_code) { return { issues: [] }; }
+}
+
+/**
+ * C++ Language Agent
+ */
+export class CppAgent extends LanguageAgent {
+  constructor() {
+    super('cpp');
+  }
+
+  async initialize() {
+    try {
+      const TreeSitter = (await import('tree-sitter')).default;
+      const Cpp = (await import('tree-sitter-cpp')).catch(() => null);
+
+      if (TreeSitter && Cpp) {
+        this.parser = new TreeSitter();
+        try {
+          await TreeSitter.init();
+          this.parser.setLanguage(Cpp);
+          this.useTreeSitter = true;
+        } catch (initErr) {
+          console.warn('Tree-sitter C++ init failed');
+          this.useTreeSitter = false;
+        }
+      }
+    } catch (error) {
+      console.warn(`⚠️  Tree-sitter C++ not available: ${error.message}`);
+      this.useTreeSitter = false;
+    }
+    this.initialized = true;
+  }
+
+  async parse(code) {
+    if (!this.initialized) await this.initialize();
+    if (this.useTreeSitter && this.parser) {
+      try {
+        const tree = this.parser.parse(code);
+        return { type: 'tree-sitter', tree, rootNode: tree.rootNode, success: true };
+      } catch (error) {
+        return { success: false, error: error.message };
+      }
+    }
+    return { success: false, error: 'Parser not available' };
+  }
+
+  async analyze(code) {
+    const ast = await this.parse(code);
+    if (!ast.success) return { success: false, error: ast.error };
+
+    const analysis = { classes: [], functions: [], structs: [], templates: [], namespaces: [], errors: [] };
+    this.walkAST(ast.rootNode, analysis);
+    return { success: true, analysis };
+  }
+
+  walkAST(node, analysis) {
+    if (!node) return;
+    if (node.type === 'class_specifier') {
+      analysis.classes.push({ name: this.extractName(node), line: node.startPosition.row });
+    }
+    if (node.type === 'function_definition') {
+      analysis.functions.push({ name: this.extractName(node), line: node.startPosition.row });
+    }
+    if (node.type === 'struct_specifier') {
+      analysis.structs.push({ name: this.extractName(node), line: node.startPosition.row });
+    }
+    if (node.type === 'template_declaration') {
+      analysis.templates.push({ line: node.startPosition.row });
+    }
+    if (node.type === 'namespace_definition') {
+      analysis.namespaces.push({ name: this.extractName(node), line: node.startPosition.row });
+    }
+    for (const child of node.children) {
+      this.walkAST(child, analysis);
+    }
+  }
+
+  extractName(_node) { return 'unknown'; }
+  async generate(_spec) { return `Generated C++ code for ${_spec.type}`; }
+  async refactor(_code, _transformation) { return _code; }
+  async lint(_code) { return { issues: [] }; }
+}
+
+export default { getLanguageAgent, JavaScriptAgent, PythonAgent, RustAgent, JavaAgent, GoAgent, CSharpAgent, RubyAgent, KotlinAgent, SwiftAgent, PHPAgent, CAgent, CppAgent };

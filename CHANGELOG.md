@@ -5,6 +5,17 @@ All notable changes to Sentinel CLI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### 🔧 Improvements
+- Added a publish readiness validator script: `scripts/publish-readiness.mjs`.
+- Added release hardening scripts:
+	- `npm run pack:dry-run`
+	- `npm run release:check`
+- Strengthened `prepublishOnly` to run build + full release checks before publish.
+- Removed malformed duplicate source file from `src/ml/` to reduce package noise.
+- Updated README with npm publisher-ready release checklist and next workstream recommendations.
+
 ## [1.8.0] - 2025-12-29
 
 ### 🚀 New Features

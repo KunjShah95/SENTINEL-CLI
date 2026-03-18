@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Play, Shield, Zap, Search, Bug, Terminal, Activity, FileCode, CheckCircle2, AlertTriangle, ArrowRight, RefreshCw
@@ -99,6 +99,9 @@ export function Playground() {
   const [isScanning, setIsScanning] = useState(false);
   const [hasScanned, setHasScanned] = useState(false);
   const [isFixed, setIsFixed] = useState(false);
+  const [scanMode, setScanMode] = useState<'simulated' | 'live'>('simulated');
+  const [scanError, setScanError] = useState('');
+  const [liveResult, setLiveResult] = useState<any>(null);
 
   const handleTabChange = (tab: string) => {
     const tabKey = tab.toLowerCase();
@@ -106,12 +109,43 @@ export function Playground() {
     setCode(SNIPPETS[tabKey] || SNIPPETS.security);
     setHasScanned(false);
     setIsFixed(false);
+    setScanError('');
+    setLiveResult(null);
   };
 
-  const runScan = () => {
+  const runScan = async () => {
     setIsScanning(true);
     setHasScanned(false);
     setIsFixed(false);
+    setScanError('');
+
+    if (scanMode === 'live') {
+      try {
+        const response = await fetch('/api/playground/scan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            code,
+            profile: activeTab,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorBody = await response.json().catch(() => ({}));
+          throw new Error(errorBody.error || `Live scan failed (${response.status})`);
+        }
+
+        const data = await response.json();
+        setLiveResult(data);
+      } catch (error: any) {
+        setScanError(error?.message || 'Live scan failed. Falling back to simulation is recommended.');
+        setLiveResult(null);
+      } finally {
+        setIsScanning(false);
+        setHasScanned(true);
+      }
+      return;
+    }
 
     // Simulate scan delay
     setTimeout(() => {
@@ -136,6 +170,11 @@ export function Playground() {
     }
   };
 
+  const activeResult = scanMode === 'live' ? liveResult?.issues?.[0] : SCAN_RESULTS[activeTab];
+  const hasFindings = scanMode === 'live'
+    ? (liveResult?.summary?.totalIssues || 0) > 0
+    : Boolean(SCAN_RESULTS[activeTab]);
+
   return (
     <div className="min-h-screen bg-[var(--color-void)] text-[var(--color-text-primary)] font-body">
 
@@ -155,6 +194,29 @@ export function Playground() {
           <p className="text-[var(--color-text-secondary)] max-w-2xl mx-auto text-lg">
             Experience the world's fastest security analysis engine directly in your browser. Select a profile to start the scan.
           </p>
+          <div className="mt-5 inline-flex rounded-lg border border-[var(--color-sentinel)]/20 overflow-hidden">
+            <button
+              onClick={() => {
+                setScanMode('simulated');
+                setHasScanned(false);
+                setScanError('');
+                setLiveResult(null);
+              }}
+              className={`px-4 py-2 text-xs font-semibold transition-colors ${scanMode === 'simulated' ? 'bg-[var(--color-sentinel)] text-[var(--color-void)]' : 'bg-transparent text-[var(--color-text-secondary)]'}`}
+            >
+              Simulation Mode
+            </button>
+            <button
+              onClick={() => {
+                setScanMode('live');
+                setHasScanned(false);
+                setScanError('');
+              }}
+              className={`px-4 py-2 text-xs font-semibold transition-colors ${scanMode === 'live' ? 'bg-[var(--color-sentinel)] text-[var(--color-void)]' : 'bg-transparent text-[var(--color-text-secondary)]'}`}
+            >
+              Live API Mode
+            </button>
+          </div>
         </div>
 
         {/* Analyzer Toolbar */}
@@ -260,20 +322,28 @@ export function Playground() {
                       <CheckCircle2 className="w-3 h-3 text-[var(--color-success)]" /> Ready for review.
                     </div>
 
-                    {!isFixed && SCAN_RESULTS[activeTab] ? (
+                    {scanError ? (
+                      <div className="mt-6 pt-4 border-t border-[var(--color-sentinel)]/10">
+                        <div className="text-[var(--color-warning)] font-bold flex items-center gap-2">
+                          <AlertTriangle className="w-4 h-4" /> LIVE SCAN ERROR
+                        </div>
+                        <p className="text-[var(--color-text-secondary)] pl-6 mt-2">{scanError}</p>
+                      </div>
+                    ) : !isFixed && hasFindings ? (
                       <div className="mt-6 pt-4 border-t border-[var(--color-sentinel)]/10">
                         <div className="text-[var(--color-critical)] font-bold flex items-center gap-2">
-                          <AlertTriangle className="w-4 h-4" /> CRITICAL VULNERABILITY FOUND
+                          <AlertTriangle className="w-4 h-4" /> {scanMode === 'live' ? 'LIVE FINDINGS DETECTED' : 'CRITICAL VULNERABILITY FOUND'}
                         </div>
                         <div className="pl-6 mt-2 space-y-1">
-                          <div className="text-[var(--color-text-secondary)]"><span className="text-[var(--color-text-tertiary)]">ID:</span> {SCAN_RESULTS[activeTab].id}</div>
-                          <div className="text-[var(--color-text-secondary)]"><span className="text-[var(--color-text-tertiary)]">Type:</span> {SCAN_RESULTS[activeTab].type}</div>
-                          <div className="text-[var(--color-text-secondary)]"><span className="text(--color-text-tertiary)]">Location:</span> {SCAN_RESULTS[activeTab].location}</div>
+                          <div className="text-[var(--color-text-secondary)]"><span className="text-[var(--color-text-tertiary)]">ID:</span> {activeResult?.id || 'LIVE-ISSUE-1'}</div>
+                          <div className="text-[var(--color-text-secondary)]"><span className="text-[var(--color-text-tertiary)]">Type:</span> {activeResult?.type || 'Issue'}</div>
+                          <div className="text-[var(--color-text-secondary)]"><span className="text-[var(--color-text-tertiary)]">Location:</span> {activeResult?.location || (activeResult?.line ? `line ${activeResult.line}` : 'unknown')}</div>
                           <div className="text-[var(--color-text-tertiary)] mt-2 bg-[var(--color-critical)]/5 border-l-2 border-[var(--color-critical)] p-2 italic text-xs">
-                            "{SCAN_RESULTS[activeTab].message}"
+                            "{activeResult?.message || activeResult?.description || 'Potential issue detected by live engine.'}"
                           </div>
                         </div>
 
+                        {scanMode === 'simulated' && (
                         <div className="mt-6">
                           <div className="text-[var(--color-sentinel)] font-bold flex items-center gap-2">
                             <Zap className="w-4 h-4" /> SUGGESTED FIX
@@ -290,6 +360,7 @@ export function Playground() {
                             </button>
                           </div>
                         </div>
+                        )}
                       </div>
                     ) : isFixed ? (
                       <div className="mt-6 pt-4 border-t border-[var(--color-sentinel)]/10">
@@ -306,7 +377,7 @@ export function Playground() {
                           <CheckCircle2 className="w-4 h-4" /> SCAN COMPLETE
                         </div>
                         <p className="text-[var(--color-text-secondary)] pl-6 mt-2 ml-1">
-                          Analysis completed. No critical issues found for this category in the interactive demo.
+                          Analysis completed. {scanMode === 'live' ? 'No live issues detected for the current snippet.' : 'No critical issues found for this category in the interactive demo.'}
                         </p>
                       </div>
                     )}
@@ -330,7 +401,7 @@ export function Playground() {
               <input
                 className="bg-transparent border-none focus:ring-0 text-[var(--color-text-secondary)] font-mono text-sm w-full outline-none placeholder:text-[var(--color-text-tertiary)]"
                 placeholder={isScanning ? "Scanning..." : "Type 'sentinel scan'"}
-                value={isScanning ? "" : hasScanned ? "sentinel scan --profile " + activeTab : ""}
+                value={isScanning ? "" : hasScanned ? `sentinel scan --profile ${activeTab} --mode ${scanMode}` : ""}
                 readOnly
                 type="text"
               />

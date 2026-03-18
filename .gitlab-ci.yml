@@ -1,0 +1,46 @@
+stages:
+  - test
+  - analyze
+
+variables:
+  NODE_VERSION: "20"
+
+cache:
+  paths:
+    - node_modules/
+
+before_script:
+  - node --version
+  - npm --version
+  - npm ci
+
+unit_tests:
+  stage: test
+  image: node:${NODE_VERSION}
+  script:
+    - npm test
+    - npm run test:coverage
+  artifacts:
+    when: always
+    paths:
+      - coverage/
+    expire_in: 7 days
+
+sentinel_analysis:
+  stage: analyze
+  image: node:${NODE_VERSION}
+  script:
+    - node src/core/cli.js analyze src/ --format json --output sentinel-report.json || true
+    - |
+      if grep -q '"severity": "critical"' sentinel-report.json; then
+        echo "Critical findings detected";
+        exit 1;
+      fi
+  artifacts:
+    when: always
+    paths:
+      - sentinel-report.json
+    expire_in: 7 days
+  only:
+    - merge_requests
+    - main

@@ -1,0 +1,95 @@
+name: Stale PR Manager
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # Run daily at midnight
+  pull_request:
+    types: [opened, synchronize]
+  pull_request_review:
+    types: [submitted, dismissed]
+
+jobs:
+  stale-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for stale PRs
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            
+            // Get all open PRs
+            const { data: prs } = await github.rest.pulls.list({
+              owner,
+              repo,
+              state: 'open'
+            });
+            
+            const STALE_DAYS = 30;
+            const WARN_DAYS = 21;
+            const now = new Date();
+            
+            for (const pr of prs) {
+              const createdAt = new Date(pr.created_at);
+              const daysOld = Math.floor((now - createdAt) / (1000 * 60 * 60 * 24));
+              const lastUpdate = new Date(pr.updated_at);
+              const daysSinceUpdate = Math.floor((now - lastUpdate) / (1000 * 60 * 60 * 24));
+              
+              // Check if PR has recent reviews
+              const { data: reviews } = await github.rest.pulls.listReviews({
+                owner,
+                repo,
+                pull_number: pr.number
+              });
+              
+              const hasRecentReview = reviews.length > 0 && 
+                (now - new Date(reviews[reviews.length - 1].submitted_at)) < (7 * 24 * 60 * 60 * 1000);
+              
+              // Skip if PR has recent review activity or is approved
+              if (hasRecentReview || pr.merged_at) continue;
+              
+              // Warn after 21 days of inactivity
+              if (daysSinceUpdate >= WARN_DAYS && daysSinceUpdate < STALE_DAYS) {
+                const hasWarningLabel = pr.labels.some(l => l.name === 'stale:warning');
+                
+                if (!hasWarningLabel) {
+                  await github.rest.issues.addLabels({
+                    owner,
+                    repo,
+                    issue_number: pr.number,
+                    labels: ['stale:warning']
+                  });
+                  
+                  await github.rest.issues.createComment({
+                    owner,
+                    repo,
+                    issue_number: pr.number,
+                    body: `⏰ **This PR appears to be stale** (no activity for ${daysSinceUpdate} days).\n\nIf you're still working on this, please:\n1. Push updates or comment to show it's active\n2. Address any pending feedback\n\nOtherwise, it may be closed to keep the repo clean.`
+                  });
+                }
+              }
+              
+              // Close after 30 days of inactivity
+              if (daysSinceUpdate >= STALE_DAYS) {
+                await github.rest.pulls.update({
+                  owner,
+                  repo,
+                  pull_number: pr.number,
+                  state: 'closed'
+                });
+                
+                await github.rest.issues.createComment({
+                  owner,
+                  repo,
+                  issue_number: pr.number,
+                  body: `🔒 **This PR was closed due to inactivity** (no updates for ${daysSinceUpdate} days).\n\nIf you'd like to revisit this contribution, feel free to open a new PR!`
+                });
+                
+                await github.rest.issues.removeLabel({
+                  owner,
+                  repo,
+                  issue_number: pr.number,
+                  name: 'stale:warning'
+                });
+              }
+            }

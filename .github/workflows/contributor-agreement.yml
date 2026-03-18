@@ -1,0 +1,44 @@
+name: Contributor Agreement
+
+on:
+  pull_request:
+    types: [opened]
+
+jobs:
+  dco-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check DCO or CLA
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const repo = context.repo;
+            
+            // Check if PR body contains acknowledgment
+            const body = pr.body || '';
+            const hasAcknowledgment = 
+              body.toLowerCase().includes('i have read contributing.md') ||
+              body.toLowerCase().includes('i have read the contributing guidelines') ||
+              body.toLowerCase().includes('i agree to the contributing guidelines');
+            
+            if (!hasAcknowledgment) {
+              await github.rest.issues.addLabels({
+                owner: repo.owner,
+                repo: repo.repo,
+                issue_number: pr.number,
+                labels: ['needs-acknowledgment']
+              });
+              
+              await github.rest.issues.createComment({
+                owner: repo.owner,
+                repo: repo.repo,
+                issue_number: pr.number,
+                body: 'Hi! Please confirm you have read and agree to our contributing guidelines.\n\n' +
+                  'By submitting a PR, you confirm that:\n' +
+                  '- You have read CONTRIBUTING.md\n' +
+                  '- You understand the code you are submitting\n' +
+                  '- This is your original work or you have the right to submit it\n\n' +
+                  'Please add a comment saying "I have read and agree to the contributing guidelines" to proceed.'
+              });
+            }

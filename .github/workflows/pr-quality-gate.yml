@@ -1,0 +1,102 @@
+name: PR Quality Gate
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  check-pr-quality:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR files
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+
+      - name: Analyze PR changes
+        id: analysis
+        run: |
+          # Get the diff
+          git diff --name-only origin/main...HEAD > changed_files.txt
+          FILES_COUNT=$(wc -l < changed_files.txt)
+          echo "files_changed=$FILES_COUNT" >> $GITHUB_OUTPUT
+          
+          # Count lines added/removed
+          LINES_ADDED=$(git diff origin/main...HEAD --stat | grep "insertion" | awk '{print $2}' || echo "0")
+          LINES_REMOVED=$(git diff origin/main...HEAD --stat | grep "deletion" | awk '{print $2}' || echo "0")
+          echo "lines_added=$LINES_ADDED" >> $GITHUB_OUTPUT
+          echo "lines_removed=$LINES_REMOVED" >> $GITHUB_OUTPUT
+          
+          # Check PR description length
+          echo "pr_description_length=${{ github.event.pull_request.body_length }}" >> $GITHUB_OUTPUT
+
+      - name: Check PR is not too large
+        if: steps.analysis.outputs.files_changed > 15
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              labels: ['size:large', 'needs-review']
+            });
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body: `⚠️ **This PR is very large** (${{ steps.analysis.outputs.files_changed }} files changed).\n\nLarge PRs are harder to review and more likely to be AI-generated. Please consider splitting this into smaller, focused PRs:\n- One PR per feature/fix\n- Aim for under 10 files per PR\n\nIf this is intentional, please explain why in a comment.`
+            });
+
+      - name: Check PR has sufficient description
+        if: steps.analysis.outputs.pr_description_length < 50
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              labels: ['needs-description']
+            });
+
+      - name: Check for suspicious file patterns
+        run: |
+          # Check if PR touches many sensitive files at once
+          SENSITIVE_DIRS=("src/core" "src/llm" "src/rag" "src/agents")
+          SENSITIVE_COUNT=0
+          
+          while IFS= read -r file; do
+            for dir in "${SENSITIVE_DIRS[@]}"; do
+              if [[ "$file" == "$dir"* ]]; then
+                ((SENSITIVE_COUNT++))
+              fi
+            done
+          done < changed_files.txt
+          
+          if [ "$SENSITIVE_COUNT" -gt 3 ]; then
+            echo "sensitive_files=true" >> $GITHUB_OUTPUT
+          else
+            echo "sensitive_files=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Warn about sensitive file changes
+        if: steps.analysis.outputs.sensitive_files == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              labels: ['changes:core', 'needs-human-review']
+            });
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body: `📝 **Notice:** This PR modifies core infrastructure files (src/core, src/llm, src/rag, or src/agents).\n\nChanges to these areas require careful review. Please ensure:\n1. You discussed this change in an issue first\n2. You understand the code you're modifying\n3. You've tested locally\n\nThis helps ensure quality and prevents accidental breakage.`
+            });

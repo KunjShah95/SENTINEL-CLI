@@ -1,0 +1,218 @@
+name: Sentinel Issue Tracker
+
+on:
+  # When a new issue is opened, try to label and triage it
+  issues:
+    types: [opened, edited]
+  # Run a weekly security scan and file issues for critical findings
+  schedule:
+    - cron: "0 9 * * 1"  # Every Monday at 09:00 UTC
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  # ──────────────────────────────────────────────────
+  # Auto-label new issues
+  # ──────────────────────────────────────────────────
+  triage-issue:
+    name: Auto-triage Issue
+    runs-on: ubuntu-latest
+    if: github.event_name == 'issues'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Auto-label and triage
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const { pathToFileURL } = require('url');
+            const util = await import(pathToFileURL(`${process.env.GITHUB_WORKSPACE}/src/integrations/githubAutomationHandlers.js`).href);
+
+            const issue = context.payload.issue;
+            const route = util.determineAutomationActions({
+              eventName: context.eventName,
+              action: context.payload.action,
+              issue,
+            });
+
+            fs.writeFileSync('sentinel-issue-route.json', JSON.stringify(route, null, 2));
+
+            if (!route.actions.includes('run_issue_triage')) {
+              console.log('Issue triage not required for this event/action.');
+              return;
+            }
+
+            const labelsToAdd = util.classifyIssueForTriage({
+              title: issue.title || '',
+              body: issue.body || '',
+            });
+
+            const labelSpecs = {
+              'needs-triage': { color: 'D4C5F9', description: 'Needs maintainer triage' },
+              'security': { color: 'B60205', description: 'Security-related issue' },
+              'bug': { color: 'D73A4A', description: 'Something is not working' },
+              'enhancement': { color: 'A2EEEF', description: 'New feature or request' },
+              'documentation': { color: '0075CA', description: 'Documentation improvements' },
+              'performance': { color: 'FBCA04', description: 'Performance-related issue' },
+              'good first issue': { color: '7057FF', description: 'Good starter task for new contributors' },
+              'analyzer-request': { color: '5319E7', description: 'Request related to analyzer/rules behavior' },
+            };
+
+            if (labelsToAdd.length > 0) {
+              // Ensure labels exist before applying
+              const validLabels = [];
+              for (const label of labelsToAdd) {
+                try {
+                  await github.rest.issues.getLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    name: label
+                  });
+                  validLabels.push(label);
+                } catch (e) {
+                  const spec = labelSpecs[label] || { color: 'C2E0C6', description: 'Auto-generated Sentinel label' };
+                  await github.rest.issues.createLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    name: label,
+                    color: spec.color,
+                    description: spec.description,
+                  });
+                  validLabels.push(label);
+                }
+              }
+              if (validLabels.length > 0) {
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  labels: validLabels
+                });
+              }
+            }
+
+            // Welcome message for first-time contributors
+            const { data: userIssues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              creator: issue.user.login,
+              state: 'all'
+            });
+
+            if (userIssues.length === 1) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body: [
+                  `👋 Hi @${issue.user.login}, thanks for your first issue on Sentinel!`,
+                  ``,
+                  `A maintainer will review this shortly. In the meantime:`,
+                  `- Check the [README](https://github.com/KunjShah95/SENTINEL-CLI#readme) for common questions`,
+                  `- Browse [existing issues](https://github.com/KunjShah95/SENTINEL-CLI/issues) for related discussions`,
+                  `- See the [ROADMAP](https://github.com/KunjShah95/SENTINEL-CLI/blob/main/ROADMAP.md) for planned features`,
+                  ``,
+                  `If you'd like to work on this yourself, check out [CONTRIBUTING.md](https://github.com/KunjShah95/SENTINEL-CLI/blob/main/CONTRIBUTING.md).`
+                ].join('\n')
+              });
+            }
+
+      - name: Upload issue route decision report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sentinel-issue-route
+          path: sentinel-issue-route.json
+          retention-days: 30
+
+  # ──────────────────────────────────────────────────
+  # Weekly scan: create issues for any critical findings
+  # in the Sentinel codebase itself (dogfooding)
+  # ──────────────────────────────────────────────────
+  weekly-security-scan:
+    name: Weekly Self-Scan
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.x"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run weekly security scan
+        id: scan
+        run: |
+          node src/core/cli.js analyze src/ \
+            --format json \
+            --output weekly-scan.json \
+            || true
+        continue-on-error: true
+
+      - name: File issues for new critical findings
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            if (!fs.existsSync('weekly-scan.json')) return;
+
+            const report = JSON.parse(fs.readFileSync('weekly-scan.json', 'utf8'));
+            const critical = (report.issues || []).filter(i => i.severity === 'critical');
+
+            if (critical.length === 0) {
+              console.log('Weekly scan: no critical issues found.');
+              return;
+            }
+
+            // Get existing sentinel-finding issues
+            const { data: existing } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'sentinel-finding',
+              per_page: 100
+            });
+            const existingTypes = existing.map(i => i.title.toLowerCase());
+
+            for (const finding of critical.slice(0, 5)) {  // max 5 issues per scan
+              const title = `[Weekly Scan] ${finding.type || 'Critical Finding'} in ${finding.file || 'codebase'}`;
+              if (existingTypes.some(t => t.includes((finding.type || '').toLowerCase()))) continue;
+
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body: [
+                  `## Weekly Security Scan Finding`,
+                  ``,
+                  `**File:** \`${finding.file}\``,
+                  `**Line:** ${finding.line || 'unknown'}`,
+                  `**Severity:** Critical`,
+                  `**Type:** ${finding.type || 'Unknown'}`,
+                  ``,
+                  `### Description`,
+                  finding.message || 'No description.',
+                  ``,
+                  `### Suggested Fix`,
+                  finding.suggestion || 'Review manually.',
+                  ``,
+                  `---`,
+                  `_Auto-filed by Sentinel weekly scan · ${new Date().toISOString().split('T')[0]}_`
+                ].join('\n'),
+                labels: ['security', 'sentinel-finding', 'critical', 'automated']
+              });
+            }

@@ -18,6 +18,7 @@ import WorkflowEngine from '../utils/workflowEngine.js';
 import DatabaseTools from '../utils/databaseTools.js';
 import DockerManager from '../utils/dockerManager.js';
 import { configManager } from '../config/configManager.js';
+import { getVulnerabilityExplanation, getAllVulnerabilityTypes, explainVulnerability } from '../utils/vulnerabilityDatabase.js';
 
 const execAsync = promisify(exec);
 
@@ -149,6 +150,222 @@ export class ModernTUI {
     this.isProcessing = false;
     this.toolResults = [];
     this.context = {};
+    this.recentIssues = [];
+    
+    this.vulnKnowledgeBase = {
+      'sql-injection': {
+        name: 'SQL Injection',
+        severity: 'critical',
+        what: 'SQL injection occurs when user input is directly concatenated into SQL queries without proper sanitization. This allows attackers to manipulate the query logic.',
+        exploit: 'An attacker can inject malicious SQL code through input fields. For example, entering \' OR \'1\'=\'1 in a login field can bypass authentication, or dropping tables with \'; DROP TABLE users;--',
+        vulnerableExample: `const query = "SELECT * FROM users WHERE name = '" + username + "'";
+db.execute(query);`,
+        fixedExample: `const query = "SELECT * FROM users WHERE name = ?";
+db.execute(query, [username]);`,
+        cwe: 'CWE-89'
+      },
+      'xss-vulnerability': {
+        name: 'Cross-Site Scripting (XSS)',
+        severity: 'high',
+        what: 'XSS vulnerabilities occur when user input is rendered in HTML without proper sanitization, allowing execution of malicious JavaScript code.',
+        exploit: 'An attacker can inject <script>alert(\'XSS\')</script> into a comment field. When other users view the page, the script executes, stealing session cookies or performing actions as the victim.',
+        vulnerableExample: `element.innerHTML = userInput;`,
+        fixedExample: `element.textContent = userInput;
+// Or if HTML is needed:
+element.innerHTML = sanitize(userInput);`,
+        cwe: 'CWE-79'
+      },
+      'hardcoded-password': {
+        name: 'Hardcoded Credentials',
+        severity: 'critical',
+        what: 'Hardcoded passwords, API keys, or secrets are embedded directly in source code, making them easily discoverable by anyone with code access.',
+        exploit: 'Attackers who obtain source code (via leaks, repos, or social engineering) can use these credentials to access databases, APIs, admin panels, or cloud resources.',
+        vulnerableExample: `const dbPassword = "SuperSecret123!";
+const apiKey = "sk-abc123def456";`,
+        fixedExample: `const dbPassword = process.env.DB_PASSWORD;
+const apiKey = process.env.API_KEY;
+// Use a secrets manager in production`,
+        cwe: 'CWE-798'
+      },
+      'eval-usage': {
+        name: 'Dangerous Eval Usage',
+        severity: 'high',
+        what: 'The eval() function executes strings as code, which is extremely dangerous when used with untrusted input.',
+        exploit: 'An attacker can pass malicious code through input that gets eval\'d. For example, eval("process.mainModule.require(\'child_process\').execSync(\'rm -rf /\')") can destroy the server.',
+        vulnerableExample: `eval("var result = " + userInput);`,
+        fixedExample: `// Use JSON.parse for safe parsing:
+const result = JSON.parse(userInput);`,
+        cwe: 'CWE-95'
+      },
+      'path-traversal': {
+        name: 'Path Traversal',
+        severity: 'high',
+        what: 'Path traversal occurs when user input is used to construct file paths without proper validation, allowing access to files outside the intended directory.',
+        exploit: 'An attacker can use ../../../etc/passwd to read sensitive system files, or ../../../app/config to access configuration files with secrets.',
+        vulnerableExample: `const file = fs.readFileSync("uploads/" + filename);`,
+        fixedExample: `const path = require('path');
+const safePath = path.join("uploads", filename);
+if (!safePath.startsWith("uploads")) throw new Error("Invalid path");
+const file = fs.readFileSync(safePath);`,
+        cwe: 'CWE-22'
+      },
+      'command-injection': {
+        name: 'Command Injection',
+        severity: 'critical',
+        what: 'Command injection occurs when user input is passed to system shell commands without proper sanitization.',
+        exploit: 'An attacker can append malicious commands using && or ;. For example, entering "; cat /etc/passwd" can expose system users.',
+        vulnerableExample: `exec("grep " + userInput + " file.txt");`,
+        fixedExample: `execFile("grep", [userInput, "file.txt"]);
+// Or use a whitelist approach`,
+        cwe: 'CWE-78'
+      },
+      'xxe': {
+        name: 'XML External Entity (XXE)',
+        severity: 'high',
+        what: 'XXE vulnerabilities occur when XML parsers process external entity references, allowing attackers to access internal files or perform SSRF attacks.',
+        exploit: 'An attacker can craft XML that references internal files: <!ENTITY xxe SYSTEM "file:///etc/passwd">. This exposes server files or can be used for port scanning.',
+        vulnerableExample: `const xml = require('xml2js').parseString(userXml);`,
+        fixedExample: `// Disable external entities:
+const parser = new xml2js.Parser({
+  externalEntities: false,
+  entityResolution: false
+});`,
+        cwe: 'CWE-611'
+      },
+      'deserialization': {
+        name: 'Insecure Deserialization',
+        severity: 'critical',
+        what: 'Insecure deserialization occurs when untrusted data is deserialized without validation, potentially allowing code execution.',
+        exploit: 'Attackers can craft malicious serialized objects that execute arbitrary code upon deserialization, leading to remote code execution.',
+        vulnerableExample: `const obj = pickle.loads(userData);`,
+        fixedExample: `// Use JSON instead, or validate/verify serialized data
+const obj = JSON.parse(userData);
+// For required serialization, use signing`,
+        cwe: 'CWE-502'
+      },
+      'ssrf': {
+        name: 'Server-Side Request Forgery (SSRF)',
+        severity: 'high',
+        what: 'SSRF occurs when a web application fetches remote resources based on user input without proper validation.',
+        exploit: 'Attackers can make the server request internal services like metadata endpoints (169.254.169.254), internal databases, or local ports.',
+        vulnerableExample: `fetch(userProvidedUrl).then(res => res.text());`,
+        fixedExample: `const url = new URL(userProvidedUrl);
+if (!['http', 'https'].includes(url.protocol)) {
+  throw new Error('Invalid protocol');
+}
+if (url.hostname === 'localhost' || url.hostname.startsWith('127.')) {
+  throw new Error('Internal hosts not allowed');
+}
+fetch(url);`,
+        cwe: 'CWE-918'
+      },
+      'csrf': {
+        name: 'Cross-Site Request Forgery (CSRF)',
+        severity: 'medium',
+        what: 'CSRF attacks trick authenticated users into submitting malicious requests without their knowledge.',
+        exploit: 'An attacker can embed an auto-submitting form on their site: <form action="https://bank.com/transfer" method="POST"><input name="to" value="attacker"/><input name="amount" value="10000"/></form>. When a logged-in victim visits, their bank account is drained.',
+        vulnerableExample: `// No CSRF protection on form submission`,
+        fixedExample: `// Use anti-CSRF tokens
+const token = generateToken();
+session.csrfToken = token;
+// Include in forms as hidden field
+// Validate on server`,
+        cwe: 'CWE-352'
+      },
+      'weak-crypto': {
+        name: 'Weak Cryptography',
+        severity: 'medium',
+        what: 'Using weak cryptographic algorithms (MD5, SHA1, DES) or improper implementation makes encryption easily breakable.',
+        exploit: 'Weak hashes can be cracked with rainbow tables. Encrypted data can be decrypted, exposing sensitive information like passwords or credit cards.',
+        vulnerableExample: `const hash = crypto.createHash('md5').update(password).digest('hex');`,
+        fixedExample: `const hash = crypto.createHash('sha256').update(password).digest('hex');
+// Or use bcrypt for passwords:
+const hash = await bcrypt.hash(password, 10);`,
+        cwe: 'CWE-327'
+      },
+      'idor': {
+        name: 'Insecure Direct Object Reference (IDOR)',
+        severity: 'medium',
+        what: 'IDOR occurs when application exposes direct references to internal objects without proper authorization checks.',
+        exploit: 'Changing /api/orders/123 to /api/orders/124 might reveal another user\'s order. Attackers enumerate IDs to access unauthorized data.',
+        vulnerableExample: `app.get('/api/orders/:id', (req, res) => {
+  const order = db.orders.find(req.params.id);
+  res.json(order);
+});`,
+        fixedExample: `app.get('/api/orders/:id', (req, res) => {
+  const order = db.orders.find(req.params.id);
+  if (order.userId !== req.user.id) {
+    return res.status(403).json({error: 'Forbidden'});
+  }
+  res.json(order);
+});`,
+        cwe: 'CWE-639'
+      },
+      'sensitive-data-exposure': {
+        name: 'Sensitive Data Exposure',
+        severity: 'high',
+        what: 'Sensitive data (passwords, tokens, PII) is stored or transmitted without proper encryption or protection.',
+        exploit: 'Unencrypted data in transit can be intercepted. Data at rest without encryption can be accessed via SQL injection, file inclusion, or compromised servers.',
+        vulnerableExample: `// Storing passwords in plain text
+db.users.save({ email, password });`,
+        fixedExample: `// Hash passwords before storage:
+const hash = await bcrypt.hash(password, 12);
+db.users.save({ email, password: hash });
+// Use HTTPS for all communications`,
+        cwe: 'CWE-200'
+      },
+      'broken-auth': {
+        name: 'Broken Authentication',
+        severity: 'critical',
+        what: 'Weaknesses in authentication mechanisms allow attackers to compromise passwords, keys, or session tokens.',
+        exploit: 'Attackers can brute force passwords, use default credentials, exploit session fixation, or steal session tokens to impersonate users.',
+        vulnerableExample: `// No rate limiting, weak password policy
+app.post('/login', (req, res) => {
+  const user = db.users.find(req.body.email);
+  if (user.password === req.body.password) {
+    req.session.user = user;
+  }
+});`,
+        fixedExample: `// Implement rate limiting, strong passwords, secure sessions
+app.post('/login', rateLimit, async (req, res) => {
+  const user = db.users.find(req.body.email);
+  if (!user || !await bcrypt.compare(req.body.password, user.password)) {
+    return res.status(401).json({error: 'Invalid credentials'});
+  }
+  req.session.regenerate();
+  req.session.user = user;
+});`,
+        cwe: 'CWE-287'
+      },
+      'bypass-cors': {
+        name: 'CORS Misconfiguration',
+        severity: 'medium',
+        what: 'Improperly configured Cross-Origin Resource Sharing (CORS) allows unauthorized cross-origin access to sensitive data.',
+        exploit: 'If Access-Control-Allow-Origin: * is set on sensitive endpoints, any website can fetch that data using JavaScript, enabling data theft.',
+        vulnerableExample: `res.setHeader('Access-Control-Allow-Origin', '*');
+res.setHeader('Access-Control-Allow-Credentials', 'true');`,
+        fixedExample: `const allowedOrigins = ['https://trusted.com'];
+if (allowedOrigins.includes(req.headers.origin)) {
+  res.setHeader('Access-Control-Allow-Origin', req.headers.origin);
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+}`,
+        cwe: 'CWE-346'
+      },
+      'dependency-vulnerability': {
+        name: 'Vulnerable Dependency',
+        severity: 'high',
+        what: 'The project uses a third-party library with known security vulnerabilities.',
+        exploit: 'Attackers exploit known CVEs in outdated dependencies. For example, Log4Shell (CVE-2021-44228) allowed remote code execution in millions of Java applications.',
+        vulnerableExample: `"dependencies": {
+  "express": "4.16.0"  // Has known vulnerabilities
+}`,
+        fixedExample: `"dependencies": {
+  "express": "4.17.3"  // Updated to patched version
+}
+// Run: npm audit fix`,
+        cwe: 'CWE-1104'
+      }
+    };
     
     this.rl = readline.createInterface({
       input: process.stdin,
@@ -161,6 +378,18 @@ export class ModernTUI {
       'audit': this.handleSecurityAudit.bind(this),
       'fix': this.handleFix.bind(this),
       'scan': this.handleScan.bind(this),
+      'init': this.handleInit.bind(this),
+      'score': this.handleScore.bind(this),
+      'watch': this.handleWatch.bind(this),
+      'plugin': this.handlePlugin.bind(this),
+      'benchmark': this.handleRepoBenchmark.bind(this),
+      'ignore': this.handleIgnore.bind(this),
+      'report': this.handleReport.bind(this),
+      'env': this.handleEnv.bind(this),
+      'doctor': this.handleDoctor.bind(this),
+      'completion': this.handleCompletion.bind(this),
+      'migrate': this.handleMigrate.bind(this),
+      'demo': this.handleDemo.bind(this),
       'chat': this.handleChat.bind(this),
       'ask': this.handleAsk.bind(this),
       'exec': this.handleExec.bind(this),
@@ -207,7 +436,10 @@ export class ModernTUI {
       'badge': this.handleBadge.bind(this),
       'trend': this.handleTrends.bind(this),
       'generate': this.handleGenerate.bind(this),
-      'explain': this.handleExplain.bind(this),
+      'explain': this.handleExplainIssue.bind(this),
+      'issue': this.handleExplainIssue.bind(this),
+      'vuln': this.handleExplainIssue.bind(this),
+      'security': this.handleExplainIssue.bind(this),
       'refactor': this.handleRefactor.bind(this),
       'optimize': this.handleOptimize.bind(this),
       'document': this.handleDocument.bind(this),
@@ -215,6 +447,7 @@ export class ModernTUI {
       'ci': this.handleCI.bind(this),
       'deploy': this.handleDeploy.bind(this),
       'db': this.handleDatabase.bind(this),
+      'diff': this.handleDiff.bind(this),
     };
   }
 
@@ -430,6 +663,7 @@ ${chalk.yellow('Analysis:')}
 ${chalk.yellow('AI Code Assistant:')}
   generate <desc>      - Generate code from description
   explain <code>       - Explain what code does
+  vuln <id>            - Explain a security vulnerability (what, exploit, fix)
   test <code>          - Generate unit tests
   refactor <code>      - Refactor code
   optimize <code>      - Optimize code performance
@@ -537,6 +771,152 @@ ${chalk.yellow('Utility:')}
 
   async handleScan(_args, _fullCommand) {
     await this.handleSecurityAudit(_args, _fullCommand);
+  }
+
+  async handleInit(_args, _fullCommand) {
+    const { InitCommand } = await import('../commands/initCommand.js');
+    const initCmd = new InitCommand({ projectPath: this.projectPath });
+    await initCmd.run();
+  }
+
+  async handleScore(_args, _fullCommand) {
+    const spinner = ora('Calculating project score...').start();
+    
+    try {
+      const { ScoreCommand } = await import('../commands/scoreCommand.js');
+      const scoreCmd = new ScoreCommand({ projectPath: this.projectPath });
+      const result = await scoreCmd.run();
+      
+      spinner.succeed('Score calculated');
+    } catch (e) {
+      spinner.fail('Score calculation failed');
+      this.addMessage('error', e.message);
+    }
+  }
+
+  async handleWatch(_args, _fullCommand) {
+    this.addMessage('system', 'Starting file watcher...');
+    
+    try {
+      const { WatchCommand } = await import('../commands/watchCommand.js');
+      const watchCmd = new WatchCommand({ projectPath: this.projectPath });
+      await watchCmd.run(_args);
+    } catch (e) {
+      this.addMessage('error', `Watch failed: ${e.message}`);
+    }
+  }
+
+  async handlePlugin(args, _fullCommand) {
+    const spinner = ora('Managing plugins...').start();
+    
+    try {
+      const { runPluginCommand } = await import('../commands/pluginCommand.js');
+      await runPluginCommand(args, { projectPath: this.projectPath });
+      spinner.succeed('Plugin operation complete');
+    } catch (e) {
+      spinner.fail('Plugin operation failed');
+      this.addMessage('error', e.message);
+    }
+  }
+
+  async handleRepoBenchmark(_args, _fullCommand) {
+    const spinner = ora('Comparing with similar projects...').start();
+    
+    try {
+      const { runRepoBenchmarkCommand } = await import('../commands/repoBenchmarkCommand.js');
+      await runRepoBenchmarkCommand(_args, { projectPath: this.projectPath });
+      spinner.succeed('Benchmark complete');
+    } catch (e) {
+      spinner.fail('Benchmark failed');
+      this.addMessage('error', e.message);
+    }
+  }
+
+  async handleIgnore(args, _fullCommand) {
+    const spinner = ora('Managing ignore rules...').start();
+    
+    try {
+      const { runIgnoreCommand } = await import('../commands/ignoreCommand.js');
+      await runIgnoreCommand(args, { projectPath: this.projectPath });
+      spinner.succeed('Ignore operation complete');
+    } catch (e) {
+      spinner.fail('Ignore operation failed');
+      this.addMessage('error', e.message);
+    }
+  }
+
+  async handleReport(args, _fullCommand) {
+    const spinner = ora('Generating report...').start();
+    
+    try {
+      const { runReportCommand } = await import('../commands/reportCommand.js');
+      await runReportCommand(args, { projectPath: this.projectPath });
+      spinner.succeed('Report generated');
+    } catch (e) {
+      spinner.fail('Report generation failed');
+      this.addMessage('error', e.message);
+    }
+  }
+
+  async handleEnv(args, _fullCommand) {
+    const spinner = ora('Managing environment...').start();
+    
+    try {
+      const { runEnvCommand } = await import('../commands/envCommand.js');
+      await runEnvCommand(args, { projectPath: this.projectPath });
+      spinner.succeed('Environment operation complete');
+    } catch (e) {
+      spinner.fail('Environment operation failed');
+      this.addMessage('error', e.message);
+    }
+  }
+
+  async handleDoctor(args, _fullCommand) {
+    const spinner = ora('Running health checks...').start();
+    
+    try {
+      const { runDoctorCommand } = await import('../commands/doctorCommand.js');
+      await runDoctorCommand(args, { projectPath: this.projectPath });
+      spinner.succeed('Health check complete');
+    } catch (e) {
+      spinner.fail('Health check failed');
+      this.addMessage('error', e.message);
+    }
+  }
+
+  async handleCompletion(args, _fullCommand) {
+    try {
+      const { runCompletionCommand } = await import('../commands/completionCommand.js');
+      await runCompletionCommand(args, { projectPath: this.projectPath });
+    } catch (e) {
+      this.addMessage('error', e.message);
+    }
+  }
+
+  async handleMigrate(args, _fullCommand) {
+    const spinner = ora('Migrating configuration...').start();
+    
+    try {
+      const { runMigrateCommand } = await import('../commands/migrateCommand.js');
+      await runMigrateCommand(args, { projectPath: this.projectPath });
+      spinner.succeed('Migration complete');
+    } catch (e) {
+      spinner.fail('Migration failed');
+      this.addMessage('error', e.message);
+    }
+  }
+
+  async handleDemo(_args, _fullCommand) {
+    const { exec } = await import('child_process');
+    const { promisify } = await import('util');
+    const execAsync = promisify(exec);
+    
+    try {
+      const { stdout } = await execAsync('node src/core/demo.js', { cwd: this.projectPath });
+      this.addMessage('system', stdout);
+    } catch (e) {
+      this.addMessage('error', `Demo failed: ${e.message}`);
+    }
   }
 
   async handleChat(_args, fullCommand) {
@@ -1408,6 +1788,262 @@ DevDeps:  ${Object.keys(this.context.project?.devDependencies || {}).length}
     }
   }
 
+  async handleExplainIssue(args) {
+    const input = args[0] || args.join(' ');
+    
+    if (!input) {
+      this.addMessage('system', `${chalk.yellow('Usage:')}`);
+      this.addMessage('system', '  explain <issue-id>     Explain a security vulnerability by ID');
+      this.addMessage('system', '  vuln <vuln-type>       Get details on a specific vulnerability');
+      this.addMessage('system', '  issue <id>            Look up a found issue by ID');
+      this.addMessage('system', '');
+      this.addMessage('system', `${chalk.yellow('Examples:')}`);
+      this.addMessage('system', '  sentinel explain "SQL Query Concatenation"');
+      this.addMessage('system', '  sentinel vuln eval() Usage');
+      this.addMessage('system', '  sentinel issue security_12345');
+      this.addMessage('system', '');
+      this.addMessage('system', `${chalk.yellow('Available vulnerability types:')}`);
+      const types = getAllVulnerabilityTypes();
+      for (let i = 0; i < types.length; i += 3) {
+        this.addMessage('system', '  ' + types.slice(i, i + 3).join(', '));
+      }
+      return;
+    }
+
+    const issueById = await this.findIssueById(input);
+    if (issueById) {
+      await this.explainFoundIssue(issueById);
+      return;
+    }
+
+    const explanation = getVulnerabilityExplanation(input);
+    
+    if (!explanation) {
+      const fuzzyMatch = getAllVulnerabilityTypes().find(t => 
+        t.toLowerCase().includes(input.toLowerCase()) ||
+        input.toLowerCase().includes(t.toLowerCase())
+      );
+      
+      if (fuzzyMatch) {
+        this.addMessage('system', `Did you mean: "${fuzzyMatch}"?`);
+        const fuzzyExplanation = getVulnerabilityExplanation(fuzzyMatch);
+        this.displayVulnerabilityExplanation(fuzzyMatch, fuzzyExplanation);
+      } else {
+        this.addMessage('error', `Unknown vulnerability: ${input}`);
+        this.addMessage('system', `Run "sentinel explain" to see all available vulnerability types.`);
+        this.addMessage('system', `Or run "sentinel analyze" to find issues in your code.`);
+      }
+      return;
+    }
+
+    this.displayVulnerabilityExplanation(input, explanation);
+  }
+
+  async findIssueById(issueId) {
+    try {
+      const dbPath = path.join(this.projectPath, '.sentinel', 'database.json');
+      const exists = await this.fileExists(dbPath);
+      if (!exists) return null;
+      
+      const content = await fs.readFile(dbPath, 'utf8');
+      const db = JSON.parse(content);
+      
+      if (db.issues) {
+        const found = db.issues.find(i => i.id === issueId || i.id?.includes(issueId));
+        if (found) return found;
+      }
+      
+      if (db.analyses) {
+        for (const analysis of db.analyses.slice(-10)) {
+          if (analysis.issues) {
+            const found = analysis.issues.find(i => i.id === issueId || i.id?.includes(issueId));
+            if (found) return found;
+          }
+        }
+      }
+      
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  async explainFoundIssue(issue) {
+    const boxWidth = Math.min(70, this.width - 4);
+    const vulnType = this.mapIssueToVulnerabilityType(issue);
+    
+    this.addMessage('system', '');
+    this.addMessage('system', chalk.cyan('═'.repeat(boxWidth)));
+    this.addMessage('system', chalk.cyan('  📋 ISSUE DETAILS'));
+    this.addMessage('system', chalk.cyan('═'.repeat(boxWidth)));
+    this.addMessage('system', '');
+    this.addMessage('system', chalk.yellow('  ID: ') + (issue.id || 'N/A'));
+    this.addMessage('system', chalk.yellow('  File: ') + (issue.file || 'N/A') + (issue.line ? `:${issue.line}` : ''));
+    this.addMessage('system', chalk.yellow('  Severity: ') + this.getSeverityColor(issue.severity) + (issue.severity || 'unknown'));
+    this.addMessage('system', chalk.yellow('  Type: ') + (issue.type || issue.title || 'Unknown'));
+    this.addMessage('system', '');
+    
+    if (issue.message) {
+      this.addMessage('system', chalk.yellow('  Message:'));
+      const msgLines = this.wrapText(issue.message, boxWidth - 6);
+      for (const line of msgLines) {
+        this.addMessage('system', '    ' + line);
+      }
+      this.addMessage('system', '');
+    }
+
+    if (issue.snippet) {
+      this.addMessage('system', chalk.yellow('  Vulnerable Code:'));
+      this.addMessage('system', chalk.red('    ' + issue.snippet.split('\n').join('\n    ')));
+      this.addMessage('system', '');
+    }
+    
+    if (vulnType) {
+      const explanation = getVulnerabilityExplanation(vulnType);
+      if (explanation) {
+        this.addMessage('system', chalk.cyan('═'.repeat(boxWidth)));
+        this.addMessage('system', chalk.cyan('  🔒 VULNERABILITY BREAKDOWN'));
+        this.addMessage('system', chalk.cyan('═'.repeat(boxWidth)));
+        this.addMessage('system', '');
+        
+        this.addMessage('system', chalk.yellow('  📛 ') + chalk.bold(vulnType));
+        this.addMessage('system', '');
+        
+        this.addMessage('system', chalk.red('  ⚡ WHAT:'));
+        const whatLines = this.wrapText(explanation.what, boxWidth - 6);
+        for (const line of whatLines) {
+          this.addMessage('system', '    ' + line);
+        }
+        this.addMessage('system', '');
+        
+        this.addMessage('system', chalk.red('  🎯 ATTACK SCENARIO:'));
+        const exploitLines = this.wrapText(explanation.exploit, boxWidth - 6);
+        for (const line of exploitLines) {
+          this.addMessage('system', '    ' + line);
+        }
+        this.addMessage('system', '');
+        
+        this.addMessage('system', chalk.green('  ✅ SECURE FIX:'));
+        const fixLines = explanation.fix.split('\n');
+        for (const line of fixLines) {
+          this.addMessage('system', '    ' + chalk.gray(line));
+        }
+        this.addMessage('system', '');
+      }
+    } else if (issue.suggestion) {
+      this.addMessage('system', chalk.green('  💡 SUGGESTED FIX:'));
+      this.addMessage('system', '    ' + issue.suggestion);
+      this.addMessage('system', '');
+    }
+    
+    this.addMessage('system', chalk.cyan('═'.repeat(boxWidth)));
+    this.addMessage('system', '');
+  }
+
+  mapIssueToVulnerabilityType(issue) {
+    const title = (issue.title || issue.type || '').toLowerCase();
+    const message = (issue.message || '').toLowerCase();
+    const type = (issue.type || '').toLowerCase();
+    
+    const mappings = {
+      'sql': 'SQL Query Concatenation',
+      'sql-injection': 'SQL Query Concatenation',
+      'xss': 'innerHTML Assignment',
+      'cross-site scripting': 'innerHTML Assignment',
+      'eval': 'eval() Usage',
+      'eval-usage': 'eval() Usage',
+      'hardcoded': 'Hardcoded Passwords',
+      'hardcoded-password': 'Hardcoded API Keys',
+      'hardcoded-secret': 'Hardcoded API Keys',
+      'pickle': 'Pickle Deserialization',
+      'deserialization': 'Pickle Deserialization',
+      'shell': 'Shell Command Execution',
+      'command-injection': 'Command Injection',
+      'path-traversal': 'Path Traversal',
+      'xxe': 'XXE Injection',
+      'ssrf': 'SSRF',
+      'csrf': 'CSRF',
+      'crypto': 'Weak Cryptography',
+      'weak-crypto': 'Weak Cryptography',
+      'idor': 'Broken Access Control',
+      'sensitive': 'Sensitive Data Exposure',
+      'auth': 'Broken Access Control',
+      'authentication': 'Broken Access Control'
+    };
+    
+    for (const [key, value] of Object.entries(mappings)) {
+      if (title.includes(key) || message.includes(key) || type.includes(key)) {
+        return value;
+      }
+    }
+    
+    return null;
+  }
+
+  getSeverityColor(severity) {
+    const colors = {
+      critical: chalk.red,
+      high: chalk.red,
+      medium: chalk.yellow,
+      low: chalk.blue,
+      info: chalk.gray
+    };
+    return colors[severity?.toLowerCase()] || chalk.gray;
+  }
+
+  displayVulnerabilityExplanation(title, explanation) {
+    const boxWidth = Math.min(70, this.width - 4);
+    
+    this.addMessage('system', '');
+    this.addMessage('system', chalk.cyan('═'.repeat(boxWidth)));
+    this.addMessage('system', chalk.cyan('  🔒 VULNERABILITY BREAKDOWN'));
+    this.addMessage('system', chalk.cyan('═'.repeat(boxWidth)));
+    this.addMessage('system', '');
+    this.addMessage('system', chalk.yellow('  📛 ') + chalk.bold(title));
+    this.addMessage('system', '');
+    
+    this.addMessage('system', chalk.red('  ⚡ WHAT:'));
+    const whatLines = this.wrapText(explanation.what, boxWidth - 6);
+    for (const line of whatLines) {
+      this.addMessage('system', '    ' + line);
+    }
+    this.addMessage('system', '');
+    
+    this.addMessage('system', chalk.red('  🎯 ATTACK SCENARIO:'));
+    const exploitLines = this.wrapText(explanation.exploit, boxWidth - 6);
+    for (const line of exploitLines) {
+      this.addMessage('system', '    ' + line);
+    }
+    this.addMessage('system', '');
+    
+    this.addMessage('system', chalk.green('  ✅ SECURE FIX:'));
+    const fixLines = explanation.fix.split('\n');
+    for (const line of fixLines) {
+      this.addMessage('system', '    ' + chalk.gray(line));
+    }
+    this.addMessage('system', '');
+    this.addMessage('system', chalk.cyan('═'.repeat(boxWidth)));
+    this.addMessage('system', '');
+  }
+
+  wrapText(text, maxWidth) {
+    const words = text.split(' ');
+    const lines = [];
+    let currentLine = '';
+    
+    for (const word of words) {
+      if ((currentLine + ' ' + word).trim().length <= maxWidth) {
+        currentLine = (currentLine + ' ' + word).trim();
+      } else {
+        if (currentLine) lines.push(currentLine);
+        currentLine = word;
+      }
+    }
+    if (currentLine) lines.push(currentLine);
+    
+    return lines;
+  }
+
   async handleRefactor(args) {
     const code = args.join(' ');
     if (!code) {
@@ -1507,6 +2143,25 @@ DevDeps:  ${Object.keys(this.context.project?.devDependencies || {}).length}
       if (result.stdout) this.addMessage('success', result.stdout.slice(-2000));
     } catch (e) {
       spinner.fail(`Database ${action} failed`);
+      this.addMessage('error', e.message);
+    }
+  }
+
+  async handleDiff(args, _fullCommand) {
+    const diffSpec = args[0] || 'main..HEAD';
+    const spinner = ora('Analyzing PR changes...').start();
+    
+    try {
+      const { DiffCommand } = await import('../commands/diffCommand.js');
+      const diffCmd = new DiffCommand({ projectPath: this.projectPath });
+      const result = await diffCmd.run(diffSpec);
+      
+      spinner.succeed('PR review complete');
+      if (result.success) {
+        this.addMessage('success', `Analyzed ${result.filesAnalyzed || 0} files`);
+      }
+    } catch (e) {
+      spinner.fail('Diff analysis failed');
       this.addMessage('error', e.message);
     }
   }

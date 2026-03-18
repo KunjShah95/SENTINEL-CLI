@@ -16,7 +16,10 @@
     "LICENSE",
     "command_guide.md",
     ".env.example",
-    ".sentinel.json.example"
+    ".sentinel.json.example",
+    "!src/dist/**",
+    "!src/intelligence/contextAware",
+    "!frontend/README.md"
   ],
   "scripts": {
     "start": "node src/core/cli.js",
@@ -36,6 +39,8 @@
     "test:coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",
     "lint": "eslint src/",
     "format": "prettier --write src/",
+    "pack:dry-run": "npm pack --dry-run",
+    "release:check": "npm run lint && npm test && npm run pack:dry-run && node scripts/publish-readiness.mjs",
     "build": "node src/core/build.js",
     "build:frontend": "cd frontend && npm install && npm run build",
     "build:all": "npm run build && npm run build:frontend",
@@ -47,7 +52,7 @@
     "bench": "node src/core/cli.js benchmark --quick",
     "deploy": "npm run build:frontend && npx vercel --prod",
     "demo": "node src/core/demo.js",
-    "prepublishOnly": "npm run build:frontend",
+    "prepublishOnly": "npm run build:frontend && npm run release:check",
     "postversion": "git push && git push --tags",
     "postinstall": "echo \"\n✨ Sentinel CLI installed! Run 'sentinel auth' to configure your API keys or 'sentinel dashboard' to see the UI.\n\""
   },

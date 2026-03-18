@@ -4,6 +4,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import cors from 'cors';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { scanCode } from '../agents/scanner_agent.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -128,6 +129,52 @@ class SentinelDashboard {
         res.json({ analysisId, status: 'started' });
       } catch (error) {
         res.status(500).json({ error: error.message });
+      }
+    });
+
+    this.app.post('/api/playground/scan', async (req, res) => {
+      try {
+        const { code = '', profile = 'security' } = req.body || {};
+
+        if (!code || typeof code !== 'string') {
+          return res.status(400).json({ error: 'Request body must include a non-empty code string.' });
+        }
+
+        const filenameByProfile = {
+          security: 'snippet.js',
+          typescript: 'snippet.ts',
+          performance: 'snippet.js',
+          'react audit': 'snippet.jsx',
+          compliance: 'snippet.js',
+        };
+
+        const filename = filenameByProfile[profile] || 'snippet.js';
+        const issues = await scanCode(code, { filename, enableAST: true });
+
+        const severityCounts = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
+        for (const issue of issues) {
+          const sev = (issue.severity || 'info').toLowerCase();
+          if (severityCounts[sev] !== undefined) {
+            severityCounts[sev] += 1;
+          } else {
+            severityCounts.info += 1;
+          }
+        }
+
+        return res.json({
+          mode: 'live',
+          profile,
+          timestamp: new Date().toISOString(),
+          summary: {
+            totalIssues: issues.length,
+            severityCounts,
+          },
+          issues,
+        });
+      } catch (error) {
+        return res.status(500).json({
+          error: error.message || 'Live playground scan failed.',
+        });
       }
     });
 

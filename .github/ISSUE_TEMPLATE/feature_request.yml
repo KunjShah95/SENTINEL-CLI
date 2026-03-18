@@ -1,0 +1,82 @@
+name: Feature Request
+description: Suggest a new feature or improvement
+title: "[Feature]: "
+labels: ["enhancement", "needs-triage"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have an idea to make Sentinel better? We'd love to hear it. The more detail you provide, the faster we can evaluate and implement it.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Which part of Sentinel does this feature belong to?
+      options:
+        - New Analyzer (security, quality, language-specific, etc.)
+        - AI / Agent Pipeline
+        - GitHub Integration (PR review, issue creation, Actions)
+        - VS Code Extension
+        - CLI / TUI Experience
+        - Frontend / Dashboard
+        - LLM Provider Support
+        - Compliance / Reporting
+        - Performance / Caching
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Statement
+      description: What problem are you trying to solve? Why does it matter?
+      placeholder: "When I run Sentinel on a monorepo, I have to scan each package manually. This is tedious and misses cross-package issues..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: How would you like this to work? Include CLI syntax, config options, or UI mockups if applicable.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: What workarounds are you using today? What other approaches did you consider?
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: How important is this to you?
+      options:
+        - "Nice to have"
+        - "Would significantly improve my workflow"
+        - "Blocking — I need this to use Sentinel"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Would you be willing to contribute this?
+      options:
+        - label: Yes, I'd like to implement this with guidance
+        - label: Yes, I can implement this independently
+        - label: No, I'm requesting it for the maintainers
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues and feature requests — this is not a duplicate
+          required: true

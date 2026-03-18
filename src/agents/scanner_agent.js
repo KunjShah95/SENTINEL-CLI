@@ -88,7 +88,7 @@ function analyzeAST(ast, _code) {
     }
     
     for (const key of Object.keys(node)) {
-      if (key === 'loc' || key === 'start' || key === 'end') continue;
+      if (key === 'loc' || key === 'start' || key === 'end' || key === 'parent') continue;
       const child = node[key];
       if (Array.isArray(child)) {
         child.forEach(c => {

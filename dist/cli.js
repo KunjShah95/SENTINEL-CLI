@@ -1587,6 +1587,118 @@ program
     }
   });
 
+// NEW: Explain vulnerability command
+program
+  .command('explain <issue-id>')
+  .description('Get detailed explanation of a vulnerability')
+  .option('-f, --format <format>', 'Output format (console|json)', 'console')
+  .action(async (issueId, options) => {
+    try {
+      const { getVulnerabilityExplanation, searchVulnerabilities, getAllVulnerabilities } = 
+        await import('./utils/vulnKnowledgeBase.js');
+      
+      let vuln = getVulnerabilityExplanation(issueId);
+      
+      if (!vuln) {
+        const matches = searchVulnerabilities(issueId);
+        if (matches.length > 0) {
+          vuln = matches[0];
+          console.log(chalk.yellow(`\nClosest match: ${vuln.name}\n`));
+        }
+      }
+      
+      if (!vuln) {
+        console.log(chalk.red(`\nNo vulnerability found for: ${issueId}`));
+        console.log(chalk.gray('\nAvailable vulnerabilities:'));
+        const all = getAllVulnerabilities();
+        for (const v of all) {
+          console.log(`  ${chalk.cyan(v.id.padEnd(30))} ${chalk.gray(v.name)}`);
+        }
+        return;
+      }
+      
+      if (options.format === 'json') {
+        console.log(JSON.stringify(vuln, null, 2));
+        return;
+      }
+      
+      const severityColor = {
+        critical: chalk.red,
+        high: chalk.red,
+        medium: chalk.yellow,
+        low: chalk.blue,
+        info: chalk.gray
+      };
+      
+      console.log('');
+      console.log(chalk.bold.cyan('═══════════════════════════════════════════════════════════════'));
+      console.log(chalk.bold.cyan('  🔐 VULNERABILITY EXPLANATION'));
+      console.log(chalk.bold.cyan('═══════════════════════════════════════════════════════════════'));
+      console.log('');
+      
+      console.log(chalk.bold.white('  📛 Name: ') + vuln.name);
+      console.log(chalk.bold.white('  ⚡ Severity: ') + severityColor[vuln.severity](vuln.severity.toUpperCase()));
+      console.log(chalk.bold.white('  📂 Category: ') + vuln.category);
+      console.log('');
+      
+      console.log(chalk.bold.white('═══════════════════════════════════════════════════════════════'));
+      console.log(chalk.bold.white('  🤔 WHAT IS THIS?'));
+      console.log(chalk.bold.white('═══════════════════════════════════════════════════════════════'));
+      console.log('');
+      console.log('  ' + vuln.what.split('\n').join('\n  '));
+      console.log('');
+      
+      console.log(chalk.bold.white('═══════════════════════════════════════════════════════════════'));
+      console.log(chalk.bold.white('  💀 HOW WOULD AN ATTACKER EXPLOIT IT?'));
+      console.log(chalk.bold.white('═══════════════════════════════════════════════════════════════'));
+      console.log('');
+      console.log('  ' + vuln.exploit.split('\n').join('\n  '));
+      console.log('');
+      
+      console.log(chalk.bold.green('═══════════════════════════════════════════════════════════════'));
+      console.log(chalk.bold.green('  ✅ FIXED CODE EXAMPLE'));
+      console.log(chalk.bold.green('═══════════════════════════════════════════════════════════════'));
+      console.log('');
+      
+      console.log(chalk.red('  ❌ VULNERABLE CODE:'));
+      console.log(chalk.gray('  ─────────────────────'));
+      console.log('');
+      const vulnLines = vuln.vulnerableExample.split('\n');
+      for (const line of vulnLines) {
+        console.log('  ' + chalk.red(line));
+      }
+      console.log('');
+      
+      console.log(chalk.green('  ✅ SAFE CODE:'));
+      console.log(chalk.gray('  ─────────────────────'));
+      console.log('');
+      const fixedLines = vuln.fixedExample.split('\n');
+      for (const line of fixedLines) {
+        console.log('  ' + chalk.green(line));
+      }
+      console.log('');
+      
+      if (vuln.cwe) {
+        console.log(chalk.bold.white('═══════════════════════════════════════════════════════════════'));
+        console.log(chalk.bold.white('  📚 REFERENCES'));
+        console.log(chalk.bold.white('═══════════════════════════════════════════════════════════════'));
+        console.log('');
+        console.log('  ' + vuln.cwe);
+        for (const ref of vuln.references || []) {
+          console.log('  ' + chalk.blue.underline(ref));
+        }
+        console.log('');
+      }
+      
+      console.log(chalk.bold.cyan('═══════════════════════════════════════════════════════════════'));
+      console.log('');
+      
+    } catch (error) {
+      console.error(chalk.red('Explain failed:'), error.message);
+      process.exit(1);
+    }
+  });
+
 // Show help if no command was provided
 if (!process.argv.slice(2).length) {
   await showBannerOnce(program);

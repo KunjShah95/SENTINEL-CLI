@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Ask a Question / General Discussion
+    url: https://github.com/KunjShah95/SENTINEL-CLI/discussions/new?category=q-a
+    about: For questions, use GitHub Discussions — not Issues
+  - name: Security Vulnerability (Private)
+    url: https://github.com/KunjShah95/SENTINEL-CLI/security/advisories/new
+    about: Report security vulnerabilities privately via GitHub Security Advisories
+  - name: Show & Tell — Share how you use Sentinel
+    url: https://github.com/KunjShah95/SENTINEL-CLI/discussions/new?category=show-and-tell
+    about: Show the community how you've integrated Sentinel into your workflow

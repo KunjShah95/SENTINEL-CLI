@@ -17,6 +17,10 @@ report.json
 report.txt
 report.md
 coverage
+test-output.txt
+.sentinel_audit.jsonl
+*.log
+firebase-debug.log
 
 # System files
 .DS_Store
@@ -47,3 +51,5 @@ tmp/
 temp/
 *.tmp
 landing page designer.agent.md
+remotion/
+.agents

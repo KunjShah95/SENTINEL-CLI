@@ -1,0 +1,57 @@
+name: Analyzer Request
+description: Request support for a new language, framework, or vulnerability pattern
+title: "[Analyzer]: "
+labels: ["analyzer-request", "needs-triage"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Sentinel currently ships 21 analyzers. If there's a language, framework, or vulnerability class you need covered, tell us about it here.
+
+  - type: dropdown
+    id: type
+    attributes:
+      label: Analyzer Type
+      options:
+        - New language support (e.g., Rust, Swift, Kotlin)
+        - New framework (e.g., Fastify, Remix, NestJS)
+        - New vulnerability pattern (e.g., SSRF, Path Traversal)
+        - New compliance standard (e.g., PCI-DSS, HIPAA, ISO 27001)
+        - Extension to existing analyzer
+    validations:
+      required: true
+
+  - type: input
+    id: language-framework
+    attributes:
+      label: Language / Framework / Standard
+      placeholder: "Rust / Axum web framework"
+    validations:
+      required: true
+
+  - type: textarea
+    id: vulnerabilities
+    attributes:
+      label: What should it detect?
+      description: List the specific issues, patterns, or CVEs the analyzer should catch
+      placeholder: |
+        - Unsafe memory operations (unsafe {} blocks without justification)
+        - Missing bounds checks on slice indexing
+        - Use of deprecated crypto crates (e.g., rust-crypto)
+    validations:
+      required: true
+
+  - type: textarea
+    id: example
+    attributes:
+      label: Example Code
+      description: Provide a code snippet that the analyzer should flag (and ideally one it should pass)
+      render: rust
+
+  - type: textarea
+    id: references
+    attributes:
+      label: References
+      description: Links to CWE, CVE, OWASP rules, or language security guides

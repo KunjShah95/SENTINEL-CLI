@@ -1,0 +1,56 @@
+# Branch Protection Rules for Sentinel CLI
+# 
+# These rules protect the main branch and should be configured in:
+# GitHub > Settings > Branches > Branch protection rules
+#
+# You can also use GitHub CLI to apply these:
+# gh api repos/OWNER/REPO/branches/main/protection -X PUT -f @branch-protection.json
+
+{
+  "required_status_checks": {
+    "strict_required_status_checks": true,
+    "contexts": [
+      "Sentinel CI/test-coverage",
+      "Sentinel CI/lint"
+    ]
+  },
+  "required_reviews": {
+    "dismiss_stale_reviews": true,
+    "require_code_owner_reviews": true,
+    "required_reviewers": 1,
+    "dismiss_restrictions": false
+  },
+  "restrictions": null,
+  "allow_force_pushes": false,
+  "allow_deletions": false,
+  "required_linear_history": true,
+  "required_conversation_resolution": true,
+  "lock_branch": false,
+  "allow_gh_script_rewrites": false
+}
+
+# Rule Summary for main branch:
+# 
+# 1. REQUIRE STATUS CHECKS
+#    - Must pass Sentinel CI/test-coverage before merge
+#    - Must pass Sentinel CI/lint before merge
+#    - Require branches to be up to date
+#
+# 2. REQUIRE REVIEWS
+#    - Dismiss stale reviews when new commits are pushed
+#    - Require code owner reviews for protected paths
+#    - Require at least 1 reviewer approval
+#
+# 3. PROTECT BRANCH HISTORY
+#    - Prevent force pushes
+#    - Prevent branch deletion
+#    - Require linear history (no merge commits)
+#    - Require all conversations to be resolved
+#
+# 4. REVIEWER ASSIGNMENT (via CODEOWNERS)
+#    - src/core/: @KunjShah95 required
+#    - src/llm/: @KunjShah95 required  
+#    - src/rag/: @KunjShah95 required
+#    - src/analyzers/: @KunjShah95 required
+#    - docs/: @KunjShah95 required
+#    - __tests__/: @KunjShah95 required

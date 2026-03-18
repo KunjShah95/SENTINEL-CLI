@@ -1208,6 +1208,96 @@ program
   });
 
 program
+  .command('explain <issue-id>')
+  .description('Get plain-English explanation of a vulnerability')
+  .option('-v, --verbose', 'Show original finding details')
+  .option('--no-color', 'Disable colored output')
+  .addHelpText('after', `
+Examples:
+  sentinel explain security_1700000000_abc123def
+  sentinel explain abc123 -v
+
+This command provides:
+  • What the vulnerability is (plain English)
+  • How an attacker would exploit it
+  • A concrete fixed code example
+
+The issue ID comes from analysis output. Run 'sentinel analyze' first,
+then look for the issue ID in the output or JSON report.
+`)
+  .action(async (issueId, options) => {
+    try {
+      const { explainVulnerability, formatExplanation } = await import('../utils/vulnerabilityExplainer.js');
+      
+      console.log(chalk.cyan('🔍 Looking up issue:'), issueId);
+      
+      let issue = null;
+      
+      const dbPath = path.resolve(process.cwd(), '.sentinel/database.json');
+      try {
+        const dbContent = await fs.readFile(dbPath, 'utf8');
+        const db = JSON.parse(dbContent);
+        
+        if (db.issues && db.issues.length > 0) {
+          issue = db.issues.find(i => i.id === issueId);
+        }
+        
+        if (!issue && db.analyses && db.analyses.length > 0) {
+          for (const analysis of db.analyses.reverse()) {
+            if (analysis.issues) {
+              issue = analysis.issues.find(i => i.id === issueId);
+              if (issue) break;
+            }
+          }
+        }
+      } catch (e) {
+      }
+      
+      if (!issue) {
+        const cachePath = path.resolve(process.cwd(), '.codereview-cache.json');
+        try {
+          const cacheContent = await fs.readFile(cachePath, 'utf8');
+          const cache = JSON.parse(cacheContent);
+          
+          if (cache.issues) {
+            issue = cache.issues.find(i => i.id === issueId);
+          }
+          if (!issue && cache.results?.issues) {
+            issue = cache.results.issues.find(i => i.id === issueId);
+          }
+        } catch (e) {
+        }
+      }
+      
+      if (!issue) {
+        console.log(chalk.yellow(`\n⚠ Issue '${issueId}' not found in local database.`));
+        console.log(chalk.gray('\nTrying to explain based on issue ID pattern...\n'));
+        
+        const inferredType = issueId.split('_')[0];
+        issue = { 
+          id: issueId,
+          type: inferredType,
+          title: 'Security Issue (ID: ' + issueId + ')',
+          message: 'Issue was not found in local analysis results.',
+          severity: 'unknown'
+        };
+      }
+      
+      const explanation = explainVulnerability(issue);
+      const output = formatExplanation(explanation, { 
+        color: options.color !== false, 
+        verbose: options.verbose 
+      });
+      
+      console.log(output);
+      
+    } catch (error) {
+      console.error(chalk.red('Explain failed:'), error.message);
+      console.log(chalk.gray('Make sure to run "sentinel analyze" first to populate the issue database.'));
+    }
+  });
+
+program
   .command('setup')
   .description('Setup configuration wizard')
   .action(async () => {

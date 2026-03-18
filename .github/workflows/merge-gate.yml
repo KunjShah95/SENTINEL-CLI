@@ -1,0 +1,91 @@
+name: Merge Gate
+
+on:
+  pull_request:
+    types: [opened, synchronize, labeled, unlabeled]
+  pull_request_review:
+    types: [submitted, dismissed]
+
+jobs:
+  check-merge-readiness:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check PR readiness
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const labels = pr.labels.map(l => l.name);
+            const repo = context.repo;
+            
+            // Labels that block merge
+            const blockingLabels = [
+              'needs-issue-link',
+              'needs-description',
+              'wip',
+              'do-not-merge',
+              'ai-detected'
+            ];
+            
+            // Check for blocking labels
+            const hasBlockingLabel = labels.some(l => blockingLabels.includes(l));
+            
+            // Check if CI passed (check latest commit status)
+            const { data: commits } = await github.rest.repos.listCommits({
+              owner: repo.owner,
+              repo: repo.repo,
+              sha: pr.head.sha,
+              per_page: 1
+            });
+            
+            const commit = commits[0];
+            const { data: statuses } = await github.rest.repos.listCommitStatuses({
+              owner: repo.owner,
+              repo: repo.repo,
+              sha: commit.sha
+            });
+            
+            const requiredChecks = ['Sentinel CI'];
+            const allChecksPassed = requiredChecks.every(check => {
+              const status = statuses.find(s => s.context === check);
+              return status && status.state === 'success';
+            });
+            
+            // Determine mergeability
+            const canMerge = !hasBlockingLabel && (statuses.length === 0 || allChecksPassed);
+            
+            // Add/remove merge-ok label
+            if (canMerge) {
+              await github.rest.issues.addLabels({
+                owner: repo.owner,
+                repo: repo.repo,
+                issue_number: pr.number,
+                labels: ['merge-when-ready']
+              });
+            } else {
+              // Try to remove merge-when-ready if it exists
+              try {
+                await github.rest.issues.removeLabel({
+                  owner: repo.owner,
+                  repo: repo.repo,
+                  issue_number: pr.number,
+                  name: 'merge-when-ready'
+                });
+              } catch (e) {
+                // Label might not exist, ignore
+              }
+            }
+            
+            // Comment if there are blocking issues
+            if (hasBlockingLabel) {
+              const blocking = labels.filter(l => blockingLabels.includes(l));
+              
+              await github.rest.issues.createComment({
+                owner: repo.owner,
+                repo: repo.repo,
+                issue_number: pr.number,
+                body: 'This PR is not ready to merge. Please resolve the following:\n\n' +
+                  '- ' + blocking.join('\n- ') + '\n\n' +
+                  'Once resolved, I will add the merge-when-ready label.'
+              });
+            }
