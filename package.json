@@ -1,13 +1,14 @@
 {
   "name": "sentinel-cli",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "🛡️ AI-Powered Code Guardian — TUI (Bun-native). Analyze, audit, fix, and chat about your code with multi-LLM support (OpenAI, Gemini, Groq, Ollama).",
   "main": "src/index.js",
   "type": "module",
   "bin": {
-    "sentinel": "./src/tui/run.js"
+    "sentinel": "bin/sentinel.js"
   },
   "files": [
+    "bin/**/*",
     "src/**/*",
     "github-app.yml",
     "README.md",
@@ -84,7 +85,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/KunjShah95/SENTINEL-CLI.git"
+    "url": "git+https://github.com/KunjShah95/SENTINEL-CLI.git"
   },
   "bugs": {
     "url": "https://github.com/KunjShah95/SENTINEL-CLI/issues"
