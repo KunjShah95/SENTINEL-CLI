@@ -1,7 +1,7 @@
 {
   "name": "sentinel-cli",
-  "version": "1.9.0",
-  "description": "🛡️ AI-Powered Code Guardian with GitHub App integration, automated PR reviews, security badges, intelligent caching, and comprehensive error handling. Supports 15+ analyzers, 3+ LLM providers (OpenAI, Gemini, Groq), and real-time webhook automation.",
+  "version": "2.0.0",
+  "description": "🛡️ AI-Powered Code Guardian — TUI (Bun-native). Analyze, audit, fix, and chat about your code with multi-LLM support (OpenAI, Gemini, Groq, Ollama).",
   "main": "src/index.js",
   "type": "module",
   "bin": {
@@ -9,7 +9,6 @@
   },
   "files": [
     "src/**/*",
-    "frontend/build/**/*",
     "github-app.yml",
     "README.md",
     "CHANGELOG.md",
@@ -57,47 +56,29 @@
     "tui:bun": "bun src/tui/index.tsx",
     "mcp:start": "node mcp/sentinel-mcp-server.js",
     "mcp:dev": "node --watch mcp/sentinel-mcp-server.js",
-    "prepublishOnly": "npm run build:frontend && npm run release:check",
+    "prepublishOnly": "bun tsc -p src/tui/tsconfig.json --noEmit",
     "postversion": "git push && git push --tags",
-    "postinstall": "echo \"\n✨ Sentinel CLI installed! Run 'sentinel' to launch the TUI and use /setup or /auth to configure.\n\""
+    "postinstall": "echo \"\n✨ Sentinel CLI installed! Run 'sentinel' (requires Bun). Use /setup or /auth to configure.\n\""
   },
   "keywords": [
-    "code-review",
-    "automation",
-    "security",
-    "quality",
-    "git",
     "cli",
+    "tui",
+    "bun",
+    "terminal-ui",
+    "code-review",
+    "security",
     "ai",
+    "llm",
     "static-analysis",
     "linter",
     "vulnerability",
-    "dependency-check",
-    "accessibility",
-    "a11y",
-    "wcag",
     "openai",
     "gemini",
     "groq",
-    "llm",
-    "pre-commit",
-    "devops",
-    "cicd",
-    "caching",
-    "badges",
-    "github-app",
-    "error-handling",
-    "security-score",
-    "webhook",
-    "parallel-processing",
-    "performance",
-    "config-validation",
-    "automated-pr-review",
-    "docker-security",
-    "secrets-detection",
-    "typescript",
+    "ollama",
+    "opentui",
     "react",
-    "vue"
+    "typescript"
   ],
   "author": "Kunj Shah",
   "license": "MIT",
@@ -160,7 +141,7 @@
     "zod": "^4.3.6"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "bun": ">=1.0.0"
   },
   "publishConfig": {
     "access": "public",
