@@ -1,20 +1,35 @@
 #!/usr/bin/env node
-const { spawn } = require('child_process');
-const { resolve } = require('path');
+import { spawn } from 'node:child_process';
+import { resolve } from 'node:path';
+import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
+const __dirname = resolve(fileURLToPath(import.meta.url), '..');
 const root = resolve(__dirname, '..');
 const tuiEntry = resolve(root, 'src/tui/run.js');
 
-const child = spawn('bun', [tuiEntry], {
+function findBun() {
+  const candidates = [
+    process.env.BUN_INSTALL && resolve(process.env.BUN_INSTALL, 'bin', 'bun.exe'),
+    resolve(process.env.APPDATA || '', 'npm', 'node_modules', 'bun', 'bin', 'bun.exe'),
+    resolve(process.env.LOCALAPPDATA || '', 'bun', 'bin', 'bun.exe'),
+  ].filter(Boolean);
+  for (const p of candidates) {
+    if (existsSync(p)) return p;
+  }
+  return 'bun.exe';
+}
+
+const bunPath = findBun();
+const child = spawn(bunPath, [tuiEntry], {
   stdio: 'inherit',
   cwd: root,
-  env: Object.assign({}, process.env, { SENTINEL_ROOT: root }),
+  env: { ...process.env, SENTINEL_ROOT: root },
+  shell: process.platform === 'win32',
 });
 
-child.on('exit', function (code) {
-  process.exit(code || 1);
-});
-child.on('error', function () {
+child.on('exit', code => process.exit(code || 1));
+child.on('error', () => {
   console.error('');
   console.error('  Sentinel TUI requires Bun runtime (https://bun.sh)');
   console.error('');

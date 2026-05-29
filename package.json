@@ -1,6 +1,6 @@
 {
   "name": "sentinel-cli",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "description": "🛡️ AI-Powered Code Guardian — TUI (Bun-native). Analyze, audit, fix, and chat about your code with multi-LLM support (OpenAI, Gemini, Groq, Ollama).",
   "main": "src/index.js",
   "type": "module",
