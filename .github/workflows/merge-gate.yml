@@ -6,6 +6,11 @@ on:
   pull_request_review:
     types: [submitted, dismissed]
 
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
 jobs:
   check-merge-readiness:
     runs-on: ubuntu-latest
@@ -39,11 +44,12 @@ jobs:
             });
             
             const commit = commits[0];
-            const { data: statuses } = await github.rest.repos.listCommitStatuses({
+            const { data: combined } = await github.rest.repos.getCombinedStatusForRef({
               owner: repo.owner,
               repo: repo.repo,
-              sha: commit.sha
+              ref: commit.sha
             });
+            const statuses = combined.statuses || [];
             
             const requiredChecks = ['Sentinel CI'];
             const allChecksPassed = requiredChecks.every(check => {

@@ -237,8 +237,8 @@ export default class ReportGenerator {
 
         for (const issue of severityIssues) {
           lines.push(`   📄 ${issue.file}:${issue.line}${issue.column ? ':' + issue.column : ''}`);
-          lines.push(`   🏷️  ${issue.title}`);
-          lines.push(`   📝 ${issue.message}`);
+          lines.push(`   🏷️  [${(issue.type || issue.analyzer || 'General').toUpperCase()}] ${issue.title}`);
+          lines.push(`   📝 [${(issue.type || issue.analyzer || 'General').toUpperCase()}] ${issue.message}`);
           lines.push(`   🔧 ${issue.analyzer}`);
 
           if (issue.snippet && report.metadata.includeSnippets) {

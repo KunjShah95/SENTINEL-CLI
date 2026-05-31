@@ -99,6 +99,7 @@ jobs:
 
       - name: Analyze base branch for score delta
         if: steps.route.outputs.run_pr_review == 'true' && steps.sentinel.outputs.issues_found == 'true'
+        continue-on-error: true
         run: |
           node -e "const fs=require('fs'); const path=require('path'); const {execSync}=require('child_process'); const files=JSON.parse(process.env.FILES_JSON||'[]'); const base=process.env.BASE_SHA; fs.rmSync('.sentinel-base',{recursive:true,force:true}); for(const f of files){ try { const content=execSync(`git show ${base}:${f}`, {encoding:'utf8', stdio:['pipe','pipe','ignore']}); const out=path.join('.sentinel-base', f); fs.mkdirSync(path.dirname(out), {recursive:true}); fs.writeFileSync(out, content); } catch(e) {} }"
           if [ -d .sentinel-base ]; then
