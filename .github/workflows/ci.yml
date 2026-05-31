@@ -60,7 +60,7 @@ jobs:
       run: |
         # Run analysis on changed files; skip gracefully if TUI native deps unavailable in CI
         node --experimental-vm-modules src/core/cli.js analyze src/output/ --format json --output code-review-report.json \
-          || echo '{"issues":[]}' > code-review-report.json
+          || echo '{"issues":[],"summary":{"totalIssues":0,"severityCounts":{"critical":0,"high":0,"medium":0,"low":0,"info":0}}}' > code-review-report.json
         
         # Check for critical issues
         if grep -q '"severity": "critical"' code-review-report.json; then
