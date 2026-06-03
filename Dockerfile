@@ -8,10 +8,10 @@ FROM node:20-alpine AS builder
 
 LABEL maintainer="Sentinel Team <sentinel@example.com>"
 LABEL description="AI-Powered Automated Code Review with Security, TypeScript, React, API analysis"
-LABEL version="1.5.0"
+LABEL version="2.0.2"
 LABEL org.opencontainers.image.title="Sentinel CLI"
-LABEL org.opencontainers.image.description="Comprehensive code review tool with 11+ analyzers"
-LABEL org.opencontainers.image.version="1.5.0   "
+LABEL org.opencontainers.image.description="Comprehensive code review tool with 13+ analyzers"
+LABEL org.opencontainers.image.version="2.0.2"
 LABEL org.opencontainers.image.vendor="Sentinel Team"
 LABEL org.opencontainers.image.source="https://github.com/KunjShah95/Sentinel-CLI"
 
@@ -41,8 +41,8 @@ RUN npm run lint || echo "Linting passed or skipped"
 FROM node:20-alpine AS production
 
 LABEL maintainer="Sentinel Team"
-LABEL description="Sentinel CLI v1.5.0 - AI-Powered Code Guardian"
-LABEL version="1.5.0"
+LABEL description="Sentinel CLI v2.0.2 - AI-Powered Code Guardian"
+LABEL version="2.0.2"
 
 # Set environment variables
 ENV NODE_ENV=production
@@ -104,7 +104,7 @@ CMD ["--help"]
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD node -e "console.log('Sentinel CLI v1.5.0 is healthy')" || exit 1
+    CMD node -e "console.log('Sentinel CLI v2.0.2 is healthy')" || exit 1
 
 # ============================================================
 # Stage 3: CI/CD Runner (optimized for GitHub Actions, GitLab CI)
@@ -112,7 +112,7 @@ FROM node:20-alpine AS ci
 
 LABEL maintainer="Sentinel Team"
 LABEL description="Sentinel CLI - CI/CD Runner"
-LABEL version="1.5.0"
+LABEL version="2.0.2"
 
 ENV NODE_ENV=production
 ENV CI=true
@@ -151,7 +151,7 @@ FROM node:20-alpine AS development
 
 LABEL maintainer="Sentinel Team"
 LABEL description="Sentinel CLI - Development Environment"
-LABEL version="1.5.0-dev"
+LABEL version="2.0.2-dev"
 
 WORKDIR /app
 

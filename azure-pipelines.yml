@@ -27,7 +27,7 @@ steps:
   - script: npm run test:coverage
     displayName: 'Run coverage gate'
 
-  - script: node src/core/cli.js analyze src/ --format json --output sentinel-report.json || true
+  - script: node src/dist/cli.js analyze src/ --format json --output sentinel-report.json || true
     displayName: 'Run Sentinel analysis'
 
   - script: |

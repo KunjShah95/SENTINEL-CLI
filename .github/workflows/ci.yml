@@ -2,115 +2,115 @@ name: Sentinel CI
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   test-coverage:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-        cache: 'npm'
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
 
-    - name: Install dependencies
-      run: npm ci
+      - name: Install dependencies
+        run: npm ci
 
-    - name: Run tests with coverage gate
-      run: npm run test:coverage
+      - name: Run tests with coverage gate
+        run: npm run test:coverage
 
-    - name: Upload coverage artifact
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: coverage-report
-        path: coverage/
+      - name: Upload coverage artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
 
   code-review:
     runs-on: ubuntu-latest
-    
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0  # Fetch full history for git analysis
-    
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18'
-        cache: 'npm'
-    
-    - name: Install dependencies
-      run: npm ci
-    
-    - name: Run Sentinel
-      run: |
-        # Run analysis on all changes
-        node src/core/cli.js analyze --format json --output code-review-report.json
-        
-        # Check for critical issues
-        if grep -q '"severity": "critical"' code-review-report.json; then
-          echo "❌ Critical issues found in code review"
-          exit 1
-        fi
-    
-    - name: Upload Code Review Report
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: code-review-report
-        path: code-review-report.json
-    
-    - name: Comment PR with Results
-      if: github.event_name == 'pull_request'
-      uses: actions/github-script@v7
-      with:
-        script: |
-          const fs = require('fs');
-          
-          if (fs.existsSync('code-review-report.json')) {
-            const report = JSON.parse(fs.readFileSync('code-review-report.json', 'utf8'));
-            
-            let comment = '## 🔍 Code Review Results\n\n';
-            comment += `**Total Issues Found:** ${report.summary.totalIssues}\n\n`;
-            
-            if (report.summary.totalIssues > 0) {
-              comment += '### Issues by Severity:\n';
-              Object.entries(report.summary.severityCounts).forEach(([severity, count]) => {
-                if (count > 0) {
-                  const emoji = severity === 'critical' ? '🔴' : 
-                               severity === 'high' ? '🟠' :
-                               severity === 'medium' ? '🟡' :
-                               severity === 'low' ? '🔵' : 'ℹ️';
-                  comment += `${emoji} ${severity.toUpperCase()}: ${count}\n`;
-                }
-              });
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetch full history for git analysis
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Sentinel
+        run: |
+          # Run analysis on all changes
+          node src/dist/cli.js analyze --format json --output code-review-report.json || true
+
+          # Check for critical issues
+          if [ -f code-review-report.json ] && grep -q '"severity": "critical"' code-review-report.json; then
+            echo "❌ Critical issues found in code review"
+            exit 1
+          fi
+
+      - name: Upload Code Review Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: code-review-report
+          path: code-review-report.json
+
+      - name: Comment PR with Results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            if (fs.existsSync('code-review-report.json')) {
+              const report = JSON.parse(fs.readFileSync('code-review-report.json', 'utf8'));
               
-              comment += '\n### Top Issues:\n';
-              report.issues.slice(0, 5).forEach((issue, index) => {
-                comment += `${index + 1}. **${issue.title}** (${issue.severity})\n`;
-                comment += `   - File: \`${issue.file}:${issue.line}\`\n`;
-                comment += `   - ${issue.message}\n\n`;
+              let comment = '## 🔍 Code Review Results\n\n';
+              comment += `**Total Issues Found:** ${report.summary.totalIssues}\n\n`;
+              
+              if (report.summary.totalIssues > 0) {
+                comment += '### Issues by Severity:\n';
+                Object.entries(report.summary.severityCounts).forEach(([severity, count]) => {
+                  if (count > 0) {
+                    const emoji = severity === 'critical' ? '🔴' : 
+                                 severity === 'high' ? '🟠' :
+                                 severity === 'medium' ? '🟡' :
+                                 severity === 'low' ? '🔵' : 'ℹ️';
+                    comment += `${emoji} ${severity.toUpperCase()}: ${count}\n`;
+                  }
+                });
+                
+                comment += '\n### Top Issues:\n';
+                report.issues.slice(0, 5).forEach((issue, index) => {
+                  comment += `${index + 1}. **${issue.title}** (${issue.severity})\n`;
+                  comment += `   - File: \`${issue.file}:${issue.line}\`\n`;
+                  comment += `   - ${issue.message}\n\n`;
+                });
+              } else {
+                comment += '🎉 **No issues found!** Great job!\n';
+              }
+              
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: comment
               });
-            } else {
-              comment += '🎉 **No issues found!** Great job!\n';
             }
-            
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: comment
-            });
-          }
 
   security-scan:
     runs-on: ubuntu-latest
@@ -123,7 +123,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '18'
+        node-version: '20'
         cache: 'npm'
     
     - name: Install dependencies
@@ -132,24 +132,24 @@ jobs:
     - name: Run Security-focused Analysis
       run: |
         # Run security-only analysis
-        node src/core/cli.js analyze --format json --output security-report.json
+        node src/dist/cli.js analyze --format json --output security-report.json || true
         
         # Check for high/critical security issues
         SECURITY_ISSUES=$(grep -c '"severity": "critical"\|"severity": "high"' security-report.json || echo "0")
-        
-        if [ "$SECURITY_ISSUES" -gt 0 ]; then
-          echo "❌ Found $SECURITY_ISSUES high/critical security issues"
-          exit 1
-        else
-          echo "✅ No high/critical security issues found"
-        fi
-    
-    - name: Upload Security Report
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: security-report
-        path: security-report.json
+
+          if [ "$SECURITY_ISSUES" -gt 0 ]; then
+            echo "❌ Found $SECURITY_ISSUES high/critical security issues"
+            exit 1
+          else
+            echo "✅ No high/critical security issues found"
+          fi
+
+      - name: Upload Security Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: security-report
+          path: security-report.json
 
   quality-check:
     runs-on: ubuntu-latest
@@ -162,7 +162,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '18'
+        node-version: '20'
         cache: 'npm'
     
     - name: Install dependencies
@@ -171,24 +171,24 @@ jobs:
     - name: Run Quality Analysis
       run: |
         # Run quality-focused analysis
-        node src/core/cli.js analyze --format json --output quality-report.json
-        
-        # Check quality metrics
-        QUALITY_ISSUES=$(grep -c '"type": "quality"' quality-report.json || echo "0")
-        echo "Found $QUALITY_ISSUES quality issues"
-        
-        # Quality gate - fail if too many issues
-        if [ "$QUALITY_ISSUES" -gt 50 ]; then
-          echo "❌ Too many quality issues found ($QUALITY_ISSUES)"
-          exit 1
-        fi
-    
-    - name: Upload Quality Report
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: quality-report
-        path: quality-report.json
+        node src/dist/cli.js analyze --format json --output quality-report.json || true
+
+          # Check quality metrics
+          QUALITY_ISSUES=$(grep -c '"type": "quality"' quality-report.json || echo "0")
+          echo "Found $QUALITY_ISSUES quality issues"
+
+          # Quality gate - fail if too many issues
+          if [ "$QUALITY_ISSUES" -gt 50 ]; then
+            echo "❌ Too many quality issues found ($QUALITY_ISSUES)"
+            exit 1
+          fi
+
+      - name: Upload Quality Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: quality-report
+          path: quality-report.json
 
   performance-check:
     runs-on: ubuntu-latest
@@ -201,7 +201,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '18'
+        node-version: '20'
         cache: 'npm'
     
     - name: Install dependencies
@@ -210,52 +210,52 @@ jobs:
     - name: Run Performance Analysis
       run: |
         # Run performance-focused analysis
-        node src/core/cli.js analyze --format json --output performance-report.json
-        
-        # Check for performance issues
-        PERF_ISSUES=$(grep -c '"type": "performance"' performance-report.json || echo "0")
-        echo "Found $PERF_ISSUES performance issues"
-        
-        # Performance gate - warn if many issues
-        if [ "$PERF_ISSUES" -gt 20 ]; then
-          echo "⚠️ Many performance issues found ($PERF_ISSUES)"
-        fi
-    
-    - name: Upload Performance Report
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: performance-report
-        path: performance-report.json
+        node src/dist/cli.js analyze --format json --output performance-report.json || true
+
+          # Check for performance issues
+          PERF_ISSUES=$(grep -c '"type": "performance"' performance-report.json || echo "0")
+          echo "Found $PERF_ISSUES performance issues"
+
+          # Performance gate - warn if many issues
+          if [ "$PERF_ISSUES" -gt 20 ]; then
+            echo "⚠️ Many performance issues found ($PERF_ISSUES)"
+          fi
+
+      - name: Upload Performance Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: performance-report
+          path: performance-report.json
 
   summary:
     runs-on: ubuntu-latest
     needs: [test-coverage, code-review, security-scan, quality-check, performance-check]
     if: always()
-    
+
     steps:
-    - name: Download all reports
-      uses: actions/download-artifact@v4
-    
-    - name: Generate Summary Report
-      run: |
-        echo "## 📊 Code Review Summary" >> summary.md
-        echo "" >> summary.md
-        echo "### Analysis Results:" >> summary.md
-        
-        for report in code-review-report security-report quality-report performance-report; do
-          if [ -f "$report/code-review-report.json" ] || [ -f "$report/security-report.json" ] || [ -f "$report/quality-report.json" ] || [ -f "$report/performance-report.json" ]; then
-            echo "- ✅ $report completed" >> summary.md
-          else
-            echo "- ❌ $report failed" >> summary.md
-          fi
-        done
-        
-        echo "" >> summary.md
-        echo "Generated on: $(date)" >> summary.md
-    
-    - name: Upload Summary
-      uses: actions/upload-artifact@v4
-      with:
-        name: summary-report
-        path: summary.md
+      - name: Download all reports
+        uses: actions/download-artifact@v4
+
+      - name: Generate Summary Report
+        run: |
+          echo "## 📊 Code Review Summary" >> summary.md
+          echo "" >> summary.md
+          echo "### Analysis Results:" >> summary.md
+
+          for report in code-review-report security-report quality-report performance-report; do
+            if [ -f "$report/code-review-report.json" ] || [ -f "$report/security-report.json" ] || [ -f "$report/quality-report.json" ] || [ -f "$report/performance-report.json" ]; then
+              echo "- ✅ $report completed" >> summary.md
+            else
+              echo "- ❌ $report failed" >> summary.md
+            fi
+          done
+
+          echo "" >> summary.md
+          echo "Generated on: $(date)" >> summary.md
+
+      - name: Upload Summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: summary-report
+          path: summary.md

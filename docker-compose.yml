@@ -1,7 +1,7 @@
 version: '3.9'
 
 # ============================================================
-# Sentinel CLI v1.5.0 - Docker Compose Configuration
+# Sentinel CLI v2.0.2 - Docker Compose Configuration
 # Supports: Production, Development, CI/CD, and specialized services
 # ============================================================
 
@@ -12,7 +12,7 @@ services:
       context: .
       dockerfile: Dockerfile
       target: production
-    image: sentinel-cli:1.5.0
+    image: sentinel-cli:2.0.2
     container_name: sentinel-review
     environment:
       - NODE_ENV=production
@@ -36,7 +36,7 @@ services:
       - ./cache:/app/cache
       - ./.sentinel:/app/.sentinel
     working_dir: /workspace
-    command: ["analyze", "--format", "console"]
+    command: ['analyze', '--format', 'console']
 
   # Security audit service
   sentinel-security:
@@ -44,7 +44,7 @@ services:
       context: .
       dockerfile: Dockerfile
       target: production
-    image: sentinel-cli:1.5.0
+    image: sentinel-cli:2.0.2
     container_name: sentinel-security
     environment:
       - NODE_ENV=production
@@ -53,7 +53,7 @@ services:
       - ./:/workspace:ro
       - ./reports:/app/reports
     working_dir: /workspace
-    command: ["security-audit", "--format", "console"]
+    command: ['security-audit', '--format', 'console']
 
   # Full scan service
   sentinel-full:
@@ -61,7 +61,7 @@ services:
       context: .
       dockerfile: Dockerfile
       target: production
-    image: sentinel-cli:1.5.0
+    image: sentinel-cli:2.0.2
     container_name: sentinel-full-scan
     environment:
       - NODE_ENV=production
@@ -70,7 +70,7 @@ services:
       - ./reports:/app/reports
       - ./.sentinel:/app/.sentinel
     working_dir: /workspace
-    command: ["full-scan", "--save-history"]
+    command: ['full-scan', '--save-history']
 
   # SARIF output for GitHub Security
   sentinel-sarif:
@@ -78,7 +78,7 @@ services:
       context: .
       dockerfile: Dockerfile
       target: ci
-    image: sentinel-cli:1.5.0-ci
+    image: sentinel-cli:2.0.2-ci
     container_name: sentinel-sarif
     environment:
       - NODE_ENV=production
@@ -87,7 +87,7 @@ services:
       - ./:/workspace:ro
       - ./reports:/app/reports
     working_dir: /workspace
-    command: ["sarif", "--output", "/app/reports/sentinel-results.sarif"]
+    command: ['sarif', '--output', '/app/reports/sentinel-results.sarif']
 
   # Development service with hot reload
   sentinel-dev:
@@ -95,7 +95,7 @@ services:
       context: .
       dockerfile: Dockerfile
       target: development
-    image: sentinel-cli:1.5.0-dev
+    image: sentinel-cli:2.0.2-dev
     container_name: sentinel-dev
     environment:
       - NODE_ENV=development
@@ -111,8 +111,8 @@ services:
       - ./:/app
       - /app/node_modules
     ports:
-      - "3000:3000"
-    command: ["npm", "run", "dev"]
+      - '3000:3000'
+    command: ['npm', 'run', 'dev']
 
   # CI/CD service for automated reviews
   sentinel-ci:
@@ -120,7 +120,7 @@ services:
       context: .
       dockerfile: Dockerfile
       target: ci
-    image: sentinel-cli:1.5.0-ci
+    image: sentinel-cli:2.0.2-ci
     container_name: sentinel-ci
     environment:
       - NODE_ENV=production
@@ -132,7 +132,15 @@ services:
       - ./:/workspace:ro
       - ./reports:/app/reports
     working_dir: /workspace
-    command: ["analyze", "--all-analyzers", "--format", "json", "--output", "/app/reports/code-review.json"]
+    command:
+      [
+        'analyze',
+        '--all-analyzers',
+        '--format',
+        'json',
+        '--output',
+        '/app/reports/code-review.json',
+      ]
 
   # GitHub PR review service
   sentinel-pr:
@@ -140,7 +148,7 @@ services:
       context: .
       dockerfile: Dockerfile
       target: production
-    image: sentinel-cli:1.5.0
+    image: sentinel-cli:2.0.2
     container_name: sentinel-pr-review
     environment:
       - NODE_ENV=production
@@ -149,8 +157,8 @@ services:
       - ./:/workspace:ro
     working_dir: /workspace
     # Usage: docker-compose run sentinel-pr review-pr https://github.com/owner/repo/pull/123
-    entrypoint: ["node", "src/cli.js"]
-    command: ["--help"]
+    entrypoint: ['node', 'src/dist/cli.js']
+    command: ['--help']
 
   # Notification service (Slack/Discord)
   sentinel-notify:
@@ -158,7 +166,7 @@ services:
       context: .
       dockerfile: Dockerfile
       target: production
-    image: sentinel-cli:1.5.0
+    image: sentinel-cli:2.0.2
     container_name: sentinel-notify
     environment:
       - NODE_ENV=production
@@ -167,7 +175,7 @@ services:
     volumes:
       - ./:/workspace:ro
     working_dir: /workspace
-    command: ["notify", "--slack", "--discord", "--project", "MyProject"]
+    command: ['notify', '--slack', '--discord', '--project', 'MyProject']
 
 # ============================================================
 # Volume definitions for persistent data

@@ -27,8 +27,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20.x"
-          cache: "npm"
+          node-version: '20.x'
+          cache: 'npm'
 
       - name: Install dependencies
         run: npm ci
@@ -88,13 +88,13 @@ jobs:
             echo "issues_found=false" >> $GITHUB_OUTPUT
             exit 0
           fi
-          node src/core/cli.js analyze $FILES \
+          node src/dist/cli.js analyze $FILES \
             --format json \
             --output sentinel-pr-report.json \
             || true
           echo "issues_found=true" >> $GITHUB_OUTPUT
         env:
-          SENTINEL_PR_MODE: "true"
+          SENTINEL_PR_MODE: 'true'
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Analyze base branch for score delta
@@ -102,7 +102,7 @@ jobs:
         run: |
           node -e "const fs=require('fs'); const path=require('path'); const {execSync}=require('child_process'); const files=JSON.parse(process.env.FILES_JSON||'[]'); const base=process.env.BASE_SHA; fs.rmSync('.sentinel-base',{recursive:true,force:true}); for(const f of files){ try { const content=execSync(`git show ${base}:${f}`, {encoding:'utf8', stdio:['pipe','pipe','ignore']}); const out=path.join('.sentinel-base', f); fs.mkdirSync(path.dirname(out), {recursive:true}); fs.writeFileSync(out, content); } catch(e) {} }"
           if [ -d .sentinel-base ]; then
-            node src/core/cli.js analyze .sentinel-base --format json --output sentinel-base-report.json || true
+            node src/dist/cli.js analyze .sentinel-base --format json --output sentinel-base-report.json || true
           fi
         env:
           FILES_JSON: ${{ steps.changed-files.outputs.json }}

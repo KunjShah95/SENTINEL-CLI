@@ -1,0 +1,210 @@
+<h2>Website Content Overhaul: CLI → TUI</h2>
+<p class="subtitle">Every page needs content updated to reflect the Terminal UI product</p>
+
+<div class="section">
+  <h3>Navbar</h3>
+  <p><strong>Before:</strong> Subtitle "AI Security" • Version badge "v1.8.0"</p>
+  <p><strong>After:</strong> Subtitle "Terminal AI" • Version badge "v2.0.2"</p>
+</div>
+
+<div class="section">
+  <h3>Home Page — Hero Section</h3>
+  <div class="split">
+    <div class="mockup">
+      <div class="mockup-header">Current</div>
+      <div class="mockup-body" style="padding: 16px; font-size: 13px">
+        <div class="label">AI-Powered Code Guardian</div>
+        <div style="font-size: 18px; font-weight: 700; margin: 8px 0">
+          Your AI Security<br /><span style="color: var(--color-green)">Pair Programmer</span>
+        </div>
+        <div style="color: var(--color-muted); font-size: 12px">
+          Sentinel CLI scans your code in real-time...
+        </div>
+        <div style="display: flex; gap: 8px; margin-top: 12px">
+          <div class="mock-button">Get Started Free</div>
+          <div class="mock-button">View on GitHub</div>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 12px">
+          <span class="label" style="font-size: 9px">Semgrep</span>
+          <span class="label" style="font-size: 9px">TruffleHog</span>
+          <span class="label" style="font-size: 9px">Snyk</span>
+        </div>
+      </div>
+    </div>
+    <div class="mockup">
+      <div class="mockup-header">Proposed</div>
+      <div class="mockup-body" style="padding: 16px; font-size: 13px">
+        <div class="label">Terminal-Native AI Security</div>
+        <div style="font-size: 18px; font-weight: 700; margin: 8px 0">
+          Your Code Security<br /><span style="color: var(--color-green)">Terminal</span>
+        </div>
+        <div style="color: var(--color-muted); font-size: 12px">
+          Sentinel TUI brings real-time analysis, AI chat, and sessions to your terminal. Built with
+          Bun + React.
+        </div>
+        <div style="display: flex; gap: 8px; margin-top: 12px">
+          <div class="mock-button">Launch TUI</div>
+          <div class="mock-button">View on GitHub</div>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 12px">
+          <span class="label" style="font-size: 9px">OpenTUI</span>
+          <span class="label" style="font-size: 9px">Bun</span>
+          <span class="label" style="font-size: 9px">React</span>
+          <span class="label" style="font-size: 9px">TypeScript</span>
+          <span class="label" style="font-size: 9px">Multi-LLM</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Stats Bar</h3>
+  <div class="split">
+    <div class="mockup">
+      <div class="mockup-header">Current</div>
+      <div
+        class="mockup-body"
+        style="
+          padding: 12px;
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 8px;
+          font-size: 11px;
+        "
+      >
+        <div><strong>13+</strong><br />Analyzers</div>
+        <div><strong>50ms</strong><br />Avg Scan</div>
+        <div><strong>0</strong><br />False Positives</div>
+        <div><strong>10k+</strong><br />GitHub Stars</div>
+      </div>
+    </div>
+    <div class="mockup">
+      <div class="mockup-header">Proposed</div>
+      <div
+        class="mockup-body"
+        style="
+          padding: 12px;
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 8px;
+          font-size: 11px;
+        "
+      >
+        <div><strong>69</strong><br />Commands</div>
+        <div><strong>13+</strong><br />Analyzers</div>
+        <div><strong>0</strong><br />Build Errors</div>
+        <div><strong>4</strong><br />LLM Providers</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Features Grid</h3>
+  <div class="split">
+    <div class="mockup">
+      <div class="mockup-header">Current (security scanners)</div>
+      <div class="mockup-body" style="padding: 12px; font-size: 11px">
+        <div>Automated Fixes</div>
+        <div>CI/CD Integration</div>
+        <div>Custom Rule Engine</div>
+        <div>Secret Scanning</div>
+        <div>Dependency Audit</div>
+        <div>IaC Protection</div>
+      </div>
+    </div>
+    <div class="mockup">
+      <div class="mockup-header">Proposed (TUI features)</div>
+      <div class="mockup-body" style="padding: 12px; font-size: 11px">
+        <div>Command Palette</div>
+        <div>Session Management</div>
+        <div>Live Dashboard</div>
+        <div>Multi-LLM Chat</div>
+        <div>Analysis Wizard</div>
+        <div>Custom Themes</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Terminal Mock</h3>
+  <div class="split">
+    <div class="mockup">
+      <div class="mockup-header">Current (CLI output)</div>
+      <div class="mockup-body" style="padding: 12px; font-family: monospace; font-size: 10px">
+        <div>$ sentinel agents pr https://...</div>
+        <div class="label">Analyzing PR #123...</div>
+        <div>Scanner found 3 issues</div>
+      </div>
+    </div>
+    <div class="mockup">
+      <div class="mockup-header">Proposed (TUI view)</div>
+      <div class="mockup-body" style="padding: 12px; font-size: 10px">
+        <div class="label">Command Palette:</div>
+        <div>/analyze src/ [MRU]</div>
+        <div>/session list</div>
+        <div>/dashboard</div>
+        <div class="label" style="margin-top: 8px">Dashboard:</div>
+        <div>Cache: 1.2K entries 89% hit</div>
+        <div>Config: 3 providers 8 analyzers</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>How It Works</h3>
+  <div class="split">
+    <div class="mockup">
+      <div class="mockup-header">Current</div>
+      <div class="mockup-body" style="padding: 12px; font-size: 11px">
+        1. Push Code → 2. Webhook → 3. Diff Analysis → 4. AI Processing → 5. Review Posted
+      </div>
+    </div>
+    <div class="mockup">
+      <div class="mockup-header">Proposed</div>
+      <div class="mockup-body" style="padding: 12px; font-size: 11px">
+        1. Launch TUI → 2. Open Session → 3. Run Analysis → 4. Review Results → 5. Chat &amp; Fix
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Features Page</h3>
+  <div class="split">
+    <div class="mockup">
+      <div class="mockup-header">Current</div>
+      <div class="mockup-body" style="padding: 12px; font-size: 11px">
+        SQL Injection, Vulnerability Scanning, Docker &amp; K8s, Secrets Detection, Dependency
+        Audit, Auto-fix
+      </div>
+    </div>
+    <div class="mockup">
+      <div class="mockup-header">Proposed</div>
+      <div class="mockup-body" style="padding: 12px; font-size: 11px">
+        Command Palette, Session Manager, Live Dashboard, Multi-LLM Chat, Analysis Wizard, Theme
+        Engine, Result Viewer, Exec Pagination
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Docs Page</h3>
+  <p>Update CLI command references to TUI commands. Add:</p>
+  <ul>
+    <li>How to launch the TUI</li>
+    <li>Command palette usage (/analyze, /session, /chat)</li>
+    <li>Session management guide</li>
+    <li>Theme customization</li>
+    <li>Multi-LLM provider setup</li>
+  </ul>
+</div>
+
+<div class="section">
+  <h3>Unchanged</h3>
+  <p>Changelog, Blog, Article, Contact pages — minimal TUI references added.</p>
+</div>
