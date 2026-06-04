@@ -7,7 +7,7 @@ import { promises as fs } from 'fs';
 export class SarifGenerator {
     constructor(options = {}) {
         this.toolName = options.toolName || 'Sentinel CLI';
-        this.toolVersion = options.toolVersion || '1.2.2';
+        this.toolVersion = options.toolVersion || '2.0.2';
         this.toolUri = options.toolUri || 'https://github.com/KunjShah95/Sentinel-CLI';
     }
 
