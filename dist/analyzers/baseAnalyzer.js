@@ -290,7 +290,7 @@ export class BaseAnalyzer {
       },
       {
         name: 'AWS Credentials',
-        pattern: /(AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY|AKIA[0-9A-Z]{16})\s*=\s*['"][^'"]+['"]/gi,
+        pattern: /(AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY|(?:AKIA|ASIA|AID|AROA)[0-9A-Z]{16}|A3T[A-Z0-9]{15}|A3TX[A-Z0-9]{14})\s*=\s*['"][^'"]+['"]/gi,
         severity: 'critical',
         type: 'security',
       },
