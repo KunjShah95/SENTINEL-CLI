@@ -1804,27 +1804,15 @@ program
 
 // NEW: SARIF output for GitHub Security
 program
-  .command('sarif')
-  .description('Generate SARIF report for GitHub Security tab')
-  .option('-o, --output <file>', 'Output file path', 'sentinel-results.sarif')
-  .action(async options => {
+  .command('sarif [input-file]')
+  .description('Export analysis results to SARIF 2.1.0 format')
+  .option('-o, --output <file>', 'Output file (defaults to stdout)')
+  .action(async (inputFile, options) => {
     try {
-      const { SarifGenerator } = await import('./output/sarifGenerator.js');
-      const bot = new CodeReviewBot();
-      await bot.initialize();
-
-      console.log(chalk.cyan('🔍 Running analysis...'));
-      const { issues } = await bot.runAnalysis({ format: 'json', silent: true });
-
-      const sarif = new SarifGenerator();
-      await sarif.saveToFile(issues, options.output);
-
-      console.log(chalk.green('✓') + ` SARIF report saved to ${options.output}`);
-      console.log(
-        chalk.gray('  Upload to GitHub: gh code-scanning upload-sarif --sarif ' + options.output)
-      );
-    } catch (error) {
-      console.error(chalk.red('SARIF generation failed:'), error.message);
+      const { default: runSarif } = await import('./cli/commands/sarif.js');
+      await runSarif(inputFile, options);
+    } catch (err) {
+      console.error(chalk.red('SARIF export failed:'), err.message);
       process.exit(1);
     }
   });
