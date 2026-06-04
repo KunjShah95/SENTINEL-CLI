@@ -1,1 +1,0 @@
-{"version":3,"file":"spinner.d.ts","sourceRoot":"","sources":["../../../src/tui/components/spinner.tsx"],"names":[],"mappings":"AAGA,MAAM,MAAM,IAAI,GAAG,OAAO,GAAG,MAAM,GAAG,MAAM,GAAG,KAAK,CAAC;AAIrD,KAAK,KAAK,GAAG;IAAE,IAAI,CAAC,EAAE,IAAI,CAAA;CAAE,CAAC;AAE7B,wBAAgB,OAAO,CAAC,EAAE,IAAc,EAAE,EAAE,KAAK,6BAgBhD"}

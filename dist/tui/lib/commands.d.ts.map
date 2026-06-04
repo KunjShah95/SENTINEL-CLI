@@ -1,1 +1,0 @@
-{"version":3,"file":"commands.d.ts","sourceRoot":"","sources":["../../../src/tui/lib/commands.ts"],"names":[],"mappings":"AAOA,MAAM,MAAM,cAAc,GAAG;IAC3B,OAAO,EAAE,CAAC,IAAI,EAAE,MAAM,KAAK,OAAO,CAAC,MAAM,CAAC,CAAC;IAC3C,WAAW,EAAE,MAAM,CAAC;CACrB,CAAC;AA8DF,eAAO,MAAM,gBAAgB,EAAE,MAAM,CAAC,MAAM,EAAE,cAAc,CA+1B3D,CAAC"}

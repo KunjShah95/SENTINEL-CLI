@@ -1,1 +1,0 @@
-{"version":3,"file":"scan-dialog.d.ts","sourceRoot":"","sources":["../../../../src/tui/components/dialogs/scan-dialog.tsx"],"names":[],"mappings":"AAWA,KAAK,KAAK,GAAG;IACX,QAAQ,EAAE,CAAC,MAAM,EAAE,MAAM,KAAK,IAAI,CAAC;CACpC,CAAC;AAEF,wBAAgB,iBAAiB,CAAC,EAAE,QAAQ,EAAE,EAAE,KAAK,6BA8BpD"}

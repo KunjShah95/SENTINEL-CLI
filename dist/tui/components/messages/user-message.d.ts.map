@@ -1,1 +1,0 @@
-{"version":3,"file":"user-message.d.ts","sourceRoot":"","sources":["../../../../src/tui/components/messages/user-message.tsx"],"names":[],"mappings":"AAIA,KAAK,KAAK,GAAG;IAAE,OAAO,EAAE,MAAM,CAAC;IAAC,IAAI,CAAC,EAAE,OAAO,GAAG,MAAM,GAAG,MAAM,GAAG,KAAK,CAAA;CAAE,CAAC;AAE3E,wBAAgB,WAAW,CAAC,EAAE,OAAO,EAAE,IAAc,EAAE,EAAE,KAAK,6BAiB7D"}

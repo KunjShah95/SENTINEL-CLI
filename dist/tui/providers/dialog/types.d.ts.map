@@ -1,1 +1,0 @@
-{"version":3,"file":"types.d.ts","sourceRoot":"","sources":["../../../../src/tui/providers/dialog/types.ts"],"names":[],"mappings":"AAAA,OAAO,KAAK,EAAE,SAAS,EAAE,MAAM,OAAO,CAAC;AAEvC,MAAM,MAAM,YAAY,GAAG;IACzB,KAAK,EAAE,MAAM,CAAC;IACd,QAAQ,EAAE,SAAS,CAAC;IACpB,OAAO,CAAC,EAAE,MAAM,IAAI,CAAC;IACrB,KAAK,CAAC,EAAE,MAAM,CAAC;IACf,MAAM,CAAC,EAAE,MAAM,CAAC;CACjB,CAAC"}

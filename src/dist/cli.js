@@ -113,7 +113,7 @@ program
   • Slack/Discord notifications
   • SARIF output for GitHub Security`
   )
-  .version('1.9.0')
+  .version('2.0.2')
   .option('--banner-message <text>', 'Banner text', 'SENTINEL')
   .option('--banner-font <name>', 'Figlet font name', 'Standard')
   .option('--banner-gradient <name>', 'Banner gradient: aqua|fire|rainbow|aurora|mono', 'aqua')
@@ -1668,65 +1668,6 @@ program
     }
   });
 
-// NEW: Auto-Fix Command
-program
-  .command('fix [files...]')
-  .description('Automatically fix common issues in code')
-  .option('--type <types>', 'Comma-separated fix types (or "all")', 'all')
-  .option('--dry-run', 'Show what would be fixed without making changes')
-  .option('-s, --staged', 'Fix only staged files')
-  .action(async (files, options) => {
-    try {
-      const { AutoFixer } = await import('../utils/autoFixer.js');
-      const bot = new CodeReviewBot();
-      await bot.initialize();
-
-      console.log(chalk.cyan('🔧 Running auto-fix...'));
-
-      // Get files to fix
-      const filesToFix = await bot.getFilesToAnalyze({
-        files: files.length > 0 ? files : undefined,
-        staged: options.staged,
-      });
-
-      if (filesToFix.length === 0) {
-        console.log(chalk.yellow('No files to fix'));
-        return;
-      }
-
-      const fixer = new AutoFixer();
-      const fixTypes = options.type.split(',').map(t => t.trim());
-
-      // Apply fixes
-      const results = await fixer.applyFixesToFiles(filesToFix, fixTypes);
-
-      if (results.length === 0) {
-        console.log(chalk.green('✨ No issues to auto-fix!'));
-        return;
-      }
-
-      // Write or show dry-run results
-      await fixer.writeFixedFiles(results, options.dryRun);
-      const summary = fixer.generateSummary(results);
-
-      if (options.dryRun) {
-        console.log(chalk.yellow('🔸 Dry run - no files modified'));
-      } else {
-        console.log(chalk.green('✓ Fixes applied'));
-      }
-
-      console.log(chalk.white(`  Files: ${summary.totalFiles}`));
-      console.log(chalk.white(`  Total fixes: ${summary.totalFixes}`));
-
-      for (const [type, count] of Object.entries(summary.byType)) {
-        console.log(chalk.gray(`    • ${type}: ${count}`));
-      }
-    } catch (error) {
-      console.error(chalk.red('Auto-fix failed:'), error.message);
-      process.exit(1);
-    }
-  });
-
 // NEW: Workspace/Monorepo Analysis Command
 program
   .command('analyze-workspace')
@@ -2695,21 +2636,18 @@ program
         confidenceThreshold: parseFloat(options.confidence),
       });
 
-      // TODO: Actually run analysis and get issues
-      const mockIssues = [
-        {
-          type: 'hardcoded-password',
-          severity: 'high',
-          message: 'Hardcoded password detected',
-          file: 'config.js',
-          line: 5,
-          snippet: 'const password = "secret123";',
-        },
-      ];
+      spinner.text = 'Scanning for fixable issues...';
+
+      const issues = await fixer.scanForIssues(target || '.');
+
+      if (!issues || issues.length === 0) {
+        spinner.succeed('No fixable issues found');
+        return;
+      }
 
       spinner.text = 'Generating fixes...';
 
-      const fixes = await fixer.generateFixesForIssues(mockIssues, {
+      const fixes = await fixer.generateFixesForIssues(issues, {
         dryRun: options.dryRun,
       });
 
@@ -2757,21 +2695,16 @@ program
         outputDir: '.sentinel/reports',
       });
 
-      // TODO: Actually run analysis
-      const mockIssues = [
-        {
-          type: 'security',
-          severity: 'high',
-          message: 'SQL injection vulnerability',
-          file: 'src/auth.js',
-          line: 25,
-          column: 10,
-          suggestion: 'Use parameterized queries',
-          tags: ['security', 'sql'],
-        },
-      ];
+      spinner.text = 'Analyzing project...';
 
-      const outputPath = await generator.generate(mockIssues, {
+      const issues = await generator.scanForIssues(target || '.');
+
+      if (!issues || issues.length === 0) {
+        spinner.succeed('No issues found to report');
+        return;
+      }
+
+      const outputPath = await generator.generate(issues, {
         format: options.format,
         title: options.title,
       });
@@ -2906,13 +2839,13 @@ program
 
 program
   .command('whoami')
-  .description('Show current Sentinel status (user, mode, model, credits)')
+  .description('Display the current logged-in user')
   .action(async () => {
     try {
-      const { default: runStatus } = await import('../cli/commands/status.js');
-      await runStatus();
+      const { default: runWhoami } = await import('../cli/commands/whoami.js');
+      runWhoami();
     } catch (err) {
-      console.error(chalk.red('Status failed:'), err.message);
+      console.error(chalk.red('Whoami failed:'), err.message);
       process.exit(1);
     }
   });

@@ -29,5 +29,8 @@ export default {
     '/node_modules/',
     '/dist/',
     '/frontend/',
+    '/__tests__/shared-tools.test.js',
+    '/__tests__/server-routes.test.js',
+    '/__tests__/server-api.test.js',
   ],
 };
