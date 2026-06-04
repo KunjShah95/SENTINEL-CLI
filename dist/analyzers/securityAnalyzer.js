@@ -46,6 +46,9 @@ export class SecurityAnalyzer extends BaseAnalyzer {
       issues.push(...this.checkLanguageSecurity(content, filePath, language));
     }
 
+    // Check for potential secrets
+    issues.push(...this.checkForSecrets(content, filePath));
+
     // Add issues to the analyzer
     for (const issue of issues) {
       this.addIssue(issue);
@@ -199,6 +202,31 @@ export class SecurityAnalyzer extends BaseAnalyzer {
       {
         name: 'AWS Access Key',
         pattern: /AKIA[0-9A-Z]{16}/gi,
+        severity: 'high',
+      },
+      {
+        name: 'AWS Temporary Access Key',
+        pattern: /ASIA[0-9A-Z]{16}/gi,
+        severity: 'high',
+      },
+      {
+        name: 'AWS V3 Unique ID',
+        pattern: /AID[A-Z0-9]{16}/gi,
+        severity: 'high',
+      },
+      {
+        name: 'AWS Role ARN',
+        pattern: /AROA[A-Z0-9]{16}/gi,
+        severity: 'high',
+      },
+      {
+        name: 'AWS V3 Pattern',
+        pattern: /A3T[A-Z0-9]{15}/gi,
+        severity: 'high',
+      },
+      {
+        name: 'AWS V3 Extended Pattern',
+        pattern: /A3TX[A-Z0-9]{14}/gi,
         severity: 'high',
       },
       {

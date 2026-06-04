@@ -96,6 +96,86 @@ describe('SecurityAnalyzer', () => {
             expect(issues.some(i => i.severity === 'critical' || i.severity === 'high')).toBe(true);
         });
 
+        it('should detect AWS SDK v3 temporary access key (ASIA)', async () => {
+            const code = `
+        const credentials = {
+            accessKeyId: "ASIAIOSFODNN7EXAMPLE"
+        };
+      `;
+            const files = [{ path: 'aws-v3.js', content: code }];
+
+            const issues = await analyzer.analyze(files, {});
+
+            expect(issues.length).toBeGreaterThan(0);
+            expect(issues.some(i => i.title.includes('AWS'))).toBe(true);
+        });
+
+        it('should detect AWS SDK v3 unique ID (AID)', async () => {
+            const code = `
+        const accessKeyId = "AIDAIOSFODNN7EXAMPLE";
+      `;
+            const files = [{ path: 'config.js', content: code }];
+
+            const issues = await analyzer.analyze(files, {});
+
+            expect(issues.some(i => i.title.includes('AWS'))).toBe(true);
+        });
+
+        it('should detect AWS SDK v3 role ARN (AROA)', async () => {
+            const code = `
+        const roleArn = "AROAIOSFODNN7EXAMPLE";
+      `;
+            const files = [{ path: 'config.js', content: code }];
+
+            const issues = await analyzer.analyze(files, {});
+
+            expect(issues.some(i => i.title.includes('AWS'))).toBe(true);
+        });
+
+        it('should detect AWS SDK v3 pattern (A3T)', async () => {
+            const code = `
+        const credentials = { accessKeyId: "A3TIOSFODNN7EXAMPLE" };
+      `;
+            const files = [{ path: 'config.js', content: code }];
+
+            const issues = await analyzer.analyze(files, {});
+
+            expect(issues.some(i => i.title.includes('AWS'))).toBe(true);
+        });
+
+        it('should detect AWS SDK v3 extended pattern (A3TX)', async () => {
+            const code = `
+        process.env.AWS_ACCESS_KEY_ID = "A3TXOSFODNN7EXAMP";
+      `;
+            const files = [{ path: 'config.js', content: code }];
+
+            const issues = await analyzer.analyze(files, {});
+
+            expect(issues.some(i => i.title.includes('AWS'))).toBe(true);
+        });
+
+        it('should detect AWS credentials via assignment pattern', async () => {
+            const code = `
+        const awsConfig = { accessKeyId: "ASIAIOSFODNN7EXAMPLE" };
+      `;
+            const files = [{ path: 'aws-sdk-v3.js', content: code }];
+
+            const issues = await analyzer.analyze(files, {});
+
+            expect(issues.some(i => i.title.includes('AWS'))).toBe(true);
+        });
+
+        it('should detect role-based AWS credentials (AROA assignment)', async () => {
+            const code = `
+        const config = { accessKey: "AROAIOSFODNN7EXAMPLE" };
+      `;
+            const files = [{ path: 'config.js', content: code }];
+
+            const issues = await analyzer.analyze(files, {});
+
+            expect(issues.some(i => i.title.includes('AWS'))).toBe(true);
+        });
+
         it('should not flag environment variable references', async () => {
             const code = `
         const apiKey = process.env.API_KEY;
