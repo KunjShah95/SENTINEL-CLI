@@ -2,11 +2,16 @@ import { TextAttributes } from "@opentui/core";
 import { useTheme } from "../../providers/theme";
 import { EmptyBorder } from "../border";
 
-type Props = { message: string; mode?: "BUILD" | "PLAN" | "SCAN" | "FIX" };
+type Props = { message: string; mode?: "BUILD" | "PLAN" | "REVIEW" | "SCAN" | "FIX" };
 
 export function UserMessage({ message, mode = "BUILD" }: Props) {
   const { colors } = useTheme();
-  const borderColor = mode === "PLAN" ? colors.planMode : colors.primary;
+  const borderColor =
+    mode === "PLAN"
+      ? colors.planMode
+      : mode === "REVIEW"
+      ? (colors.warning || colors.planMode)
+      : colors.primary;
   return (
     <box width="100%" flexDirection="column">
       <box

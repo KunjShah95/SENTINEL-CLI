@@ -11,8 +11,10 @@
 import path from "node:path";
 import fs from "node:fs/promises";
 import { existsSync } from "node:fs";
+import { createPatch } from "diff";
 import { Mode, isReadOnlyTool } from "../schemas/mode.js";
 import { runSandboxed } from "./sandbox.js";
+import { createCheckpoint, restoreCheckpoint, listCheckpoints } from "./checkpoint.js";
 import {
   toolInputSchemas,
   READ_ONLY_TOOL_NAMES,
@@ -203,6 +205,8 @@ async function writeFileImpl(input) {
   if (typeof p !== "string") throw new Error("path is required");
   if (typeof content !== "string") throw new Error("content is required");
   const { resolved, relative } = resolveInsideCwd(p);
+  // Checkpoint before overwriting
+  try { await createCheckpoint([resolved]); } catch {}
   await fs.mkdir(path.dirname(resolved), { recursive: true });
   await fs.writeFile(resolved, content, "utf-8");
   return {
@@ -226,6 +230,8 @@ async function editFileImpl(input) {
   if (occurrences > 1) {
     throw new Error(`oldString is ambiguous; found ${occurrences} matches`);
   }
+  // Checkpoint before editing
+  try { await createCheckpoint([resolved]); } catch {}
   await fs.writeFile(resolved, current.replace(oldString, newString), "utf-8");
   return { success: true, path: relative };
 }
@@ -385,6 +391,32 @@ async function searchWebImpl(input) {
   }
 }
 
+async function diffFileImpl(input) {
+  const p = input?.path;
+  const newContent = input?.newContent;
+  if (typeof p !== "string") throw new Error("path is required");
+  if (typeof newContent !== "string") throw new Error("newContent is required");
+  const { resolved, relative } = resolveInsideCwd(p);
+  let oldContent = "";
+  try {
+    oldContent = await fs.readFile(resolved, "utf-8");
+  } catch {
+    // File doesn't exist yet — diff against empty
+  }
+  const patch = createPatch(relative, oldContent, newContent, "current", "proposed");
+  return { diff: patch, path: relative };
+}
+
+async function undoLastChangeImpl(_input) {
+  const result = await restoreCheckpoint();
+  return {
+    success: true,
+    restored: result.restored,
+    deleted: result.deleted,
+    message: `Restored ${result.restored.length} file(s)${result.deleted.length > 0 ? `, removed ${result.deleted.length} new file(s)` : ""}.`,
+  };
+}
+
 const TOOL_IMPLS = {
   readFile: readFileImpl,
   listDirectory: listDirectoryImpl,
@@ -394,6 +426,8 @@ const TOOL_IMPLS = {
   editFile: editFileImpl,
   batchEdit: batchEditImpl,
   bash: runBashImpl,
+  diffFile: diffFileImpl,
+  undoLastChange: undoLastChangeImpl,
 };
 
 export const readOnlyToolContracts = Object.freeze({
@@ -437,25 +471,34 @@ export const buildToolContracts = Object.freeze({
     description: "Run a shell command in the current project directory.",
     inputSchema: toolInputSchemas.bash,
   },
+  diffFile: {
+    description: "Preview a unified diff of proposed changes to a file without applying them.",
+    inputSchema: toolInputSchemas.diffFile,
+  },
+  undoLastChange: {
+    description: "Undo the last file change by restoring from the most recent checkpoint.",
+    inputSchema: toolInputSchemas.undoLastChange,
+  },
 });
 
 export function getToolContracts(mode) {
-  return mode === Mode.PLAN ? readOnlyToolContracts : buildToolContracts;
+  if (mode === Mode.PLAN || mode === Mode.REVIEW) return readOnlyToolContracts;
+  return buildToolContracts;
 }
 
 export function getToolNames(mode) {
-  return mode === Mode.PLAN ? READ_ONLY_TOOL_NAMES : Object.keys(buildToolContracts);
+  return (mode === Mode.PLAN || mode === Mode.REVIEW) ? READ_ONLY_TOOL_NAMES : Object.keys(buildToolContracts);
 }
 
 /**
- * Execute a local tool call. PLAN mode rejects write/edit/bash.
+ * Execute a local tool call. PLAN/REVIEW modes reject write/edit/bash/diffFile/undoLastChange.
  * @param {string} toolName
  * @param {object} input
  * @param {string} mode
  */
 export async function executeLocalTool(toolName, input, mode = Mode.BUILD) {
-  if (mode === Mode.PLAN && !isReadOnlyTool(toolName)) {
-    throw new Error(`Tool ${toolName} is not available in PLAN mode`);
+  if ((mode === Mode.PLAN || mode === Mode.REVIEW) && !isReadOnlyTool(toolName)) {
+    throw new Error(`Tool ${toolName} is not available in ${mode} mode`);
   }
   const impl = TOOL_IMPLS[toolName];
   if (!impl) {

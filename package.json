@@ -3,6 +3,10 @@
   "version": "2.0.2",
   "description": "🛡️ AI-Powered Code Guardian — TUI (Bun-native). Analyze, audit, fix, and chat about your code with multi-LLM support (OpenAI, Gemini, Groq, Ollama).",
   "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./sdk": "./src/shared/sdk.js"
+  },
   "type": "module",
   "bin": {
     "sentinel": "bin/sentinel.js"

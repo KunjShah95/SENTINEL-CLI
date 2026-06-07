@@ -178,3 +178,67 @@ test("path sandbox rejects absolute paths outside cwd", async () => {
     /outside the project directory/i
   );
 });
+
+test("createCheckpoint / restoreCheckpoint round-trip via writeFile and undoLastChange", async () => {
+  // 1. Write initial file
+  await executeLocalTool(
+    "writeFile",
+    { path: "checkme.txt", content: "version 1" },
+    Mode.BUILD
+  );
+
+  // 2. Overwrite the file. This creates a checkpoint of "version 1".
+  await executeLocalTool(
+    "writeFile",
+    { path: "checkme.txt", content: "version 2" },
+    Mode.BUILD
+  );
+
+  // Read current content, should be version 2
+  let content = await readFile(join(workDir, "checkme.txt"), "utf-8");
+  assert.equal(content, "version 2");
+
+  // 3. Undo last change
+  const undoResult = await executeLocalTool("undoLastChange", {}, Mode.BUILD);
+  assert.equal(undoResult.success, true);
+  assert.ok(undoResult.restored.includes("checkme.txt"));
+
+  // Content should be restored to version 1
+  content = await readFile(join(workDir, "checkme.txt"), "utf-8");
+  assert.equal(content, "version 1");
+});
+
+test("undoLastChange deletes newly created files", async () => {
+  // 1. Write a new file
+  await executeLocalTool(
+    "writeFile",
+    { path: "newly-created.txt", content: "brand new content" },
+    Mode.BUILD
+  );
+
+  let exists = await readFile(join(workDir, "newly-created.txt"), "utf-8").then(() => true).catch(() => false);
+  assert.equal(exists, true);
+
+  // 2. Undo should restore checkpoint where it didn't exist -> deletes it
+  const undoResult = await executeLocalTool("undoLastChange", {}, Mode.BUILD);
+  assert.equal(undoResult.success, true);
+  assert.ok(undoResult.deleted.includes("newly-created.txt"));
+
+  exists = await readFile(join(workDir, "newly-created.txt"), "utf-8").then(() => true).catch(() => false);
+  assert.equal(exists, false);
+});
+
+test("diffFile tool generates unified diff correctly", async () => {
+  await writeFile(join(workDir, "diffme.txt"), "line 1\nline 2\nline 3\n", "utf-8");
+  
+  const result = await executeLocalTool(
+    "diffFile",
+    { path: "diffme.txt", newContent: "line 1\nline 2 updated\nline 3\n" },
+    Mode.BUILD
+  );
+
+  assert.equal(result.path, "diffme.txt");
+  assert.match(result.diff, /Index: diffme\.txt/);
+  assert.match(result.diff, /-line 2/);
+  assert.match(result.diff, /\+line 2 updated/);
+});

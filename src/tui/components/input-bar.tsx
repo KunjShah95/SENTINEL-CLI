@@ -5,7 +5,7 @@ import type { InputRenderable } from "@opentui/core";
 import { useKeyboardLayer } from "../providers/keyboard-layer";
 import { useTheme } from "../providers/theme";
 
-type Mode = "BUILD" | "PLAN" | "SCAN" | "FIX";
+type Mode = "BUILD" | "PLAN" | "REVIEW" | "SCAN" | "FIX";
 
 type Props = {
   onSubmit: (value: string) => void;

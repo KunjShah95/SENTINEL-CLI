@@ -40,7 +40,7 @@ chat.use("*", requireCreditsBalance());
 const submitSchema = z.object({
   id: z.string(),
   messages: z.array(z.object({})).min(1),
-  mode: z.enum(["BUILD", "PLAN"]),
+  mode: z.enum(["BUILD", "PLAN", "REVIEW"]),
   model: z.string().refine(isSupportedChatModel, "Unsupported model"),
 });
 

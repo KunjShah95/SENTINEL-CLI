@@ -19,7 +19,7 @@ const sessions = new Hono();
 
 const createSchema = z.object({
   title: z.string().min(1, "title is required"),
-  mode: z.enum(["BUILD", "PLAN"]).optional(),
+  mode: z.enum(["BUILD", "PLAN", "REVIEW"]).optional(),
   model: z.string().optional(),
   projectPath: z.string().optional(),
 });

@@ -23,7 +23,7 @@ import { randomUUID } from "node:crypto";
 import { streamChat, Sessions, checkServerHealth, type ChatEvent } from "../lib/api-client.js";
 import { runLocalTool, Mode, isReadOnlyTool } from "../lib/local-tools.js";
 
-export type AgentMode = "BUILD" | "PLAN";
+export type AgentMode = "BUILD" | "PLAN" | "REVIEW";
 
 export type AgentMessagePart =
   | { type: "text"; text: string }
@@ -107,7 +107,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
           }));
           setMessages(restored);
         }
-        if (session.mode && (session.mode === 'BUILD' || session.mode === 'PLAN')) setMode(session.mode);
+        if (session.mode && (session.mode === 'BUILD' || session.mode === 'PLAN' || session.mode === 'REVIEW')) setMode(session.mode);
         if (session.model) setModel(session.model);
       } catch {
         // Silently fall back if server is unavailable

@@ -137,10 +137,18 @@ export const toolInputSchemas = {
       },
     };
   }),
+  diffFile: validator((input) => {
+    if (typeof input.path !== "string") return { ok: false, error: "path is required" };
+    if (typeof input.newContent !== "string") return { ok: false, error: "newContent is required" };
+    return { ok: true, value: { path: input.path, newContent: input.newContent } };
+  }),
+  undoLastChange: validator((_input) => {
+    return { ok: true, value: {} };
+  }),
 };
 
 export const READ_ONLY_TOOL_NAMES = ["readFile", "listDirectory", "glob", "grep", "searchWeb"];
-export const BUILD_TOOL_NAMES = [...READ_ONLY_TOOL_NAMES, "writeFile", "editFile", "bash", "batchEdit"];
+export const BUILD_TOOL_NAMES = [...READ_ONLY_TOOL_NAMES, "writeFile", "editFile", "bash", "batchEdit", "diffFile", "undoLastChange"];
 
 export function isReadOnly(toolName) {
   return isReadOnlyTool(toolName);

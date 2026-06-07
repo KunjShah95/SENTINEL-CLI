@@ -184,7 +184,7 @@ test("GET /billing/success is public", async () => {
   assert.match(body, /Sentinel/);
 });
 
-test("shared tool registry exposes 4 read-only tools for PLAN", async () => {
+test("shared tool registry exposes read-only tools for PLAN", async () => {
   const { getToolContracts, READ_ONLY_TOOL_NAMES } = await import(
     "../src/shared/index.js"
   );
@@ -192,15 +192,25 @@ test("shared tool registry exposes 4 read-only tools for PLAN", async () => {
   assert.deepEqual(Object.keys(contracts).sort(), [...READ_ONLY_TOOL_NAMES].sort());
 });
 
-test("shared tool registry exposes 9 tools for BUILD", async () => {
+test("shared tool registry exposes read-only tools for REVIEW", async () => {
+  const { getToolContracts, READ_ONLY_TOOL_NAMES } = await import(
+    "../src/shared/index.js"
+  );
+  const contracts = getToolContracts("REVIEW");
+  assert.deepEqual(Object.keys(contracts).sort(), [...READ_ONLY_TOOL_NAMES].sort());
+});
+
+test("shared tool registry exposes 11 tools for BUILD", async () => {
   const { getToolContracts } = await import("../src/shared/index.js");
   const contracts = getToolContracts("BUILD");
-  assert.equal(Object.keys(contracts).length, 9);
+  assert.equal(Object.keys(contracts).length, 11);
   assert.ok(contracts.bash);
   assert.ok(contracts.writeFile);
   assert.ok(contracts.editFile);
   assert.ok(contracts.batchEdit);
   assert.ok(contracts.searchWeb);
+  assert.ok(contracts.diffFile);
+  assert.ok(contracts.undoLastChange);
 });
 
 test("calculateCreditsForUsage produces a positive integer", async () => {

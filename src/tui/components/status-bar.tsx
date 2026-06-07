@@ -1,7 +1,7 @@
 import { TextAttributes } from "@opentui/core";
 import { useTheme } from "../providers/theme";
 
-type Mode = "BUILD" | "PLAN" | "SCAN" | "FIX";
+type Mode = "BUILD" | "PLAN" | "REVIEW" | "SCAN" | "FIX";
 
 type Props = {
   mode?: Mode;
@@ -13,6 +13,7 @@ function getBadgeColor(mode: Mode, colors: Record<string, string>): string {
   switch (mode) {
     case "BUILD": return colors.success;
     case "PLAN": return colors.planMode;
+    case "REVIEW": return colors.warning || colors.planMode;
     case "SCAN": return colors.info;
     case "FIX": return colors.error;
     default: return colors.primary;

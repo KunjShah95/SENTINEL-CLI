@@ -20,7 +20,7 @@ export function Session() {
   const location = useLocation();
   const initialState = location.state as {
     message?: string;
-    mode?: 'BUILD' | 'PLAN' | 'SCAN' | 'FIX';
+    mode?: 'BUILD' | 'PLAN' | 'REVIEW' | 'SCAN' | 'FIX';
   } | null;
   const initialMessage = initialState?.message;
   const initialMode = initialState?.mode;
@@ -32,7 +32,7 @@ export function Session() {
     messages, loading, mode, setMode, toggleMode,
     submit, stop, clear, appendMessage, model, setModel, status,
   } = useAgentChat({
-    initialMode: initialMode === 'BUILD' || initialMode === 'PLAN' ? initialMode : undefined,
+    initialMode: initialMode === 'BUILD' || initialMode === 'PLAN' || initialMode === 'REVIEW' ? initialMode : undefined,
   });
   const [showCommands, setShowCommands] = useState(false);
   const [showSessionPanel, setShowSessionPanel] = useState(false);
@@ -42,8 +42,8 @@ export function Session() {
   const navigate = useNavigate();
   const { theme } = useTheme();
 
-  const handleSetMode = useCallback((m: 'BUILD' | 'PLAN' | 'SCAN' | 'FIX') => {
-    if (m === 'BUILD' || m === 'PLAN') {
+  const handleSetMode = useCallback((m: 'BUILD' | 'PLAN' | 'REVIEW' | 'SCAN' | 'FIX') => {
+    if (m === 'BUILD' || m === 'PLAN' || m === 'REVIEW') {
       setMode(m);
     }
   }, [setMode]);
@@ -115,8 +115,102 @@ export function Session() {
           toggleMode();
           return;
         }
+        if (cmd === 'review') {
+          const prevMode = mode;
+          setMode('REVIEW' as AgentMode);
+          (async () => {
+            try {
+              const { executeLocalTool } = await import('../../shared/tools/index.js');
+              let diffResult = await executeLocalTool('bash', { command: 'git diff --staged' }, 'BUILD');
+              let diffText = diffResult?.stdout?.trim();
+              if (!diffText) {
+                diffResult = await executeLocalTool('bash', { command: 'git diff HEAD' }, 'BUILD');
+                diffText = diffResult?.stdout?.trim();
+              }
+              if (!diffText) {
+                toast.info('No changes detected. Stage changes with git add first.');
+                setMode(prevMode);
+                return;
+              }
+              submit(`Review this diff for bugs, security issues, and best practices:\n\n\`\`\`diff\n${diffText}\n\`\`\``);
+            } catch (e) {
+              toast.error('Failed to get git diff: ' + String(e));
+              setMode(prevMode);
+            }
+          })();
+          return;
+        }
+        if (cmd === 'undo') {
+          (async () => {
+            try {
+              const { executeLocalTool } = await import('../../shared/tools/index.js');
+              const result = await executeLocalTool('undoLastChange', {}, 'BUILD');
+              if (result?.success) {
+                toast.success(result.message || 'Changes undone.');
+                appendMessage({
+                  role: 'assistant',
+                  mode,
+                  model,
+                  parts: [{ type: 'text', text: `✅ Undo complete: ${result.message}` }],
+                });
+              } else {
+                toast.error('No checkpoints available.');
+              }
+            } catch (e) {
+              toast.error('Undo failed: ' + String(e));
+            }
+          })();
+          return;
+        }
+        if (cmd === 'background') {
+          const prompt = value.replace(/^\/background\s*/i, '').trim();
+          if (!prompt) {
+            toast.error('Usage: /background <prompt>');
+            return;
+          }
+          (async () => {
+            try {
+              const { launchBackgroundAgent } = await import('../../agents/background-agent.js');
+              const agent = launchBackgroundAgent(prompt);
+              toast.success(`Background agent launched: ${agent.id}`);
+              appendMessage({
+                role: 'assistant',
+                mode,
+                model,
+                parts: [{ type: 'text', text: `🚀 Background agent \`${agent.id}\` started.\nPrompt: "${prompt.slice(0, 80)}"\nCheck status with /agents` }],
+              });
+            } catch (e) {
+              toast.error('Failed to launch agent: ' + String(e));
+            }
+          })();
+          return;
+        }
+        if (cmd === 'agents') {
+          (async () => {
+            try {
+              const { listAgents } = await import('../../agents/background-agent.js');
+              const agents = listAgents();
+              if (agents.length === 0) {
+                toast.info('No background agents running.');
+                return;
+              }
+              const lines = agents.map((a: any) =>
+                `• ${a.id} — ${a.status} (${a.elapsed}) — "${a.prompt}"`
+              ).join('\n');
+              appendMessage({
+                role: 'assistant',
+                mode,
+                model,
+                parts: [{ type: 'text', text: `**Background Agents:**\n${lines}` }],
+              });
+            } catch (e) {
+              toast.error('Failed to list agents: ' + String(e));
+            }
+          })();
+          return;
+        }
         if (cmd === 'help') {
-          toast.info('Commands: /clear /new /wizard /mode /help');
+          toast.info('Commands: /clear /new /wizard /mode /review /undo /background /agents /help');
           return;
         }
         toast.error('Unknown command. Type /help for commands.');
@@ -124,7 +218,7 @@ export function Session() {
       }
       submit(value);
     },
-    [clear, navigate, dialog, appendMessage, mode, model, toggleMode, toast, submit]
+    [clear, navigate, dialog, appendMessage, mode, model, toggleMode, toast, submit, setMode]
   );
 
   const handleSelectSession = useCallback(async (id: string) => {
@@ -142,7 +236,7 @@ export function Session() {
           });
         }
       }
-      if (session.mode === 'BUILD' || session.mode === 'PLAN') setMode(session.mode as AgentMode);
+      if (session.mode === 'BUILD' || session.mode === 'PLAN' || session.mode === 'REVIEW') setMode(session.mode as AgentMode);
       if (session.model) setModel(session.model);
       setShowSessionPanel(false);
     } catch {

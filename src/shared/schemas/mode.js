@@ -8,15 +8,17 @@
 export const Mode = Object.freeze({
   BUILD: "BUILD",
   PLAN: "PLAN",
+  REVIEW: "REVIEW",
 });
 
 export const modeSchema = {
   BUILD: "BUILD",
   PLAN: "PLAN",
+  REVIEW: "REVIEW",
 };
 
 export function isMode(value) {
-  return value === Mode.BUILD || value === Mode.PLAN;
+  return value === Mode.BUILD || value === Mode.PLAN || value === Mode.REVIEW;
 }
 
 export function isReadOnlyTool(toolName) {
@@ -24,5 +26,7 @@ export function isReadOnlyTool(toolName) {
 }
 
 export function getModeLabel(mode) {
-  return mode === Mode.PLAN ? "Plan" : "Build";
+  if (mode === Mode.PLAN) return "Plan";
+  if (mode === Mode.REVIEW) return "Review";
+  return "Build";
 }

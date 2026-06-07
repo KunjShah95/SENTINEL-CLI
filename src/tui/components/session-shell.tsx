@@ -3,7 +3,7 @@ import { InputBar } from "./input-bar";
 import { Spinner } from "./spinner";
 import { StatusBar } from "./status-bar";
 
-type Mode = "BUILD" | "PLAN" | "SCAN" | "FIX";
+type Mode = "BUILD" | "PLAN" | "REVIEW" | "SCAN" | "FIX";
 
 type Props = {
   children: ReactNode;
