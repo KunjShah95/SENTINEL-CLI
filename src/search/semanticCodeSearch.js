@@ -69,8 +69,8 @@ export class SemanticCodeSearch {
     const content = await fs.readFile(filePath, 'utf-8');
     const chunks = [];
 
-    // Split into logical chunks (functions, classes, etc.)
-    const logicalChunks = this.splitIntoLogicalChunks(content, file);
+    // Split into logical chunks (functions, classes, etc.) using AST
+    const logicalChunks = await this.splitIntoLogicalChunks(content, file);
 
     for (const chunk of logicalChunks) {
       chunks.push({
@@ -88,51 +88,47 @@ export class SemanticCodeSearch {
   }
 
   /**
-   * Split code into logical chunks
+   * Split code into logical chunks using AST
    */
-  splitIntoLogicalChunks(content, _file) {
-    const chunks = [];
-    const lines = content.split('\n');
-
-    // Simple chunking by functions/classes for JS/TS
-    let currentChunk = null;
-    let braceCount = 0;
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-
-      // Detect function/class start
-      if (/^(export\s+)?(async\s+)?function\s+\w+|^class\s+\w+|^export\s+class\s+\w+/.test(line.trim())) {
-        if (currentChunk) {
-          chunks.push(currentChunk);
-        }
-
-        const match = line.match(/(?:function|class)\s+(\w+)/);
-        currentChunk = {
-          type: line.includes('class') ? 'class' : 'function',
-          name: match ? match[1] : 'anonymous',
-          content: line + '\n',
-          startLine: i + 1,
-          endLine: i + 1
+  async splitIntoLogicalChunks(content, file) {
+    const ext = file.split('.').pop();
+    let chunks = [];
+    
+    try {
+      const { getLanguageAgent } = await import('../agents/languageAgents.js');
+      const agent = await getLanguageAgent(ext);
+      const analysisResult = await agent.analyze(content);
+      
+      if (analysisResult.success && analysisResult.analysis) {
+        const lines = content.split('\n');
+        const extractChunk = (items, type) => {
+          if (!items) return;
+          for (const item of items) {
+            // Some agents return startLine/endLine, others return line. We assume we can slice based on this.
+            // If endLine is missing, we fall back to fixed size or regex.
+            if (item.startLine !== undefined && item.endLine !== undefined) {
+               chunks.push({
+                 type,
+                 name: item.name,
+                 content: lines.slice(item.startLine, item.endLine + 1).join('\n'),
+                 startLine: item.startLine,
+                 endLine: item.endLine
+               });
+            }
+          }
         };
-        braceCount = (line.match(/{/g) || []).length - (line.match(/}/g) || []).length;
-        continue;
+        
+        extractChunk(analysisResult.analysis.functions, 'function');
+        extractChunk(analysisResult.analysis.classes, 'class');
+        extractChunk(analysisResult.analysis.structs, 'struct');
       }
-
-      if (currentChunk) {
-        currentChunk.content += line + '\n';
-        currentChunk.endLine = i + 1;
-        braceCount += (line.match(/{/g) || []).length - (line.match(/}/g) || []).length;
-
-        if (braceCount === 0 && line.includes('}')) {
-          chunks.push(currentChunk);
-          currentChunk = null;
-        }
-      }
+    } catch (e) {
+      console.warn(`AST chunking failed for ${file}, falling back to regex block chunking.`);
     }
 
-    // If no logical chunks found, create fixed-size chunks
+    // Fallback if AST returns nothing
     if (chunks.length === 0) {
+      const lines = content.split('\n');
       const chunkSize = 50; // lines
       for (let i = 0; i < lines.length; i += chunkSize) {
         chunks.push({

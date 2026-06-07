@@ -288,7 +288,9 @@ export class UniversalAgent {
 
   async buildContext() {
     const pkgPath = `${this.projectPath}/package.json`;
+    const rulesPath = `${this.projectPath}/.sentinelrules`;
     let projectInfo = {};
+    let rules = '';
 
     try {
       const pkg = await this.files.read(pkgPath);
@@ -297,6 +299,15 @@ export class UniversalAgent {
       }
     } catch (e) {
       // Ignore package.json parse errors
+    }
+    
+    try {
+      const rulesFile = await this.files.read(rulesPath);
+      if (rulesFile.success && rulesFile.content) {
+        rules = rulesFile.content.trim();
+      }
+    } catch (e) {
+      // Ignore rules file read errors
     }
 
     const files = await this.files.glob('**/*.{js,ts,jsx,tsx,json,md}', {
@@ -311,6 +322,7 @@ export class UniversalAgent {
         description: projectInfo.description || '',
         path: this.projectPath
       },
+      rules,
       files: files.files?.slice(0, 50) || [],
       fileCount: files.count || 0,
       tools: Object.keys(this.tools)
@@ -328,7 +340,7 @@ export class UniversalAgent {
 
     const systemPrompt = `You are Sentinel Agent, an autonomous coding assistant. Your role is to accomplish tasks by breaking them down into steps and using available tools.
 
-## Available Tools
+${context.rules ? `## Project Rules (Intent Context)\n${context.rules}\n` : ''}## Available Tools
 ${toolsDescription}
 
 ## Current Project
@@ -453,7 +465,7 @@ Begin by understanding the task, then execute the necessary steps using the avai
 
     const systemPrompt = `You are Sentinel Agent, an autonomous coding assistant. Your role is to accomplish tasks by breaking them down into steps and using available tools.
 
-## Available Tools
+${context.rules ? `## Project Rules (Intent Context)\n${context.rules}\n` : ''}## Available Tools
 ${toolsDescription}
 
 ## Current Project
@@ -564,7 +576,7 @@ Begin by understanding the task, then execute the necessary steps.`;
 
     const prompt = `You are Sentinel CLI, an AI-powered code guardian. Be helpful, concise, and practical.
 
-Current Project: ${context.project.name} (${context.project.version})
+${context.rules ? `Project Rules:\n${context.rules}\n` : ''}Current Project: ${context.project.name} (${context.project.version})
 Path: ${context.project.path}
 Files: ${context.fileCount}
 

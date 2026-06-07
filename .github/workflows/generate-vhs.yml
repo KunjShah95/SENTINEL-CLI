@@ -1,0 +1,46 @@
+name: Generate VHS Tapes
+
+on:
+  push:
+    paths:
+      - 'docs/media/*.tape'
+  workflow_dispatch:
+
+jobs:
+  generate-tapes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Sentinel CLI globally
+        run: npm install -g .
+
+      - name: Generate Video 1 (Install + First Scan)
+        uses: charmbracelet/vhs-action@v2
+        with:
+          path: docs/media/video1_shield.tape
+          
+      - name: Generate Video 2 (CI/CD Integration)
+        uses: charmbracelet/vhs-action@v2
+        with:
+          path: docs/media/video2_cicd.tape
+
+      - name: Generate Video 3 (Custom Rules)
+        uses: charmbracelet/vhs-action@v2
+        with:
+          path: docs/media/video3_rules.tape
+
+      - name: Commit Generated GIFs
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "docs: update auto-generated VHS GIFs [skip ci]"
+          file_pattern: 'docs/media/*.gif'

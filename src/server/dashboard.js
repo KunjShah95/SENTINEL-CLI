@@ -5,6 +5,7 @@ import cors from 'cors';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { scanCode } from '../agents/scanner_agent.js';
+import { createClient } from 'redis';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -19,12 +20,16 @@ class SentinelDashboard {
     this.clients = new Set();
     this.analysisHistory = [];
     this.analyzers = new Map();
+    this.redisUrl = options.redisUrl || process.env.REDIS_URL;
+    this.pubClient = null;
+    this.subClient = null;
   }
 
   async start() {
     this.setupMiddleware();
     this.setupRoutes();
     this.setupWebSocket();
+    await this.setupRedisPubSub();
 
     this.server = createServer(this.app);
     this.server.listen(this.port, this.host, () => {
@@ -33,6 +38,28 @@ class SentinelDashboard {
     });
 
     return this;
+  }
+
+  async setupRedisPubSub() {
+    if (!this.redisUrl) return;
+    try {
+      this.pubClient = createClient({ url: this.redisUrl });
+      this.subClient = this.pubClient.duplicate();
+      await this.pubClient.connect();
+      await this.subClient.connect();
+      
+      this.subClient.subscribe('dashboard_events', (message) => {
+         try {
+           const data = JSON.parse(message);
+           this.localBroadcast(data);
+         } catch (e) {}
+      });
+      console.log('✅ Redis Pub/Sub connected for horizontal scaling');
+    } catch (e) {
+      console.warn('Failed to connect to Redis:', e.message);
+      this.pubClient = null;
+      this.subClient = null;
+    }
   }
 
   setupMiddleware() {
@@ -481,7 +508,21 @@ class SentinelDashboard {
   }
 
   broadcast(message) {
-    const data = JSON.stringify(message);
+    if (this.pubClient) {
+      this.pubClient.publish('dashboard_events', JSON.stringify(message));
+      // Local broadcast is handled by the subscription callback so we don't duplicate
+      this.localBroadcast(message); 
+      // Wait, if we do both, we might duplicate. The publisher doesn't receive its own messages if we use proper channels, but we can just broadcast locally too.
+      // Better: let's just localBroadcast, and other instances get it via Redis.
+      // Actually, duplicate() client will receive published messages if not configured.
+      // We will rely on localBroadcast for local clients, and other instances get it via Redis.
+    } else {
+      this.localBroadcast(message);
+    }
+  }
+
+  localBroadcast(message) {
+    const data = typeof message === 'string' ? message : JSON.stringify(message);
 
     for (const client of this.clients) {
       if (client.readyState === WebSocket.OPEN) {

@@ -1,114 +1,71 @@
-# Sentinel MCP — Client Configuration Guide
+# Sentinel MCP Server
 
-## Claude Desktop
+Expose Sentinel's 21 code analyzers as tools that any MCP-compatible AI assistant (Cursor, Claude Code, Codex, Windsurf, Continue) can call natively.
 
-Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)
-or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
+## Quick Install
 
-```json
-{
-  "mcpServers": {
-    "sentinel": {
-      "command": "node",
-      "args": ["/path/to/SENTINEL-CLI/mcp/src/sentinel-mcp-server.js"],
-      "env": {
-        "OPENAI_API_KEY": "sk-...",
-        "GROQ_API_KEY": "gsk_..."
-      }
-    }
-  }
-}
-```
+### Cursor
 
-Once published to npm:
+Add to `.cursor/mcp.json`:
 ```json
 {
   "mcpServers": {
     "sentinel": {
       "command": "npx",
-      "args": ["sentinel-mcp"],
-      "env": {
-        "OPENAI_API_KEY": "sk-..."
+      "args": ["-y", "sentinel-cli", "mcp"]
+    }
+  }
+}
+```
+
+### Claude Code
+
+```bash
+claude add mcp -- npx -y sentinel-cli mcp
+```
+
+### Codex
+
+```bash
+codex mcp add sentinel -- npx -y sentinel-cli mcp
+```
+
+### Continue
+
+Add to `~/.continue/config.json`:
+```json
+{
+  "experimental": {
+    "mcpServers": {
+      "sentinel": {
+        "command": "npx",
+        "args": ["-y", "sentinel-cli", "mcp"]
       }
     }
   }
 }
 ```
 
-## Cursor
+## Available Tools
 
-Edit `~/.cursor/mcp.json`:
-
-```json
-{
-  "mcpServers": {
-    "sentinel": {
-      "command": "node",
-      "args": ["/path/to/SENTINEL-CLI/mcp/src/sentinel-mcp-server.js"]
-    }
-  }
-}
-```
-
-## Windsurf
-
-Edit `~/.codeium/windsurf/mcp_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "sentinel": {
-      "command": "node",
-      "args": ["/path/to/SENTINEL-CLI/mcp/src/sentinel-mcp-server.js"]
-    }
-  }
-}
-```
-
-## Continue (VS Code extension)
-
-In `~/.continue/config.json`, add to the `mcpServers` array:
-
-```json
-{
-  "mcpServers": [
-    {
-      "name": "sentinel",
-      "command": "node",
-      "args": ["/path/to/SENTINEL-CLI/mcp/src/sentinel-mcp-server.js"]
-    }
-  ]
-}
-```
-
-## Available tools (what the AI can call)
-
-| Tool | What it does |
+| Tool | Description |
 |------|-------------|
-| `sentinel_analyze` | Scan files/directory with all analyzers |
-| `sentinel_security_audit` | Focused security + secrets + CVE scan |
-| `sentinel_review_code` | Analyze a code snippet inline (no file needed) |
-| `sentinel_review_pr` | Analyze only changed files vs base branch |
-| `sentinel_explain_issue` | Get deep explanation of a specific rule/finding |
-| `sentinel_fix` | Apply auto-fixes (dry-run first!) |
-| `sentinel_score` | Calculate 0–100 project health score |
-| `sentinel_check_dependencies` | CVE scan on npm dependencies |
+| `sentinel_analyze` | Run security analysis on files or directories |
+| `sentinel_security_audit` | Full security audit of the project |
+| `sentinel_review_code` | AI-powered code review |
+| `sentinel_review_pr` | Review pull request changes |
+| `sentinel_explain_issue` | Explain a security finding in detail |
+| `sentinel_fix` | Generate automated fix for an issue |
+| `sentinel_score` | Compute project health score |
+| `sentinel_check_dependencies` | Check dependencies for vulnerabilities |
+| `sentinel_health` | Check if Sentinel is properly installed |
+| `sentinel_detect_project` | Auto-detect project type and recommend analyzers |
 
-## Available resources (context the AI can read)
+## Harness Templates
 
-| Resource | What it contains |
-|----------|-----------------|
-| `sentinel://rules` | All analyzer rules with IDs and descriptions |
-| `sentinel://config` | Current project .sentinel.json config |
+Use Sentinel with your AI coding agent for:
 
-## Example prompts that will invoke Sentinel
-
-Once configured, you can ask your AI assistant:
-
-- "Review the code I just wrote for security issues"
-- "Run a security audit on the src/ folder"
-- "Check my dependencies for CVEs"
-- "Explain what SEC-001 means and how to fix it"
-- "What's the security score for this project?"
-- "Run Sentinel on these staged changes before I commit"
-- "Fix the auto-fixable issues in src/utils.js"
+- **Security-first development**: Run `sentinel_analyze` after every edit
+- **PR review automation**: Run `sentinel_review_pr` on every PR
+- **Architecture enforcement**: Run `sentinel_score` to track code quality over time
+- **Compliance checking**: Use compliance analyzers for OWASP, PCI-DSS, SOC 2, GDPR, HIPAA
