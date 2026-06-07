@@ -16,6 +16,7 @@ export function runWhoami() {
     console.log(chalk.yellow("Not logged in."));
     console.log(chalk.gray("Run ") + chalk.bold("sentinel login") + chalk.gray(" to authenticate."));
     process.exit(1);
+    return;
   }
 
   console.log(chalk.cyan(auth.userId));

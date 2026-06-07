@@ -1,9 +1,9 @@
-import type { ReactNode } from "react";
-import { InputBar } from "./input-bar";
-import { Spinner } from "./spinner";
-import { StatusBar } from "./status-bar";
+import type { ReactNode } from 'react';
+import { InputBar } from './input-bar';
+import { Spinner } from './spinner';
+import { StatusBar } from './status-bar';
 
-type Mode = "BUILD" | "PLAN" | "REVIEW" | "SCAN" | "FIX";
+type Mode = 'BUILD' | 'PLAN' | 'REVIEW' | 'SCAN' | 'FIX';
 
 type Props = {
   children: ReactNode;
@@ -26,22 +26,39 @@ export function SessionShell({
   onSlashCommand,
   inputDisabled = false,
   loading = false,
-  mode = "BUILD",
+  mode = 'BUILD',
   onModeToggle,
   onCommandPalette,
   model,
   statusText,
 }: Props) {
   return (
-    <box flexDirection="column" flexGrow={1} width="100%" height="100%" paddingY={1} paddingX={2} gap={1}>
+    <box
+      flexDirection="column"
+      flexGrow={1}
+      width="100%"
+      height="100%"
+      paddingY={1}
+      paddingX={2}
+      gap={1}
+    >
       <scrollbox flexGrow={1} width="100%" stickyScroll stickyStart="bottom">
-        <box flexDirection="column">{(() => {
+        <box flexDirection="column">
+          {(() => {
             const c: any = children;
             if (c == null) return null;
-            if (typeof c === "string" || typeof c === "number") return <text>{c}</text>;
-            if (Array.isArray(c)) return c.map((item, i) => (typeof item === "string" || typeof item === "number" ? <text key={i}>{item}</text> : item));
+            if (typeof c === 'string' || typeof c === 'number') return <text>{c}</text>;
+            if (Array.isArray(c))
+              return c.map((item, i) =>
+                typeof item === 'string' || typeof item === 'number' ? (
+                  <text key={i}>{item}</text>
+                ) : (
+                  item
+                )
+              );
             return c;
-          })()}</box>
+          })()}
+        </box>
       </scrollbox>
       {loading ? (
         <box flexShrink={0} paddingLeft={1}>
@@ -59,7 +76,15 @@ export function SessionShell({
           onCommandPalette={onCommandPalette}
         />
       </box>
-      <box flexShrink={0} flexDirection="row" justifyContent="space-between" width="100%" height={1} gap={2} paddingLeft={1}>
+      <box
+        flexShrink={0}
+        flexDirection="row"
+        justifyContent="space-between"
+        width="100%"
+        height={1}
+        gap={2}
+        paddingLeft={1}
+      >
         <StatusBar mode={mode} model={model} statusText={statusText} />
         <box flexDirection="row" gap={1}>
           <text>Tab: Mode | Ctrl+P: Commands</text>

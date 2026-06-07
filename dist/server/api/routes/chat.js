@@ -16,56 +16,56 @@
  *      invoked by the CLI when it receives a `tool_call` SSE event.
  */
 
-import { Hono } from "hono";
-import { z } from "../../../shared/schemas/index.js";
-import { getSession, appendMessages } from "../../database/sessions.js";
+import { Hono } from 'hono';
+import { z } from '../../../shared/schemas/index.js';
+import { getSession, appendMessages } from '../../database/sessions.js';
 import {
   resolveChatModel,
   calculateCreditsForUsage,
   isSupportedChatModel,
   getToolContracts,
-} from "../../../shared/index.js";
-import { requireCreditsBalance } from "../middleware/credits.js";
-import { ingestAiUsage } from "../lib/polar.js";
-import { streamWithAiSdk, streamWithOrchestrator } from "../lib/chat-stream.js";
-import { buildSystemPrompt } from "../lib/system-prompt.js";
-import { createRequire } from "node:module";
+} from '../../../shared/index.js';
+import { requireCreditsBalance } from '../middleware/credits.js';
+import { ingestAiUsage } from '../lib/polar.js';
+import { streamWithAiSdk, streamWithOrchestrator } from '../lib/chat-stream.js';
+import { buildSystemPrompt } from '../lib/system-prompt.js';
+import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 
 const chat = new Hono();
 
-chat.use("*", requireCreditsBalance());
+chat.use('*', requireCreditsBalance());
 
 const submitSchema = z.object({
   id: z.string(),
   messages: z.array(z.object({})).min(1),
-  mode: z.enum(["BUILD", "PLAN"]),
-  model: z.string().refine(isSupportedChatModel, "Unsupported model"),
+  mode: z.enum(['BUILD', 'PLAN', 'REVIEW']),
+  model: z.string().refine(isSupportedChatModel, 'Unsupported model'),
 });
 
 function hasPendingToolCalls(message) {
   if (!message?.parts) return false;
   return message.parts.some(
-    (p) =>
-      (p.type === "dynamic-tool" || p.type?.startsWith?.("tool-")) &&
-      p.state !== "output-available" &&
-      p.state !== "output-error"
+    p =>
+      (p.type === 'dynamic-tool' || p.type?.startsWith?.('tool-')) &&
+      p.state !== 'output-available' &&
+      p.state !== 'output-error'
   );
 }
 
-chat.post("/", async (c) => {
-  const userId = c.get("userId");
+chat.post('/', async c => {
+  const userId = c.get('userId');
   const body = await c.req.json().catch(() => null);
   const parsed = submitSchema.safeParse(body);
   if (!parsed.success) {
-    return c.json({ error: parsed.error?.message || "Invalid request" }, 400);
+    return c.json({ error: parsed.error?.message || 'Invalid request' }, 400);
   }
   const { id, messages, mode, model } = parsed.data;
 
   const session = await getSession({ id, userId });
   if (!session) {
-    return c.json({ error: "Session not found" }, 404);
+    return c.json({ error: 'Session not found' }, 404);
   }
 
   const resolved = resolveChatModel(model);
@@ -73,7 +73,8 @@ chat.post("/", async (c) => {
   const systemPrompt = buildSystemPrompt({ mode });
 
   // Merge incoming messages with stored ones by id.
-  const previous = typeof session.messages === 'string' ? JSON.parse(session.messages) : (session.messages || []);
+  const previous =
+    typeof session.messages === 'string' ? JSON.parse(session.messages) : session.messages || [];
   const byId = new Map();
   for (const m of previous) byId.set(m.id, m);
   for (const m of messages) {
@@ -94,7 +95,7 @@ chat.post("/", async (c) => {
     modelId: resolved.modelId,
     provider: resolved.provider,
     providerOptions: resolved.providerOptions,
-    onUsage: (u) => {
+    onUsage: u => {
       completedUsage = u;
     },
   });
@@ -109,11 +110,11 @@ chat.post("/", async (c) => {
         for (;;) {
           const { value, done } = await reader.read();
           if (done) break;
-          if (value.kind === "ui-message") {
+          if (value.kind === 'ui-message') {
             finalMessages = value.messages;
-          } else if (value.kind === "usage") {
+          } else if (value.kind === 'usage') {
             completedUsage = value.usage;
-          } else if (value.kind === "aborted") {
+          } else if (value.kind === 'aborted') {
             aborted = true;
           }
           controller.enqueue(encoder.encode(value.frame));
@@ -144,7 +145,7 @@ chat.post("/", async (c) => {
       try {
         await appendMessages({ id, userId, messages: finalMessages });
       } catch (e) {
-        console.error("[chat] persist failed:", e.message);
+        console.error('[chat] persist failed:', e.message);
       }
     }
     if (completedUsage) {
@@ -163,26 +164,27 @@ chat.post("/", async (c) => {
           sessionId: id,
         });
       } catch (e) {
-        console.error("[chat] billing failed:", e.message);
+        console.error('[chat] billing failed:', e.message);
       }
     }
   })();
 
   return new Response(readable, {
     headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache, no-transform",
-      Connection: "keep-alive",
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache, no-transform',
+      Connection: 'keep-alive',
     },
   });
 });
 
 function pickStreamer() {
-  const hasKey = ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY"]
-    .some((k) => process.env[k]);
+  const hasKey = ['ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'GOOGLE_GENERATIVE_AI_API_KEY'].some(
+    k => process.env[k]
+  );
   if (!hasKey) return { stream: streamWithOrchestrator };
   try {
-    require("ai");
+    require('ai');
     return { stream: streamWithAiSdk };
   } catch {
     return { stream: streamWithOrchestrator };

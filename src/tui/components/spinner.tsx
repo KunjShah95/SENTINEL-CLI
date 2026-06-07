@@ -14,8 +14,8 @@ export function Spinner({ mode = 'BUILD' }: Props) {
     mode === 'PLAN'
       ? colors.planMode
       : mode === 'REVIEW'
-      ? (colors.warning || colors.planMode)
-      : colors.primary;
+        ? colors.warning || colors.planMode
+        : colors.primary;
 
   useEffect(() => {
     const id = setInterval(() => setFrame(f => (f + 1) % FRAMES.length), 120);

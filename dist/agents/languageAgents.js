@@ -65,6 +65,41 @@ export class LanguageAgent {
   async lint(_code) {
     throw new Error('lint() must be implemented by subclass');
   }
+
+  /**
+   * Refactor code safely using LLM with AST feedback loop (Harness Engineering)
+   */
+  async safeRefactor(code, instructions, llmCallback, maxRetries = 3) {
+    let currentCode = code;
+    let attempt = 0;
+    let feedback = '';
+    
+    while (attempt < maxRetries) {
+      attempt++;
+      // 1. Call LLM to generate code (passing feedback if any)
+      let generatedCode = await llmCallback(currentCode, instructions, feedback);
+      
+      // 2. Parse the generated code to check for syntax errors
+      let astResult = await this.parse(generatedCode);
+      if (!astResult.success) {
+         feedback = `Syntax Error in generated code: ${astResult.error}. Please fix this and try again.`;
+         continue; // Loop back and let LLM try again
+      }
+      
+      // 3. Lint the generated code for simple errors/security flaws
+      let lintResult = await this.lint(generatedCode);
+      if (lintResult.success && lintResult.issues && lintResult.issues.some(i => i.severity === 'error')) {
+         let errors = lintResult.issues.filter(i => i.severity === 'error').map(i => i.message).join(', ');
+         feedback = `Lint Errors in generated code: ${errors}. Please fix them and try again.`;
+         continue;
+      }
+      
+      // If we pass AST parse and linting, return success!
+      return { success: true, code: generatedCode, attempt };
+    }
+    
+    return { success: false, error: `Failed to generate valid code after ${maxRetries} attempts.` };
+  }
 }
 
 /**

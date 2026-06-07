@@ -11,36 +11,81 @@ Sentinel is a local-first, privacy-focused code security platform — now with a
 
 ## AI Coding Agent
 
-Sentinel ships a terminal-based AI coding agent with four modes and 9 local tools.
+Sentinel ships a terminal-based AI coding agent with five modes and 11 local tools.
 
-### Four modes
+### Five modes
 
 | Mode | Tools | Use case |
 |------|-------|----------|
-| **BUILD** | all 9 | Implement features, edit files, run commands |
-| **PLAN** | read-only (readFile, globFiles, grepFiles) | Explore codebase, propose plans |
+| **BUILD** | all 11 | Implement features, edit files, run commands, preview diffs, undo changes |
+| **PLAN** | read-only (readFile, listDirectory, glob, grep, searchWeb) | Explore codebase, propose plans |
+| **REVIEW** | read-only | Automated code reviews & bug heuristics check (Bugbot mode) |
 | **ASK** | read-only + web search | Research, documentation, questions |
-| **DEBUG** | all 9 + verbose logging | Root-cause analysis |
+| **DEBUG** | all 11 + verbose logging | Root-cause analysis |
 
 Tab to toggle between BUILD and PLAN. Type `/mode` in the TUI for other modes.
 
 ### Local tools
 
-`readFile`, `globFiles`, `grepFiles`, `writeFile`, `executeCommand` (sandboxed), `toddInstructions`, `readOutput`, `searchWeb`, `batchEdit` (atomic multi-file edit with rollback).
+`readFile`, `listDirectory`, `glob`, `grep`, `searchWeb`, `writeFile`, `editFile`, `bash` (sandboxed command execution), `batchEdit` (atomic multi-file edit with rollback), `diffFile` (preview unified diff before applying changes), and `undoLastChange` (restores files from the most recent checkpoint).
 
-All tools run inside the project working directory. bash is sandboxed (bwrap/macOS sandbox-exec/fallback). Rate-limited: glob, grep, bash, and searchWeb (max 3 concurrent).
+All tools run inside the project working directory. `bash` is sandboxed (bwrap/macOS sandbox-exec/fallback). Rate-limited: glob, grep, bash, and searchWeb (max 3 concurrent).
 
 ### Slash commands
 
 Inside the TUI, type `/` to open the command menu:
 
-`/help`, `/clear`, `/mode`, `/model <name>`, `/login`, `/logout`, `/upgrade`, `/status`
+`/help`, `/clear`, `/mode`, `/model <name>`, `/login`, `/logout`, `/upgrade`, `/status`, `/review`, `/undo`, `/background <prompt>`, `/agents`
 
 ### @-mentions
 
 Type `@` in the input bar to fuzzy-match a project file. Select with arrow keys, insert with Tab / Enter.
 
-### Server mode (optional)
+---
+
+## Developer SDK & Programmatic Agents
+
+Sentinel exposes a Node.js/TypeScript SDK for developers to build custom programmatic agents using Sentinel's underlying LLM orchestrator and tools:
+
+```javascript
+import { Agent } from 'sentinel-cli/sdk';
+
+const agent = new Agent({
+  mode: 'BUILD', // 'BUILD' | 'PLAN' | 'REVIEW'
+  model: 'claude-sonnet-4-6',
+  apiKey: process.env.ANTHROPIC_API_KEY
+});
+
+// Stream reasoning/responses
+for await (const chunk of agent.stream("Write a basic HTTP server in Node.js")) {
+  process.stdout.write(chunk);
+}
+
+// Send and await full response
+const response = await agent.send("Check if server-api.test.js exists");
+```
+
+---
+
+## Cursor & BugBot Features (Phase 2)
+
+Sentinel includes advanced coding tools inspired by Cursor Composer 2.5/3 and BugBot:
+
+1. **Agent Checkpoints & Undo (`/undo`)**
+   Before any destructive tool execution (`writeFile`, `editFile`), Sentinel automatically creates a checkpoint in `.sentinel/checkpoints/` and keeps up to 10 historical snapshots. Type `/undo` inside the TUI or use the `undoLastChange` tool to rollback instantly.
+   
+2. **Background Agents (`/background <prompt>`)**
+   Run long-running agent tasks asynchronously in the background. While the agent runs, you can continue working in the TUI. Use `/agents` to view active background tasks and status. Logs are written to `.sentinel/agents/<agent-id>.log`.
+   
+3. **Automated Diff Review (`/review`)**
+   Pipes your staged git changes (`git diff --staged` or `git diff HEAD`) directly to the agent in `REVIEW` mode. Bugbot analyzes the diff against a structured checklist for SQL injection, XSS, hardcoded secrets, missing error handling, race conditions, and API breaking changes.
+   
+4. **Unified Diff Previews (`diffFile` Tool)**
+   A dedicated tool allowing agents in `BUILD` mode to display a unified diff of proposed changes so the user can verify them before they are committed to disk.
+
+---
+
+## Server mode (optional)
 
 Run a Hono SSE server alongside for session persistence and credit metering:
 

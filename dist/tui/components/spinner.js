@@ -8,7 +8,7 @@ export function Spinner({ mode = 'BUILD' }) {
     const activeColor = mode === 'PLAN'
         ? colors.planMode
         : mode === 'REVIEW'
-            ? (colors.warning || colors.planMode)
+            ? colors.warning || colors.planMode
             : colors.primary;
     useEffect(() => {
         const id = setInterval(() => setFrame(f => (f + 1) % FRAMES.length), 120);

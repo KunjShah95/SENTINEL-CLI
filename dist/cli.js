@@ -502,6 +502,8 @@ program
   .option('--baseline-save <file>', 'Save current issues as baseline JSON')
   .option('--new-only', 'Only report issues not present in baseline')
   .option('--incremental', 'Only scan files that changed since last run')
+  .option('--pr-comment', 'Post a markdown comment with the analysis results to the active PR')
+  .option('--github-token <token>', 'GitHub token for posting PR comments')
   .action(async (files, options) => {
     try {
       // Handle analyzer selection
@@ -576,6 +578,41 @@ program
         await sarif.saveToFile(result.issues, outputPath);
         if (!options.silent) {
           console.log(chalk.green('✓') + ` SARIF report saved to ${outputPath}`);
+        }
+      }
+
+      // Handle PR Commenting
+      if (options.prComment && result && result.issues) {
+        try {
+          const { ReportGenerator } = await import('./output/reportGenerator.js');
+          const generator = new ReportGenerator();
+          const markdown = generator.generateMarkdownReport(result);
+
+          const { GitHubIntegration } = await import('./integrations/github.js');
+          const gh = new GitHubIntegration({ token: options.githubToken || process.env.GITHUB_TOKEN });
+          
+          let prNumber = null;
+          let repoFull = null;
+
+          const isGitHubAction = process.env.GITHUB_ACTIONS === 'true';
+          if (isGitHubAction && process.env.GITHUB_REF && process.env.GITHUB_REF.includes('pull')) {
+             prNumber = process.env.GITHUB_REF.split('/')[2];
+             repoFull = process.env.GITHUB_REPOSITORY;
+          }
+
+          if (prNumber && repoFull) {
+             const [owner, repo] = repoFull.split('/');
+             if (owner && repo) {
+                await gh.postComment(owner, repo, prNumber, markdown);
+                if (!options.silent) {
+                  console.log(chalk.green('✓') + ` Posted markdown summary to PR #${prNumber}`);
+                }
+             }
+          } else {
+             console.warn(chalk.yellow('⚠') + ' --pr-comment flag requires running in a GitHub Action pull request event context.');
+          }
+        } catch (e) {
+          console.warn(chalk.yellow('⚠') + ` Failed to post PR comment: ${e.message}`);
         }
       }
 

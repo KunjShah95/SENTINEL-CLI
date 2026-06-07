@@ -8,20 +8,24 @@
  * subset — no Bun.spawn or Bun.Glob, falls back to Node primitives).
  */
 
-import path from "node:path";
-import fs from "node:fs/promises";
-import { existsSync } from "node:fs";
-import { Mode, isReadOnlyTool } from "../schemas/mode.js";
-import { runSandboxed } from "./sandbox.js";
-import {
+import path from 'node:path';
+import fs from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { createPatch } from 'diff';
+import { Mode, isReadOnlyTool } from '../schemas/mode.js';
+import { runSandboxed } from './sandbox.js';
+import { createCheckpoint, restoreCheckpoint, listCheckpoints } from './checkpoint.js';
+import { toolInputSchemas, READ_ONLY_TOOL_NAMES, BUILD_TOOL_NAMES, isReadOnly } from './schemas.js';
+
+// Re-export so callers can do `import { Mode, toolInputSchemas } from "./tools"`.
+export {
+  Mode,
+  isReadOnlyTool,
   toolInputSchemas,
   READ_ONLY_TOOL_NAMES,
   BUILD_TOOL_NAMES,
   isReadOnly,
-} from "./schemas.js";
-
-// Re-export so callers can do `import { Mode, toolInputSchemas } from "./tools"`.
-export { Mode, isReadOnlyTool, toolInputSchemas, READ_ONLY_TOOL_NAMES, BUILD_TOOL_NAMES, isReadOnly };
+};
 
 export const MAX_FILE_SIZE = 10_000;
 export const MAX_RESULTS = 200;
@@ -33,23 +37,23 @@ export function resolveInsideCwd(inputPath) {
   const cwd = process.cwd();
   const target = path.isAbsolute(inputPath) ? inputPath : path.resolve(cwd, inputPath);
   const rel = path.relative(cwd, target);
-  if (rel.startsWith("..") || path.isAbsolute(rel)) {
-    throw new Error("Path is outside the project directory");
+  if (rel.startsWith('..') || path.isAbsolute(rel)) {
+    throw new Error('Path is outside the project directory');
   }
-  return { cwd, resolved: target, relative: rel || "." };
+  return { cwd, resolved: target, relative: rel || '.' };
 }
 
 export function truncate(value, limit) {
-  if (typeof value !== "string") return value;
+  if (typeof value !== 'string') return value;
   if (value.length <= limit) return value;
   return `${value.slice(0, limit)}\n... (truncated, ${value.length} total chars)`;
 }
 
 async function readFileImpl(input) {
   const p = input?.path;
-  if (typeof p !== "string") throw new Error("path is required");
+  if (typeof p !== 'string') throw new Error('path is required');
   const { resolved, relative } = resolveInsideCwd(p);
-  const content = await fs.readFile(resolved, "utf-8");
+  const content = await fs.readFile(resolved, 'utf-8');
   if (content.length > MAX_FILE_SIZE) {
     return {
       content: content.slice(0, MAX_FILE_SIZE),
@@ -62,43 +66,45 @@ async function readFileImpl(input) {
 }
 
 async function listDirectoryImpl(input) {
-  const p = input?.path ?? ".";
+  const p = input?.path ?? '.';
   const { resolved, relative } = resolveInsideCwd(p);
   const names = await fs.readdir(resolved);
   const entries = [];
   for (const name of names) {
-    if (name.startsWith(".") || name === "node_modules") continue;
+    if (name.startsWith('.') || name === 'node_modules') continue;
     const full = path.join(resolved, name);
     try {
       const st = await fs.stat(full);
-      entries.push({ name, type: st.isDirectory() ? "directory" : "file" });
+      entries.push({ name, type: st.isDirectory() ? 'directory' : 'file' });
     } catch {
       // skip
     }
   }
   entries.sort((a, b) => {
-    if (a.type !== b.type) return a.type === "directory" ? -1 : 1;
+    if (a.type !== b.type) return a.type === 'directory' ? -1 : 1;
     return a.name.localeCompare(b.name);
   });
-  return { path: relative || ".", entries };
+  return { path: relative || '.', entries };
 }
 
 async function globImpl(input) {
   const pattern = input?.pattern;
-  const cwdDir = input?.path ?? ".";
-  if (typeof pattern !== "string" || pattern.length === 0) {
-    throw new Error("pattern is required");
+  const cwdDir = input?.path ?? '.';
+  if (typeof pattern !== 'string' || pattern.length === 0) {
+    throw new Error('pattern is required');
   }
   const { resolved, relative } = resolveInsideCwd(cwdDir);
 
   const files = [];
   let truncated = false;
-  await walkDir(resolved, "", files, pattern, MAX_RESULTS + 1);
+  await walkDir(resolved, '', files, pattern, MAX_RESULTS + 1);
   if (files.length > MAX_RESULTS) {
     files.length = MAX_RESULTS;
     truncated = true;
   }
-  const out = { files: files.map((f) => path.posix.join(relative === "." ? "" : relative, f).replace(/\\/g, "/")) };
+  const out = {
+    files: files.map(f => path.posix.join(relative === '.' ? '' : relative, f).replace(/\\/g, '/')),
+  };
   if (truncated) out.truncated = true;
   return out;
 }
@@ -113,7 +119,7 @@ async function walkDir(base, rel, out, pattern, cap) {
   }
   for (const entry of entries) {
     if (out.length >= cap) return;
-    if (entry.name.startsWith(".") || entry.name === "node_modules") continue;
+    if (entry.name.startsWith('.') || entry.name === 'node_modules') continue;
     const childRel = rel ? path.posix.join(rel, entry.name) : entry.name;
     if (entry.isDirectory()) {
       await walkDir(base, childRel, out, pattern, cap);
@@ -127,19 +133,25 @@ async function walkDir(base, rel, out, pattern, cap) {
 
 function matchGlob(name, pattern) {
   // Very small glob: only supports `*` and `**`. Good enough for sentinel.
-  if (!pattern.includes("*")) return name === pattern;
+  if (!pattern.includes('*')) return name === pattern;
   const re = new RegExp(
-    "^" + pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*\*/g, "::").replace(/\*/g, "[^/]*").replace(/::/g, ".*") + "$"
+    '^' +
+      pattern
+        .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+        .replace(/\*\*/g, '::')
+        .replace(/\*/g, '[^/]*')
+        .replace(/::/g, '.*') +
+      '$'
   );
   return re.test(name);
 }
 
 async function grepImpl(input) {
   const pattern = input?.pattern;
-  const cwdDir = input?.path ?? ".";
+  const cwdDir = input?.path ?? '.';
   const include = input?.include;
-  if (typeof pattern !== "string" || pattern.length === 0) {
-    throw new Error("pattern is required");
+  if (typeof pattern !== 'string' || pattern.length === 0) {
+    throw new Error('pattern is required');
   }
   const { resolved, relative } = resolveInsideCwd(cwdDir);
   let regex;
@@ -149,7 +161,13 @@ async function grepImpl(input) {
     throw new Error(`Invalid regex: ${e.message}`);
   }
   const matches = [];
-  await walkDirGrep(resolved, "", { matches, pattern, regex, include, cap: MAX_MATCHES + 1 }, null, MAX_MATCHES + 1);
+  await walkDirGrep(
+    resolved,
+    '',
+    { matches, pattern, regex, include, cap: MAX_MATCHES + 1 },
+    null,
+    MAX_MATCHES + 1
+  );
   const out = { matches: matches.slice(0, MAX_MATCHES) };
   if (matches.length > MAX_MATCHES) {
     out.truncated = true;
@@ -167,7 +185,7 @@ async function walkDirGrep(base, rel, ctx, _parent, cap) {
   }
   for (const entry of entries) {
     if (ctx.matches.length >= cap) return;
-    if (entry.name.startsWith(".") || entry.name === "node_modules") continue;
+    if (entry.name.startsWith('.') || entry.name === 'node_modules') continue;
     const childRel = rel ? path.posix.join(rel, entry.name) : entry.name;
     if (entry.isDirectory()) {
       await walkDirGrep(base, childRel, ctx, null, cap);
@@ -176,7 +194,7 @@ async function walkDirGrep(base, rel, ctx, _parent, cap) {
       const full = path.join(base, childRel);
       let content;
       try {
-        content = await fs.readFile(full, "utf-8");
+        content = await fs.readFile(full, 'utf-8');
       } catch {
         continue;
       }
@@ -200,15 +218,19 @@ function regexExec(re, s) {
 async function writeFileImpl(input) {
   const p = input?.path;
   const content = input?.content;
-  if (typeof p !== "string") throw new Error("path is required");
-  if (typeof content !== "string") throw new Error("content is required");
+  if (typeof p !== 'string') throw new Error('path is required');
+  if (typeof content !== 'string') throw new Error('content is required');
   const { resolved, relative } = resolveInsideCwd(p);
+  // Checkpoint before overwriting
+  try {
+    await createCheckpoint([resolved]);
+  } catch {}
   await fs.mkdir(path.dirname(resolved), { recursive: true });
-  await fs.writeFile(resolved, content, "utf-8");
+  await fs.writeFile(resolved, content, 'utf-8');
   return {
     success: true,
     path: relative,
-    bytesWritten: Buffer.byteLength(content, "utf-8"),
+    bytesWritten: Buffer.byteLength(content, 'utf-8'),
   };
 }
 
@@ -216,17 +238,21 @@ async function editFileImpl(input) {
   const p = input?.path;
   const oldString = input?.oldString;
   const newString = input?.newString;
-  if (typeof p !== "string") throw new Error("path is required");
-  if (typeof oldString !== "string") throw new Error("oldString is required");
-  if (typeof newString !== "string") throw new Error("newString is required");
+  if (typeof p !== 'string') throw new Error('path is required');
+  if (typeof oldString !== 'string') throw new Error('oldString is required');
+  if (typeof newString !== 'string') throw new Error('newString is required');
   const { resolved, relative } = resolveInsideCwd(p);
-  const current = await fs.readFile(resolved, "utf-8");
+  const current = await fs.readFile(resolved, 'utf-8');
   const occurrences = current.split(oldString).length - 1;
-  if (occurrences === 0) throw new Error("oldString not found in file");
+  if (occurrences === 0) throw new Error('oldString not found in file');
   if (occurrences > 1) {
     throw new Error(`oldString is ambiguous; found ${occurrences} matches`);
   }
-  await fs.writeFile(resolved, current.replace(oldString, newString), "utf-8");
+  // Checkpoint before editing
+  try {
+    await createCheckpoint([resolved]);
+  } catch {}
+  await fs.writeFile(resolved, current.replace(oldString, newString), 'utf-8');
   return { success: true, path: relative };
 }
 
@@ -235,20 +261,21 @@ async function batchEditImpl(input) {
   const fallback = input?.fallback ?? false;
 
   if (!Array.isArray(operations) || operations.length < 1 || operations.length > 10) {
-    throw new Error("operations must be an array of 1-10 edit operations");
+    throw new Error('operations must be an array of 1-10 edit operations');
   }
 
   const resolved = [];
   for (const op of operations) {
-    if (typeof op.filePath !== "string") throw new Error("Each operation must have a filePath");
-    if (typeof op.oldString !== "string") throw new Error("Each operation must have an oldString");
-    if (typeof op.newString !== "string") throw new Error("Each operation must have a newString");
+    if (typeof op.filePath !== 'string') throw new Error('Each operation must have a filePath');
+    if (typeof op.oldString !== 'string') throw new Error('Each operation must have an oldString');
+    if (typeof op.newString !== 'string') throw new Error('Each operation must have a newString');
 
     const { resolved: r, relative } = resolveInsideCwd(op.filePath);
-    const content = await fs.readFile(r, "utf-8");
+    const content = await fs.readFile(r, 'utf-8');
     const occurrences = content.split(op.oldString).length - 1;
     if (occurrences === 0) throw new Error(`oldString not found in ${relative}`);
-    if (occurrences > 1) throw new Error(`oldString is ambiguous in ${relative}; found ${occurrences} matches`);
+    if (occurrences > 1)
+      throw new Error(`oldString is ambiguous in ${relative}; found ${occurrences} matches`);
 
     resolved.push({ ...op, resolved: r, relative, content });
   }
@@ -256,7 +283,7 @@ async function batchEditImpl(input) {
   const backups = [];
   try {
     for (const { resolved: r } of resolved) {
-      const backup = r + ".batchbak";
+      const backup = r + '.batchbak';
       await fs.copyFile(r, backup);
       backups.push(backup);
     }
@@ -267,29 +294,41 @@ async function batchEditImpl(input) {
     for (let i = 0; i < resolved.length; i++) {
       const op = resolved[i];
       try {
-        const current = await fs.readFile(op.resolved, "utf-8");
-        await fs.writeFile(op.resolved, current.replace(op.oldString, op.newString), "utf-8");
+        const current = await fs.readFile(op.resolved, 'utf-8');
+        await fs.writeFile(op.resolved, current.replace(op.oldString, op.newString), 'utf-8');
         succeeded.push(op.relative);
       } catch (err) {
         if (!fallback) {
           for (let j = 0; j < backups.length; j++) {
-            try { await fs.copyFile(backups[j], resolved[j].resolved); } catch {}
+            try {
+              await fs.copyFile(backups[j], resolved[j].resolved);
+            } catch {}
           }
           for (const b of backups) {
-            try { await fs.rm(b); } catch {}
+            try {
+              await fs.rm(b);
+            } catch {}
           }
-          return { success: false, error: "Batch edit failed, all changes reverted" };
+          return { success: false, error: 'Batch edit failed, all changes reverted' };
         }
         errors.push({ file: op.relative, error: err.message });
       }
     }
 
     for (const b of backups) {
-      try { await fs.rm(b); } catch {}
+      try {
+        await fs.rm(b);
+      } catch {}
     }
 
     if (errors.length > 0) {
-      return { success: true, partial: true, operations: succeeded.length, files: succeeded, errors };
+      return {
+        success: true,
+        partial: true,
+        operations: succeeded.length,
+        files: succeeded,
+        errors,
+      };
     }
 
     return { success: true, operations: resolved.length, files: succeeded };
@@ -301,27 +340,27 @@ async function batchEditImpl(input) {
 function runBashImpl(input) {
   const command = input?.command;
   const timeout = input?.timeout ?? DEFAULT_TIMEOUT;
-  if (typeof command !== "string" || command.length === 0) {
-    throw new Error("command is required");
+  if (typeof command !== 'string' || command.length === 0) {
+    throw new Error('command is required');
   }
 
-  return new Promise((resolve) => {
+  return new Promise(resolve => {
     try {
       const stdout = runSandboxed(command, {
         cwd: process.cwd(),
         timeout,
-        env: { ...process.env, TERM: "dumb" },
+        env: { ...process.env, TERM: 'dumb' },
       });
       resolve({
-        stdout: truncate(stdout?.toString() || "", MAX_OUTPUT),
-        stderr: "",
+        stdout: truncate(stdout?.toString() || '', MAX_OUTPUT),
+        stderr: '',
         exitCode: 0,
         timedOut: false,
       });
     } catch (err) {
       resolve({
-        stdout: truncate(err.stdout?.toString() || "", MAX_OUTPUT),
-        stderr: truncate(err.stderr?.toString() || "", MAX_OUTPUT),
+        stdout: truncate(err.stdout?.toString() || '', MAX_OUTPUT),
+        stderr: truncate(err.stderr?.toString() || '', MAX_OUTPUT),
         exitCode: err.status || 1,
         timedOut: false,
       });
@@ -332,10 +371,12 @@ function runBashImpl(input) {
 async function searchWebImpl(input) {
   const query = input?.query;
   const count = input?.count ?? 5;
-  if (typeof query !== "string" || query.length === 0) {
-    throw new Error("query is required");
+  if (typeof query !== 'string' || query.length === 0) {
+    throw new Error('query is required');
   }
-  const endpoint = (process.env.SEARCH_WEB_ENDPOINT || "https://html.duckduckgo.com/html/").replace(/\/+$/, "") + "/";
+  const endpoint =
+    (process.env.SEARCH_WEB_ENDPOINT || 'https://html.duckduckgo.com/html/').replace(/\/+$/, '') +
+    '/';
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 10_000);
   try {
@@ -349,16 +390,16 @@ async function searchWebImpl(input) {
     const linkMatches = [];
     let m;
     while ((m = linkRe.exec(html)) !== null && linkMatches.length < count) {
-      linkMatches.push({ url: m[1], title: m[2].replace(/<[^>]+>/g, "").trim() });
+      linkMatches.push({ url: m[1], title: m[2].replace(/<[^>]+>/g, '').trim() });
     }
     const snippetMatches = [];
     while ((m = snippetRe.exec(html)) !== null && snippetMatches.length < count) {
-      snippetMatches.push(m[1].replace(/<[^>]+>/g, "").trim());
+      snippetMatches.push(m[1].replace(/<[^>]+>/g, '').trim());
     }
     for (let i = 0; i < Math.min(linkMatches.length, count); i++) {
       results.push({
         title: linkMatches[i].title,
-        snippet: snippetMatches[i] || "",
+        snippet: snippetMatches[i] || '',
         url: linkMatches[i].url,
       });
     }
@@ -367,22 +408,52 @@ async function searchWebImpl(input) {
       const fallbackRes = await fetch(fallbackUrl, { signal: AbortSignal.timeout(10_000) });
       const data = await fallbackRes.json();
       if (data.AbstractText) {
-        results.push({ title: data.Heading || query, snippet: data.AbstractText, url: data.AbstractURL || "" });
+        results.push({
+          title: data.Heading || query,
+          snippet: data.AbstractText,
+          url: data.AbstractURL || '',
+        });
       }
       if (data.Results) {
         for (const r of data.Results.slice(0, count)) {
-          results.push({ title: r.Text || "", snippet: r.Text || "", url: r.FirstURL || "" });
+          results.push({ title: r.Text || '', snippet: r.Text || '', url: r.FirstURL || '' });
         }
       }
     }
     return { results };
   } catch (err) {
     clearTimeout(timer);
-    if (err.name === "AbortError") {
-      return { error: "Search request timed out" };
+    if (err.name === 'AbortError') {
+      return { error: 'Search request timed out' };
     }
     return { error: err.message };
   }
+}
+
+async function diffFileImpl(input) {
+  const p = input?.path;
+  const newContent = input?.newContent;
+  if (typeof p !== 'string') throw new Error('path is required');
+  if (typeof newContent !== 'string') throw new Error('newContent is required');
+  const { resolved, relative } = resolveInsideCwd(p);
+  let oldContent = '';
+  try {
+    oldContent = await fs.readFile(resolved, 'utf-8');
+  } catch {
+    // File doesn't exist yet — diff against empty
+  }
+  const patch = createPatch(relative, oldContent, newContent, 'current', 'proposed');
+  return { diff: patch, path: relative };
+}
+
+async function undoLastChangeImpl(_input) {
+  const result = await restoreCheckpoint();
+  return {
+    success: true,
+    restored: result.restored,
+    deleted: result.deleted,
+    message: `Restored ${result.restored.length} file(s)${result.deleted.length > 0 ? `, removed ${result.deleted.length} new file(s)` : ''}.`,
+  };
 }
 
 const TOOL_IMPLS = {
@@ -394,27 +465,30 @@ const TOOL_IMPLS = {
   editFile: editFileImpl,
   batchEdit: batchEditImpl,
   bash: runBashImpl,
+  diffFile: diffFileImpl,
+  undoLastChange: undoLastChangeImpl,
 };
 
 export const readOnlyToolContracts = Object.freeze({
   readFile: {
-    description: "Read a file from the current project directory.",
+    description: 'Read a file from the current project directory.',
     inputSchema: toolInputSchemas.readFile,
   },
   listDirectory: {
-    description: "List entries in a directory under the current project directory.",
+    description: 'List entries in a directory under the current project directory.',
     inputSchema: toolInputSchemas.listDirectory,
   },
   glob: {
-    description: "Find files matching a glob pattern under the current project directory.",
+    description: 'Find files matching a glob pattern under the current project directory.',
     inputSchema: toolInputSchemas.glob,
   },
   grep: {
-    description: "Search file contents with a regular expression under the current project directory.",
+    description:
+      'Search file contents with a regular expression under the current project directory.',
     inputSchema: toolInputSchemas.grep,
   },
   searchWeb: {
-    description: "Search the web and return relevant results (titles, snippets, URLs).",
+    description: 'Search the web and return relevant results (titles, snippets, URLs).',
     inputSchema: toolInputSchemas.searchWeb,
   },
 });
@@ -422,40 +496,51 @@ export const readOnlyToolContracts = Object.freeze({
 export const buildToolContracts = Object.freeze({
   ...readOnlyToolContracts,
   writeFile: {
-    description: "Create or overwrite a file under the current project directory.",
+    description: 'Create or overwrite a file under the current project directory.',
     inputSchema: toolInputSchemas.writeFile,
   },
   editFile: {
-    description: "Replace exact text in a file under the current project directory.",
+    description: 'Replace exact text in a file under the current project directory.',
     inputSchema: toolInputSchemas.editFile,
   },
   batchEdit: {
-    description: "Apply multiple file edits atomically with rollback on failure.",
+    description: 'Apply multiple file edits atomically with rollback on failure.',
     inputSchema: toolInputSchemas.batchEdit,
   },
   bash: {
-    description: "Run a shell command in the current project directory.",
+    description: 'Run a shell command in the current project directory.',
     inputSchema: toolInputSchemas.bash,
+  },
+  diffFile: {
+    description: 'Preview a unified diff of proposed changes to a file without applying them.',
+    inputSchema: toolInputSchemas.diffFile,
+  },
+  undoLastChange: {
+    description: 'Undo the last file change by restoring from the most recent checkpoint.',
+    inputSchema: toolInputSchemas.undoLastChange,
   },
 });
 
 export function getToolContracts(mode) {
-  return mode === Mode.PLAN ? readOnlyToolContracts : buildToolContracts;
+  if (mode === Mode.PLAN || mode === Mode.REVIEW) return readOnlyToolContracts;
+  return buildToolContracts;
 }
 
 export function getToolNames(mode) {
-  return mode === Mode.PLAN ? READ_ONLY_TOOL_NAMES : Object.keys(buildToolContracts);
+  return mode === Mode.PLAN || mode === Mode.REVIEW
+    ? READ_ONLY_TOOL_NAMES
+    : Object.keys(buildToolContracts);
 }
 
 /**
- * Execute a local tool call. PLAN mode rejects write/edit/bash.
+ * Execute a local tool call. PLAN/REVIEW modes reject write/edit/bash/diffFile/undoLastChange.
  * @param {string} toolName
  * @param {object} input
  * @param {string} mode
  */
 export async function executeLocalTool(toolName, input, mode = Mode.BUILD) {
-  if (mode === Mode.PLAN && !isReadOnlyTool(toolName)) {
-    throw new Error(`Tool ${toolName} is not available in PLAN mode`);
+  if ((mode === Mode.PLAN || mode === Mode.REVIEW) && !isReadOnlyTool(toolName)) {
+    throw new Error(`Tool ${toolName} is not available in ${mode} mode`);
   }
   const impl = TOOL_IMPLS[toolName];
   if (!impl) {

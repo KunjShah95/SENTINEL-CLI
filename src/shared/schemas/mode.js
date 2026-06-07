@@ -6,15 +6,15 @@
  */
 
 export const Mode = Object.freeze({
-  BUILD: "BUILD",
-  PLAN: "PLAN",
-  REVIEW: "REVIEW",
+  BUILD: 'BUILD',
+  PLAN: 'PLAN',
+  REVIEW: 'REVIEW',
 });
 
 export const modeSchema = {
-  BUILD: "BUILD",
-  PLAN: "PLAN",
-  REVIEW: "REVIEW",
+  BUILD: 'BUILD',
+  PLAN: 'PLAN',
+  REVIEW: 'REVIEW',
 };
 
 export function isMode(value) {
@@ -22,11 +22,11 @@ export function isMode(value) {
 }
 
 export function isReadOnlyTool(toolName) {
-  return ["readFile", "listDirectory", "glob", "grep", "searchWeb"].includes(toolName);
+  return ['readFile', 'listDirectory', 'glob', 'grep', 'searchWeb'].includes(toolName);
 }
 
 export function getModeLabel(mode) {
-  if (mode === Mode.PLAN) return "Plan";
-  if (mode === Mode.REVIEW) return "Review";
-  return "Build";
+  if (mode === Mode.PLAN) return 'Plan';
+  if (mode === Mode.REVIEW) return 'Review';
+  return 'Build';
 }
