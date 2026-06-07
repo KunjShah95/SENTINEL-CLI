@@ -1,87 +1,71 @@
-# 🛡️ Sentinel MCP Server
+# Sentinel MCP Server
 
-[![MCP Compatible](https://img.shields.io/badge/MCP-Compatible-blue)](https://modelcontextprotocol.io)
-[![Sentinel CLI](https://img.shields.io/badge/Sentinel-CLI-green)](https://github.com/KunjShah95/SENTINEL-CLI)
+Expose Sentinel's 21 code analyzers as tools that any MCP-compatible AI assistant (Cursor, Claude Code, Codex, Windsurf, Continue) can call natively.
 
-Extend your AI assistant with professional-grade security and code quality analysis. The Sentinel MCP server exposes the full power of the Sentinel CLI as native tools for Cursor, Claude Code, Codex, and Continue.
+## Quick Install
 
-## ⚡ Quick Install
+### Cursor
 
-To use Sentinel, ensure you have the [Sentinel CLI](https://github.com/KunjShah95/SENTINEL-CLI) installed in your project root.
-
-### 🟦 Cursor
-Add the following to your `.cursor/mcp.json`:
+Add to `.cursor/mcp.json`:
 ```json
 {
   "mcpServers": {
     "sentinel": {
-      "command": "node",
-      "args": ["/path/to/your/project/mcp/sentinel-mcp-server.js"]
+      "command": "npx",
+      "args": ["-y", "sentinel-cli", "mcp"]
     }
   }
 }
 ```
 
-### 🟧 Claude Code
-Run the following command in your terminal:
+### Claude Code
+
 ```bash
-claude add mcp sentinel node /path/to/your/project/mcp/sentinel-mcp-server.js
+claude add mcp -- npx -y sentinel-cli mcp
 ```
 
-### 🟪 Codex
-Run the following command in your terminal:
+### Codex
+
 ```bash
-codex mcp add sentinel node /path/to/your/project/mcp/sentinel-mcp-server.js
+codex mcp add sentinel -- npx -y sentinel-cli mcp
 ```
 
-### 🟩 Continue
-Add to your `~/.continue/config.json` under `mcpServers`:
+### Continue
+
+Add to `~/.continue/config.json`:
 ```json
 {
-  "mcpServers": [
-    {
-      "name": "sentinel",
-      "command": "node",
-      "args": ["/path/to/your/project/mcp/sentinel-mcp-server.js"]
+  "experimental": {
+    "mcpServers": {
+      "sentinel": {
+        "command": "npx",
+        "args": ["-y", "sentinel-cli", "mcp"]
+      }
     }
-  ]
+  }
 }
 ```
 
----
+## Available Tools
 
-## 🛠️ Tool Reference
+| Tool | Description |
+|------|-------------|
+| `sentinel_analyze` | Run security analysis on files or directories |
+| `sentinel_security_audit` | Full security audit of the project |
+| `sentinel_review_code` | AI-powered code review |
+| `sentinel_review_pr` | Review pull request changes |
+| `sentinel_explain_issue` | Explain a security finding in detail |
+| `sentinel_fix` | Generate automated fix for an issue |
+| `sentinel_score` | Compute project health score |
+| `sentinel_check_dependencies` | Check dependencies for vulnerabilities |
+| `sentinel_health` | Check if Sentinel is properly installed |
+| `sentinel_detect_project` | Auto-detect project type and recommend analyzers |
 
-| Tool | Description | Best Use Case |
-| :--- | :--- | :--- |
-| `analyze` | Full-suite scan of files or directories | General review or auditing a new module |
-| `security-audit` | Focused security scan (XSS, SQLi, CSRF, Secrets) | Hardening code before production |
-| `review-code` | Analyze a raw code snippet without saving to file | Immediate feedback on pasted code |
-| `review-pr` | Analyze only changes between current and base branch | Pre-merge verification (noise-free) |
-| `explain-issue` | Deep dive into a specific rule with OWASP/CWE ref | Learning why a finding is dangerous |
-| `fix` | Apply automatic fixes for common issues | Rapidly cleaning up lint/security noise |
-| `score` | Calculate overall project health (0-100) | Tracking security posture over time |
-| `check-dependencies` | Scan for known CVEs and license issues | Managing supply chain risk (`npm audit`+) |
-| `health` | Comprehensive system and project health check | Routine maintenance and baseline audit |
-| `detect-project` | Analyze project structure and tech stack | Auto-configuring the best analysis suite |
+## Harness Templates
 
----
+Use Sentinel with your AI coding agent for:
 
-## 🏗️ Harness Templates
-
-Sentinel provides **Harness Templates** to streamline analysis based on your project type. Instead of manually picking analyzers, the AI can launch a pre-configured "Harness" optimized for your stack:
-
-### Common Templates
-- **Node.js API**: 🛡️ `security` $\rightarrow$ `api` $\rightarrow$ `secrets` $\rightarrow$ `dependency`
-- **React SPA**: 🎨 `accessibility` $\rightarrow$ `react` $\rightarrow$ `typescript` $\rightarrow$ `security`
-- **K8s Microservice**: ☸️ `kubernetes` $\rightarrow$ `docker` $\rightarrow$ `security` $\rightarrow$ `performance`
-- **Python Data Suite**: 🐍 `bugs` $\rightarrow$ `security` $\rightarrow$ `performance`
-
-**How to use:**
-Ask your AI: *"Run the Node.js API harness on the `/src` folder"* or *"Check this React project using the SPA template."*
-
----
-
-## 📖 Resources
-- **Rules List**: Access `sentinel://rules` via your MCP client to see all active detection patterns.
-- **Config**: Access `sentinel://config` to view your current `.sentinel.json` settings.
+- **Security-first development**: Run `sentinel_analyze` after every edit
+- **PR review automation**: Run `sentinel_review_pr` on every PR
+- **Architecture enforcement**: Run `sentinel_score` to track code quality over time
+- **Compliance checking**: Use compliance analyzers for OWASP, PCI-DSS, SOC 2, GDPR, HIPAA
