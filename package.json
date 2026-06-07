@@ -108,6 +108,7 @@
     "@types/react-dom": "^19.2.3",
     "@vercel/analytics": "^1.6.1",
     "axios": "^1.6.2",
+    "bullmq": "^5.78.0",
     "chalk": "^5.3.0",
     "cline": "^2.2.2",
     "commander": "^11.1.0",
@@ -128,9 +129,11 @@
     "jshint": "^0.5.9",
     "marked": "^11.1.0",
     "ora": "^7.0.1",
+    "prisma": "^5.22.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "react-router": "^7.16.0",
+    "redis": "^6.0.0",
     "semver": "^7.5.4",
     "sentinel": "^1.0.1",
     "simple-git": "^3.24.0",
@@ -151,34 +154,53 @@
     "zod": "^4.3.6"
   },
   "optionalDependencies": {
-    "hono": "^4.0.0",
-    "@hono/node-server": "^1.12.0",
-    "better-sqlite3": "^11.0.0",
-    "@prisma/client": "^5.20.0",
-    "@polar-sh/sdk": "^0.34.0",
-    "@clerk/backend": "^1.0.0",
-    "ai": "^3.0.0",
     "@ai-sdk/anthropic": "^1.0.0",
+    "@ai-sdk/google": "^1.0.0",
     "@ai-sdk/openai": "^1.0.0",
-    "@ai-sdk/google": "^1.0.0"
+    "@clerk/backend": "^1.0.0",
+    "@hono/node-server": "^1.12.0",
+    "@polar-sh/sdk": "^0.34.0",
+    "@prisma/client": "^5.22.0",
+    "ai": "^3.0.0",
+    "better-sqlite3": "^11.0.0",
+    "hono": "^4.0.0"
   },
   "peerDependenciesMeta": {
-    "hono": { "optional": true },
-    "@hono/node-server": { "optional": true },
-    "better-sqlite3": { "optional": true },
-    "@prisma/client": { "optional": true },
-    "@polar-sh/sdk": { "optional": true },
-    "@clerk/backend": { "optional": true },
-    "ai": { "optional": true },
-    "@ai-sdk/anthropic": { "optional": true },
-    "@ai-sdk/openai": { "optional": true },
-    "@ai-sdk/google": { "optional": true }
+    "hono": {
+      "optional": true
+    },
+    "@hono/node-server": {
+      "optional": true
+    },
+    "better-sqlite3": {
+      "optional": true
+    },
+    "@prisma/client": {
+      "optional": true
+    },
+    "@polar-sh/sdk": {
+      "optional": true
+    },
+    "@clerk/backend": {
+      "optional": true
+    },
+    "ai": {
+      "optional": true
+    },
+    "@ai-sdk/anthropic": {
+      "optional": true
+    },
+    "@ai-sdk/openai": {
+      "optional": true
+    },
+    "@ai-sdk/google": {
+      "optional": true
+    }
   },
   "engines": {
     "node": ">=20.0.0",
     "bun": ">=1.0.0"
   },
-
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"

@@ -501,6 +501,7 @@ program
   .option('--baseline <file>', 'Load baseline issues JSON to compare')
   .option('--baseline-save <file>', 'Save current issues as baseline JSON')
   .option('--new-only', 'Only report issues not present in baseline')
+  .option('--incremental', 'Only scan files that changed since last run')
   .action(async (files, options) => {
     try {
       // Handle analyzer selection

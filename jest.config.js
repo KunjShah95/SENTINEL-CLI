@@ -7,6 +7,8 @@ export default {
   testMatch: [
     '**/__tests__/**/*.test.js',
     '**/__tests__/**/*.spec.js',
+    'src/**/*.test.js',
+    'src/**/*.spec.js',
   ],
   collectCoverageFrom: [
     'src/**/*.js',

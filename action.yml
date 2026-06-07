@@ -24,6 +24,10 @@ inputs:
   files:
     description: 'Specific files to analyze (space separated)'
     required: false
+  post_pr_comment:
+    description: 'Post a markdown summary comment on the active PR'
+    required: false
+    default: 'true'
 
 runs:
   using: 'composite'
@@ -39,10 +43,16 @@ runs:
 
     - name: Run Sentinel Analysis
       run: |
+        COMMENT_FLAG=""
+        if [ "${{ inputs.post_pr_comment }}" = "true" ]; then
+          COMMENT_FLAG="--pr-comment --github-token ${{ inputs.github_token }}"
+        fi
+
         sentinel analyze \
           --format ${{ inputs.output_format }} \
           --output sentinel-report.sarif \
           --analyzers ${{ inputs.analyzers }} \
+          $COMMENT_FLAG \
           ${{ inputs.files }}
       shell: bash
       env:
