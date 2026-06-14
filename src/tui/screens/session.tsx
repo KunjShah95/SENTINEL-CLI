@@ -138,53 +138,6 @@ export function Session() {
           })();
           return;
         }
-        if (cmd === 'review-branch') {
-          const branch = value.replace(/^\/review-branch\s*/i, '').trim();
-          if (!branch) {
-            toast.error('Usage: /review-branch <branch-name>');
-            return;
-          }
-          const prevMode = mode;
-          setMode('REVIEW' as AgentMode);
-          (async () => {
-            try {
-              const { getGitDiff, getChangedFiles, buildReviewPrompt } = await import('../lib/security-reviewer.js');
-              const diff = getGitDiff({ branch });
-              if (!diff) {
-                toast.info(`No changes detected vs ${branch}.`);
-                setMode(prevMode);
-                return;
-              }
-              const files = getChangedFiles({ branch });
-              submit(buildReviewPrompt(diff, { files, focus: 'all' }));
-            } catch (e) {
-              toast.error('Review failed: ' + String(e));
-              setMode(prevMode);
-            }
-          })();
-          return;
-        }
-        if (cmd === 'review-file') {
-          navigate('/review');
-          return;
-        }
-        if (cmd === 'scan') {
-          const target = value.replace(/^\/scan\s*/i, '').trim() || '.';
-          (async () => {
-            try {
-              const result = await TOOLS.securityAudit.execute({ files: target });
-              appendMessage({
-                role: 'assistant',
-                mode,
-                model,
-                parts: [{ type: 'text', text: result.output || result.error || 'Scan complete.' }],
-              });
-            } catch (e) {
-              toast.error('Scan failed: ' + String(e));
-            }
-          })();
-          return;
-        }
         if (cmd === 'undo') {
           (async () => {
             try {
