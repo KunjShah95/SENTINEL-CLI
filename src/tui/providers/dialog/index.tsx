@@ -1,8 +1,8 @@
-import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
-import { useKeyboardLayer } from '../keyboard-layer';
-import { useTheme } from '../theme';
-import { SentinelBorderChars } from '../../components/border';
-import type { DialogConfig } from './types';
+import React, { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
+import { Box, Text, useInput } from 'ink';
+import { useKeyboardLayer } from '../keyboard-layer/index.js';
+import { useTheme } from '../theme/index.js';
+import type { DialogConfig } from './types.js';
 
 type DialogContextValue = {
   open: (config: DialogConfig) => void;
@@ -14,7 +14,7 @@ const DialogContext = createContext<DialogContextValue | null>(null);
 
 export function DialogProvider({ children }: { children: ReactNode }) {
   const [dialog, setDialog] = useState<DialogConfig | null>(null);
-  const { push, pop, isTopLayer } = useKeyboardLayer();
+  const { push, pop } = useKeyboardLayer();
   const { colors } = useTheme();
 
   const close = useCallback(() => {
@@ -25,59 +25,35 @@ export function DialogProvider({ children }: { children: ReactNode }) {
   const open = useCallback(
     (config: DialogConfig) => {
       setDialog(config);
-      push('dialog', (key: string) => {
-        if (key === 'escape') {
-          close();
-          return true;
-        }
-        return false;
-      });
+      push('dialog');
     },
-    [push, close]
+    [push]
   );
+
+  useInput((input, key) => {
+    if (dialog && key.escape) {
+      close();
+    }
+  });
 
   return (
     <DialogContext.Provider value={{ open, close, isOpen: !!dialog }}>
       {children}
       {dialog ? (
-        <box position="absolute" top={0} left={0} width="100%" height="100%">
-          <box
-            backgroundColor="rgba(0,0,0,150)"
-            width="100%"
-            height="100%"
-            alignItems="center"
-            justifyContent="center"
+        <Box flexDirection="column" paddingX={2} paddingY={1}>
+          <Box
+            flexDirection="column"
+            borderStyle="single"
+            borderColor={colors.dimSeparator}
+            width={dialog.width ?? 60}
+            padding={1}
           >
-            <box
-              flexDirection="column"
-              backgroundColor={colors.dialogSurface}
-              border={SentinelBorderChars as any}
-              borderColor={colors.dimSeparator}
-              width={dialog.width ?? 60}
-              height={dialog.height ?? 30}
-              padding={1}
-            >
-              <box paddingBottom={1}>
-                <text attributes={1}>{dialog.title}</text>
-              </box>
-              {/* Render dialog children safely: wrap plain strings/numbers in <text> */}
-              {(() => {
-                const c: any = dialog.children;
-                if (c == null) return null;
-                if (typeof c === 'string' || typeof c === 'number') return <text>{c}</text>;
-                if (Array.isArray(c))
-                  return c.map((item, i) =>
-                    typeof item === 'string' || typeof item === 'number' ? (
-                      <text key={i}>{item}</text>
-                    ) : (
-                      item
-                    )
-                  );
-                return c;
-              })()}
-            </box>
-          </box>
-        </box>
+            <Box paddingBottom={1}>
+              <Text bold>{dialog.title}</Text>
+            </Box>
+            {dialog.children}
+          </Box>
+        </Box>
       ) : null}
     </DialogContext.Provider>
   );

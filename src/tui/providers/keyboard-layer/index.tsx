@@ -1,15 +1,20 @@
-import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
+import React, { createContext, useContext, useCallback, useState, type ReactNode } from 'react';
 
 type KeyboardResponder = (key: string) => boolean;
 
-type KeyboardLayerContextValue = {
+type KeyboardLayerCtx = {
   push: (id: string, responder?: KeyboardResponder) => void;
   pop: (id: string) => void;
   isTopLayer: (id: string) => boolean;
   setResponder: (id: string, responder: KeyboardResponder) => void;
 };
 
-const KeyboardLayerContext = createContext<KeyboardLayerContextValue | null>(null);
+const KeyboardLayerContext = createContext<KeyboardLayerCtx>({
+  push: () => {},
+  pop: () => {},
+  isTopLayer: () => true,
+  setResponder: () => {},
+});
 
 type Layer = {
   id: string;
@@ -46,8 +51,6 @@ export function KeyboardLayerProvider({ children }: { children: ReactNode }) {
   );
 }
 
-export function useKeyboardLayer(): KeyboardLayerContextValue {
-  const ctx = useContext(KeyboardLayerContext);
-  if (!ctx) throw new Error("useKeyboardLayer must be used within KeyboardLayerProvider");
-  return ctx;
+export function useKeyboardLayer() {
+  return useContext(KeyboardLayerContext);
 }
