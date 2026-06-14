@@ -6,6 +6,7 @@ import { RootLayout } from './layouts/root-layout';
 import { Home } from './screens/home';
 import { Session } from './screens/session';
 import { Dashboard } from './screens/dashboard';
+import { Review } from './screens/review';
 
 const router = createMemoryRouter([
   {
@@ -15,6 +16,7 @@ const router = createMemoryRouter([
       { index: true, element: <Home /> },
       { path: 'session', element: <Session /> },
       { path: 'dashboard', element: <Dashboard /> },
+      { path: 'review', element: <Review /> },
     ],
   },
 ]);

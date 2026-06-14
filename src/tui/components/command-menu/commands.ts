@@ -28,6 +28,13 @@ export const COMMANDS: Command[] = [
     action: nav('/dashboard'),
   },
   {
+    name: 'review',
+    description: 'CodeRabbit-style security review of current git diff',
+    value: '/review',
+    category: 'git',
+    action: nav('/review'),
+  },
+  {
     name: 'help',
     description: 'Show help and available commands',
     value: '/help',

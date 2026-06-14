@@ -5,8 +5,10 @@ import { InputBar } from '../components/input-bar';
 import { StatusBar } from '../components/status-bar';
 import { useTheme } from '../providers/theme';
 import { useNavigate } from 'react-router';
+import { useKeyboard } from '@opentui/react';
+import { SentinelBorderChars } from '../components/border';
 
-type Mode = 'BUILD' | 'PLAN' | 'SCAN' | 'FIX';
+type Mode = 'BUILD' | 'PLAN' | 'REVIEW' | 'SCAN' | 'FIX';
 
 function QuickAction({
   cmdKey,
@@ -30,6 +32,7 @@ function QuickAction({
 }
 
 const QUICK_ACTIONS = [
+  { cmdKey: 'review', label: 'review', description: 'CodeRabbit-style security review of git diff', color: '#DC2626' },
   { cmdKey: 'analyze', label: 'analyze', description: 'Analyze code for issues', color: '#60A5FA' },
   {
     cmdKey: 'full-scan',
@@ -64,6 +67,10 @@ export function Home() {
 
   const handleCommand = useCallback(
     (command: string) => {
+      if (command === '/review') {
+        navigate('/review');
+        return;
+      }
       navigate('/session', { state: { message: command, mode } });
     },
     [navigate, mode]
@@ -71,11 +78,17 @@ export function Home() {
 
   const toggleMode = useCallback(() => {
     setMode(prev => {
-      const modes: Mode[] = ['BUILD', 'PLAN', 'SCAN', 'FIX'];
+      const modes: Mode[] = ['BUILD', 'PLAN', 'REVIEW', 'SCAN', 'FIX'];
       const idx = modes.indexOf(prev);
       return modes[(idx + 1) % modes.length];
     });
   }, []);
+
+  useKeyboard((key) => {
+    if (key.name === 'r' && key.ctrl) {
+      navigate('/review');
+    }
+  });
 
   return (
     <box
@@ -96,10 +109,33 @@ export function Home() {
         </box>
       </box>
 
+      {/* Security Review CTA */}
+      <box flexDirection="column" width="100%" maxWidth={80} paddingX={4} paddingY={1}>
+        <box
+          flexDirection="row"
+          border={SentinelBorderChars as any}
+          borderColor={colors.critical}
+          paddingX={2}
+          paddingY={0}
+          gap={2}
+          alignItems="center"
+        >
+          <text fg={colors.critical} attributes={TextAttributes.BOLD}>
+            {'SECURITY REVIEW'}
+          </text>
+          <text fg={colors.dimSeparator}>{'|'}</text>
+          <text fg={colors.primary}>{'CodeRabbit-style AI code review'}</text>
+          <text fg={colors.dimSeparator}>{'|'}</text>
+          <text fg={colors.warning} attributes={TextAttributes.DIM}>
+            {'Ctrl+R to launch  or  /review'}
+          </text>
+        </box>
+      </box>
+
       <box flexDirection="column" width="100%" maxWidth={80} paddingX={4}>
         <box border={['top']} borderColor={colors.dimSeparator} paddingTop={1} width="100%">
           <text attributes={TextAttributes.DIM}>
-            Type a message or /command to start. Tab to toggle modes. Ctrl+P for command palette.
+            {'Type a message or /command to start. Tab to toggle modes. Ctrl+P for command palette.'}
           </text>
         </box>
       </box>

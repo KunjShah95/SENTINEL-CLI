@@ -116,26 +116,80 @@ export function Session() {
           return;
         }
         if (cmd === 'review') {
+          // Navigate to dedicated review screen if no file argument
+          const arg = value.replace(/^\/review\s*/i, '').trim();
+          if (!arg) {
+            navigate('/review');
+            return;
+          }
+          // /review <file> — review a specific file in session
           const prevMode = mode;
           setMode('REVIEW' as AgentMode);
           (async () => {
             try {
-              const { executeLocalTool } = await import('../../shared/tools/index.js');
-              let diffResult = await executeLocalTool('bash', { command: 'git diff --staged' }, 'BUILD');
-              let diffText = diffResult?.stdout?.trim();
-              if (!diffText) {
-                diffResult = await executeLocalTool('bash', { command: 'git diff HEAD' }, 'BUILD');
-                diffText = diffResult?.stdout?.trim();
-              }
-              if (!diffText) {
-                toast.info('No changes detected. Stage changes with git add first.');
+              const { getGitDiff, buildReviewPrompt } = await import('../lib/security-reviewer.js');
+              const diff = getGitDiff({ file: arg });
+              if (!diff) {
+                toast.info(`No changes detected for ${arg}.`);
                 setMode(prevMode);
                 return;
               }
-              submit(`Review this diff for bugs, security issues, and best practices:\n\n\`\`\`diff\n${diffText}\n\`\`\``);
+              submit(buildReviewPrompt(diff, { files: [arg], focus: 'security' }));
             } catch (e) {
-              toast.error('Failed to get git diff: ' + String(e));
+              toast.error('Review failed: ' + String(e));
               setMode(prevMode);
+            }
+          })();
+          return;
+        }
+        if (cmd === 'review-branch') {
+          const branch = value.replace(/^\/review-branch\s*/i, '').trim();
+          if (!branch) {
+            toast.error('Usage: /review-branch <branch-name>');
+            return;
+          }
+          const prevMode = mode;
+          setMode('REVIEW' as AgentMode);
+          (async () => {
+            try {
+              const { getGitDiff, getChangedFiles, buildReviewPrompt } = await import('../lib/security-reviewer.js');
+              const diff = getGitDiff({ branch });
+              if (!diff) {
+                toast.info(`No changes detected vs ${branch}.`);
+                setMode(prevMode);
+                return;
+              }
+              const files = getChangedFiles({ branch });
+              submit(buildReviewPrompt(diff, { files, focus: 'all' }));
+            } catch (e) {
+              toast.error('Review failed: ' + String(e));
+              setMode(prevMode);
+            }
+          })();
+          return;
+        }
+        if (cmd === 'review-file') {
+          const file = value.replace(/^\/review-file\s*/i, '').trim();
+          if (!file) {
+            toast.error('Usage: /review-file <path>');
+            return;
+          }
+          navigate('/review');
+          return;
+        }
+        if (cmd === 'scan') {
+          const target = value.replace(/^\/scan\s*/i, '').trim() || '.';
+          (async () => {
+            try {
+              const result = await TOOLS.securityAudit.execute({ files: target });
+              appendMessage({
+                role: 'assistant',
+                mode,
+                model,
+                parts: [{ type: 'text', text: result.output || result.error || 'Scan complete.' }],
+              });
+            } catch (e) {
+              toast.error('Scan failed: ' + String(e));
             }
           })();
           return;
@@ -210,7 +264,7 @@ export function Session() {
           return;
         }
         if (cmd === 'help') {
-          toast.info('Commands: /clear /new /wizard /mode /review /undo /background /agents /help');
+          toast.info('Commands: /clear /new /wizard /mode /review [file] /review-branch <branch> /scan [path] /undo /background /agents /help');
           return;
         }
         toast.error('Unknown command. Type /help for commands.');
