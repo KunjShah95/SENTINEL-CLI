@@ -1,157 +1,97 @@
-import { useCallback, useState } from 'react';
-import { TextAttributes } from '@opentui/core';
-import { Header } from '../components/header';
-import { InputBar } from '../components/input-bar';
-import { StatusBar } from '../components/status-bar';
-import { useTheme } from '../providers/theme';
+import React, { useCallback, useState } from 'react';
+import { Box, Text, useInput, useApp } from 'ink';
+import TextInput from 'ink-text-input';
+import { useTheme } from '../providers/theme/index.js';
 import { useNavigate } from 'react-router';
-import { useKeyboard } from '@opentui/react';
-import { SentinelBorderChars } from '../components/border';
 
 type Mode = 'BUILD' | 'PLAN' | 'REVIEW' | 'SCAN' | 'FIX';
 
-function QuickAction({
-  cmdKey,
-  label,
-  description,
-  color,
-}: {
-  cmdKey: string;
-  label: string;
-  description: string;
-  color: string;
-}) {
-  return (
-    <box flexDirection="row" gap={1} paddingY={0.5}>
-      <text fg={color} width={20}>
-        / {cmdKey}
-      </text>
-      <text attributes={TextAttributes.DIM}>{description}</text>
-    </box>
-  );
-}
-
 const QUICK_ACTIONS = [
-  { cmdKey: 'review', label: 'review', description: 'CodeRabbit-style security review of git diff', color: '#DC2626' },
-  { cmdKey: 'analyze', label: 'analyze', description: 'Analyze code for issues', color: '#60A5FA' },
-  {
-    cmdKey: 'full-scan',
-    label: 'full-scan',
-    description: 'Run all available analyzers',
-    color: '#F59E0B',
-  },
-  {
-    cmdKey: 'security',
-    label: 'security',
-    description: 'Comprehensive security audit',
-    color: '#EF4444',
-  },
-  { cmdKey: 'diff', label: 'diff', description: 'Review staged changes', color: '#34D399' },
-  { cmdKey: 'agents', label: 'agents', description: 'Run multi-agent pipeline', color: '#7C3AED' },
-  { cmdKey: 'fix', label: 'fix', description: 'Auto-fix detected issues', color: '#10B981' },
-  { cmdKey: 'status', label: 'status', description: 'Show system status', color: '#88C0D0' },
-  { cmdKey: 'help', label: 'help', description: 'Show available commands', color: '#81A1C1' },
+  { cmdKey: 'review', description: 'CodeRabbit-style security review of git diff', color: '#DC2626' },
+  { cmdKey: 'analyze', description: 'Analyze code for issues', color: '#60A5FA' },
+  { cmdKey: 'full-scan', description: 'Run all available analyzers', color: '#F59E0B' },
+  { cmdKey: 'security', description: 'Comprehensive security audit', color: '#EF4444' },
+  { cmdKey: 'diff', description: 'Review staged changes', color: '#34D399' },
+  { cmdKey: 'agents', description: 'Run multi-agent pipeline', color: '#7C3AED' },
+  { cmdKey: 'fix', description: 'Auto-fix detected issues', color: '#10B981' },
+  { cmdKey: 'status', description: 'Show system status', color: '#88C0D0' },
+  { cmdKey: 'help', description: 'Show available commands', color: '#81A1C1' },
 ];
 
 export function Home() {
   const navigate = useNavigate();
   const [mode, setMode] = useState<Mode>('BUILD');
+  const [inputValue, setInputValue] = useState('');
   const { colors } = useTheme();
+  const { exit } = useApp();
 
-  const handleSubmit = useCallback(
-    (value: string) => {
-      navigate('/session', { state: { message: value, mode } });
-    },
-    [navigate, mode]
-  );
+  const handleSubmit = useCallback((value: string) => {
+    if (!value.trim()) return;
+    const lower = value.toLowerCase().trim();
+    if (lower === '/review' || lower === 'review') { navigate('/review'); return; }
+    if (lower === '/dashboard' || lower === 'dashboard') { navigate('/dashboard'); return; }
+    navigate('/session', { state: { message: value, mode } });
+    setInputValue('');
+  }, [navigate, mode]);
 
-  const handleCommand = useCallback(
-    (command: string) => {
-      if (command === '/review') {
-        navigate('/review');
-        return;
-      }
-      navigate('/session', { state: { message: command, mode } });
-    },
-    [navigate, mode]
-  );
-
-  const toggleMode = useCallback(() => {
-    setMode(prev => {
-      const modes: Mode[] = ['BUILD', 'PLAN', 'REVIEW', 'SCAN', 'FIX'];
-      const idx = modes.indexOf(prev);
-      return modes[(idx + 1) % modes.length];
-    });
-  }, []);
-
-  useKeyboard((key) => {
-    if (key.name === 'r' && key.ctrl) {
-      navigate('/review');
+  useInput((input, key) => {
+    if (key.ctrl && input === 'r') { navigate('/review'); return; }
+    if (key.ctrl && input === 'c') { exit(); return; }
+    if (key.tab) {
+      setMode(prev => {
+        const modes: Mode[] = ['BUILD', 'PLAN', 'REVIEW', 'SCAN', 'FIX'];
+        return modes[(modes.indexOf(prev) + 1) % modes.length];
+      });
     }
   });
 
+  const modeColor = mode === 'REVIEW' ? colors.critical
+    : mode === 'PLAN' ? colors.planMode
+    : mode === 'SCAN' ? colors.warning
+    : mode === 'FIX' ? colors.error
+    : colors.primary;
+
   return (
-    <box
-      flexDirection="column"
-      width="100%"
-      height="100%"
-      alignItems="center"
-      justifyContent="center"
-      paddingX={4}
-    >
-      <Header />
+    <Box flexDirection="column" padding={2}>
+      <Box justifyContent="center" marginBottom={1}>
+        <Text bold color={colors.primary}>{'SENTINEL  '}</Text>
+        <Text dimColor>{'AI-Powered Security Code Guardian'}</Text>
+      </Box>
 
-      <box paddingY={2} paddingX={4} width="100%" maxWidth={80}>
-        <box flexDirection="column" gap={0}>
-          {QUICK_ACTIONS.map(action => (
-            <QuickAction key={action.cmdKey} {...action} />
-          ))}
-        </box>
-      </box>
+      <Box borderStyle="round" borderColor={colors.critical} paddingX={2} marginBottom={1}>
+        <Text bold color={colors.critical}>{'🔴 SECURITY REVIEW  '}</Text>
+        <Text color={colors.primary}>{'CodeRabbit-style AI review  '}</Text>
+        <Text dimColor>{'Ctrl+R  /review'}</Text>
+      </Box>
 
-      {/* Security Review CTA */}
-      <box flexDirection="column" width="100%" maxWidth={80} paddingX={4} paddingY={1}>
-        <box
-          flexDirection="row"
-          border={SentinelBorderChars as any}
-          borderColor={colors.critical}
-          paddingX={2}
-          paddingY={0}
-          gap={2}
-          alignItems="center"
-        >
-          <text fg={colors.critical} attributes={TextAttributes.BOLD}>
-            {'SECURITY REVIEW'}
-          </text>
-          <text fg={colors.dimSeparator}>{'|'}</text>
-          <text fg={colors.primary}>{'CodeRabbit-style AI code review'}</text>
-          <text fg={colors.dimSeparator}>{'|'}</text>
-          <text fg={colors.warning} attributes={TextAttributes.DIM}>
-            {'Ctrl+R to launch  or  /review'}
-          </text>
-        </box>
-      </box>
+      <Box flexDirection="column" marginBottom={1}>
+        {QUICK_ACTIONS.map(a => (
+          <Box key={a.cmdKey} flexDirection="row" gap={1}>
+            <Text color={a.color}>{`/${a.cmdKey.padEnd(12)}`}</Text>
+            <Text dimColor>{a.description}</Text>
+          </Box>
+        ))}
+      </Box>
 
-      <box flexDirection="column" width="100%" maxWidth={80} paddingX={4}>
-        <box border={['top']} borderColor={colors.dimSeparator} paddingTop={1} width="100%">
-          <text attributes={TextAttributes.DIM}>
-            {'Type a message or /command to start. Tab to toggle modes. Ctrl+P for command palette.'}
-          </text>
-        </box>
-      </box>
+      <Box marginBottom={1}>
+        <Text dimColor>{'Mode: '}</Text>
+        <Text bold color={modeColor}>{mode}</Text>
+        <Text dimColor>{'  Tab to cycle  Ctrl+R: security review'}</Text>
+      </Box>
 
-      <box width="100%" maxWidth={80} paddingX={4} paddingTop={1}>
-        <InputBar
+      <Box borderStyle="single" borderColor={modeColor} paddingX={1}>
+        <Text color={modeColor}>{`[${mode}] `}</Text>
+        <TextInput
+          value={inputValue}
+          onChange={setInputValue}
           onSubmit={handleSubmit}
-          onCommand={handleCommand}
-          mode={mode}
-          onModeToggle={toggleMode}
+          placeholder="Type a message or /command..."
         />
-      </box>
+      </Box>
 
-      <box width="100%" maxWidth={80} paddingX={4} paddingTop={1}>
-        <StatusBar mode={mode} />
-      </box>
-    </box>
+      <Box marginTop={1}>
+        <Text dimColor>{'Ctrl+P: commands  Tab: mode  Ctrl+R: review  Ctrl+C: exit'}</Text>
+      </Box>
+    </Box>
   );
 }

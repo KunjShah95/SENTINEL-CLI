@@ -1,8 +1,9 @@
-import { useCallback, useState } from 'react';
-import { TextAttributes } from '@opentui/core';
-import { useTheme } from '../../providers/theme';
-import { DialogSearchList } from '../dialog-search-list';
-import { useDialog } from '../../providers/dialog';
+import React, { useCallback, useState } from 'react';
+import { Box, Text } from 'ink';
+import TextInput from 'ink-text-input';
+import { useTheme } from '../../providers/theme/index.js';
+import { DialogSearchList } from '../dialog-search-list.js';
+import { useDialog } from '../../providers/dialog/index.js';
 
 const TARGETS = [
   { id: '.', label: 'Current directory', description: 'Scan entire project' },
@@ -29,106 +30,96 @@ export function MultiStepAnalyzeDialog({ onRun }: Props) {
   const [step, setStep] = useState<'target' | 'input' | 'confirm'>('target');
   const [target, setTarget] = useState('.');
   const [analyzersInput, setAnalyzersInput] = useState('security, quality, bugs');
-  const [customPath, setCustomPath] = useState('');
 
   const handleTargetSelect = useCallback((item: (typeof TARGETS)[0]) => {
     setTarget(item.id);
     setStep('input');
   }, []);
 
-  const handleAnalyzersSubmit = useCallback(
-    (value: unknown) => {
-      const raw = String(value || analyzersInput);
-      const selected = raw
-        .split(',')
-        .map(s => s.trim())
-        .filter(Boolean);
-      if (selected.length > 0) {
-        setAnalyzersInput(raw);
-        setStep('confirm');
-      }
-    },
-    [analyzersInput]
-  );
+  const handleAnalyzersSubmit = useCallback((value: string) => {
+    const selected = value.split(',').map(s => s.trim()).filter(Boolean);
+    if (selected.length > 0) {
+      setAnalyzersInput(value);
+      setStep('confirm');
+    }
+  }, []);
 
-  const handleConfirm = useCallback(() => {
-    const selected = analyzersInput
-      .split(',')
-      .map(s => s.trim())
-      .filter(Boolean);
-    onRun(customPath || target, selected.length > 0 ? selected : ['security', 'quality', 'bugs']);
+  const handleConfirm = useCallback((value: string) => {
+    const selected = analyzersInput.split(',').map(s => s.trim()).filter(Boolean);
+    onRun(target, selected.length > 0 ? selected : ['security', 'quality', 'bugs']);
     close();
-  }, [target, analyzersInput, customPath, onRun, close]);
+  }, [target, analyzersInput, onRun, close]);
 
   if (step === 'target') {
     return (
-      <box flexDirection="column" gap={1}>
-        <text attributes={1}>Step 1: Select Target</text>
-        <text attributes={TextAttributes.DIM}>What files do you want to analyze?</text>
+      <Box flexDirection="column" gap={1}>
+        <Text bold>{'Step 1: Select Target'}</Text>
+        <Text dimColor>{'What files do you want to analyze?'}</Text>
         <DialogSearchList
           items={TARGETS}
           onSelect={handleTargetSelect}
           filterFn={(item, q) => item.label.toLowerCase().includes(q.toLowerCase())}
           renderItem={(item, isSelected) => (
-            <box flexDirection="row" gap={1}>
-              <text fg={isSelected ? colors.selection : undefined} attributes={isSelected ? 1 : 0}>
+            <Box flexDirection="row" gap={1}>
+              <Text bold={isSelected} color={isSelected ? colors.selection : undefined}>
                 {item.label}
-              </text>
-              <text attributes={2}>{item.description}</text>
-            </box>
+              </Text>
+              <Text dimColor>{item.description}</Text>
+            </Box>
           )}
           getKey={item => item.id}
           placeholder="Search targets..."
           emptyText="No matching targets"
         />
-        <box flexDirection="row" gap={1} paddingTop={1}>
-          <text attributes={TextAttributes.DIM}>Press Enter to select, Esc to cancel</text>
-        </box>
-      </box>
+        <Text dimColor>{'Press Enter to select, Esc to cancel'}</Text>
+      </Box>
     );
   }
 
   if (step === 'input') {
     return (
-      <box flexDirection="column" gap={1}>
-        <text attributes={1}>Step 2: Select Analyzers</text>
-        <text attributes={TextAttributes.DIM}>
-          Enter comma-separated analyzer names (or press Enter for defaults):
-        </text>
-        <box flexDirection="column" gap={0.5} paddingY={1}>
+      <Box flexDirection="column" gap={1}>
+        <Text bold>{'Step 2: Select Analyzers'}</Text>
+        <Text dimColor>{'Enter comma-separated analyzer names:'}</Text>
+        <Box flexDirection="column" gap={0}>
           {ANALYZERS.map(a => (
-            <box key={a.id} flexDirection="row" gap={1}>
-              <text fg={colors.primary}>{'\u25CF'}</text>
-              <text attributes={1}>{a.label}</text>
-              <text attributes={TextAttributes.DIM}>{a.description}</text>
-            </box>
+            <Box key={a.id} flexDirection="row" gap={1}>
+              <Text color={colors.primary}>{'●'}</Text>
+              <Text bold>{a.label}</Text>
+              <Text dimColor>{a.description}</Text>
+            </Box>
           ))}
-        </box>
-        <input
-          placeholder="security, quality, bugs"
-          focused
-          onInput={v => setAnalyzersInput(String(v))}
-          onSubmit={handleAnalyzersSubmit}
-        />
-        <text attributes={TextAttributes.DIM}>Default: security, quality, bugs</text>
-      </box>
+        </Box>
+        <Box borderStyle="single" borderColor={colors.primary} paddingX={1}>
+          <TextInput
+            value={analyzersInput}
+            onChange={setAnalyzersInput}
+            onSubmit={handleAnalyzersSubmit}
+            placeholder="security, quality, bugs"
+            focus
+          />
+        </Box>
+        <Text dimColor>{'Default: security, quality, bugs'}</Text>
+      </Box>
     );
   }
 
   return (
-    <box flexDirection="column" gap={1}>
-      <text attributes={1}>Step 3: Confirm & Run</text>
-      <box flexDirection="column" gap={0.5} paddingY={1}>
-        <box flexDirection="row" gap={1}>
-          <text attributes={1}>Target:</text>
-          <text>{customPath || target}</text>
-        </box>
-        <box flexDirection="row" gap={1}>
-          <text attributes={1}>Analyzers:</text>
-          <text>{analyzersInput}</text>
-        </box>
-      </box>
-      <input placeholder="Press Enter to run, Esc to cancel" focused onSubmit={handleConfirm} />
-    </box>
+    <Box flexDirection="column" gap={1}>
+      <Text bold>{'Step 3: Confirm & Run'}</Text>
+      <Box flexDirection="column" gap={0}>
+        <Box flexDirection="row" gap={1}>
+          <Text bold>{'Target:'}</Text>
+          <Text>{target}</Text>
+        </Box>
+        <Box flexDirection="row" gap={1}>
+          <Text bold>{'Analyzers:'}</Text>
+          <Text>{analyzersInput}</Text>
+        </Box>
+      </Box>
+      <Box borderStyle="single" borderColor={colors.success} paddingX={1}>
+        <TextInput value="" onChange={() => {}} onSubmit={handleConfirm} placeholder="Press Enter to run, Esc to cancel" focus />
+      </Box>
+    </Box>
   );
 }

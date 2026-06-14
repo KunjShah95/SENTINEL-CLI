@@ -1,23 +1,18 @@
-import { TextAttributes } from "@opentui/core";
-import { useTheme } from "../../providers/theme";
-import { EmptyBorder } from "../border";
+import React from 'react';
+import { Box, Text } from 'ink';
+import { useTheme } from '../../providers/theme/index.js';
 
 type Props = { message: string };
 
 export function ErrorMessage({ message }: Props) {
   const { colors } = useTheme();
   return (
-    <box width="100%" alignItems="center">
-      <box
-        border={["left"]}
-        borderColor={colors.error}
-        width="100%"
-        customBorderChars={{ ...EmptyBorder, vertical: "\u2503", bottomLeft: "\u2579" }}
-      >
-        <box justifyContent="center" paddingX={2} paddingY={1} backgroundColor={colors.surface} width="100%">
-          <text attributes={TextAttributes.DIM}>{message}</text>
-        </box>
-      </box>
-    </box>
+    <Box width="100%" paddingY={1} paddingX={1}>
+      <Box borderStyle="single" borderColor={colors.error} paddingX={2} paddingY={1} width="100%">
+        <Text color={colors.error} dimColor>
+          {`Error: ${message}`}
+        </Text>
+      </Box>
+    </Box>
   );
 }
