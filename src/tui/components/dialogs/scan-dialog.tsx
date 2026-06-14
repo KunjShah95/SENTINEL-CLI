@@ -1,12 +1,13 @@
-import { useCallback } from "react";
-import { DialogSearchList } from "../dialog-search-list";
-import { useTheme } from "../../providers/theme";
+import React, { useCallback } from 'react';
+import { Box, Text } from 'ink';
+import { DialogSearchList } from '../dialog-search-list.js';
+import { useTheme } from '../../providers/theme/index.js';
 
 const SCAN_TARGETS = [
-  { id: ".", label: "Current directory", description: "Scan entire project" },
-  { id: "src", label: "Source code", description: "Scan src/ directory" },
-  { id: "diff", label: "Staged changes", description: "Scan git diff only" },
-  { id: "custom", label: "Custom path", description: "Specify a path to scan" },
+  { id: '.', label: 'Current directory', description: 'Scan entire project' },
+  { id: 'src', label: 'Source code', description: 'Scan src/ directory' },
+  { id: 'diff', label: 'Staged changes', description: 'Scan git diff only' },
+  { id: 'custom', label: 'Custom path', description: 'Specify a path to scan' },
 ];
 
 type Props = {
@@ -31,12 +32,12 @@ export function ScanDialogContent({ onSelect }: Props) {
         item.label.toLowerCase().includes(query.toLowerCase())
       }
       renderItem={(item, isSelected) => (
-        <box flexDirection="row" gap={1}>
-          <text fg={isSelected ? colors.selection : undefined} attributes={isSelected ? 1 : 0}>
+        <Box flexDirection="row" gap={1}>
+          <Text color={isSelected ? colors.selection : undefined} bold={isSelected}>
             {item.label}
-          </text>
-          <text attributes={2}>{item.description}</text>
-        </box>
+          </Text>
+          <Text dimColor>{item.description}</Text>
+        </Box>
       )}
       getKey={(item) => item.id}
       placeholder="Select scan target..."

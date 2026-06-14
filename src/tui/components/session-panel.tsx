@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { TextAttributes } from '@opentui/core';
-import { useKeyboard } from '@opentui/react';
-import { Sessions } from '../lib/api-client';
-import { useTheme } from '../providers/theme';
-import { useKeyboardLayer } from '../providers/keyboard-layer';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Box, Text, useInput } from 'ink';
+import { Sessions } from '../lib/api-client.js';
+import { useTheme } from '../providers/theme/index.js';
+import { useKeyboardLayer } from '../providers/keyboard-layer/index.js';
 
 type SessionPanelProps = {
   currentSessionId?: string;
@@ -40,7 +39,7 @@ function relativeDate(dateStr: string): string {
 
 function truncate(str: string, max: number): string {
   if (str.length <= max) return str;
-  return str.slice(0, max - 1) + '\u2026';
+  return str.slice(0, max - 1) + '…';
 }
 
 function getModeColor(mode: string, colors: Record<string, string>): string {
@@ -52,20 +51,6 @@ function getModeColor(mode: string, colors: Record<string, string>): string {
     default: return colors.dimSeparator;
   }
 }
-
-const EmptyBorder = {
-  topLeft: '',
-  bottomLeft: '',
-  vertical: '',
-  topRight: '',
-  bottomRight: '',
-  horizontal: ' ',
-  bottomT: '',
-  topT: '',
-  cross: '',
-  leftT: '',
-  rightT: '',
-};
 
 export function SessionPanel({
   currentSessionId,
@@ -120,23 +105,23 @@ export function SessionPanel({
     }
   }, [loadSessions, onDelete]);
 
-  useKeyboard((key) => {
+  useInput((input, key) => {
     if (!isTopLayer(PANEL_LAYER_ID)) return;
-    if (key.name === 'escape') {
+    if (key.escape) {
       pop(PANEL_LAYER_ID);
       layerPushed.current = false;
       onClose();
       return;
     }
-    if (key.name === 'up') {
+    if (key.upArrow) {
       setSelectedIndex((prev) => Math.max(0, prev - 1));
       return;
     }
-    if (key.name === 'down') {
+    if (key.downArrow) {
       setSelectedIndex((prev) => Math.min(sessions.length - 1, prev + 1));
       return;
     }
-    if (key.name === 'return' || key.name === 'enter') {
+    if (key.return) {
       const session = sessions[selectedIndex];
       if (session) {
         pop(PANEL_LAYER_ID);
@@ -145,12 +130,12 @@ export function SessionPanel({
       }
       return;
     }
-    if (key.name === 'd') {
+    if (input === 'd') {
       const session = sessions[selectedIndex];
       if (session) handleDelete(session.id);
       return;
     }
-    if (key.name === 'f') {
+    if (input === 'f') {
       const session = sessions[selectedIndex];
       if (session) {
         pop(PANEL_LAYER_ID);
@@ -159,7 +144,7 @@ export function SessionPanel({
       }
       return;
     }
-    if (key.name === 'n') {
+    if (input === 'n') {
       pop(PANEL_LAYER_ID);
       layerPushed.current = false;
       onClose();
@@ -168,73 +153,60 @@ export function SessionPanel({
   });
 
   return (
-    <box
+    <Box
       flexDirection="column"
       width={28}
-      height="100%"
-      border={['left']}
+      borderStyle="single"
       borderColor={colors.dimSeparator}
-      customBorderChars={{ ...EmptyBorder, vertical: '\u2503', bottomLeft: '\u2579', topLeft: '\u257A' }}
     >
-      <box paddingX={1} paddingY={1} backgroundColor={colors.surface}>
-        <text fg={colors.primary} attributes={TextAttributes.BOLD}>Sessions</text>
-      </box>
+      <Box paddingX={1} paddingY={1}>
+        <Text bold color={colors.primary}>{'Sessions'}</Text>
+      </Box>
 
-      <scrollbox flexGrow={1} width="100%">
+      <Box flexGrow={1} flexDirection="column" width="100%">
         {loading ? (
-          <box paddingX={1} paddingY={1}>
-            <text attributes={TextAttributes.DIM} fg={colors.dimSeparator}>Loading...</text>
-          </box>
+          <Box paddingX={1} paddingY={1}>
+            <Text dimColor color={colors.dimSeparator}>{'Loading...'}</Text>
+          </Box>
         ) : sessions.length === 0 ? (
-          <box paddingX={1} paddingY={1}>
-            <text attributes={TextAttributes.DIM} fg={colors.dimSeparator}>No sessions yet</text>
-          </box>
+          <Box paddingX={1} paddingY={1}>
+            <Text dimColor color={colors.dimSeparator}>{'No sessions yet'}</Text>
+          </Box>
         ) : (
           sessions.map((session, i) => {
             const isSelected = i === selectedIndex;
             const isActive = session.id === currentSessionId;
             return (
-              <box
+              <Box
                 key={session.id}
                 flexDirection="column"
                 paddingX={1}
-                paddingY={0}
               >
-                <box flexDirection="row" gap={1}>
-                  <text
-                    fg={isActive ? colors.primary : (isSelected ? colors.selection : undefined)}
-                    attributes={isActive ? TextAttributes.BOLD : (isSelected ? TextAttributes.BOLD : undefined)}
+                <Box flexDirection="row" gap={1}>
+                  <Text
+                    color={isActive ? colors.primary : (isSelected ? colors.selection : undefined)}
+                    bold={isActive || isSelected}
                   >
-                    {isSelected ? '> ' : '  '}
-                    {truncate(session.title, 24)}
-                  </text>
-                </box>
-                <box flexDirection="row" gap={1}>
-                  <text fg={getModeColor(session.mode, colors)} attributes={TextAttributes.DIM}>
-                    {session.mode}
-                  </text>
-                  <text attributes={TextAttributes.DIM} fg={colors.dimSeparator}>
-                    {relativeDate(session.createdAt)}
-                  </text>
-                </box>
-              </box>
+                    {`${isSelected ? '> ' : '  '}${truncate(session.title, 24)}`}
+                  </Text>
+                </Box>
+                <Box flexDirection="row" gap={1}>
+                  <Text dimColor color={getModeColor(session.mode, colors)}>{session.mode}</Text>
+                  <Text dimColor color={colors.dimSeparator}>{relativeDate(session.createdAt)}</Text>
+                </Box>
+              </Box>
             );
           })
         )}
-      </scrollbox>
+      </Box>
 
-      <box
-        paddingX={1}
-        paddingY={1}
-      >
-        <text fg={colors.primary}>+ New Session</text>
-      </box>
+      <Box paddingX={1} paddingY={1}>
+        <Text color={colors.primary}>{'+ New Session'}</Text>
+      </Box>
 
-      <box paddingX={1} paddingBottom={1}>
-        <text attributes={TextAttributes.DIM} fg={colors.dimSeparator}>
-          {'\u2191\u2193'} navigate | Enter select | f fork | d del | n new
-        </text>
-      </box>
-    </box>
+      <Box paddingX={1}>
+        <Text dimColor color={colors.dimSeparator}>{'↑↓ navigate | Enter select | f fork | d del | n new'}</Text>
+      </Box>
+    </Box>
   );
 }

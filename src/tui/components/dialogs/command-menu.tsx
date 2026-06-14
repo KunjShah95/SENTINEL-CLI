@@ -1,18 +1,17 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useKeyboard } from "@opentui/react";
-import { TextAttributes } from "@opentui/core";
-import type { InputRenderable } from "@opentui/core";
-import { useKeyboardLayer } from "../../providers/keyboard-layer";
-import { useTheme } from "../../providers/theme";
-import { useDialog } from "../../providers/dialog";
-import { useToast } from "../../providers/toast";
-import { usePromptConfig } from "../../providers/prompt-config";
-import { Auth } from "../../lib/api-client";
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Box, Text, useInput } from 'ink';
+import TextInput from 'ink-text-input';
+import { useKeyboardLayer } from '../../providers/keyboard-layer/index.js';
+import { useTheme } from '../../providers/theme/index.js';
+import { useDialog } from '../../providers/dialog/index.js';
+import { useToast } from '../../providers/toast/index.js';
+import { usePromptConfig } from '../../providers/prompt-config/index.js';
+import { Auth } from '../../lib/api-client.js';
 
 const MAX_VISIBLE = 9;
-const UPGRADE_URL = "https://sentinel.dev/billing";
+const UPGRADE_URL = 'https://sentinel.dev/billing';
 
-export const COMMAND_MENU_CLEAR_EVENT = "sentinel:chat:clear";
+export const COMMAND_MENU_CLEAR_EVENT = 'sentinel:chat:clear';
 
 type CommandEntry = {
   name: string;
@@ -21,14 +20,14 @@ type CommandEntry = {
 };
 
 const COMMANDS: CommandEntry[] = [
-  { name: "/help", description: "Show available commands" },
-  { name: "/clear", description: "Clear the current chat history" },
-  { name: "/mode", description: "Toggle between BUILD and PLAN mode" },
-  { name: "/model", description: "Switch to a different model", usage: "/model <name>" },
-  { name: "/login", description: "Sign in to Sentinel" },
-  { name: "/logout", description: "Sign out" },
-  { name: "/upgrade", description: "Open billing page to upgrade" },
-  { name: "/status", description: "Show session, mode, and model" },
+  { name: '/help', description: 'Show available commands' },
+  { name: '/clear', description: 'Clear the current chat history' },
+  { name: '/mode', description: 'Toggle between BUILD and PLAN mode' },
+  { name: '/model', description: 'Switch to a different model', usage: '/model <name>' },
+  { name: '/login', description: 'Sign in to Sentinel' },
+  { name: '/logout', description: 'Sign out' },
+  { name: '/upgrade', description: 'Open billing page to upgrade' },
+  { name: '/status', description: 'Show session, mode, and model' },
 ];
 
 type Props = {
@@ -37,9 +36,8 @@ type Props = {
 };
 
 export function CommandMenu({ onClear, sessionId }: Props) {
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const inputRef = useRef<InputRenderable>(null);
   const { isTopLayer, push, pop } = useKeyboardLayer();
   const { colors } = useTheme();
   const { close } = useDialog();
@@ -47,20 +45,20 @@ export function CommandMenu({ onClear, sessionId }: Props) {
   const { mode, model, toggleMode, setModel, availableModels } = usePromptConfig();
 
   useEffect(() => {
-    push("command-menu");
-    return () => pop("command-menu");
+    push('command-menu');
+    return () => pop('command-menu');
   }, [push, pop]);
 
   const { entries, isModelSubMenu } = useMemo(() => {
     const trimmed = query.trim();
-    if (trimmed === "/model" || trimmed.startsWith("/model ")) {
-      const prefix = trimmed.length > 6 ? trimmed.slice(7).trim().toLowerCase() : "";
+    if (trimmed === '/model' || trimmed.startsWith('/model ')) {
+      const prefix = trimmed.length > 6 ? trimmed.slice(7).trim().toLowerCase() : '';
       const matches = availableModels
         .filter((m) => {
           if (prefix.length === 0) return true;
           return (
             m.id.toLowerCase().includes(prefix) ||
-            (m.label || "").toLowerCase().includes(prefix)
+            (m.label || '').toLowerCase().includes(prefix)
           );
         })
         .map<CommandEntry>((m) => ({
@@ -69,7 +67,7 @@ export function CommandMenu({ onClear, sessionId }: Props) {
         }));
       return { entries: matches, isModelSubMenu: true };
     }
-    const needle = trimmed.replace(/^\//, "").toLowerCase();
+    const needle = trimmed.replace(/^\//, '').toLowerCase();
     const filtered =
       needle.length === 0
         ? COMMANDS
@@ -84,13 +82,6 @@ export function CommandMenu({ onClear, sessionId }: Props) {
   const setInputValue = useCallback((next: string) => {
     setQuery(next);
     setSelectedIndex(0);
-    if (inputRef.current) {
-      try {
-        inputRef.current.value = next;
-      } catch {
-        // ignore — uncontrolled input fallback
-      }
-    }
   }, []);
 
   const fireClear = useCallback(() => {
@@ -100,7 +91,7 @@ export function CommandMenu({ onClear, sessionId }: Props) {
     }
     try {
       const g: any = globalThis as any;
-      if (typeof g.dispatchEvent === "function" && typeof g.Event === "function") {
+      if (typeof g.dispatchEvent === 'function' && typeof g.Event === 'function') {
         g.dispatchEvent(new g.Event(COMMAND_MENU_CLEAR_EVENT));
       }
     } catch {
@@ -112,7 +103,7 @@ export function CommandMenu({ onClear, sessionId }: Props) {
     async (entry: CommandEntry) => {
       const fullName = entry.name;
 
-      if (fullName.startsWith("/model ")) {
+      if (fullName.startsWith('/model ')) {
         const id = fullName.slice(7).trim();
         if (id.length > 0) {
           setModel(id);
@@ -123,39 +114,39 @@ export function CommandMenu({ onClear, sessionId }: Props) {
       }
 
       switch (fullName) {
-        case "/help": {
-          setInputValue("");
+        case '/help': {
+          setInputValue('');
           return;
         }
-        case "/clear": {
+        case '/clear': {
           fireClear();
-          toast.success("Chat cleared");
+          toast.success('Chat cleared');
           break;
         }
-        case "/mode": {
-          const next = mode === "BUILD" ? "PLAN" : "BUILD";
+        case '/mode': {
+          const next = mode === 'BUILD' ? 'PLAN' : 'BUILD';
           toggleMode();
           toast.info(`Mode: ${next}`);
           break;
         }
-        case "/model": {
-          setInputValue("/model ");
+        case '/model': {
+          setInputValue('/model ');
           return;
         }
-        case "/login": {
+        case '/login': {
           try {
             const res = await Auth.devLogin();
-            const { saveAuth } = await import("../../../server/api/client.js");
+            const { saveAuth } = await import('../../../server/api/client.js');
             saveAuth({ token: res.token, userId: res.userId });
             toast.success(`Signed in as ${res.userId}`);
           } catch (e: any) {
-            toast.error(e?.message || "Login failed");
+            toast.error(e?.message || 'Login failed');
           }
           break;
         }
-        case "/logout": {
+        case '/logout': {
           try {
-            const { getAuth, clearAuth } = await import("../../../server/api/client.js");
+            const { getAuth, clearAuth } = await import('../../../server/api/client.js');
             const auth = getAuth?.();
             if (auth?.token) {
               try {
@@ -165,18 +156,18 @@ export function CommandMenu({ onClear, sessionId }: Props) {
               }
             }
             clearAuth?.();
-            toast.success("Signed out");
+            toast.success('Signed out');
           } catch (e: any) {
-            toast.error(e?.message || "Logout failed");
+            toast.error(e?.message || 'Logout failed');
           }
           break;
         }
-        case "/upgrade": {
+        case '/upgrade': {
           toast.info(`Upgrade: ${UPGRADE_URL}`);
           break;
         }
-        case "/status": {
-          const sid = sessionId ? sessionId.slice(0, 8) : "none";
+        case '/status': {
+          const sid = sessionId ? sessionId.slice(0, 8) : 'none';
           toast.info(`session=${sid} mode=${String(mode)} model=${model}`);
           break;
         }
@@ -195,84 +186,82 @@ export function CommandMenu({ onClear, sessionId }: Props) {
     setSelectedIndex(0);
   }, []);
 
-  const handleSubmit = useCallback(() => {
-    const entry = entries[selectedIndex];
-    if (entry) runCommand(entry);
-  }, [entries, selectedIndex, runCommand]);
+  const handleSubmit = useCallback(
+    (_value: string) => {
+      const entry = entries[selectedIndex];
+      if (entry) runCommand(entry);
+    },
+    [entries, selectedIndex, runCommand]
+  );
 
-  useKeyboard((key) => {
-    if (!isTopLayer("command-menu")) return;
-    if (key.name === "up") {
+  useInput((input, key) => {
+    if (!isTopLayer('command-menu')) return;
+    if (key.upArrow) {
       setSelectedIndex((p) => Math.max(0, p - 1));
       return;
     }
-    if (key.name === "down") {
+    if (key.downArrow) {
       setSelectedIndex((p) => Math.min(Math.max(entries.length - 1, 0), p + 1));
       return;
     }
-    if (key.name === "escape") {
+    if (key.escape) {
       close();
       return;
     }
-    if (!key.ctrl && !key.meta && key.number) {
-      const n = Number(key.name);
+    if (!key.ctrl && !key.meta) {
+      const n = parseInt(input, 10);
       if (Number.isInteger(n) && n >= 1 && n <= 9 && entries[n - 1]) {
         runCommand(entries[n - 1]);
       }
     }
   });
 
-  const visibleHeight = Math.min(Math.max(entries.length, 1), MAX_VISIBLE);
+  const visibleItems = entries.slice(0, MAX_VISIBLE);
   const nameWidth = isModelSubMenu ? 32 : 18;
 
   return (
-    <box flexDirection="column" gap={1}>
-      <input
-        ref={inputRef}
-        placeholder={isModelSubMenu ? "Filter models..." : "Type a command..."}
-        focused
-        onInput={handleChange}
+    <Box flexDirection="column" gap={1}>
+      <TextInput
+        value={query}
+        onChange={handleChange}
         onSubmit={handleSubmit}
+        placeholder={isModelSubMenu ? 'Filter models...' : 'Type a command...'}
       />
       {entries.length === 0 ? (
-        <text attributes={TextAttributes.DIM}>
-          {isModelSubMenu ? "No matching models" : "No matching commands"}
-        </text>
+        <Text dimColor>
+          {isModelSubMenu ? 'No matching models' : 'No matching commands'}
+        </Text>
       ) : (
-        <scrollbox height={visibleHeight}>
-          {entries.map((entry, i) => {
+        <Box flexDirection="column">
+          {visibleItems.map((entry, i) => {
             const isSelected = i === selectedIndex;
-            const numberHint = i < 9 ? String(i + 1) : " ";
+            const numberHint = i < 9 ? String(i + 1) : ' ';
             return (
-              <box
+              <Box
                 key={entry.name}
                 flexDirection="row"
                 gap={1}
-                backgroundColor={isSelected ? colors.selection + "40" : undefined}
                 paddingX={1}
               >
-                <text fg={colors.dimSeparator} width={2}>
-                  {numberHint}
-                </text>
-                <text
-                  fg={isSelected ? colors.selection : colors.primary}
-                  width={nameWidth}
-                  attributes={isSelected ? TextAttributes.BOLD : 0}
+                <Text dimColor color={colors.dimSeparator}>{numberHint}</Text>
+                <Text
+                  color={isSelected ? colors.selection : colors.primary}
+                  bold={isSelected}
                 >
                   {entry.usage || entry.name}
-                </text>
-                <text attributes={TextAttributes.DIM}>{entry.description}</text>
-              </box>
+                </Text>
+                <Text dimColor>{entry.description}</Text>
+              </Box>
             );
           })}
-        </scrollbox>
+        </Box>
       )}
-      <box flexDirection="row" gap={2}>
-        <text attributes={TextAttributes.DIM}>{"\u2191\u2193 select"}</text>
-        <text attributes={TextAttributes.DIM}>enter run</text>
-        <text attributes={TextAttributes.DIM}>1-9 jump</text>
-        <text attributes={TextAttributes.DIM}>esc close</text>
-      </box>
-    </box>
+      <Box flexDirection="row" gap={2}>
+        <Text dimColor>{'↑↓ select'}</Text>
+        <Text dimColor>{'enter run'}</Text>
+        <Text dimColor>{'1-9 jump'}</Text>
+        <Text dimColor>{'esc close'}</Text>
+      </Box>
+    </Box>
   );
 }

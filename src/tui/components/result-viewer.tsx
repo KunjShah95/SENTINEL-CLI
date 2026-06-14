@@ -1,5 +1,6 @@
-import { TextAttributes } from '@opentui/core';
-import { useTheme } from '../providers/theme';
+import React from 'react';
+import { Box, Text } from 'ink';
+import { useTheme } from '../providers/theme/index.js';
 
 type Issue = {
   file?: string;
@@ -27,60 +28,48 @@ const SEVERITY_COLORS: Record<string, string> = {
 };
 
 const SEVERITY_ICONS: Record<string, string> = {
-  critical: '\u2622',
-  high: '\u26A0',
-  medium: '\u25CF',
-  low: '\u2193',
-  info: '\u2139',
+  critical: '☢',
+  high: '⚠',
+  medium: '●',
+  low: '↓',
+  info: 'ℹ',
 };
 
 function IssueCard({ issue, icon, fg }: { issue: Issue; icon: string; fg: string }) {
   const { colors } = useTheme();
   return (
-    <box flexDirection="column" paddingY={0.5} width="100%">
-      <box flexDirection="row" gap={1}>
-        <text fg={fg}>{icon}</text>
-        <text attributes={1} fg={fg}>
-          {issue.title || 'Issue'}
-        </text>
+    <Box flexDirection="column" width="100%">
+      <Box flexDirection="row" gap={1}>
+        <Text color={fg}>{icon}</Text>
+        <Text bold color={fg}>{issue.title || 'Issue'}</Text>
         {issue.line ? (
-          <text attributes={TextAttributes.DIM} fg={colors.dimSeparator}>
-            :{issue.line}
-          </text>
+          <Text dimColor color={colors.dimSeparator}>{`:${issue.line}`}</Text>
         ) : null}
         {issue.confidence ? (
-          <text attributes={TextAttributes.DIM} fg={colors.dimSeparator}>
-            {Math.round(issue.confidence * 100)}%
-          </text>
+          <Text dimColor color={colors.dimSeparator}>{`${Math.round(issue.confidence * 100)}%`}</Text>
         ) : null}
-      </box>
-      <box paddingLeft={2}>
-        <text attributes={TextAttributes.DIM}>{issue.message}</text>
-      </box>
+      </Box>
+      <Box paddingLeft={2}>
+        <Text dimColor>{issue.message}</Text>
+      </Box>
       {issue.file ? (
-        <box paddingLeft={2}>
-          <text attributes={TextAttributes.DIM} fg={colors.info}>
-            {'\u2192'} {issue.file}
-          </text>
-        </box>
+        <Box paddingLeft={2}>
+          <Text dimColor color={colors.info}>{`→ ${issue.file}`}</Text>
+        </Box>
       ) : null}
       {issue.suggestion ? (
-        <box paddingLeft={2}>
-          <text attributes={TextAttributes.DIM} fg={colors.success}>
-            {'\u2713'} {issue.suggestion}
-          </text>
-        </box>
+        <Box paddingLeft={2}>
+          <Text dimColor color={colors.success}>{`✓ ${issue.suggestion}`}</Text>
+        </Box>
       ) : null}
       {issue.tags && issue.tags.length > 0 ? (
-        <box paddingLeft={2} flexDirection="row" gap={1}>
+        <Box paddingLeft={2} flexDirection="row" gap={1}>
           {issue.tags.slice(0, 4).map(t => (
-            <text key={t} attributes={TextAttributes.DIM} fg={colors.dimSeparator}>
-              #{t}
-            </text>
+            <Text key={t} dimColor color={colors.dimSeparator}>{`#${t}`}</Text>
           ))}
-        </box>
+        </Box>
       ) : null}
-    </box>
+    </Box>
   );
 }
 
@@ -88,9 +77,9 @@ export function ResultViewer({ issues, title }: Props) {
   const { colors } = useTheme();
   if (!issues || issues.length === 0) {
     return (
-      <box padding={2}>
-        <text fg={colors.success}>{'\u2713'} No issues found.</text>
-      </box>
+      <Box padding={2}>
+        <Text color={colors.success}>{'✓ No issues found.'}</Text>
+      </Box>
     );
   }
 
@@ -105,39 +94,27 @@ export function ResultViewer({ issues, title }: Props) {
   const sorted = sevOrder.filter(s => grouped[s]);
 
   return (
-    <box flexDirection="column" width="100%" paddingY={1} gap={1}>
+    <Box flexDirection="column" width="100%" paddingY={1} gap={1}>
       {title ? (
-        <text attributes={1} fg={colors.primary}>
-          {title}
-        </text>
+        <Text bold color={colors.primary}>{title}</Text>
       ) : null}
-      <text attributes={TextAttributes.DIM}>
-        {issues.length} issue{issues.length !== 1 ? 's' : ''} found
-      </text>
+      <Text dimColor>{`${issues.length} issue${issues.length !== 1 ? 's' : ''} found`}</Text>
       {sorted.map(sev => {
         const items = grouped[sev];
         const color = SEVERITY_COLORS[sev] || colors.info;
-        const icon = SEVERITY_ICONS[sev] || '\u25CF';
+        const icon = SEVERITY_ICONS[sev] || '●';
         return (
-          <box key={sev} flexDirection="column" width="100%">
-            <box
-              border={['bottom']}
-              borderColor={colors.dimSeparator}
-              paddingY={0.5}
-              flexDirection="row"
-              gap={1}
-            >
-              <text attributes={1} fg={color}>
-                {icon} {sev.toUpperCase()}
-              </text>
-              <text attributes={TextAttributes.DIM}>{items.length}</text>
-            </box>
+          <Box key={sev} flexDirection="column" width="100%">
+            <Box borderStyle="single" borderColor={colors.dimSeparator} flexDirection="row" gap={1}>
+              <Text bold color={color}>{`${icon} ${sev.toUpperCase()}`}</Text>
+              <Text dimColor>{String(items.length)}</Text>
+            </Box>
             {items.map((issue, i) => (
               <IssueCard key={i} issue={issue} icon={icon} fg={color} />
             ))}
-          </box>
+          </Box>
         );
       })}
-    </box>
+    </Box>
   );
 }

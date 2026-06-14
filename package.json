@@ -1,7 +1,7 @@
 {
   "name": "sentinel-cli",
   "version": "2.0.2",
-  "description": "🛡️ AI-Powered Code Guardian — TUI (Bun-native). Analyze, audit, fix, and chat about your code with multi-LLM support (OpenAI, Gemini, Groq, Ollama).",
+  "description": "🛡️ AI-Powered Code Guardian — TUI (Node.js-native, Ink). Analyze, audit, fix, and chat about your code with multi-LLM support (OpenAI, Gemini, Groq, Ollama).",
   "main": "src/index.js",
   "exports": {
     ".": "./src/index.js",
@@ -62,8 +62,7 @@
     "demo": "node src/core/demo.js",
     "tui": "node bin/sentinel.js",
     "tui:build": "npx tsc -p src/tui/tsconfig.json",
-    "tui:bun": "bun src/tui/index.tsx",
-    "tui:node": "echo 'TUI requires Bun. Install: curl -fsSL https://bun.sh/install | bash' && exit 1",
+    "tui:tsx": "node node_modules/tsx/dist/cli.mjs src/tui/index.tsx",
     "mcp:start": "node mcp/sentinel-mcp-server.js",
     "mcp:dev": "node --watch mcp/sentinel-mcp-server.js",
     "sentinel:server": "node src/server/api/start.js",
@@ -77,7 +76,6 @@
   "keywords": [
     "cli",
     "tui",
-    "bun",
     "terminal-ui",
     "code-review",
     "security",
@@ -90,7 +88,6 @@
     "gemini",
     "groq",
     "ollama",
-    "opentui",
     "react",
     "typescript"
   ],
@@ -106,10 +103,14 @@
   "homepage": "https://github.com/KunjShah95/SENTINEL-CLI#readme",
   "dependencies": {
     "@google/generative-ai": "^0.1.3",
-    "@opentui/core": "^0.3.0",
-    "@opentui/react": "^0.3.0",
     "@types/react": "^19.2.15",
     "@types/react-dom": "^19.2.3",
+    "ink": "^7.0.6",
+    "ink-divider": "^4.1.1",
+    "ink-gradient": "^4.0.1",
+    "ink-select-input": "^6.2.0",
+    "ink-spinner": "^5.0.0",
+    "ink-text-input": "^6.0.0",
     "@vercel/analytics": "^1.6.1",
     "axios": "^1.6.2",
     "bullmq": "^5.78.0",
@@ -202,8 +203,7 @@
     }
   },
   "engines": {
-    "node": ">=20.0.0",
-    "bun": ">=1.0.0"
+    "node": ">=20.0.0"
   },
   "publishConfig": {
     "access": "public",

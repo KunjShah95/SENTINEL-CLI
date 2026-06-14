@@ -1,7 +1,8 @@
-import { useCallback } from "react";
-import { DialogSearchList } from "../dialog-search-list";
-import { useTheme } from "../../providers/theme";
-import { useDialog } from "../../providers/dialog";
+import React, { useCallback } from 'react';
+import { Text } from 'ink';
+import { DialogSearchList } from '../dialog-search-list.js';
+import { useTheme } from '../../providers/theme/index.js';
+import { useDialog } from '../../providers/dialog/index.js';
 
 export function ThemeDialogContent() {
   const { themes, setTheme, theme: currentTheme } = useTheme();
@@ -21,9 +22,9 @@ export function ThemeDialogContent() {
       onSelect={handleSelect}
       filterFn={(item, query) => item.name.toLowerCase().includes(query.toLowerCase())}
       renderItem={(item, isSelected) => (
-        <text fg={isSelected ? currentTheme.colors.selection : undefined}>
-          {item.name === currentTheme.name ? " \u2022 " : "   "}{item.name}
-        </text>
+        <Text color={isSelected ? currentTheme.colors.selection : undefined}>
+          {`${item.name === currentTheme.name ? ' • ' : '   '}${item.name}`}
+        </Text>
       )}
       getKey={(item) => item.name}
       placeholder="Search themes..."

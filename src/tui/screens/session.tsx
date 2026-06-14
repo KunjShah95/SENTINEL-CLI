@@ -1,20 +1,19 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Box, Text, useInput } from 'ink';
 import { useLocation, useNavigate } from 'react-router';
-import { useKeyboard } from '@opentui/react';
-import { SessionShell } from '../components/session-shell';
-import { SessionPanel } from '../components/session-panel';
-import { UserMessage, BotMessage, ErrorMessage } from '../components/messages';
-import { CommandMenu } from '../components/command-menu';
-import { MultiStepAnalyzeDialog } from '../components/dialogs/multi-step-analyze';
-import { useTheme } from '../providers/theme';
-import { useDialog } from '../providers/dialog';
-import { useToast } from '../providers/toast';
-import { useAgentChat } from '../hooks/use-agent-chat';
-import { Sessions } from '../lib/api-client';
-import { getDisplayVersion } from '../lib/version';
-import { TOOLS } from '../lib/tools';
-import type { CommandContext } from '../components/command-menu/types';
-import type { AgentMode, AgentMessagePart } from '../hooks/use-agent-chat';
+import { SessionShell } from '../components/session-shell.js';
+import { SessionPanel } from '../components/session-panel.js';
+import { UserMessage, BotMessage, ErrorMessage } from '../components/messages/index.js';
+import { CommandMenu } from '../components/command-menu/index.js';
+import { MultiStepAnalyzeDialog } from '../components/dialogs/multi-step-analyze.js';
+import { useTheme } from '../providers/theme/index.js';
+import { useDialog } from '../providers/dialog/index.js';
+import { useToast } from '../providers/toast/index.js';
+import { useAgentChat } from '../hooks/use-agent-chat.js';
+import { Sessions } from '../lib/api-client.js';
+import { TOOLS } from '../lib/tools.js';
+import type { CommandContext } from '../components/command-menu/types.js';
+import type { AgentMode, AgentMessagePart } from '../hooks/use-agent-chat.js';
 
 export function Session() {
   const location = useLocation();
@@ -38,7 +37,6 @@ export function Session() {
   const [showSessionPanel, setShowSessionPanel] = useState(false);
   const dialog = useDialog();
 
-  const exitApp = useCallback(() => process.exit(0), []);
   const navigate = useNavigate();
   const { theme } = useTheme();
 
@@ -49,7 +47,7 @@ export function Session() {
   }, [setMode]);
 
   const commandCtx: CommandContext = {
-    exit: exitApp,
+    exit: () => process.exit(0),
     navigate: (path: string) => navigate(path),
     execute: (action: string) => {
       submit(`/${action}`);
@@ -116,26 +114,73 @@ export function Session() {
           return;
         }
         if (cmd === 'review') {
+          const arg = value.replace(/^\/review\s*/i, '').trim();
+          if (!arg) {
+            navigate('/review');
+            return;
+          }
           const prevMode = mode;
           setMode('REVIEW' as AgentMode);
           (async () => {
             try {
-              const { executeLocalTool } = await import('../../shared/tools/index.js');
-              let diffResult = await executeLocalTool('bash', { command: 'git diff --staged' }, 'BUILD');
-              let diffText = diffResult?.stdout?.trim();
-              if (!diffText) {
-                diffResult = await executeLocalTool('bash', { command: 'git diff HEAD' }, 'BUILD');
-                diffText = diffResult?.stdout?.trim();
-              }
-              if (!diffText) {
-                toast.info('No changes detected. Stage changes with git add first.');
+              const { getGitDiff, buildReviewPrompt } = await import('../lib/security-reviewer.js');
+              const diff = getGitDiff({ file: arg });
+              if (!diff) {
+                toast.info(`No changes detected for ${arg}.`);
                 setMode(prevMode);
                 return;
               }
-              submit(`Review this diff for bugs, security issues, and best practices:\n\n\`\`\`diff\n${diffText}\n\`\`\``);
+              submit(buildReviewPrompt(diff, { files: [arg], focus: 'security' }));
             } catch (e) {
-              toast.error('Failed to get git diff: ' + String(e));
+              toast.error('Review failed: ' + String(e));
               setMode(prevMode);
+            }
+          })();
+          return;
+        }
+        if (cmd === 'review-branch') {
+          const branch = value.replace(/^\/review-branch\s*/i, '').trim();
+          if (!branch) {
+            toast.error('Usage: /review-branch <branch-name>');
+            return;
+          }
+          const prevMode = mode;
+          setMode('REVIEW' as AgentMode);
+          (async () => {
+            try {
+              const { getGitDiff, getChangedFiles, buildReviewPrompt } = await import('../lib/security-reviewer.js');
+              const diff = getGitDiff({ branch });
+              if (!diff) {
+                toast.info(`No changes detected vs ${branch}.`);
+                setMode(prevMode);
+                return;
+              }
+              const files = getChangedFiles({ branch });
+              submit(buildReviewPrompt(diff, { files, focus: 'all' }));
+            } catch (e) {
+              toast.error('Review failed: ' + String(e));
+              setMode(prevMode);
+            }
+          })();
+          return;
+        }
+        if (cmd === 'review-file') {
+          navigate('/review');
+          return;
+        }
+        if (cmd === 'scan') {
+          const target = value.replace(/^\/scan\s*/i, '').trim() || '.';
+          (async () => {
+            try {
+              const result = await TOOLS.securityAudit.execute({ files: target });
+              appendMessage({
+                role: 'assistant',
+                mode,
+                model,
+                parts: [{ type: 'text', text: result.output || result.error || 'Scan complete.' }],
+              });
+            } catch (e) {
+              toast.error('Scan failed: ' + String(e));
             }
           })();
           return;
@@ -210,7 +255,7 @@ export function Session() {
           return;
         }
         if (cmd === 'help') {
-          toast.info('Commands: /clear /new /wizard /mode /review /undo /background /agents /help');
+          toast.info('Commands: /clear /new /wizard /mode /review [file] /review-branch <branch> /scan [path] /undo /background /agents /help');
           return;
         }
         toast.error('Unknown command. Type /help for commands.');
@@ -268,10 +313,9 @@ export function Session() {
     }
   }, [clear, messages.length]);
 
-  useKeyboard((key) => {
-    if (key.name === 's' && key.ctrl) {
+  useInput((input, key) => {
+    if (key.ctrl && input === 's') {
       setShowSessionPanel((v) => !v);
-      return;
     }
   });
 
@@ -288,7 +332,7 @@ export function Session() {
   const isLoading = loading || status === 'streaming';
 
   return (
-    <box flexGrow={1} width="100%" height="100%" flexDirection="row">
+    <Box flexGrow={1} width="100%" flexDirection="row">
       {showSessionPanel ? (
         <SessionPanel
           currentSessionId={undefined}
@@ -298,7 +342,7 @@ export function Session() {
           onClose={() => setShowSessionPanel(false)}
         />
       ) : null}
-      <box flexGrow={1} width={showSessionPanel ? undefined : '100%'} height="100%" flexDirection="column">
+      <Box flexGrow={1} flexDirection="column">
         <SessionShell
           onSubmit={wrappedSubmit}
           inputDisabled={isLoading}
@@ -310,9 +354,9 @@ export function Session() {
           statusText={`${messages.length} msgs | ${theme.name}`}
         >
           {messages.length === 0 ? (
-            <box padding={2} alignItems="center" justifyContent="center">
-              <text attributes={2}>Start a conversation or type /help for commands</text>
-            </box>
+            <Box padding={2} alignItems="center" justifyContent="center">
+              <Text dimColor>{'Start a conversation or type /help for commands'}</Text>
+            </Box>
           ) : null}
           {messages.map(msg => {
             if (msg.role === 'error') {
@@ -333,7 +377,7 @@ export function Session() {
         {showCommands ? (
           <CommandMenu onClose={() => setShowCommands(false)} ctx={commandCtx} />
         ) : null}
-      </box>
-    </box>
+      </Box>
+    </Box>
   );
 }

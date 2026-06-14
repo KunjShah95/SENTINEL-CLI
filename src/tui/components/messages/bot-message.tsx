@@ -1,7 +1,6 @@
-import { useEffect, useState } from "react";
-import { TextAttributes } from "@opentui/core";
-import { useTheme } from "../../providers/theme";
-import { EmptyBorder } from "../border";
+import React, { useEffect, useState } from 'react';
+import { Box, Text } from 'ink';
+import { useTheme } from '../../providers/theme/index.js';
 
 type ToolCall = {
   name: string;
@@ -10,13 +9,13 @@ type ToolCall = {
 };
 
 type MessagePart = {
-  type: "text" | "reasoning" | "tool-call" | "tool-result";
+  type: 'text' | 'reasoning' | 'tool-call' | 'tool-result';
   text?: string;
   toolCall?: ToolCall;
   toolName?: string;
   toolCallId?: string;
   input?: unknown;
-  state?: "pending" | "output-available" | "output-error";
+  state?: 'pending' | 'output-available' | 'output-error';
   output?: unknown;
   errorText?: string;
 };
@@ -27,7 +26,7 @@ type Props = {
   duration?: number;
 };
 
-const SPINNER_FRAMES = ["\u25D0", "\u25D3", "\u25D1", "\u25D2"];
+const SPINNER_FRAMES = ['◐', '◓', '◑', '◒'];
 
 function PendingSpinner() {
   const [frame, setFrame] = useState(0);
@@ -38,26 +37,19 @@ function PendingSpinner() {
     return () => clearInterval(id);
   }, []);
 
-  return <text fg={colors.info}>{SPINNER_FRAMES[frame]}</text>;
+  return <Text color={colors.info}>{SPINNER_FRAMES[frame]}</Text>;
 }
 
 function ReasoningBlock({ text }: { text: string }) {
   const { colors } = useTheme();
   return (
-    <box width="100%" flexDirection="column" paddingY={1}>
-      <box
-        border={["left"]}
-        borderColor={colors.thinkingBorder}
-        width="100%"
-        customBorderChars={{ ...EmptyBorder, vertical: "\u2503" }}
-      >
-        <box paddingX={2} paddingY={1} flexDirection="column" width="100%">
-          <text attributes={TextAttributes.DIM} fg={colors.thinking}>
-            {text}
-          </text>
-        </box>
-      </box>
-    </box>
+    <Box width="100%" flexDirection="column" paddingY={1}>
+      <Box borderStyle="single" borderColor={colors.thinkingBorder} width="100%">
+        <Box paddingX={2} paddingY={1} flexDirection="column" width="100%">
+          <Text dimColor color={colors.thinking}>{text}</Text>
+        </Box>
+      </Box>
+    </Box>
   );
 }
 
@@ -66,80 +58,56 @@ function ToolCallBlock({ part }: { part: MessagePart }) {
 
   if (part.toolCall) {
     return (
-      <box width="100%" paddingY={1}>
-        <box
-          border={["left"]}
-          borderColor={colors.info}
-          width="100%"
-          customBorderChars={{ ...EmptyBorder, vertical: "\u2503" }}
-        >
-          <box paddingX={2} paddingY={1} flexDirection="column" width="100%">
-            <text fg={colors.info}>
-              {"\u2699"} {part.toolCall.name}
-            </text>
+      <Box width="100%" paddingY={1}>
+        <Box borderStyle="single" borderColor={colors.info} width="100%">
+          <Box paddingX={2} paddingY={1} flexDirection="column" width="100%">
+            <Text color={colors.info}>{'⚙'} {part.toolCall.name}</Text>
             {part.toolCall.args ? (
-              <text attributes={TextAttributes.DIM}>
-                {JSON.stringify(part.toolCall.args, null, 2)}
-              </text>
+              <Text dimColor>{JSON.stringify(part.toolCall.args, null, 2)}</Text>
             ) : null}
             {part.toolCall.result ? (
-              <text attributes={TextAttributes.DIM} fg={colors.success}>
-                {"\u2713"} Done
-              </text>
+              <Text dimColor color={colors.success}>{'✓'} Done</Text>
             ) : null}
-          </box>
-        </box>
-      </box>
+          </Box>
+        </Box>
+      </Box>
     );
   }
 
-  const isPending = part.state === "pending";
-  const isDone = part.state === "output-available";
-  const isError = part.state === "output-error";
+  const isPending = part.state === 'pending';
+  const isDone = part.state === 'output-available';
+  const isError = part.state === 'output-error';
 
   return (
-    <box width="100%" paddingY={1}>
-      <box
-        border={["left"]}
-        borderColor={isError ? colors.error : colors.info}
-        width="100%"
-        customBorderChars={{ ...EmptyBorder, vertical: "\u2503" }}
-      >
-        <box paddingX={2} paddingY={1} flexDirection="column" width="100%">
-          <box flexDirection="row" gap={1}>
-            {isPending ? <PendingSpinner /> : <text fg={colors.info}>{"\u2699"}</text>}
-            <text fg={isError ? colors.error : colors.info}>
-              {part.toolName}
-            </text>
-          </box>
+    <Box width="100%" paddingY={1}>
+      <Box borderStyle="single" borderColor={isError ? colors.error : colors.info} width="100%">
+        <Box paddingX={2} paddingY={1} flexDirection="column" width="100%">
+          <Box flexDirection="row" gap={1}>
+            {isPending ? <PendingSpinner /> : <Text color={colors.info}>{'⚙'}</Text>}
+            <Text color={isError ? colors.error : colors.info}>{part.toolName}</Text>
+          </Box>
           {part.input !== undefined ? (
-            <text attributes={TextAttributes.DIM}>
-              {JSON.stringify(part.input, null, 2)}
-            </text>
+            <Text dimColor>{JSON.stringify(part.input, null, 2)}</Text>
           ) : null}
           {isPending ? (
-            <text attributes={TextAttributes.DIM}>(running...)</text>
+            <Text dimColor>{'(running...)'}</Text>
           ) : null}
           {isDone ? (
-            <text attributes={TextAttributes.DIM}>
+            <Text dimColor>
               {part.output !== undefined
                 ? JSON.stringify(part.output).slice(0, 500)
-                : ""}
-            </text>
+                : ''}
+            </Text>
           ) : null}
           {isDone ? (
-            <text attributes={TextAttributes.DIM} fg={colors.success}>
-              Done
-            </text>
+            <Text dimColor color={colors.success}>{'Done'}</Text>
           ) : null}
           {isError && part.errorText ? (
-            <text attributes={TextAttributes.DIM} fg={colors.error}>
-              Error: {part.errorText}
-            </text>
+            <Text dimColor color={colors.error}>{`Error: ${part.errorText}`}</Text>
           ) : null}
-        </box>
-      </box>
-    </box>
+        </Box>
+      </Box>
+    </Box>
   );
 }
 
@@ -158,39 +126,35 @@ export function BotMessage({ parts, model, duration }: Props) {
   }, []);
 
   return (
-    <box width="100%" flexDirection="column" paddingY={1}>
+    <Box width="100%" flexDirection="column" paddingY={1}>
       {grouped.map((group, gi) => {
         const type = group[0].type;
-        if (type === "reasoning") {
-          return <ReasoningBlock key={gi} text={group.map((p) => p.text).join("")} />;
+        if (type === 'reasoning') {
+          return <ReasoningBlock key={gi} text={group.map((p) => p.text).join('')} />;
         }
-        if (type === "tool-call") {
+        if (type === 'tool-call') {
           return (
-            <box key={gi} flexDirection="column">
+            <Box key={gi} flexDirection="column">
               {group.map((p, pi) => <ToolCallBlock key={pi} part={p} />)}
-            </box>
+            </Box>
           );
         }
         return (
-          <box key={gi} paddingX={1}>
-            <text>{group.map((p) => p.text).join("")}</text>
-          </box>
+          <Box key={gi} paddingX={1}>
+            <Text>{group.map((p) => p.text).join('')}</Text>
+          </Box>
         );
       })}
       {model || duration ? (
-        <box flexDirection="row" gap={1} paddingX={1} paddingTop={1}>
+        <Box flexDirection="row" gap={1} paddingX={1} paddingTop={1}>
           {model ? (
-            <text attributes={TextAttributes.DIM} fg={colors.info}>
-              {model}
-            </text>
+            <Text dimColor color={colors.info}>{model}</Text>
           ) : null}
           {duration ? (
-            <text attributes={TextAttributes.DIM} fg={colors.dimSeparator}>
-              {duration}ms
-            </text>
+            <Text dimColor color={colors.dimSeparator}>{`${duration}ms`}</Text>
           ) : null}
-        </box>
+        </Box>
       ) : null}
-    </box>
+    </Box>
   );
 }
