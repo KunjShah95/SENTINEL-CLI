@@ -1,8 +1,7 @@
-import { createContext, useContext, useState, useCallback, useRef, type ReactNode } from "react";
-import { TextAttributes } from "@opentui/core";
-import { useTheme } from "../theme";
-import { EmptyBorder } from "../../components/border";
-import type { ToastOptions, ToastVariant } from "./types";
+import React, { createContext, useContext, useState, useCallback, useRef, type ReactNode } from 'react';
+import { Box, Text } from 'ink';
+import { useTheme } from '../theme/index.js';
+import type { ToastOptions, ToastVariant } from './types.js';
 
 type ToastItem = {
   id: number;
@@ -25,7 +24,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const idRef = useRef(0);
   const { colors } = useTheme();
 
-  const show = useCallback(({ message, variant = "info", duration = 3000 }: ToastOptions) => {
+  const show = useCallback(({ message, variant = 'info', duration = 3000 }: ToastOptions) => {
     const id = ++idRef.current;
     setToasts((prev) => [...prev, { id, message, variant }]);
     setTimeout(() => {
@@ -33,53 +32,46 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     }, duration);
   }, []);
 
-  const success = useCallback((message: string) => show({ message, variant: "success" }), [show]);
-  const error = useCallback((message: string) => show({ message, variant: "error" }), [show]);
-  const info = useCallback((message: string) => show({ message, variant: "info" }), [show]);
-  const warning = useCallback((message: string) => show({ message, variant: "warning" }), [show]);
+  const success = useCallback((message: string) => show({ message, variant: 'success' }), [show]);
+  const error = useCallback((message: string) => show({ message, variant: 'error' }), [show]);
+  const info = useCallback((message: string) => show({ message, variant: 'info' }), [show]);
+  const warning = useCallback((message: string) => show({ message, variant: 'warning' }), [show]);
 
   const getBorderColor = (variant: ToastVariant) => {
     switch (variant) {
-      case "success": return colors.success;
-      case "error": return colors.error;
-      case "warning": return colors.warning;
-      case "info": return colors.info;
+      case 'success': return colors.success;
+      case 'error': return colors.error;
+      case 'warning': return colors.warning;
+      case 'info': return colors.info;
     }
   };
 
   return (
     <ToastContext.Provider value={{ show, success, error, info, warning }}>
-      <box flexGrow={1} width="100%" height="100%">
-        {/* Render children safely: wrap plain strings/numbers in <text> */}
-        {(() => {
-          const c: any = children;
-          if (c == null) return null;
-          if (typeof c === "string" || typeof c === "number") return <text>{c}</text>;
-          if (Array.isArray(c)) return c.map((item, i) => (typeof item === "string" || typeof item === "number" ? <text key={i}>{item}</text> : item));
-          return c;
-        })()}
-        <box position="absolute" top={0} right={0} flexDirection="column" gap={1} padding={1}>
-          {toasts.map((toast) => (
-            <box
-              key={toast.id}
-              border={["left"]}
-              borderColor={getBorderColor(toast.variant)}
-              customBorderChars={{ ...EmptyBorder, vertical: "\u2503", bottomLeft: "\u2579" }}
-              backgroundColor={colors.surface}
-              paddingX={2}
-              paddingY={1}
-            >
-              <text attributes={TextAttributes.DIM}>{toast.message}</text>
-            </box>
-          ))}
-        </box>
-      </box>
+      <Box flexGrow={1} width="100%" flexDirection="column">
+        {children}
+        {toasts.length > 0 ? (
+          <Box flexDirection="column" gap={1} paddingX={1} paddingY={1}>
+            {toasts.map((toast) => (
+              <Box
+                key={toast.id}
+                borderStyle="single"
+                borderColor={getBorderColor(toast.variant)}
+                paddingX={2}
+                paddingY={0}
+              >
+                <Text dimColor>{toast.message}</Text>
+              </Box>
+            ))}
+          </Box>
+        ) : null}
+      </Box>
     </ToastContext.Provider>
   );
 }
 
 export function useToast(): ToastContextValue {
   const ctx = useContext(ToastContext);
-  if (!ctx) throw new Error("useToast must be used within ToastProvider");
+  if (!ctx) throw new Error('useToast must be used within ToastProvider');
   return ctx;
 }

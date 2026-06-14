@@ -1,11 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useKeyboard } from "@opentui/react";
-import { TextAttributes } from "@opentui/core";
-import type { InputRenderable } from "@opentui/core";
-import { useKeyboardLayer } from "../providers/keyboard-layer";
-import { useTheme } from "../providers/theme";
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Box, Text, useInput } from 'ink';
+import TextInput from 'ink-text-input';
+import { useTheme } from '../providers/theme/index.js';
 
-type Mode = "BUILD" | "PLAN" | "REVIEW" | "SCAN" | "FIX";
+type Mode = 'BUILD' | 'PLAN' | 'REVIEW' | 'SCAN' | 'FIX';
 
 type Props = {
   onSubmit: (value: string) => void;
@@ -18,28 +16,12 @@ type Props = {
   onCommandPalette?: () => void;
 };
 
-const MAX_SUGGESTIONS = 20;
-const LARGE_PROJECT_THRESHOLD = 1000;
-const MENTION_LAYER_ID = "mention-list";
+const MAX_SUGGESTIONS = 10;
 const MENTION_REGEX = /(?:^|\s)@([^\s@]*)$/;
-const REPLACE_REGEX = /^(.*?)(@[^\s@]*)$/;
 
 function extractMentionToken(text: string): string | null {
   const match = text.match(MENTION_REGEX);
   return match ? match[1] : null;
-}
-
-function filterFiles(files: string[], token: string, limit: number): string[] {
-  if (!token) return files.slice(0, limit);
-  const lower = token.toLowerCase();
-  const out: string[] = [];
-  for (const file of files) {
-    if (file.toLowerCase().includes(lower)) {
-      out.push(file);
-      if (out.length >= limit) break;
-    }
-  }
-  return out;
 }
 
 export function InputBar({
@@ -47,230 +29,112 @@ export function InputBar({
   onCommand,
   onSlashCommand,
   disabled = false,
-  placeholder = "Ask Sentinel to do anything...",
-  mode = "BUILD",
+  placeholder = 'Ask Sentinel to do anything...',
+  mode = 'BUILD',
   onModeToggle,
   onCommandPalette,
 }: Props) {
-  const inputRef = useRef<InputRenderable>(null);
-  const { colors } = useTheme();
-  const { isTopLayer, push, pop } = useKeyboardLayer();
-
-  const [value, setValue] = useState("");
+  const [value, setValue] = useState('');
   const [mentionToken, setMentionToken] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const cachedFilesRef = useRef<string[] | null>(null);
-  const isLargeProjectRef = useRef(false);
-  const layerPushedRef = useRef(false);
+  const { colors } = useTheme();
 
-  const closeMentionList = useCallback(() => {
-    if (layerPushedRef.current) {
-      pop(MENTION_LAYER_ID);
-      layerPushedRef.current = false;
-    }
-    setMentionToken(null);
-    setSuggestions([]);
-    setSelectedIndex(0);
-  }, [pop]);
+  const activeColor = mode === 'PLAN' ? colors.planMode
+    : mode === 'REVIEW' ? colors.critical
+    : mode === 'SCAN' ? colors.warning
+    : mode === 'FIX' ? colors.error
+    : colors.primary;
 
   useEffect(() => {
-    return () => {
-      if (layerPushedRef.current) {
-        pop(MENTION_LAYER_ID);
-        layerPushedRef.current = false;
-      }
-    };
-  }, [pop]);
-
-  useEffect(() => {
-    if (mentionToken === null) {
-      if (layerPushedRef.current) {
-        pop(MENTION_LAYER_ID);
-        layerPushedRef.current = false;
-      }
-      return;
-    }
-    if (!layerPushedRef.current) {
-      push(MENTION_LAYER_ID);
-      layerPushedRef.current = true;
-    }
-
+    if (mentionToken === null) { setSuggestions([]); return; }
     let cancelled = false;
-    const sanitizedToken = mentionToken.replace(/[*?[\]]/g, "");
-
     (async () => {
       try {
-        const { executeLocalTool } = await import("../../shared/tools/index.js");
-        const cached = cachedFilesRef.current;
-
-        if (cached !== null && !isLargeProjectRef.current) {
-          if (cancelled) return;
-          setSuggestions(filterFiles(cached, mentionToken, MAX_SUGGESTIONS));
-          setSelectedIndex(0);
-          return;
-        }
-
-        if (isLargeProjectRef.current) {
-          const pattern = sanitizedToken.length > 0 ? `**/*${sanitizedToken}*` : "**/*";
-          const result = await executeLocalTool("glob", { pattern });
-          if (cancelled) return;
-          const files: string[] = Array.isArray(result?.files) ? result.files : [];
-          setSuggestions(files.slice(0, MAX_SUGGESTIONS));
-          setSelectedIndex(0);
-          return;
-        }
-
-        const initial = await executeLocalTool("glob", { pattern: "**/*" });
+        const { executeLocalTool } = await import('../../shared/tools/index.js');
+        const pattern = mentionToken.length > 0 ? `**/*${mentionToken}*` : '**/*';
+        const result = await executeLocalTool('glob', { pattern });
         if (cancelled) return;
-        const files: string[] = Array.isArray(initial?.files) ? initial.files : [];
-        if (initial?.truncated || files.length >= LARGE_PROJECT_THRESHOLD) {
-          isLargeProjectRef.current = true;
-          const pattern = sanitizedToken.length > 0 ? `**/*${sanitizedToken}*` : "**/*";
-          const lazyResult = await executeLocalTool("glob", { pattern });
-          if (cancelled) return;
-          const lazyFiles: string[] = Array.isArray(lazyResult?.files) ? lazyResult.files : [];
-          setSuggestions(lazyFiles.slice(0, MAX_SUGGESTIONS));
-          setSelectedIndex(0);
-          return;
-        }
-
-        cachedFilesRef.current = files;
-        setSuggestions(filterFiles(files, mentionToken, MAX_SUGGESTIONS));
+        const files: string[] = Array.isArray(result?.files) ? result.files : [];
+        setSuggestions(files.slice(0, MAX_SUGGESTIONS));
         setSelectedIndex(0);
       } catch {
-        if (!cancelled) {
-          setSuggestions([]);
-          setSelectedIndex(0);
-        }
+        if (!cancelled) setSuggestions([]);
       }
     })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [mentionToken, push, pop]);
-
-  const handleInput = useCallback((next: unknown) => {
-    const text = String(next);
-    setValue(text);
-    setMentionToken(extractMentionToken(text));
-  }, [onSlashCommand]);
+    return () => { cancelled = true; };
+  }, [mentionToken]);
 
   const insertSelected = useCallback(() => {
     if (mentionToken === null || suggestions.length === 0) return;
     const selected = suggestions[selectedIndex];
     if (!selected) return;
-    const match = value.match(REPLACE_REGEX);
-    const nextValue = match ? `${match[1]}@${selected} ` : `${value}@${selected} `;
-    if (inputRef.current) {
-      inputRef.current.value = nextValue;
-    }
-    setValue(nextValue);
-    closeMentionList();
-  }, [mentionToken, suggestions, selectedIndex, value, closeMentionList]);
+    const newValue = value.replace(/@[^\s@]*$/, `@${selected} `);
+    setValue(newValue);
+    setMentionToken(null);
+    setSuggestions([]);
+  }, [mentionToken, suggestions, selectedIndex, value]);
 
-  const handleSubmit = useCallback(
-    (submittedValue: unknown) => {
-      if (mentionToken !== null && suggestions.length > 0) {
-        insertSelected();
-        return;
-      }
-      const trimmed = String(submittedValue).trim();
-      if (trimmed.length === 0) return;
-
-      if (trimmed.startsWith("/")) {
-        if (onSlashCommand) {
-          onSlashCommand();
-          return;
-        }
-        if (onCommand) {
-          onCommand(trimmed);
-          return;
-        }
-        onSubmit(trimmed);
-        return;
-      }
-      onSubmit(trimmed);
-      if (inputRef.current) {
-        inputRef.current.value = "";
-      }
-      setValue("");
-      closeMentionList();
-    },
-    [onSubmit, onCommand, onSlashCommand, mentionToken, suggestions, insertSelected, closeMentionList]
-  );
-
-  const activeColor = mode === "PLAN" ? colors.planMode : colors.primary;
-  const showSuggestions = mentionToken !== null && suggestions.length > 0;
-
-  useKeyboard((key) => {
-    if (showSuggestions && isTopLayer(MENTION_LAYER_ID)) {
-      if (key.name === "up") {
-        setSelectedIndex((prev) => Math.max(0, prev - 1));
-        return;
-      }
-      if (key.name === "down") {
-        setSelectedIndex((prev) => Math.min(suggestions.length - 1, prev + 1));
-        return;
-      }
-      if (key.name === "tab") {
-        insertSelected();
-        return;
-      }
-      if (key.name === "escape") {
-        closeMentionList();
-        return;
-      }
+  useInput((input, key) => {
+    if (mentionToken !== null && suggestions.length > 0) {
+      if (key.upArrow) { setSelectedIndex(p => Math.max(0, p - 1)); return; }
+      if (key.downArrow) { setSelectedIndex(p => Math.min(suggestions.length - 1, p + 1)); return; }
+      if (key.tab) { insertSelected(); return; }
+      if (key.escape) { setMentionToken(null); setSuggestions([]); return; }
       return;
     }
-    if (!isTopLayer("dialog") && !isTopLayer("command-menu")) {
-      return;
-    }
-    if (key.name === "tab") {
-      onModeToggle?.();
-      return;
-    }
-    if (key.name === "p" && key.ctrl) {
-      onCommandPalette?.();
-    }
+    if (key.tab) { onModeToggle?.(); return; }
+    if (key.ctrl && input === 'p') { onCommandPalette?.(); return; }
   });
 
+  const handleChange = useCallback((next: string) => {
+    setValue(next);
+    setMentionToken(extractMentionToken(next));
+  }, []);
+
+  const handleSubmit = useCallback((submitted: string) => {
+    if (mentionToken !== null && suggestions.length > 0) {
+      insertSelected();
+      return;
+    }
+    const trimmed = submitted.trim();
+    if (!trimmed) return;
+    if (trimmed.startsWith('/')) {
+      if (onSlashCommand) { onSlashCommand(); return; }
+      if (onCommand) { onCommand(trimmed); return; }
+    }
+    onSubmit(trimmed);
+    setValue('');
+    setMentionToken(null);
+    setSuggestions([]);
+  }, [onSubmit, onCommand, onSlashCommand, mentionToken, suggestions, insertSelected]);
+
+  const showSuggestions = mentionToken !== null && suggestions.length > 0;
+
   return (
-    <box flexDirection="column" width="100%">
+    <Box flexDirection="column" width="100%">
       {showSuggestions ? (
-        <box
-          flexDirection="column"
-          backgroundColor={colors.dialogSurface}
-          paddingX={1}
-          width="100%"
-        >
+        <Box flexDirection="column" paddingX={1} borderStyle="single" borderColor={colors.info}>
           {suggestions.map((filePath, i) => {
             const isSelected = i === selectedIndex;
             return (
-              <text
-                key={filePath}
-                fg={isSelected ? colors.primary : colors.info}
-                attributes={isSelected ? TextAttributes.BOLD : TextAttributes.DIM}
-              >
-                {isSelected ? "> " : "  "}
-                {filePath}
-              </text>
+              <Text key={filePath} bold={isSelected} color={isSelected ? colors.primary : colors.info}>
+                {`${isSelected ? '> ' : '  '}${filePath}`}
+              </Text>
             );
           })}
-        </box>
+        </Box>
       ) : null}
-      <box flexDirection="row" width="100%" alignItems="center">
-        <text fg={activeColor}>{"\u276F"} </text>
-        <input
-          ref={inputRef}
-          placeholder={disabled ? "Processing..." : placeholder}
-          focused={!disabled}
-          flexGrow={1}
-          onInput={handleInput}
+      <Box flexDirection="row" borderStyle="single" borderColor={activeColor} paddingX={1}>
+        <Text color={activeColor}>{`[${mode}] `}</Text>
+        <TextInput
+          value={value}
+          onChange={handleChange}
           onSubmit={handleSubmit}
+          placeholder={disabled ? 'Processing...' : placeholder}
+          focus={!disabled}
         />
-      </box>
-    </box>
+      </Box>
+    </Box>
   );
 }

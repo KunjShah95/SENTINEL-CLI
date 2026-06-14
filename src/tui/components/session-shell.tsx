@@ -1,10 +1,10 @@
-import type { ReactNode } from 'react';
-import { InputBar } from './input-bar';
-import { Spinner } from './spinner';
-import { StatusBar } from './status-bar';
+import React, { type ReactNode } from 'react';
+import { Box, Text } from 'ink';
+import { InputBar } from './input-bar.js';
+import { Spinner } from './spinner.js';
+import { StatusBar } from './status-bar.js';
 
 type Mode = 'BUILD' | 'PLAN' | 'REVIEW' | 'SCAN' | 'FIX';
-
 type Props = {
   children: ReactNode;
   onSubmit: (value: string) => void;
@@ -19,53 +19,18 @@ type Props = {
   statusText?: string;
 };
 
-export function SessionShell({
-  children,
-  onSubmit,
-  onCommand,
-  onSlashCommand,
-  inputDisabled = false,
-  loading = false,
-  mode = 'BUILD',
-  onModeToggle,
-  onCommandPalette,
-  model,
-  statusText,
-}: Props) {
+export function SessionShell({ children, onSubmit, onCommand, onSlashCommand, inputDisabled = false, loading = false, mode = 'BUILD', onModeToggle, onCommandPalette, model, statusText }: Props) {
   return (
-    <box
-      flexDirection="column"
-      flexGrow={1}
-      width="100%"
-      height="100%"
-      paddingY={1}
-      paddingX={2}
-      gap={1}
-    >
-      <scrollbox flexGrow={1} width="100%" stickyScroll stickyStart="bottom">
-        <box flexDirection="column">
-          {(() => {
-            const c: any = children;
-            if (c == null) return null;
-            if (typeof c === 'string' || typeof c === 'number') return <text>{c}</text>;
-            if (Array.isArray(c))
-              return c.map((item, i) =>
-                typeof item === 'string' || typeof item === 'number' ? (
-                  <text key={i}>{item}</text>
-                ) : (
-                  item
-                )
-              );
-            return c;
-          })()}
-        </box>
-      </scrollbox>
+    <Box flexDirection="column" flexGrow={1} width="100%" paddingY={1} paddingX={2}>
+      <Box flexDirection="column" flexGrow={1} width="100%">
+        {children}
+      </Box>
       {loading ? (
-        <box flexShrink={0} paddingLeft={1}>
+        <Box flexShrink={0} paddingLeft={1}>
           <Spinner mode={mode} />
-        </box>
+        </Box>
       ) : null}
-      <box flexShrink={0}>
+      <Box flexShrink={0}>
         <InputBar
           onSubmit={onSubmit}
           onCommand={onCommand}
@@ -75,21 +40,11 @@ export function SessionShell({
           onModeToggle={onModeToggle}
           onCommandPalette={onCommandPalette}
         />
-      </box>
-      <box
-        flexShrink={0}
-        flexDirection="row"
-        justifyContent="space-between"
-        width="100%"
-        height={1}
-        gap={2}
-        paddingLeft={1}
-      >
+      </Box>
+      <Box flexShrink={0} flexDirection="row" justifyContent="space-between" width="100%" paddingLeft={1}>
         <StatusBar mode={mode} model={model} statusText={statusText} />
-        <box flexDirection="row" gap={1}>
-          <text>Tab: Mode | Ctrl+P: Commands</text>
-        </box>
-      </box>
-    </box>
+        <Text dimColor>{'Tab: Mode | Ctrl+P: Commands'}</Text>
+      </Box>
+    </Box>
   );
 }

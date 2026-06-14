@@ -28,6 +28,31 @@ export const COMMANDS: Command[] = [
     action: nav('/dashboard'),
   },
   {
+    name: 'review',
+    description: 'CodeRabbit-style security review of current git diff',
+    value: '/review',
+    category: 'git',
+    action: nav('/review'),
+  },
+  {
+    name: 'review-file',
+    description: 'Review a specific file for security issues',
+    value: '/review-file',
+    category: 'git',
+  },
+  {
+    name: 'review-branch',
+    description: 'Review changes vs a branch (e.g. /review-branch main)',
+    value: '/review-branch',
+    category: 'git',
+  },
+  {
+    name: 'scan',
+    description: 'Quick security scan of a path (e.g. /scan src/)',
+    value: '/scan',
+    category: 'scan',
+  },
+  {
     name: 'help',
     description: 'Show help and available commands',
     value: '/help',

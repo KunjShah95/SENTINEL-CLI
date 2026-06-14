@@ -1,10 +1,11 @@
-import { ThemeProvider } from "../providers/theme";
-import { ToastProvider } from "../providers/toast";
-import { KeyboardLayerProvider } from "../providers/keyboard-layer";
-import { DialogProvider } from "../providers/dialog";
-import { PromptConfigProvider } from "../providers/prompt-config";
-import { ThemedRoot } from "./themed-root";
-import { Outlet } from "react-router";
+import React from 'react';
+import { ThemeProvider } from '../providers/theme/index.js';
+import { ToastProvider } from '../providers/toast/index.js';
+import { KeyboardLayerProvider } from '../providers/keyboard-layer/index.js';
+import { DialogProvider } from '../providers/dialog/index.js';
+import { PromptConfigProvider } from '../providers/prompt-config/index.js';
+import { ThemedRoot } from './themed-root.js';
+import { Outlet } from 'react-router';
 
 export function RootLayout() {
   return (
