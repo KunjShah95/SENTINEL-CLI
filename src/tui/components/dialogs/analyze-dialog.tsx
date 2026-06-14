@@ -24,12 +24,9 @@ type Props = {
 export function AnalyzeDialogContent({ onSelect }: Props) {
   const { colors } = useTheme();
 
-  const handleSelect = useCallback(
-    (item: (typeof ANALYZER_MODES)[0]) => {
-      onSelect(item.id);
-    },
-    [onSelect]
-  );
+  const handleSelect = useCallback((item: (typeof ANALYZER_MODES)[0]) => {
+    onSelect(item.id);
+  }, [onSelect]);
 
   return (
     <DialogSearchList
@@ -41,13 +38,11 @@ export function AnalyzeDialogContent({ onSelect }: Props) {
       }
       renderItem={(item, isSelected) => (
         <Box flexDirection="row" gap={1}>
-          <Text color={isSelected ? colors.selection : undefined} bold={isSelected}>
-            {item.label}
-          </Text>
+          <Text bold={isSelected} color={isSelected ? colors.selection : undefined}>{item.label}</Text>
           <Text dimColor>{item.description}</Text>
         </Box>
       )}
-      getKey={(item) => item.id}
+      getKey={item => item.id}
       placeholder="Search analyzers..."
       emptyText="No matching analyzers"
     />

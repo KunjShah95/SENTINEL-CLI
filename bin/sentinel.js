@@ -36,16 +36,25 @@ if (isFlag || (firstArg && CLI_COMMANDS.has(firstArg))) {
 }
 
 async function launchTui() {
-  const tsxPath = resolve(root, 'node_modules', 'tsx', 'dist', 'cli.mjs');
-  if (existsSync(tsxPath)) {
-    const child = spawn(process.execPath, [tsxPath, tuiEntry], {
-      stdio: 'inherit',
+  const tsxEntry = resolve(root, "node_modules", "tsx", "dist", "cli.mjs");
+  if (existsSync(tsxEntry)) {
+    const child = spawn(process.execPath, [tsxEntry, tuiEntry], {
+      stdio: "inherit",
       cwd: root,
       env: { ...process.env, SENTINEL_ROOT: root },
     });
     child.on('exit', (code) => process.exit(code ?? 1));
     return;
   }
-  console.error('tsx not found. Run: npm install');
+
+  console.error("");
+  console.error("  Sentinel TUI requires tsx (already in devDependencies).");
+  console.error("  Try: npm install");
+  console.error("");
+  console.error("  CLI commands work without TUI:");
+  console.error("    sentinel login | whoami | clear | upgrade");
+  console.error("    sentinel analyze | security-audit | diff");
+  console.error("    sentinel --help");
+  console.error("");
   process.exit(1);
 }

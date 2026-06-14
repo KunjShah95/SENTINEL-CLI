@@ -30,39 +30,25 @@ export function MultiStepAnalyzeDialog({ onRun }: Props) {
   const [step, setStep] = useState<'target' | 'input' | 'confirm'>('target');
   const [target, setTarget] = useState('.');
   const [analyzersInput, setAnalyzersInput] = useState('security, quality, bugs');
-  const [customPath, setCustomPath] = useState('');
 
   const handleTargetSelect = useCallback((item: (typeof TARGETS)[0]) => {
     setTarget(item.id);
     setStep('input');
   }, []);
 
-  const handleAnalyzersSubmit = useCallback(
-    (value: string) => {
-      const raw = value || analyzersInput;
-      const selected = raw
-        .split(',')
-        .map(s => s.trim())
-        .filter(Boolean);
-      if (selected.length > 0) {
-        setAnalyzersInput(raw);
-        setStep('confirm');
-      }
-    },
-    [analyzersInput]
-  );
+  const handleAnalyzersSubmit = useCallback((value: string) => {
+    const selected = value.split(',').map(s => s.trim()).filter(Boolean);
+    if (selected.length > 0) {
+      setAnalyzersInput(value);
+      setStep('confirm');
+    }
+  }, []);
 
-  const handleConfirm = useCallback(
-    (_value: string) => {
-      const selected = analyzersInput
-        .split(',')
-        .map(s => s.trim())
-        .filter(Boolean);
-      onRun(customPath || target, selected.length > 0 ? selected : ['security', 'quality', 'bugs']);
-      close();
-    },
-    [target, analyzersInput, customPath, onRun, close]
-  );
+  const handleConfirm = useCallback((value: string) => {
+    const selected = analyzersInput.split(',').map(s => s.trim()).filter(Boolean);
+    onRun(target, selected.length > 0 ? selected : ['security', 'quality', 'bugs']);
+    close();
+  }, [target, analyzersInput, onRun, close]);
 
   if (step === 'target') {
     return (
@@ -75,7 +61,7 @@ export function MultiStepAnalyzeDialog({ onRun }: Props) {
           filterFn={(item, q) => item.label.toLowerCase().includes(q.toLowerCase())}
           renderItem={(item, isSelected) => (
             <Box flexDirection="row" gap={1}>
-              <Text color={isSelected ? colors.selection : undefined} bold={isSelected}>
+              <Text bold={isSelected} color={isSelected ? colors.selection : undefined}>
                 {item.label}
               </Text>
               <Text dimColor>{item.description}</Text>
@@ -85,9 +71,7 @@ export function MultiStepAnalyzeDialog({ onRun }: Props) {
           placeholder="Search targets..."
           emptyText="No matching targets"
         />
-        <Box flexDirection="row" gap={1} paddingTop={1}>
-          <Text dimColor>{'Press Enter to select, Esc to cancel'}</Text>
-        </Box>
+        <Text dimColor>{'Press Enter to select, Esc to cancel'}</Text>
       </Box>
     );
   }
@@ -96,8 +80,8 @@ export function MultiStepAnalyzeDialog({ onRun }: Props) {
     return (
       <Box flexDirection="column" gap={1}>
         <Text bold>{'Step 2: Select Analyzers'}</Text>
-        <Text dimColor>{'Enter comma-separated analyzer names (or press Enter for defaults):'}</Text>
-        <Box flexDirection="column" gap={1} paddingY={1}>
+        <Text dimColor>{'Enter comma-separated analyzer names:'}</Text>
+        <Box flexDirection="column" gap={0}>
           {ANALYZERS.map(a => (
             <Box key={a.id} flexDirection="row" gap={1}>
               <Text color={colors.primary}>{'●'}</Text>
@@ -106,12 +90,15 @@ export function MultiStepAnalyzeDialog({ onRun }: Props) {
             </Box>
           ))}
         </Box>
-        <TextInput
-          value={analyzersInput}
-          onChange={setAnalyzersInput}
-          onSubmit={handleAnalyzersSubmit}
-          placeholder="security, quality, bugs"
-        />
+        <Box borderStyle="single" borderColor={colors.primary} paddingX={1}>
+          <TextInput
+            value={analyzersInput}
+            onChange={setAnalyzersInput}
+            onSubmit={handleAnalyzersSubmit}
+            placeholder="security, quality, bugs"
+            focus
+          />
+        </Box>
         <Text dimColor>{'Default: security, quality, bugs'}</Text>
       </Box>
     );
@@ -120,22 +107,19 @@ export function MultiStepAnalyzeDialog({ onRun }: Props) {
   return (
     <Box flexDirection="column" gap={1}>
       <Text bold>{'Step 3: Confirm & Run'}</Text>
-      <Box flexDirection="column" gap={1} paddingY={1}>
+      <Box flexDirection="column" gap={0}>
         <Box flexDirection="row" gap={1}>
           <Text bold>{'Target:'}</Text>
-          <Text>{customPath || target}</Text>
+          <Text>{target}</Text>
         </Box>
         <Box flexDirection="row" gap={1}>
           <Text bold>{'Analyzers:'}</Text>
           <Text>{analyzersInput}</Text>
         </Box>
       </Box>
-      <TextInput
-        value=""
-        onChange={() => {}}
-        onSubmit={handleConfirm}
-        placeholder="Press Enter to run, Esc to cancel"
-      />
+      <Box borderStyle="single" borderColor={colors.success} paddingX={1}>
+        <TextInput value="" onChange={() => {}} onSubmit={handleConfirm} placeholder="Press Enter to run, Esc to cancel" focus />
+      </Box>
     </Box>
   );
 }

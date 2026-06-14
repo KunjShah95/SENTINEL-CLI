@@ -35,22 +35,20 @@ const SEVERITY_ICONS: Record<string, string> = {
   info: 'ℹ',
 };
 
-function IssueCard({ issue, icon, fg }: { issue: Issue; icon: string; fg: string }) {
+function IssueCard({ issue, icon, color }: { issue: Issue; icon: string; color: string }) {
   const { colors } = useTheme();
   return (
-    <Box flexDirection="column" width="100%">
+    <Box flexDirection="column" paddingY={0}>
       <Box flexDirection="row" gap={1}>
-        <Text color={fg}>{icon}</Text>
-        <Text bold color={fg}>{issue.title || 'Issue'}</Text>
-        {issue.line ? (
-          <Text dimColor color={colors.dimSeparator}>{`:${issue.line}`}</Text>
-        ) : null}
+        <Text color={color}>{icon}</Text>
+        <Text bold color={color}>{issue.title || 'Issue'}</Text>
+        {issue.line ? <Text dimColor color={colors.dimSeparator}>{`:${issue.line}`}</Text> : null}
         {issue.confidence ? (
           <Text dimColor color={colors.dimSeparator}>{`${Math.round(issue.confidence * 100)}%`}</Text>
         ) : null}
       </Box>
       <Box paddingLeft={2}>
-        <Text dimColor>{issue.message}</Text>
+        <Text dimColor>{issue.message || ''}</Text>
       </Box>
       {issue.file ? (
         <Box paddingLeft={2}>
@@ -95,9 +93,7 @@ export function ResultViewer({ issues, title }: Props) {
 
   return (
     <Box flexDirection="column" width="100%" paddingY={1} gap={1}>
-      {title ? (
-        <Text bold color={colors.primary}>{title}</Text>
-      ) : null}
+      {title ? <Text bold color={colors.primary}>{title}</Text> : null}
       <Text dimColor>{`${issues.length} issue${issues.length !== 1 ? 's' : ''} found`}</Text>
       {sorted.map(sev => {
         const items = grouped[sev];
@@ -105,12 +101,12 @@ export function ResultViewer({ issues, title }: Props) {
         const icon = SEVERITY_ICONS[sev] || '●';
         return (
           <Box key={sev} flexDirection="column" width="100%">
-            <Box borderStyle="single" borderColor={colors.dimSeparator} flexDirection="row" gap={1}>
+            <Box paddingY={0} flexDirection="row" gap={1}>
               <Text bold color={color}>{`${icon} ${sev.toUpperCase()}`}</Text>
               <Text dimColor>{String(items.length)}</Text>
             </Box>
             {items.map((issue, i) => (
-              <IssueCard key={i} issue={issue} icon={icon} fg={color} />
+              <IssueCard key={i} issue={issue} icon={icon} color={color} />
             ))}
           </Box>
         );

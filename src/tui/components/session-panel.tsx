@@ -1,8 +1,7 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { Sessions } from '../lib/api-client.js';
 import { useTheme } from '../providers/theme/index.js';
-import { useKeyboardLayer } from '../providers/keyboard-layer/index.js';
 
 type SessionPanelProps = {
   currentSessionId?: string;
@@ -20,12 +19,9 @@ type SessionItem = {
   model: string;
 };
 
-const PANEL_LAYER_ID = 'session-panel';
-
 function relativeDate(dateStr: string): string {
   const date = new Date(dateStr);
-  const now = Date.now();
-  const diff = now - date.getTime();
+  const diff = Date.now() - date.getTime();
   const mins = Math.floor(diff / 60000);
   if (mins < 1) return 'just now';
   if (mins < 60) return `${mins}m ago`;
@@ -52,19 +48,11 @@ function getModeColor(mode: string, colors: Record<string, string>): string {
   }
 }
 
-export function SessionPanel({
-  currentSessionId,
-  onSelect,
-  onFork,
-  onDelete,
-  onClose,
-}: SessionPanelProps) {
+export function SessionPanel({ currentSessionId, onSelect, onFork, onDelete, onClose }: SessionPanelProps) {
   const { colors } = useTheme();
-  const { push, pop, isTopLayer } = useKeyboardLayer();
   const [sessions, setSessions] = useState<SessionItem[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [loading, setLoading] = useState(true);
-  const layerPushed = useRef(false);
 
   const loadSessions = useCallback(async () => {
     setLoading(true);
@@ -72,7 +60,7 @@ export function SessionPanel({
       const list = await Sessions.list();
       list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       setSessions(list);
-      setSelectedIndex((prev) => Math.min(prev, Math.max(0, list.length - 1)));
+      setSelectedIndex(prev => Math.min(prev, Math.max(0, list.length - 1)));
     } catch {
       setSessions([]);
     } finally {
@@ -80,54 +68,23 @@ export function SessionPanel({
     }
   }, []);
 
-  useEffect(() => {
-    loadSessions();
-  }, [loadSessions]);
-
-  useEffect(() => {
-    push(PANEL_LAYER_ID);
-    layerPushed.current = true;
-    return () => {
-      if (layerPushed.current) {
-        pop(PANEL_LAYER_ID);
-        layerPushed.current = false;
-      }
-    };
-  }, [push, pop]);
+  useEffect(() => { loadSessions(); }, [loadSessions]);
 
   const handleDelete = useCallback(async (id: string) => {
     try {
       await Sessions.delete(id);
       onDelete(id);
       await loadSessions();
-    } catch {
-      // silent
-    }
+    } catch {}
   }, [loadSessions, onDelete]);
 
   useInput((input, key) => {
-    if (!isTopLayer(PANEL_LAYER_ID)) return;
-    if (key.escape) {
-      pop(PANEL_LAYER_ID);
-      layerPushed.current = false;
-      onClose();
-      return;
-    }
-    if (key.upArrow) {
-      setSelectedIndex((prev) => Math.max(0, prev - 1));
-      return;
-    }
-    if (key.downArrow) {
-      setSelectedIndex((prev) => Math.min(sessions.length - 1, prev + 1));
-      return;
-    }
+    if (key.escape) { onClose(); return; }
+    if (key.upArrow) { setSelectedIndex(prev => Math.max(0, prev - 1)); return; }
+    if (key.downArrow) { setSelectedIndex(prev => Math.min(sessions.length - 1, prev + 1)); return; }
     if (key.return) {
       const session = sessions[selectedIndex];
-      if (session) {
-        pop(PANEL_LAYER_ID);
-        layerPushed.current = false;
-        onSelect(session.id);
-      }
+      if (session) onSelect(session.id);
       return;
     }
     if (input === 'd') {
@@ -137,60 +94,36 @@ export function SessionPanel({
     }
     if (input === 'f') {
       const session = sessions[selectedIndex];
-      if (session) {
-        pop(PANEL_LAYER_ID);
-        layerPushed.current = false;
-        onFork(session.id);
-      }
+      if (session) onFork(session.id);
       return;
     }
-    if (input === 'n') {
-      pop(PANEL_LAYER_ID);
-      layerPushed.current = false;
-      onClose();
-      return;
-    }
+    if (input === 'n') { onClose(); return; }
   });
 
   return (
-    <Box
-      flexDirection="column"
-      width={28}
-      borderStyle="single"
-      borderColor={colors.dimSeparator}
-    >
-      <Box paddingX={1} paddingY={1}>
+    <Box flexDirection="column" width={28} borderStyle="single" borderColor={colors.dimSeparator}>
+      <Box paddingX={1} paddingY={0}>
         <Text bold color={colors.primary}>{'Sessions'}</Text>
       </Box>
 
-      <Box flexGrow={1} flexDirection="column" width="100%">
+      <Box flexDirection="column" flexGrow={1}>
         {loading ? (
-          <Box paddingX={1} paddingY={1}>
-            <Text dimColor color={colors.dimSeparator}>{'Loading...'}</Text>
-          </Box>
+          <Box paddingX={1}><Text dimColor>{'Loading...'}</Text></Box>
         ) : sessions.length === 0 ? (
-          <Box paddingX={1} paddingY={1}>
-            <Text dimColor color={colors.dimSeparator}>{'No sessions yet'}</Text>
-          </Box>
+          <Box paddingX={1}><Text dimColor>{'No sessions yet'}</Text></Box>
         ) : (
           sessions.map((session, i) => {
             const isSelected = i === selectedIndex;
             const isActive = session.id === currentSessionId;
             return (
-              <Box
-                key={session.id}
-                flexDirection="column"
-                paddingX={1}
-              >
-                <Box flexDirection="row" gap={1}>
-                  <Text
-                    color={isActive ? colors.primary : (isSelected ? colors.selection : undefined)}
-                    bold={isActive || isSelected}
-                  >
-                    {`${isSelected ? '> ' : '  '}${truncate(session.title, 24)}`}
-                  </Text>
-                </Box>
-                <Box flexDirection="row" gap={1}>
+              <Box key={session.id} flexDirection="column" paddingX={1}>
+                <Text
+                  bold={isActive || isSelected}
+                  color={isActive ? colors.primary : isSelected ? colors.selection : undefined}
+                >
+                  {`${isSelected ? '> ' : '  '}${truncate(session.title, 22)}`}
+                </Text>
+                <Box flexDirection="row" gap={1} paddingLeft={2}>
                   <Text dimColor color={getModeColor(session.mode, colors)}>{session.mode}</Text>
                   <Text dimColor color={colors.dimSeparator}>{relativeDate(session.createdAt)}</Text>
                 </Box>
@@ -200,12 +133,11 @@ export function SessionPanel({
         )}
       </Box>
 
-      <Box paddingX={1} paddingY={1}>
+      <Box paddingX={1}>
         <Text color={colors.primary}>{'+ New Session'}</Text>
       </Box>
-
-      <Box paddingX={1}>
-        <Text dimColor color={colors.dimSeparator}>{'↑↓ navigate | Enter select | f fork | d del | n new'}</Text>
+      <Box paddingX={1} paddingBottom={0}>
+        <Text dimColor color={colors.dimSeparator}>{'↑↓ nav  Enter sel  f fork  d del  Esc close'}</Text>
       </Box>
     </Box>
   );

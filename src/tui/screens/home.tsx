@@ -1,17 +1,19 @@
 import React, { useCallback, useState } from 'react';
 import { Box, Text, useInput, useApp } from 'ink';
 import TextInput from 'ink-text-input';
+import { useTheme } from '../providers/theme/index.js';
 import { useNavigate } from 'react-router';
 import { useTheme } from '../providers/theme/index.js';
 
 type Mode = 'BUILD' | 'PLAN' | 'REVIEW' | 'SCAN' | 'FIX';
 
 const QUICK_ACTIONS = [
-  { cmdKey: 'review', description: 'CodeRabbit-style security review', color: '#DC2626' },
+  { cmdKey: 'review', description: 'CodeRabbit-style security review of git diff', color: '#DC2626' },
   { cmdKey: 'analyze', description: 'Analyze code for issues', color: '#60A5FA' },
   { cmdKey: 'full-scan', description: 'Run all available analyzers', color: '#F59E0B' },
   { cmdKey: 'security', description: 'Comprehensive security audit', color: '#EF4444' },
   { cmdKey: 'diff', description: 'Review staged changes', color: '#34D399' },
+  { cmdKey: 'agents', description: 'Run multi-agent pipeline', color: '#7C3AED' },
   { cmdKey: 'fix', description: 'Auto-fix detected issues', color: '#10B981' },
   { cmdKey: 'status', description: 'Show system status', color: '#88C0D0' },
   { cmdKey: 'help', description: 'Show available commands', color: '#81A1C1' },
@@ -44,7 +46,11 @@ export function Home() {
     }
   });
 
-  const modeColor = mode === 'REVIEW' ? colors.critical : mode === 'PLAN' ? colors.planMode : mode === 'SCAN' ? colors.warning : mode === 'FIX' ? colors.error : colors.primary;
+  const modeColor = mode === 'REVIEW' ? colors.critical
+    : mode === 'PLAN' ? colors.planMode
+    : mode === 'SCAN' ? colors.warning
+    : mode === 'FIX' ? colors.error
+    : colors.primary;
 
   return (
     <Box flexDirection="column" padding={2}>
@@ -53,7 +59,7 @@ export function Home() {
         <Text dimColor>{'AI-Powered Security Code Guardian'}</Text>
       </Box>
 
-      <Box borderStyle="round" borderColor={colors.critical} paddingX={2} paddingY={0} marginBottom={1}>
+      <Box borderStyle="round" borderColor={colors.critical} paddingX={2} marginBottom={1}>
         <Text bold color={colors.critical}>{'🔴 SECURITY REVIEW  '}</Text>
         <Text color={colors.primary}>{'CodeRabbit-style AI review  '}</Text>
         <Text dimColor>{'Ctrl+R  /review'}</Text>
@@ -76,7 +82,12 @@ export function Home() {
 
       <Box borderStyle="single" borderColor={modeColor} paddingX={1}>
         <Text color={modeColor}>{`[${mode}] `}</Text>
-        <TextInput value={inputValue} onChange={setInputValue} onSubmit={handleSubmit} placeholder="Type a message or /command..." />
+        <TextInput
+          value={inputValue}
+          onChange={setInputValue}
+          onSubmit={handleSubmit}
+          placeholder="Type a message or /command..."
+        />
       </Box>
 
       <Box marginTop={1}>

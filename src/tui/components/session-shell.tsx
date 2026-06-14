@@ -21,8 +21,8 @@ type Props = {
 
 export function SessionShell({ children, onSubmit, onCommand, onSlashCommand, inputDisabled = false, loading = false, mode = 'BUILD', onModeToggle, onCommandPalette, model, statusText }: Props) {
   return (
-    <Box flexDirection="column" flexGrow={1} width="100%" paddingY={1} paddingX={2} gap={1}>
-      <Box flexGrow={1} flexDirection="column" overflow="hidden">
+    <Box flexDirection="column" flexGrow={1} width="100%" paddingY={1} paddingX={2}>
+      <Box flexDirection="column" flexGrow={1} width="100%">
         {children}
       </Box>
       {loading ? (
@@ -41,9 +41,9 @@ export function SessionShell({ children, onSubmit, onCommand, onSlashCommand, in
           onCommandPalette={onCommandPalette}
         />
       </Box>
-      <Box flexShrink={0} flexDirection="row" justifyContent="space-between">
+      <Box flexShrink={0} flexDirection="row" justifyContent="space-between" width="100%" paddingLeft={1}>
         <StatusBar mode={mode} model={model} statusText={statusText} />
-        <Text dimColor>{'Tab:Mode  Ctrl+P:Commands'}</Text>
+        <Text dimColor>{'Tab: Mode | Ctrl+P: Commands'}</Text>
       </Box>
     </Box>
   );

@@ -8,13 +8,10 @@ export function ThemeDialogContent() {
   const { themes, setTheme, theme: currentTheme } = useTheme();
   const dialog = useDialog();
 
-  const handleSelect = useCallback(
-    (t: (typeof themes)[0]) => {
-      setTheme(t.name);
-      dialog.close();
-    },
-    [setTheme, dialog]
-  );
+  const handleSelect = useCallback((t: (typeof themes)[0]) => {
+    setTheme(t.name);
+    dialog.close();
+  }, [setTheme, dialog]);
 
   return (
     <DialogSearchList
@@ -23,10 +20,10 @@ export function ThemeDialogContent() {
       filterFn={(item, query) => item.name.toLowerCase().includes(query.toLowerCase())}
       renderItem={(item, isSelected) => (
         <Text color={isSelected ? currentTheme.colors.selection : undefined}>
-          {`${item.name === currentTheme.name ? ' • ' : '   '}${item.name}`}
+          {item.name === currentTheme.name ? ' • ' : '   '}{item.name}
         </Text>
       )}
-      getKey={(item) => item.name}
+      getKey={item => item.name}
       placeholder="Search themes..."
       emptyText="No matching themes"
     />

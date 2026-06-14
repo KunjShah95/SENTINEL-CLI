@@ -17,29 +17,22 @@ type Props = {
 export function ScanDialogContent({ onSelect }: Props) {
   const { colors } = useTheme();
 
-  const handleSelect = useCallback(
-    (item: (typeof SCAN_TARGETS)[0]) => {
-      onSelect(item.id);
-    },
-    [onSelect]
-  );
+  const handleSelect = useCallback((item: (typeof SCAN_TARGETS)[0]) => {
+    onSelect(item.id);
+  }, [onSelect]);
 
   return (
     <DialogSearchList
       items={SCAN_TARGETS}
       onSelect={handleSelect}
-      filterFn={(item, query) =>
-        item.label.toLowerCase().includes(query.toLowerCase())
-      }
+      filterFn={(item, query) => item.label.toLowerCase().includes(query.toLowerCase())}
       renderItem={(item, isSelected) => (
         <Box flexDirection="row" gap={1}>
-          <Text color={isSelected ? colors.selection : undefined} bold={isSelected}>
-            {item.label}
-          </Text>
+          <Text bold={isSelected} color={isSelected ? colors.selection : undefined}>{item.label}</Text>
           <Text dimColor>{item.description}</Text>
         </Box>
       )}
-      getKey={(item) => item.id}
+      getKey={item => item.id}
       placeholder="Select scan target..."
       emptyText="No matching targets"
     />

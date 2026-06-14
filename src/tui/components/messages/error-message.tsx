@@ -7,9 +7,11 @@ type Props = { message: string };
 export function ErrorMessage({ message }: Props) {
   const { colors } = useTheme();
   return (
-    <Box width="100%" alignItems="center">
-      <Box borderStyle="single" borderColor={colors.error} width="100%" paddingX={2} paddingY={0}>
-        <Text dimColor>{message}</Text>
+    <Box width="100%" paddingY={1} paddingX={1}>
+      <Box borderStyle="single" borderColor={colors.error} paddingX={2} paddingY={1} width="100%">
+        <Text color={colors.error} dimColor>
+          {`Error: ${message}`}
+        </Text>
       </Box>
     </Box>
   );

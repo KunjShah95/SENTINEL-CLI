@@ -49,9 +49,7 @@ export function Session() {
   const commandCtx: CommandContext = {
     exit: () => process.exit(0),
     navigate: (path: string) => navigate(path),
-    execute: (action: string) => {
-      submit(`/${action}`);
-    },
+    execute: (action: string) => { submit(`/${action}`); },
     mode,
     setMode: handleSetMode,
   };
@@ -60,14 +58,8 @@ export function Session() {
     (value: string) => {
       if (value.startsWith('/')) {
         const cmd = value.replace(/^\//, '').split(/\s+/)[0].toLowerCase();
-        if (cmd === 'clear') {
-          clear();
-          return;
-        }
-        if (cmd === 'new') {
-          navigate('/');
-          return;
-        }
+        if (cmd === 'clear') { clear(); return; }
+        if (cmd === 'new') { navigate('/'); return; }
         if (cmd === 'wizard') {
           dialog.open({
             title: 'Multi-Step Analysis Wizard',
@@ -85,23 +77,12 @@ export function Session() {
                   try {
                     const result = await TOOLS.analyze.execute({ files: target });
                     if (result.output) {
-                      appendMessage({
-                        role: 'assistant',
-                        mode,
-                        model,
-                        parts: [{ type: 'text', text: result.output }],
-                      });
+                      appendMessage({ role: 'assistant', mode, model, parts: [{ type: 'text', text: result.output }] });
                     } else {
-                      appendMessage({
-                        role: 'error',
-                        parts: [{ type: 'text', text: result.error || 'Analysis failed' }],
-                      });
+                      appendMessage({ role: 'error', parts: [{ type: 'text', text: result.error || 'Analysis failed' }] });
                     }
                   } catch (e) {
-                    appendMessage({
-                      role: 'error',
-                      parts: [{ type: 'text', text: String(e) }],
-                    });
+                    appendMessage({ role: 'error', parts: [{ type: 'text', text: String(e) }] });
                   }
                 }}
               />
@@ -109,32 +90,51 @@ export function Session() {
           });
           return;
         }
-        if (cmd === 'mode') {
-          toggleMode();
-          return;
-        }
+        if (cmd === 'mode') { toggleMode(); return; }
         if (cmd === 'review') {
           const arg = value.replace(/^\/review\s*/i, '').trim();
-          if (!arg) {
-            navigate('/review');
-            return;
-          }
+          if (!arg) { navigate('/review'); return; }
           const prevMode = mode;
           setMode('REVIEW' as AgentMode);
           (async () => {
             try {
               const { getGitDiff, buildReviewPrompt } = await import('../lib/security-reviewer.js');
               const diff = getGitDiff({ file: arg });
-              if (!diff) {
-                toast.info(`No changes detected for ${arg}.`);
-                setMode(prevMode);
-                return;
-              }
+              if (!diff) { toast.info(`No changes detected for ${arg}.`); setMode(prevMode); return; }
               submit(buildReviewPrompt(diff, { files: [arg], focus: 'security' }));
-            } catch (e) {
-              toast.error('Review failed: ' + String(e));
-              setMode(prevMode);
-            }
+            } catch (e) { toast.error('Review failed: ' + String(e)); setMode(prevMode); }
+          })();
+          return;
+        }
+        if (cmd === 'review-branch') {
+          const branch = value.replace(/^\/review-branch\s*/i, '').trim();
+          if (!branch) { toast.error('Usage: /review-branch <branch-name>'); return; }
+          const prevMode = mode;
+          setMode('REVIEW' as AgentMode);
+          (async () => {
+            try {
+              const { getGitDiff, getChangedFiles, buildReviewPrompt } = await import('../lib/security-reviewer.js');
+              const diff = getGitDiff({ branch });
+              if (!diff) { toast.info(`No changes detected vs ${branch}.`); setMode(prevMode); return; }
+              const files = getChangedFiles({ branch });
+              submit(buildReviewPrompt(diff, { files, focus: 'all' }));
+            } catch (e) { toast.error('Review failed: ' + String(e)); setMode(prevMode); }
+          })();
+          return;
+        }
+        if (cmd === 'review-file') {
+          const file = value.replace(/^\/review-file\s*/i, '').trim();
+          if (!file) { toast.error('Usage: /review-file <path>'); return; }
+          navigate('/review');
+          return;
+        }
+        if (cmd === 'scan') {
+          const target = value.replace(/^\/scan\s*/i, '').trim() || '.';
+          (async () => {
+            try {
+              const result = await TOOLS.securityAudit.execute({ files: target });
+              appendMessage({ role: 'assistant', mode, model, parts: [{ type: 'text', text: result.output || result.error || 'Scan complete.' }] });
+            } catch (e) { toast.error('Scan failed: ' + String(e)); }
           })();
           return;
         }
@@ -192,41 +192,24 @@ export function Session() {
               const result = await executeLocalTool('undoLastChange', {}, 'BUILD');
               if (result?.success) {
                 toast.success(result.message || 'Changes undone.');
-                appendMessage({
-                  role: 'assistant',
-                  mode,
-                  model,
-                  parts: [{ type: 'text', text: `✅ Undo complete: ${result.message}` }],
-                });
+                appendMessage({ role: 'assistant', mode, model, parts: [{ type: 'text', text: `✅ Undo complete: ${result.message}` }] });
               } else {
                 toast.error('No checkpoints available.');
               }
-            } catch (e) {
-              toast.error('Undo failed: ' + String(e));
-            }
+            } catch (e) { toast.error('Undo failed: ' + String(e)); }
           })();
           return;
         }
         if (cmd === 'background') {
           const prompt = value.replace(/^\/background\s*/i, '').trim();
-          if (!prompt) {
-            toast.error('Usage: /background <prompt>');
-            return;
-          }
+          if (!prompt) { toast.error('Usage: /background <prompt>'); return; }
           (async () => {
             try {
               const { launchBackgroundAgent } = await import('../../agents/background-agent.js');
               const agent = launchBackgroundAgent(prompt);
               toast.success(`Background agent launched: ${agent.id}`);
-              appendMessage({
-                role: 'assistant',
-                mode,
-                model,
-                parts: [{ type: 'text', text: `🚀 Background agent \`${agent.id}\` started.\nPrompt: "${prompt.slice(0, 80)}"\nCheck status with /agents` }],
-              });
-            } catch (e) {
-              toast.error('Failed to launch agent: ' + String(e));
-            }
+              appendMessage({ role: 'assistant', mode, model, parts: [{ type: 'text', text: `🚀 Background agent \`${agent.id}\` started.\nPrompt: "${prompt.slice(0, 80)}"\nCheck status with /agents` }] });
+            } catch (e) { toast.error('Failed to launch agent: ' + String(e)); }
           })();
           return;
         }
@@ -235,22 +218,10 @@ export function Session() {
             try {
               const { listAgents } = await import('../../agents/background-agent.js');
               const agents = listAgents();
-              if (agents.length === 0) {
-                toast.info('No background agents running.');
-                return;
-              }
-              const lines = agents.map((a: any) =>
-                `• ${a.id} — ${a.status} (${a.elapsed}) — "${a.prompt}"`
-              ).join('\n');
-              appendMessage({
-                role: 'assistant',
-                mode,
-                model,
-                parts: [{ type: 'text', text: `**Background Agents:**\n${lines}` }],
-              });
-            } catch (e) {
-              toast.error('Failed to list agents: ' + String(e));
-            }
+              if (agents.length === 0) { toast.info('No background agents running.'); return; }
+              const lines = agents.map((a: any) => `• ${a.id} — ${a.status} (${a.elapsed}) — "${a.prompt}"`).join('\n');
+              appendMessage({ role: 'assistant', mode, model, parts: [{ type: 'text', text: `**Background Agents:**\n${lines}` }] });
+            } catch (e) { toast.error('Failed to list agents: ' + String(e)); }
           })();
           return;
         }
@@ -284,9 +255,7 @@ export function Session() {
       if (session.mode === 'BUILD' || session.mode === 'PLAN' || session.mode === 'REVIEW') setMode(session.mode as AgentMode);
       if (session.model) setModel(session.model);
       setShowSessionPanel(false);
-    } catch {
-      toast.error('Failed to load session');
-    }
+    } catch { toast.error('Failed to load session'); }
   }, [clear, appendMessage, setMode, setModel, toast]);
 
   const handleForkSession = useCallback(async (id: string) => {
@@ -302,20 +271,16 @@ export function Session() {
       if (!newSession) { toast.error('Failed to create session'); return; }
       await handleSelectSession(newSession.id);
       toast.success('Session forked');
-    } catch {
-      toast.error('Failed to fork session');
-    }
+    } catch { toast.error('Failed to fork session'); }
   }, [handleSelectSession, toast]);
 
   const handleDeleteSession = useCallback((_id: string) => {
-    if (messages.length > 0) {
-      clear();
-    }
+    if (messages.length > 0) clear();
   }, [clear, messages.length]);
 
   useInput((input, key) => {
     if (key.ctrl && input === 's') {
-      setShowSessionPanel((v) => !v);
+      setShowSessionPanel(v => !v);
     }
   });
 
@@ -360,11 +325,11 @@ export function Session() {
           ) : null}
           {messages.map(msg => {
             if (msg.role === 'error') {
-              const text = msg.parts.find(p => p.type === 'text')?.text || 'Unknown error';
+              const text = msg.parts.find((p: any) => p.type === 'text')?.text || 'Unknown error';
               return <ErrorMessage key={msg.id} message={text} />;
             }
             if (msg.role === 'user') {
-              const text = msg.parts.find(p => p.type === 'text')?.text || '';
+              const text = msg.parts.find((p: any) => p.type === 'text')?.text || '';
               return <UserMessage key={msg.id} message={text} mode={msg.mode || mode} />;
             }
             if (msg.role === 'assistant') {
