@@ -83,9 +83,16 @@ export async function getErrorMessage(response) {
   return response.statusText || `Request failed with status ${response.status}`;
 }
 
+async function sleep(ms) {
+  return new Promise(r => setTimeout(r, ms));
+}
+
 /**
  * Tiny request helper. Avoids the `hono/client` import (which would
  * require a build step) by encoding routes manually.
+ *
+ * Retries on 429 (rate-limited) and 503 (service unavailable) with
+ * backoff. Other errors are thrown immediately.
  */
 export async function api(method, path, body) {
   const base = process.env.SENTINEL_API_URL || process.env.API_URL || "http://localhost:3000";
@@ -95,8 +102,32 @@ export async function api(method, path, body) {
     init.headers = { "Content-Type": "application/json" };
     init.body = JSON.stringify(body);
   }
-  const res = await authedFetch(url, init);
-  return res;
+
+  const MAX_RETRIES = 3;
+  let lastRes;
+
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    const res = await authedFetch(url, init);
+
+    if (res.status === 429) {
+      if (attempt === MAX_RETRIES) { lastRes = res; break; }
+      const retryAfter = res.headers.get('Retry-After');
+      const waitMs = retryAfter ? parseFloat(retryAfter) * 1000 : 2000;
+      await sleep(waitMs);
+      continue;
+    }
+
+    if (res.status === 503) {
+      if (attempt === MAX_RETRIES) { lastRes = res; break; }
+      const waitMs = 1000 * Math.pow(2, attempt);
+      await sleep(waitMs);
+      continue;
+    }
+
+    return res;
+  }
+
+  return lastRes;
 }
 
 /**

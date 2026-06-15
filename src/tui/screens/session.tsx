@@ -29,10 +29,19 @@ export function Session() {
 
   const {
     messages, loading, mode, setMode, toggleMode,
-    submit, stop, clear, appendMessage, model, setModel, status,
+    submit, stop, clear, appendMessage, model, setModel, status, sessionId,
+    serverStatus,
   } = useAgentChat({
     initialMode: initialMode === 'BUILD' || initialMode === 'PLAN' || initialMode === 'REVIEW' ? initialMode : undefined,
   });
+
+  const tokenUsage = {
+    estimated: messages.reduce((acc, m) =>
+      acc + m.parts.reduce((s, p) => s + (p.type === 'text' || p.type === 'reasoning' ? (p as any).text?.length ?? 0 : 0), 0), 0
+    ) / 4,
+    limit: 40000,
+    get percentage() { return Math.min(100, Math.round(this.estimated / this.limit * 100)); },
+  };
   const [showCommands, setShowCommands] = useState(false);
   const [showSessionPanel, setShowSessionPanel] = useState(false);
   const dialog = useDialog();
@@ -99,9 +108,14 @@ export function Session() {
           (async () => {
             try {
               const { getGitDiff, buildReviewPrompt } = await import('../lib/security-reviewer.js');
+              const { injectContextIntoPrompt } = await import('../lib/context-file.js');
+              const { runSast, formatSastForPrompt } = await import('../lib/sast-runner.js');
               const diff = getGitDiff({ file: arg });
               if (!diff) { toast.info(`No changes detected for ${arg}.`); setMode(prevMode); return; }
-              submit(buildReviewPrompt(diff, { files: [arg], focus: 'security' }));
+              const [sast] = await Promise.all([runSast()]);
+              const sastSummary = sast.findings.length > 0 ? formatSastForPrompt(sast) : undefined;
+              const basePrompt = buildReviewPrompt(diff, { files: [arg], focus: 'security', sastSummary });
+              submit(injectContextIntoPrompt(basePrompt));
             } catch (e) { toast.error('Review failed: ' + String(e)); setMode(prevMode); }
           })();
           return;
@@ -114,10 +128,15 @@ export function Session() {
           (async () => {
             try {
               const { getGitDiff, getChangedFiles, buildReviewPrompt } = await import('../lib/security-reviewer.js');
+              const { injectContextIntoPrompt } = await import('../lib/context-file.js');
+              const { runSast, formatSastForPrompt } = await import('../lib/sast-runner.js');
               const diff = getGitDiff({ branch });
               if (!diff) { toast.info(`No changes detected vs ${branch}.`); setMode(prevMode); return; }
               const files = getChangedFiles({ branch });
-              submit(buildReviewPrompt(diff, { files, focus: 'all' }));
+              const sast = await runSast();
+              const sastSummary = sast.findings.length > 0 ? formatSastForPrompt(sast) : undefined;
+              const basePrompt = buildReviewPrompt(diff, { files, focus: 'all', sastSummary });
+              submit(injectContextIntoPrompt(basePrompt));
             } catch (e) { toast.error('Review failed: ' + String(e)); setMode(prevMode); }
           })();
           return;
@@ -178,8 +197,171 @@ export function Session() {
           })();
           return;
         }
+        if (cmd === 'loop') {
+          navigate('/loop');
+          return;
+        }
+        if (cmd === 'watch') {
+          navigate('/loop');
+          toast.info('Loop Engine opened. Select Watch Loop and press Enter.');
+          return;
+        }
+        if (cmd === 'pipeline') {
+          navigate('/loop');
+          toast.info('Loop Engine opened. Select Pipeline Loop and press Enter.');
+          return;
+        }
+        if (cmd === 'ci') {
+          navigate('/loop');
+          toast.info('Loop Engine opened. Select CI Loop and press Enter.');
+          return;
+        }
+        if (cmd === 'sast') {
+          const target = value.replace(/^\/sast\s*/i, '').trim() || '.';
+          (async () => {
+            try {
+              appendMessage({ role: 'user', mode, model, parts: [{ type: 'text', text: `/sast ${target}` }] });
+              const { runSast, formatSastForPrompt } = await import('../lib/sast-runner.js');
+              toast.info('Running SAST analysis…');
+              const result = await runSast({ target });
+              const formatted = formatSastForPrompt(result);
+              appendMessage({ role: 'assistant', mode, model, parts: [{ type: 'text', text: formatted }] });
+              if (result.errors.length > 0) toast.error(`SAST warnings: ${result.errors.slice(0, 2).join('; ')}`);
+            } catch (e) { toast.error('SAST failed: ' + String(e)); }
+          })();
+          return;
+        }
+        if (cmd === 'commit') {
+          (async () => {
+            try {
+              const { getGitDiff, getChangedFiles } = await import('../lib/security-reviewer.js');
+              const diff = getGitDiff({ staged: true }) || getGitDiff();
+              if (!diff) { toast.error('No changes to commit.'); return; }
+              const files = getChangedFiles({ staged: true });
+              const prompt = `Generate a concise git commit message for these changes. Output ONLY the commit message (subject line + optional body). No preamble.\n\nChanged files: ${files.join(', ')}\n\n\`\`\`diff\n${diff.slice(0, 6000)}\n\`\`\``;
+              const prevMode = mode;
+              setMode('PLAN' as AgentMode);
+              await submit(prompt);
+              setMode(prevMode);
+            } catch (e) { toast.error('Commit generation failed: ' + String(e)); }
+          })();
+          return;
+        }
+        if (cmd === 'context') {
+          (async () => {
+            try {
+              const { loadContextFiles, createDefaultContextFile } = await import('../lib/context-file.js');
+              const files = loadContextFiles();
+              if (files.length === 0) {
+                createDefaultContextFile();
+                toast.success('Created SENTINEL.md — edit it to add project context.');
+                appendMessage({ role: 'assistant', mode, model, parts: [{ type: 'text', text: '## Context File Created\n\nA `SENTINEL.md` file was created in your project root. Edit it to add:\n- Project overview\n- Security-sensitive areas\n- Architecture notes\n- Areas to exclude from review\n\nSentinel will auto-inject this context into every review.' }] });
+              } else {
+                const content = files.map(f => `**${f.source}** (${f.content.length} chars)\n\`\`\`\n${f.content.slice(0, 500)}${f.content.length > 500 ? '\n...' : ''}\n\`\`\``).join('\n\n');
+                appendMessage({ role: 'assistant', mode, model, parts: [{ type: 'text', text: `## Active Context Files\n\n${content}` }] });
+              }
+            } catch (e) { toast.error('Context command failed: ' + String(e)); }
+          })();
+          return;
+        }
+        if (cmd === 'parallel') {
+          const target = value.replace(/^\/parallel\s*/i, '').trim();
+          (async () => {
+            try {
+              const { getGitDiff, getChangedFiles } = await import('../lib/security-reviewer.js');
+              const diff = getGitDiff();
+              if (!diff) { toast.error('No git diff found for parallel scan.'); return; }
+              const files = getChangedFiles();
+              toast.info('Launching 4 specialist agents in parallel…');
+              const { runParallelAgents } = await import('../lib/parallel-agents.js');
+              const result = await runParallelAgents(diff, files, async (prompt, m) => {
+                const prevMode = mode;
+                setMode((m || 'REVIEW') as AgentMode);
+                await submit(prompt);
+                setMode(prevMode);
+                return '';
+              }, {
+                onProgress: (agent, done) => {
+                  if (done) toast.info(`Agent done: ${agent}`);
+                },
+              });
+              const summary = `## Parallel Scan Complete\n\n**${result.mergedIssues.length} unique issues** across ${result.agentResults.length} agents\n\n${result.agentResults.map(a => `- **${a.agent}**: ${a.issues.length} issues (${Math.round(a.durationMs / 1000)}s)`).join('\n')}`;
+              appendMessage({ role: 'assistant', mode, model, parts: [{ type: 'text', text: summary }] });
+            } catch (e) { toast.error('Parallel scan failed: ' + String(e)); }
+          })();
+          return;
+        }
+        if (cmd === 'models') {
+          (async () => {
+            try {
+              const { SUPPORTED_CHAT_MODELS } = await import('../../shared/models/index.js');
+              const byProvider: Record<string, string[]> = {};
+              for (const m of SUPPORTED_CHAT_MODELS as any[]) {
+                if (!byProvider[m.provider]) byProvider[m.provider] = [];
+                const price = m.inputUsdPerMillionTokens > 0
+                  ? ` ($${m.inputUsdPerMillionTokens}/$${m.outputUsdPerMillionTokens} per M)`
+                  : ' (free/local)';
+                const flag = m.thinking ? ' 🧠' : '';
+                byProvider[m.provider].push(`  \`${m.id}\` — ${m.label}${flag}${price}`);
+              }
+              const lines = ['## Available Models by Provider', ''];
+              for (const [provider, models] of Object.entries(byProvider)) {
+                lines.push(`### ${provider.charAt(0).toUpperCase() + provider.slice(1)}`);
+                lines.push(...models);
+                lines.push('');
+              }
+              lines.push('> Switch model: type the model ID in your message, or set `MODEL=<id>` env var.');
+              appendMessage({ role: 'assistant', mode, model, parts: [{ type: 'text', text: lines.join('\n') }] });
+            } catch (e) { toast.error('Failed to list models: ' + String(e)); }
+          })();
+          return;
+        }
+        if (cmd === 'health') {
+          (async () => {
+            try {
+              const { checkServerHealth } = await import('../lib/api-client.js');
+              const serverOk = await checkServerHealth();
+              const mem = process.memoryUsage();
+              const uptime = process.uptime();
+              const uptimeStr = `${Math.floor(uptime / 60)}m ${Math.floor(uptime % 60)}s`;
+              const heapMB = (mem.heapUsed / 1024 / 1024).toFixed(1);
+              const rssMB = (mem.rss / 1024 / 1024).toFixed(1);
+              const providerChecks: Array<[string, boolean]> = [
+                ['Anthropic', !!process.env.ANTHROPIC_API_KEY],
+                ['OpenAI', !!process.env.OPENAI_API_KEY],
+                ['Gemini', !!(process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GEMINI_API_KEY)],
+                ['Groq', !!process.env.GROQ_API_KEY],
+                ['Mistral', !!process.env.MISTRAL_API_KEY],
+                ['DeepSeek', !!process.env.DEEPSEEK_API_KEY],
+                ['xAI/Grok', !!process.env.XAI_API_KEY],
+                ['Together', !!process.env.TOGETHER_API_KEY],
+                ['Fireworks', !!process.env.FIREWORKS_API_KEY],
+                ['Perplexity', !!process.env.PERPLEXITY_API_KEY],
+                ['OpenRouter', !!process.env.OPENROUTER_API_KEY],
+                ['Ollama', !!(process.env.OLLAMA_HOST || true)],
+                ['LM Studio', !!(process.env.LMSTUDIO_HOST || true)],
+              ];
+              const activeProviders = providerChecks.filter(([, ok]) => ok).map(([n]) => `${n} ✓`).join(' · ');
+              const providers = activeProviders || 'None configured — set ANTHROPIC_API_KEY etc.';
+              const tokenEst = Math.round(tokenUsage.estimated);
+              const healthText = [
+                '## System Health',
+                '',
+                `**Server:** ${serverOk ? '🟢 Connected (localhost:3000)' : '🔴 Offline — running in local mode'}`,
+                `**Uptime:** ${uptimeStr}  **Memory:** ${heapMB}MB heap / ${rssMB}MB RSS`,
+                `**Model:** ${model}  **Mode:** ${mode}`,
+                `**Context:** ~${tokenEst.toLocaleString()} tokens used of 40,000 limit (${tokenUsage.percentage}%)`,
+                `**AI Providers:** ${providers}`,
+                '',
+                serverOk ? '' : '> Tip: `npm run sentinel:server` starts the API server for session persistence.',
+              ].filter(l => l !== undefined).join('\n');
+              appendMessage({ role: 'assistant', mode, model, parts: [{ type: 'text', text: healthText }] });
+            } catch (e) { toast.error('Health check failed: ' + String(e)); }
+          })();
+          return;
+        }
         if (cmd === 'help') {
-          toast.info('Commands: /clear /new /wizard /mode /review [file] /review-branch <branch> /scan [path] /undo /background /agents /help');
+          toast.info('Commands: /clear /new /wizard /mode /review /loop /watch /pipeline /ci /scan /sast /commit /context /parallel /health /undo /background /agents /help');
           return;
         }
         toast.error('Unknown command. Type /help for commands.');
@@ -269,7 +451,10 @@ export function Session() {
           onModeToggle={handleModeToggle}
           onCommandPalette={handleCommandPalette}
           model={model}
-          statusText={`${messages.length} msgs | ${theme.name}`}
+          sessionId={sessionId ?? undefined}
+          statusText={`${messages.length} msgs · ${theme.name}`}
+          tokenUsage={tokenUsage.estimated > 0 ? tokenUsage : undefined}
+          serverStatus={serverStatus}
         >
           {messages.length === 0 ? (
             <Box padding={2} alignItems="center" justifyContent="center">
@@ -278,12 +463,12 @@ export function Session() {
           ) : null}
           {messages.map(msg => {
             if (msg.role === 'error') {
-              const text = msg.parts.find((p: any) => p.type === 'text')?.text || 'Unknown error';
-              return <ErrorMessage key={msg.id} message={text} />;
+              const textPart = msg.parts.find((p): p is { type: 'text'; text: string } => p.type === 'text');
+              return <ErrorMessage key={msg.id} message={textPart?.text || 'Unknown error'} />;
             }
             if (msg.role === 'user') {
-              const text = msg.parts.find((p: any) => p.type === 'text')?.text || '';
-              return <UserMessage key={msg.id} message={text} mode={msg.mode || mode} />;
+              const textPart = msg.parts.find((p): p is { type: 'text'; text: string } => p.type === 'text');
+              return <UserMessage key={msg.id} message={textPart?.text || ''} mode={msg.mode || mode} />;
             }
             if (msg.role === 'assistant') {
               return <BotMessage key={msg.id} parts={msg.parts} model={msg.model || model} />;

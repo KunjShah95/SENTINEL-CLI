@@ -84,6 +84,52 @@ export async function streamWithAiSdk({
   } else if (provider === "google") {
     const { google } = await import("@ai-sdk/google");
     modelFn = google(modelId);
+  } else if (provider === "groq") {
+    const { createGroq } = await import("@ai-sdk/groq");
+    const groq = createGroq({ apiKey: process.env.GROQ_API_KEY });
+    modelFn = groq(modelId);
+  } else if (provider === "mistral") {
+    const { createMistral } = await import("@ai-sdk/mistral");
+    const mistral = createMistral({ apiKey: process.env.MISTRAL_API_KEY });
+    modelFn = mistral(modelId);
+  } else if (provider === "deepseek") {
+    // DeepSeek is OpenAI-compatible
+    const { createOpenAI } = await import("@ai-sdk/openai");
+    const deepseek = createOpenAI({ baseURL: "https://api.deepseek.com/v1", apiKey: process.env.DEEPSEEK_API_KEY });
+    modelFn = deepseek(modelId);
+  } else if (provider === "xai") {
+    const { createOpenAI } = await import("@ai-sdk/openai");
+    const xai = createOpenAI({ baseURL: "https://api.x.ai/v1", apiKey: process.env.XAI_API_KEY });
+    modelFn = xai(modelId);
+  } else if (provider === "together") {
+    const { createOpenAI } = await import("@ai-sdk/openai");
+    const together = createOpenAI({ baseURL: "https://api.together.xyz/v1", apiKey: process.env.TOGETHER_API_KEY });
+    modelFn = together(modelId);
+  } else if (provider === "fireworks") {
+    const { createOpenAI } = await import("@ai-sdk/openai");
+    const fireworks = createOpenAI({ baseURL: "https://api.fireworks.ai/inference/v1", apiKey: process.env.FIREWORKS_API_KEY });
+    modelFn = fireworks(modelId);
+  } else if (provider === "perplexity") {
+    const { createOpenAI } = await import("@ai-sdk/openai");
+    const perplexity = createOpenAI({ baseURL: "https://api.perplexity.ai", apiKey: process.env.PERPLEXITY_API_KEY });
+    modelFn = perplexity(modelId);
+  } else if (provider === "openrouter") {
+    const { createOpenAI } = await import("@ai-sdk/openai");
+    const bare = modelId.replace(/^openrouter\//, "");
+    const openrouter = createOpenAI({ baseURL: "https://openrouter.ai/api/v1", apiKey: process.env.OPENROUTER_API_KEY });
+    modelFn = openrouter(bare);
+  } else if (provider === "ollama") {
+    const { createOpenAI } = await import("@ai-sdk/openai");
+    const base = process.env.OLLAMA_HOST || "http://localhost:11434";
+    const bare = modelId.replace(/^ollama\//, "");
+    const ollama = createOpenAI({ baseURL: `${base}/v1`, apiKey: "ollama" });
+    modelFn = ollama(bare);
+  } else if (provider === "lmstudio") {
+    const { createOpenAI } = await import("@ai-sdk/openai");
+    const base = process.env.LMSTUDIO_HOST || "http://localhost:1234";
+    const bare = modelId.replace(/^lmstudio\//, "");
+    const lmstudio = createOpenAI({ baseURL: `${base}/v1`, apiKey: "lmstudio" });
+    modelFn = lmstudio(bare);
   } else {
     throw new Error(`Unsupported provider: ${provider}`);
   }

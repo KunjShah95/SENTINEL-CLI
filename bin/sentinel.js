@@ -4,6 +4,18 @@ import { resolve, dirname } from "node:path";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
+async function checkServerHealth() {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 2000);
+    const res = await fetch("http://localhost:3000/health", { signal: controller.signal });
+    clearTimeout(timer);
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
 const distCli = resolve(__dirname, "../dist/cli.js");
@@ -36,6 +48,37 @@ if (isFlag || (firstArg && CLI_COMMANDS.has(firstArg))) {
 }
 
 async function launchTui() {
+  // Auto-start server if not running
+  const serverRunning = await checkServerHealth();
+  if (!serverRunning) {
+    const startPath = resolve(root, "src/server/api/start.js");
+    if (existsSync(startPath)) {
+      try {
+        const serverProc = spawn(process.execPath, [startPath], {
+          stdio: 'ignore',
+          detached: true,
+          cwd: root,
+          env: { ...process.env, PORT: '3000' },
+        });
+        serverProc.unref();
+
+        // Poll up to 3000ms for server to come up
+        let started = false;
+        for (let i = 0; i < 6; i++) {
+          await new Promise(r => setTimeout(r, 500));
+          if (await checkServerHealth()) { started = true; break; }
+        }
+        if (started) {
+          process.stderr.write("  ✓ Sentinel server started\n");
+        } else {
+          process.stderr.write("  ⚠  Server not available — using local AI mode\n");
+        }
+      } catch {
+        process.stderr.write("  ⚠  Server not available — using local AI mode\n");
+      }
+    }
+  }
+
   const tsxEntry = resolve(root, "node_modules", "tsx", "dist", "cli.mjs");
   if (existsSync(tsxEntry)) {
     const child = spawn(process.execPath, [tsxEntry, tuiEntry], {

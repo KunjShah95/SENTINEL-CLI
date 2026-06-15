@@ -35,6 +35,27 @@ export const COMMANDS: Command[] = [
     action: nav('/review'),
   },
   {
+    name: 'loop',
+    description: 'Loop Engine — review/watch/pipeline/CI agentic loops',
+    value: '/loop',
+    category: 'actions',
+    action: nav('/loop'),
+  },
+  {
+    name: 'watch',
+    description: 'Watch files and auto-review on change',
+    value: '/watch',
+    category: 'actions',
+    action: nav('/loop'),
+  },
+  {
+    name: 'pipeline',
+    description: 'Multi-agent scan → plan → fix → verify pipeline',
+    value: '/pipeline',
+    category: 'actions',
+    action: nav('/loop'),
+  },
+  {
     name: 'review-file',
     description: 'Review a specific file for security issues',
     value: '/review-file',
@@ -185,6 +206,12 @@ export const COMMANDS: Command[] = [
     category: 'output',
   },
   {
+    name: 'health',
+    description: 'System health: server, memory, token usage, AI providers',
+    value: '/health',
+    category: 'views',
+  },
+  {
     name: 'status',
     description: 'Show system status and statistics',
     value: '/status',
@@ -212,9 +239,27 @@ export const COMMANDS: Command[] = [
   },
   {
     name: 'parallel',
-    description: 'Run parallel analysis with worker threads',
+    description: 'Run 4 specialist AI agents in parallel (security/deps/logic/style)',
     value: '/parallel',
     category: 'scan',
+  },
+  {
+    name: 'sast',
+    description: 'Run SAST tools: ESLint + Semgrep + secret scan + npm audit',
+    value: '/sast',
+    category: 'scan',
+  },
+  {
+    name: 'context',
+    description: 'Show or create SENTINEL.md project context file',
+    value: '/context',
+    category: 'settings',
+  },
+  {
+    name: 'commit',
+    description: 'AI-generate a commit message for current changes',
+    value: '/commit',
+    category: 'git',
   },
   { name: 'ci', description: 'CI-friendly analysis mode', value: '/ci', category: 'ci' },
   {

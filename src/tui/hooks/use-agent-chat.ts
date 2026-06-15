@@ -22,6 +22,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { randomUUID } from "node:crypto";
 import { streamChat, Sessions, checkServerHealth, type ChatEvent } from "../lib/api-client.js";
 import { runLocalTool, Mode, isReadOnlyTool } from "../lib/local-tools.js";
+import { shouldCompact, compactMessages, estimateTokens } from "../lib/context-compactor.js";
 
 export type AgentMode = "BUILD" | "PLAN" | "REVIEW";
 
@@ -68,6 +69,12 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
   const [mode, setMode] = useState<AgentMode>(options.initialMode || "BUILD");
   const [model, setModel] = useState<string>(options.initialModel || "claude-sonnet-4-6");
   const [streamedText, setStreamedText] = useState<string>("");
+  const [compacting, setCompacting] = useState(false);
+  const [tokenUsage, setTokenUsage] = useState<{ estimated: number; limit: number; percentage: number }>({
+    estimated: 0,
+    limit: 40_000,
+    percentage: 0,
+  });
 
   const sessionIdRef = useRef(sessionId);
   const modeRef = useRef(mode);
@@ -134,6 +141,47 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
     setStatus("idle");
     setLoading(false);
   }, []);
+
+  /**
+   * Fire-and-collect chat request used exclusively by the context compactor.
+   * Does NOT touch React message state — just returns the full response text.
+   */
+  const submitAndWaitForCompaction = useCallback(
+    async (prompt: string, mode: "BUILD" | "PLAN" | "REVIEW" = "PLAN"): Promise<string> => {
+      const sid = sessionIdRef.current;
+      if (!sid) return "";
+
+      const summaryUserMsg = {
+        id: `compaction-req-${Date.now()}`,
+        role: "user" as const,
+        content: prompt,
+        parts: [{ type: "text" as const, text: prompt }],
+        metadata: { mode, model: modelRef.current },
+      };
+
+      const stream = streamChat({
+        id: sid,
+        messages: [summaryUserMsg],
+        mode,
+        model: modelRef.current,
+      });
+
+      let collected = "";
+      try {
+        for await (const ev of stream) {
+          if (ev.event === "text") {
+            collected += ev.data?.delta || "";
+          } else if (ev.event === "done" || ev.event === "finish") {
+            break;
+          }
+        }
+      } catch {
+        // If the server call fails, return whatever was collected (may be empty).
+      }
+      return collected;
+    },
+    []
+  );
 
   const submit = useCallback(
     async (userText: string) => {
@@ -268,9 +316,45 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
         setStatus("idle");
         setLoading(false);
         abortRef.current = null;
+
+        // Update token usage after each response completes.
+        setMessages((currentMsgs) => {
+          const estimated = estimateTokens(currentMsgs);
+          setTokenUsage({
+            estimated,
+            limit: 40_000,
+            percentage: Math.round(estimated / 400),
+          });
+
+          // Trigger background compaction if the context is getting too long.
+          if (shouldCompact(currentMsgs)) {
+            setCompacting(true);
+            compactMessages(currentMsgs, submitAndWaitForCompaction, {
+              onProgress: (phase) => {
+                if (phase === 'done') setCompacting(false);
+              },
+            }).then((result) => {
+              if (result.compacted) {
+                setMessages(result.messages);
+                // Recalculate token usage after compaction.
+                const newEstimated = estimateTokens(result.messages);
+                setTokenUsage({
+                  estimated: newEstimated,
+                  limit: 40_000,
+                  percentage: Math.round(newEstimated / 400),
+                });
+              }
+              setCompacting(false);
+            }).catch(() => {
+              setCompacting(false);
+            });
+          }
+
+          return currentMsgs;
+        });
       }
     },
-    [messages, appendMessage, options]
+    [messages, appendMessage, options, submitAndWaitForCompaction]
   );
 
   const handleEvent = useCallback(
@@ -412,6 +496,8 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
     useServer,
     setUseServer,
     serverStatus,
+    compacting,
+    tokenUsage,
   };
 }
 

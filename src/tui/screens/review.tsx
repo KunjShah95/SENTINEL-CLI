@@ -79,7 +79,8 @@ export function Review() {
   useEffect(() => {
     const lastAssistant = [...messages].reverse().find(m => m.role === 'assistant');
     if (!lastAssistant) return;
-    const text = lastAssistant.parts.find((p: any) => p.type === 'text')?.text || '';
+    const textPart = lastAssistant.parts.find((p): p is { type: 'text'; text: string } => p.type === 'text');
+    const text = textPart?.text || '';
     const critMatch = text.match(/🔴[^\n]*\((\d+)\)|critical[^\n]*:\s*(\d+)/i);
     const highMatch = text.match(/🟠[^\n]*\((\d+)\)|high[^\n]*:\s*(\d+)/i);
     const medMatch = text.match(/🟡[^\n]*\((\d+)\)|medium[^\n]*:\s*(\d+)/i);
