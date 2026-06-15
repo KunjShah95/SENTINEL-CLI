@@ -1,0 +1,44 @@
+{
+  "dismissals": {
+    "src/analyzers/securityAnalyzer.js:63:eval-usage": {
+      "dismissedAt": 1781530700000,
+      "reason": "False positive: matches the pattern definition regex itself, not actual eval usage",
+      "issue": { "file": "src/analyzers/securityAnalyzer.js", "line": 63, "ruleId": "eval-usage", "type": "eval-usage" }
+    },
+    "src/analyzers/securityAnalyzer.js:66:eval-usage": {
+      "dismissedAt": 1781530700000,
+      "reason": "False positive: matches the suggestion text mentioning eval(), not actual eval usage",
+      "issue": { "file": "src/analyzers/securityAnalyzer.js", "line": 66, "ruleId": "eval-usage", "type": "eval-usage" }
+    },
+    "src/analyzers/securityAnalyzer.js:93:sql-injection": {
+      "dismissedAt": 1781530700000,
+      "reason": "False positive: matches the SQL injection pattern definition regex itself",
+      "issue": { "file": "src/analyzers/securityAnalyzer.js", "line": 93, "ruleId": "sql-injection", "type": "sql-injection" }
+    },
+    "src/analyzers/securityAnalyzer.js:168:inefficient-loop": {
+      "dismissedAt": 1781530700000,
+      "reason": "False positive: for-loop in rule initialization, not performance-critical",
+      "issue": { "file": "src/analyzers/securityAnalyzer.js", "line": 168, "ruleId": "inefficient-loop", "type": "inefficient-loop" }
+    },
+    "src/analyzers/securityAnalyzer.js:257:inefficient-loop": {
+      "dismissedAt": 1781530700000,
+      "reason": "False positive: for-loop in secret pattern matching, intentional pattern",
+      "issue": { "file": "src/analyzers/securityAnalyzer.js", "line": 257, "ruleId": "inefficient-loop", "type": "inefficient-loop" }
+    },
+    "src/analyzers/securityAnalyzer.js:304:inefficient-loop": {
+      "dismissedAt": 1781530700000,
+      "reason": "False positive: for-loop in validation check, intentional pattern",
+      "issue": { "file": "src/analyzers/securityAnalyzer.js", "line": 304, "ruleId": "inefficient-loop", "type": "inefficient-loop" }
+    },
+    "src/core/bot.js:388:assignment-in-condition": {
+      "dismissedAt": 1781530700000,
+      "reason": "False positive: intentional assignment in condition pattern, not a bug",
+      "issue": { "file": "src/core/bot.js", "line": 388, "ruleId": "assignment-in-condition", "type": "assignment-in-condition" }
+    }
+  },
+  "metadata": {
+    "version": 1,
+    "createdAt": 1781530700000,
+    "description": "Pre-dismissed false positives for the Sentinel project itself. These are scanner artifacts where the pattern-based analyzer flags its own rule definitions or intentional code patterns."
+  }
+}

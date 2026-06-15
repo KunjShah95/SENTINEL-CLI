@@ -706,15 +706,20 @@ class AnalysisOrchestrator {
       if (!this.secretsScanner.shouldScanFile(filePath)) continue;
       const secrets = this.secretsScanner.scanHighEntropy(content || '', filePath);
       for (const [, rule] of Object.entries(this.secretsScanner.secretsDb || {})) {
-        const matches = (content || '').match(rule.pattern);
-        if (matches) {
+        const safeContent = content || '';
+        const regex = rule.pattern instanceof RegExp
+          ? new RegExp(rule.pattern.source, rule.pattern.flags.includes('g') ? rule.pattern.flags : rule.pattern.flags + 'g')
+          : new RegExp(rule.pattern, 'g');
+        let match;
+        while ((match = regex.exec(safeContent)) !== null) {
+          const lineNum = safeContent.substring(0, match.index).split('\n').length;
           secrets.push({
             type: 'secret',
             severity: rule.severity,
             message: `Potential ${rule.vendor} secret found`,
             file: filePath,
-            line: 1,
-            snippet: matches[0].substring(0, 80),
+            line: lineNum,
+            snippet: match[0].substring(0, 80),
             suggestion: rule.remediation,
             confidence: 0.8,
             tags: ['secret', rule.vendor.toLowerCase()],

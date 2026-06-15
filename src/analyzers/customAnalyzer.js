@@ -119,48 +119,59 @@ export class CustomAnalyzer extends BaseAnalyzer {
         return this.getIssues();
     }
 
-    async analyzeFile(filePath, content, _context) {
-        const lines = content.split('\n');
+  isSafePattern(pattern) {
+    if (pattern.length > RECOMPLEXITY_LIMIT) return false;
+    const dangerous = /(\+|\*|\?)\{|\{.*,\s*\d+\}\s*[+*?]|\([^)]*\)\{|\([^)]*\)\+[+*?]|\(\?:\|[^)]*\)[+*?]/;
+    return !dangerous.test(pattern);
+  }
 
-        for (const rule of this.rules) {
-            // Check if rule applies to this file type
-            if (rule.filePattern) {
-                const fileRegex = new RegExp(rule.filePattern);
-                if (!fileRegex.test(filePath)) {
-                    continue;
-                }
-            }
+  async analyzeFile(filePath, content, _context) {
+    const lines = content.split('\n');
 
-            // Skip rules without patterns
-            if (!rule.pattern) continue;
-
-            try {
-                const regex = new RegExp(rule.pattern, 'gi');
-
-                for (let i = 0; i < lines.length; i++) {
-                    const line = lines[i];
-                    const matches = line.match(regex);
-
-                    if (matches) {
-                        this.addIssue({
-                            severity: rule.severity || 'warning',
-                            type: 'custom',
-                            title: rule.id || 'Custom Rule Violation',
-                            message: rule.message || `Pattern matched: ${rule.pattern}`,
-                            file: filePath,
-                            line: i + 1,
-                            column: line.indexOf(matches[0]) + 1,
-                            snippet: line.trim(),
-                            suggestion: rule.suggestion || null,
-                            tags: ['custom', rule.id],
-                            analyzer: this.name,
-                        });
-                    }
-                }
-            } catch (regexError) {
-                console.warn(`[CustomAnalyzer] Invalid regex in rule ${rule.id}: ${regexError.message}`);
-            }
+    for (const rule of this.rules) {
+      // Check if rule applies to this file type
+      if (rule.filePattern) {
+        const fileRegex = new RegExp(rule.filePattern);
+        if (!fileRegex.test(filePath)) {
+          continue;
         }
+      }
+
+      // Skip rules without patterns
+      if (!rule.pattern) continue;
+
+      if (!this.isSafePattern(rule.pattern)) {
+        console.warn(`[CustomAnalyzer] Pattern for rule ${rule.id} rejected (potential ReDoS)`);
+        continue;
+      }
+
+      try {
+        const regex = new RegExp(rule.pattern, 'gi');
+
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          const matches = line.match(regex);
+
+          if (matches) {
+            this.addIssue({
+              severity: rule.severity || 'warning',
+              type: 'custom',
+              title: rule.id || 'Custom Rule Violation',
+              message: rule.message || `Pattern matched: ${rule.pattern}`,
+              file: filePath,
+              line: i + 1,
+              column: line.indexOf(matches[0]) + 1,
+              snippet: line.trim(),
+              suggestion: rule.suggestion || null,
+              tags: ['custom', rule.id],
+              analyzer: this.name,
+            });
+          }
+        }
+      } catch (regexError) {
+        console.warn(`[CustomAnalyzer] Invalid regex in rule ${rule.id}: ${regexError.message}`);
+      }
+    }
 
         // Built-in style rules
         this.checkInlineStyles(filePath, content, lines);

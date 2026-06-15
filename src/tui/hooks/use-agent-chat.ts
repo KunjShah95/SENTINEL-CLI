@@ -94,6 +94,9 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
   useEffect(() => {
     modelRef.current = model;
   }, [model]);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   // Load an existing session.
   useEffect(() => {
@@ -244,7 +247,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
       try {
         const allMessages: AgentMessage[] = [
           // Snapshot of messages BEFORE the placeholder
-          ...messages,
+          ...messagesRef.current,
           {
             id: nextId("user"),
             role: "user",

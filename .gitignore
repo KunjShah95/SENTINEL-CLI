@@ -40,17 +40,8 @@ yarn-debug.log*
 yarn-error.log*
 
 # Build artifacts
-dist/*.map
-dist/**/*.map
-dist/**/*.d.ts
-dist/tui/components/**/*.d.ts
-dist/tui/components/**/*.d.ts.map
-dist/tui/hooks/**/*.d.ts
-dist/tui/hooks/**/*.d.ts.map
-dist/tui/lib/**/*.d.ts
-dist/tui/lib/**/*.d.ts.map
-dist/tui/providers/**/*.d.ts
-dist/tui/providers/**/*.d.ts.map
+dist/
+src/dist/
 
 # Docker volumes
 reports/

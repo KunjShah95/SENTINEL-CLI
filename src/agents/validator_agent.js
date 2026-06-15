@@ -38,7 +38,7 @@ function validateGo(code, filePath = null) {
   const details = [];
   
   try {
-    if (filePath && existsSync(filePath)) {
+    if (filePath && fs.existsSync(filePath)) {
       execSync(`go vet ${filePath}`, { stdio: 'pipe' });
     } else {
       execSync(`echo 'package main\nfunc main(){}' | go run /dev/stdin`, { input: code, stdio: ['pipe', 'pipe', 'pipe'] });
