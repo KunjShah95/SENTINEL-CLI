@@ -3,7 +3,15 @@ import { Box, Text } from 'ink';
 import { useTheme } from '../providers/theme/index.js';
 
 type Mode = 'BUILD' | 'PLAN' | 'REVIEW' | 'SCAN' | 'FIX';
-type Props = { mode?: Mode; model?: string; statusText?: string; sessionId?: string };
+type Props = {
+  mode?: Mode;
+  model?: string;
+  statusText?: string;
+  sessionId?: string;
+  tokenUsage?: { estimated: number; limit: number; percentage: number };
+  compacting?: boolean;
+  serverStatus?: 'connected' | 'local';
+};
 
 const MODE_SYMBOL: Record<Mode, string> = {
   BUILD: '⬡ BUILD', PLAN: '◎ PLAN', REVIEW: '⊕ REVIEW', SCAN: '◈ SCAN', FIX: '⚙ FIX',
@@ -23,7 +31,7 @@ function Pipe({ colors }: { colors: any }) {
   return <Text color={colors.dimSeparator}>{' │ '}</Text>;
 }
 
-export function StatusBar({ mode = 'BUILD', model, statusText, sessionId }: Props) {
+export function StatusBar({ mode = 'BUILD', model, statusText, sessionId, tokenUsage, compacting, serverStatus }: Props) {
   const { colors } = useTheme();
   const branch = useGitBranch();
 
@@ -69,6 +77,34 @@ export function StatusBar({ mode = 'BUILD', model, statusText, sessionId }: Prop
         <>
           <Pipe colors={colors} />
           <Text dimColor>{statusText}</Text>
+        </>
+      )}
+
+      {compacting && (
+        <>
+          <Pipe colors={colors} />
+          <Text color={colors.warning}>{'⟳ compacting…'}</Text>
+        </>
+      )}
+
+      {tokenUsage && tokenUsage.estimated > 0 && (
+        <>
+          <Pipe colors={colors} />
+          <Text color={
+            tokenUsage.percentage >= 80 ? colors.error :
+            tokenUsage.percentage >= 60 ? colors.warning : colors.dimSeparator
+          }>
+            {`~${(tokenUsage.estimated / 1000).toFixed(1)}k/${(tokenUsage.limit / 1000).toFixed(0)}k tok`}
+          </Text>
+        </>
+      )}
+
+      {serverStatus && (
+        <>
+          <Pipe colors={colors} />
+          <Text color={serverStatus === 'connected' ? colors.success : colors.warning}>
+            {serverStatus === 'connected' ? '⬤ server' : '◌ local'}
+          </Text>
         </>
       )}
 

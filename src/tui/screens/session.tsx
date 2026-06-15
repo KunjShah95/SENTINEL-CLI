@@ -30,9 +30,18 @@ export function Session() {
   const {
     messages, loading, mode, setMode, toggleMode,
     submit, stop, clear, appendMessage, model, setModel, status, sessionId,
+    serverStatus,
   } = useAgentChat({
     initialMode: initialMode === 'BUILD' || initialMode === 'PLAN' || initialMode === 'REVIEW' ? initialMode : undefined,
   });
+
+  const tokenUsage = {
+    estimated: messages.reduce((acc, m) =>
+      acc + m.parts.reduce((s, p) => s + (p.type === 'text' || p.type === 'reasoning' ? (p as any).text?.length ?? 0 : 0), 0), 0
+    ) / 4,
+    limit: 40000,
+    get percentage() { return Math.min(100, Math.round(this.estimated / this.limit * 100)); },
+  };
   const [showCommands, setShowCommands] = useState(false);
   const [showSessionPanel, setShowSessionPanel] = useState(false);
   const dialog = useDialog();
@@ -282,8 +291,45 @@ export function Session() {
           })();
           return;
         }
+        if (cmd === 'health') {
+          (async () => {
+            try {
+              const { checkServerHealth } = await import('../lib/api-client.js');
+              const serverOk = await checkServerHealth();
+              const mem = process.memoryUsage();
+              const uptime = process.uptime();
+              const uptimeStr = `${Math.floor(uptime / 60)}m ${Math.floor(uptime % 60)}s`;
+              const heapMB = (mem.heapUsed / 1024 / 1024).toFixed(1);
+              const rssMB = (mem.rss / 1024 / 1024).toFixed(1);
+              const hasAnthropic = !!process.env.ANTHROPIC_API_KEY;
+              const hasOpenAI = !!process.env.OPENAI_API_KEY;
+              const hasGemini = !!(process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GEMINI_API_KEY);
+              const hasGroq = !!process.env.GROQ_API_KEY;
+              const providers = [
+                hasAnthropic && 'Anthropic ✓',
+                hasOpenAI && 'OpenAI ✓',
+                hasGemini && 'Gemini ✓',
+                hasGroq && 'Groq ✓',
+              ].filter(Boolean).join(' · ') || 'None configured — set ANTHROPIC_API_KEY etc.';
+              const tokenEst = Math.round(tokenUsage.estimated);
+              const healthText = [
+                '## System Health',
+                '',
+                `**Server:** ${serverOk ? '🟢 Connected (localhost:3000)' : '🔴 Offline — running in local mode'}`,
+                `**Uptime:** ${uptimeStr}  **Memory:** ${heapMB}MB heap / ${rssMB}MB RSS`,
+                `**Model:** ${model}  **Mode:** ${mode}`,
+                `**Context:** ~${tokenEst.toLocaleString()} tokens used of 40,000 limit (${tokenUsage.percentage}%)`,
+                `**AI Providers:** ${providers}`,
+                '',
+                serverOk ? '' : '> Tip: `npm run sentinel:server` starts the API server for session persistence.',
+              ].filter(l => l !== undefined).join('\n');
+              appendMessage({ role: 'assistant', mode, model, parts: [{ type: 'text', text: healthText }] });
+            } catch (e) { toast.error('Health check failed: ' + String(e)); }
+          })();
+          return;
+        }
         if (cmd === 'help') {
-          toast.info('Commands: /clear /new /wizard /mode /review /loop /watch /pipeline /ci /scan /sast /commit /context /parallel /undo /background /agents /help');
+          toast.info('Commands: /clear /new /wizard /mode /review /loop /watch /pipeline /ci /scan /sast /commit /context /parallel /health /undo /background /agents /help');
           return;
         }
         toast.error('Unknown command. Type /help for commands.');
@@ -375,6 +421,8 @@ export function Session() {
           model={model}
           sessionId={sessionId ?? undefined}
           statusText={`${messages.length} msgs · ${theme.name}`}
+          tokenUsage={tokenUsage.estimated > 0 ? tokenUsage : undefined}
+          serverStatus={serverStatus}
         >
           {messages.length === 0 ? (
             <Box padding={2} alignItems="center" justifyContent="center">

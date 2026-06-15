@@ -206,6 +206,12 @@ export const COMMANDS: Command[] = [
     category: 'output',
   },
   {
+    name: 'health',
+    description: 'System health: server, memory, token usage, AI providers',
+    value: '/health',
+    category: 'views',
+  },
+  {
     name: 'status',
     description: 'Show system status and statistics',
     value: '/status',

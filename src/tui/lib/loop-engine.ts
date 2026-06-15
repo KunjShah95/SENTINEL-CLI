@@ -16,6 +16,30 @@ import {
   type ReviewIssue,
 } from './security-reviewer.js';
 
+// ─── Signal handler registry ─────────────────────────────────────────────────
+
+const cleanupFns: Array<() => void> = [];
+
+function registerCleanup(fn: () => void): () => void {
+  cleanupFns.push(fn);
+  return () => {
+    const idx = cleanupFns.indexOf(fn);
+    if (idx !== -1) cleanupFns.splice(idx, 1);
+  };
+}
+
+// Only register once — guard with a flag
+let signalsRegistered = false;
+function ensureSignalHandlers() {
+  if (signalsRegistered) return;
+  signalsRegistered = true;
+  const handler = () => {
+    for (const fn of cleanupFns) { try { fn(); } catch {} }
+  };
+  process.on('SIGINT', handler);
+  process.on('SIGTERM', handler);
+}
+
 // ─── Shared types ─────────────────────────────────────────────────────────────
 
 export type LoopType = 'review' | 'watch' | 'pipeline' | 'ci';
@@ -114,6 +138,8 @@ export async function runReviewLoop(opts: ReviewLoopOptions): Promise<LoopSummar
     abortSignal,
   } = opts;
 
+  ensureSignalHandlers();
+
   const startTime = now();
   let totalIssuesFound = 0;
   let totalIssuesFixed = 0;
@@ -121,6 +147,10 @@ export async function runReviewLoop(opts: ReviewLoopOptions): Promise<LoopSummar
   let actualIterations = 0;
 
   const emit = (partial: Omit<LoopEvent, 'timestamp'>) => onEvent({ ...partial, timestamp: now() });
+
+  const unregister = abortSignal
+    ? registerCleanup(() => { abortSignal.aborted = true; })
+    : undefined;
 
   for (let i = 0; i < maxIterations; i++) {
     if (abortSignal?.aborted) { finalState = 'stopped'; break; }
@@ -192,6 +222,8 @@ export async function runReviewLoop(opts: ReviewLoopOptions): Promise<LoopSummar
     }
   }
 
+  unregister?.();
+
   const summary: LoopSummary = {
     type: 'review',
     iterations: actualIterations,
@@ -223,6 +255,8 @@ export function startWatchLoop(opts: WatchLoopOptions): () => void {
     onFilesChanged,
   } = opts;
 
+  ensureSignalHandlers();
+
   const emit = (partial: Omit<LoopEvent, 'timestamp'>) => onEvent({ ...partial, timestamp: now() });
   const pending = new Set<string>();
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -252,10 +286,17 @@ export function startWatchLoop(opts: WatchLoopOptions): () => void {
 
   emit({ type: 'state', state: 'watching', text: `Watching ${paths.map(p => p.replace(process.cwd() + '/', '')).join(', ')}` });
 
-  return () => {
+  const stopFn = () => {
     if (debounceTimer) clearTimeout(debounceTimer);
     watchers.forEach(w => { try { w.close(); } catch {} });
     emit({ type: 'state', state: 'idle' });
+  };
+
+  const unregister = registerCleanup(stopFn);
+
+  return () => {
+    unregister();
+    stopFn();
   };
 }
 
@@ -272,12 +313,19 @@ const PIPELINE_STAGES = ['scanning', 'planning', 'fixing', 'verifying'] as const
 
 export async function runPipelineLoop(opts: PipelineLoopOptions): Promise<LoopSummary> {
   const { target = '.', onEvent, submitAndWait, abortSignal } = opts;
+
+  ensureSignalHandlers();
+
   const startTime = now();
   let issuesFound = 0;
   let issuesFixed = 0;
   let finalState = 'done';
 
   const emit = (partial: Omit<LoopEvent, 'timestamp'>) => onEvent({ ...partial, timestamp: now() });
+
+  const unregister = abortSignal
+    ? registerCleanup(() => { abortSignal.aborted = true; })
+    : undefined;
 
   // Stage 1: Scan
   emit({ type: 'stage', stage: 'scanning', text: 'Running security scan...' });
@@ -366,6 +414,8 @@ For each issue, specify: (1) exact file and line to change, (2) old code pattern
     }
   }
 
+  unregister?.();
+
   const summary: LoopSummary = {
     type: 'pipeline',
     iterations: 1,
@@ -397,11 +447,17 @@ export async function runCILoop(opts: CILoopOptions): Promise<LoopSummary> {
     abortSignal,
   } = opts;
 
+  ensureSignalHandlers();
+
   const startTime = now();
   let fixAttempts = 0;
   let finalState = 'green';
 
   const emit = (partial: Omit<LoopEvent, 'timestamp'>) => onEvent({ ...partial, timestamp: now() });
+
+  const unregister = abortSignal
+    ? registerCleanup(() => { abortSignal.aborted = true; })
+    : undefined;
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     if (abortSignal?.aborted) { finalState = 'stopped'; break; }
@@ -453,6 +509,8 @@ Analyse each failure carefully. Fix the underlying production code — do NOT sk
       break;
     }
   }
+
+  unregister?.();
 
   const summary: LoopSummary = {
     type: 'ci',

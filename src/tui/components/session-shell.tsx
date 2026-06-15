@@ -19,6 +19,9 @@ type Props = {
   model?: string;
   statusText?: string;
   sessionId?: string;
+  tokenUsage?: { estimated: number; limit: number; percentage: number };
+  compacting?: boolean;
+  serverStatus?: 'connected' | 'local';
 };
 
 export function SessionShell({
@@ -34,6 +37,9 @@ export function SessionShell({
   model,
   statusText,
   sessionId,
+  tokenUsage,
+  compacting,
+  serverStatus,
 }: Props) {
   const { colors } = useTheme();
 
@@ -92,7 +98,15 @@ export function SessionShell({
 
       {/* Status bar */}
       <Box flexShrink={0}>
-        <StatusBar mode={mode} model={model} statusText={statusText} sessionId={sessionId} />
+        <StatusBar
+          mode={mode}
+          model={model}
+          statusText={statusText}
+          sessionId={sessionId}
+          tokenUsage={tokenUsage}
+          compacting={compacting}
+          serverStatus={serverStatus}
+        />
       </Box>
     </Box>
   );
