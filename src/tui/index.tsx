@@ -6,6 +6,7 @@ import { Home } from './screens/home.js';
 import { Session } from './screens/session.js';
 import { Dashboard } from './screens/dashboard.js';
 import { Review } from './screens/review.js';
+import { Loop } from './screens/loop.js';
 
 const router = createMemoryRouter([
   {
@@ -16,6 +17,7 @@ const router = createMemoryRouter([
       { path: 'session', element: <Session /> },
       { path: 'dashboard', element: <Dashboard /> },
       { path: 'review', element: <Review /> },
+      { path: 'loop', element: <Loop /> },
     ],
   },
 ]);

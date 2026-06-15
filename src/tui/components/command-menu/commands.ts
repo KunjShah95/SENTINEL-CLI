@@ -35,6 +35,27 @@ export const COMMANDS: Command[] = [
     action: nav('/review'),
   },
   {
+    name: 'loop',
+    description: 'Loop Engine — review/watch/pipeline/CI agentic loops',
+    value: '/loop',
+    category: 'actions',
+    action: nav('/loop'),
+  },
+  {
+    name: 'watch',
+    description: 'Watch files and auto-review on change',
+    value: '/watch',
+    category: 'actions',
+    action: nav('/loop'),
+  },
+  {
+    name: 'pipeline',
+    description: 'Multi-agent scan → plan → fix → verify pipeline',
+    value: '/pipeline',
+    category: 'actions',
+    action: nav('/loop'),
+  },
+  {
     name: 'review-file',
     description: 'Review a specific file for security issues',
     value: '/review-file',

@@ -178,8 +178,27 @@ export function Session() {
           })();
           return;
         }
+        if (cmd === 'loop') {
+          navigate('/loop');
+          return;
+        }
+        if (cmd === 'watch') {
+          navigate('/loop');
+          toast.info('Loop Engine opened. Select Watch Loop and press Enter.');
+          return;
+        }
+        if (cmd === 'pipeline') {
+          navigate('/loop');
+          toast.info('Loop Engine opened. Select Pipeline Loop and press Enter.');
+          return;
+        }
+        if (cmd === 'ci') {
+          navigate('/loop');
+          toast.info('Loop Engine opened. Select CI Loop and press Enter.');
+          return;
+        }
         if (cmd === 'help') {
-          toast.info('Commands: /clear /new /wizard /mode /review [file] /review-branch <branch> /scan [path] /undo /background /agents /help');
+          toast.info('Commands: /clear /new /wizard /mode /review /loop /watch /pipeline /ci /scan /undo /background /agents /help');
           return;
         }
         toast.error('Unknown command. Type /help for commands.');
