@@ -467,6 +467,7 @@ const TOOL_IMPLS = {
   bash: runBashImpl,
   diffFile: diffFileImpl,
   undoLastChange: undoLastChangeImpl,
+  searchWeb: searchWebImpl,
 };
 
 export const readOnlyToolContracts = Object.freeze({

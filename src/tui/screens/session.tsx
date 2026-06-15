@@ -409,9 +409,12 @@ export function Session() {
     } catch { toast.error('Failed to fork session'); }
   }, [handleSelectSession, toast]);
 
-  const handleDeleteSession = useCallback((_id: string) => {
-    if (messages.length > 0) clear();
-  }, [clear, messages.length]);
+  const handleDeleteSession = useCallback(async (id: string) => {
+    try {
+      await Sessions.delete(id);
+      clear();
+    } catch { toast.error('Failed to delete session'); }
+  }, [clear, toast]);
 
   useInput((input, key) => {
     if (key.ctrl && input === 's') {

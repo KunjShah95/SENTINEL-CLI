@@ -59,12 +59,19 @@ export function buildSystemPrompt({ mode }) {
       '- [x/✗] Path traversal',
       '- [x/✗] Missing authentication / authorization',
       '- [x/✗] Input validation',
-      '- [x/✗] Insecure dependencies',
+      '- [x/✗] Insecure dependencies / supply-chain',
+      '- [x/✗] LLM prompt injection (if AI features present)',
+      '- [x/✗] Async race conditions / TOCTOU',
+      '- [x/✗] Prototype pollution / mass assignment',
+      '- [x/✗] Regex DoS (ReDoS)',
       '',
       '## Score: [A/B/C/D/F]',
       '[One sentence justification]',
       '',
       'Omit sections that have no issues. Be specific with file:line references.',
+      'For supply-chain: flag any new dependency added without pinned version or integrity hash.',
+      'For LLM prompt injection: flag any place user input is interpolated directly into an AI prompt.',
+      'For async races: flag shared mutable state accessed across await boundaries without locks.',
     ].join('\n');
   } else {
     modeDescription =

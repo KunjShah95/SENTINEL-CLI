@@ -160,16 +160,16 @@ export const COMMANDS: Command[] = [
   },
   { name: 'log', description: 'View git history', value: '/log', category: 'git' },
   { name: 'pr', description: 'Review a GitHub PR', value: '/pr', category: 'git' },
-  {
-    name: 'commit',
-    description: 'Generate commit message from changes',
-    value: '/commit',
-    category: 'git',
-  },
   { name: 'fix', description: 'Auto-fix detected issues', value: '/fix', category: 'actions' },
   {
+    name: 'background',
+    description: 'Launch a background agent task (e.g. /background audit API endpoints)',
+    value: '/background',
+    category: 'actions',
+  },
+  {
     name: 'agents',
-    description: 'Run multi-agent pipeline (Scanner/Fixer/Validator)',
+    description: 'List all running background agents and status',
     value: '/agents',
     category: 'actions',
   },
