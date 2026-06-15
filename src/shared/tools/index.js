@@ -10,11 +10,11 @@
 
 import path from 'node:path';
 import fs from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import { realpathSync } from 'node:fs';
 import { createPatch } from 'diff';
 import { Mode, isReadOnlyTool } from '../schemas/mode.js';
 import { runSandboxed } from './sandbox.js';
-import { createCheckpoint, restoreCheckpoint, listCheckpoints } from './checkpoint.js';
+import { createCheckpoint, restoreCheckpoint } from './checkpoint.js';
 import { toolInputSchemas, READ_ONLY_TOOL_NAMES, BUILD_TOOL_NAMES, isReadOnly } from './schemas.js';
 
 // Re-export so callers can do `import { Mode, toolInputSchemas } from "./tools"`.
@@ -146,6 +146,15 @@ function matchGlob(name, pattern) {
   return re.test(name);
 }
 
+function validateRegexPattern(pattern) {
+  if (/\([^()]*[+*][^()]*\)[+*?]/.test(pattern)) {
+    throw new Error('Pattern contains nested quantifiers which may cause excessive backtracking');
+  }
+  if (/\([^()]*\|[^()]*\)[+*?]/.test(pattern)) {
+    throw new Error('Pattern contains alternation inside quantified groups which may cause excessive backtracking');
+  }
+}
+
 async function grepImpl(input) {
   const pattern = input?.pattern;
   const cwdDir = input?.path ?? '.';
@@ -156,6 +165,7 @@ async function grepImpl(input) {
   const { resolved, relative } = resolveInsideCwd(cwdDir);
   let regex;
   try {
+    validateRegexPattern(pattern);
     regex = new RegExp(pattern);
   } catch (e) {
     throw new Error(`Invalid regex: ${e.message}`);

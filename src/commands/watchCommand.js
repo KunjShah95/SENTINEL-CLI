@@ -2,13 +2,9 @@ import chalk from 'chalk';
 import { watch } from 'fs';
 import { promises as fs } from 'fs';
 import path from 'path';
-import { exec } from 'child_process';
-import { promisify } from 'util';
 import { glob } from 'glob';
 import { CodeReviewBot } from '../core/bot.js';
 import Config from '../config/config.js';
-
-const execAsync = promisify(exec);
 
 export class WatchCommand {
     constructor(options = {}) {

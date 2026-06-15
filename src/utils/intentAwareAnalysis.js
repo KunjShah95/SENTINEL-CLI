@@ -1,6 +1,4 @@
 import { promises as fs } from 'fs';
-import { glob } from 'glob';
-
 export class IntentAwareAnalysis {
   constructor(options = {}) {
     this.llmClient = options.llmClient || null;
@@ -149,8 +147,6 @@ export class IntentAwareAnalysis {
 
   detectIntentWithPatterns(functionCode) {
     let bestMatch = { type: 'unknown', confidence: 0, explanation: '' };
-    const lowerCode = functionCode.toLowerCase();
-
     for (const [intentType, config] of Object.entries(this.intentPatterns)) {
       let matchCount = 0;
       
@@ -259,7 +255,7 @@ Respond in JSON format:
     }
   }
 
-  extractFunctions(content, filePath) {
+  extractFunctions(content, _filePath) {
     const functions = [];
     const lines = content.split('\n');
     

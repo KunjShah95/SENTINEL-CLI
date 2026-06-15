@@ -186,6 +186,35 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
     []
   );
 
+  useEffect(() => {
+    if (compacting || messages.length === 0) return;
+    if (!shouldCompact(messages)) return;
+    setCompacting(true);
+    const snapshot = messages;
+    compactMessages(snapshot, submitAndWaitForCompaction, {
+      onProgress: (phase) => {
+        if (phase === 'done') setCompacting(false);
+      },
+    }).then((result) => {
+      if (result.compacted) {
+        setMessages((prev) => {
+          const snapshotIds = new Set(snapshot.map((m) => m.id));
+          const addedSince = prev.filter((m) => !snapshotIds.has(m.id));
+          return [...result.messages, ...addedSince];
+        });
+        const newEstimated = estimateTokens(result.messages);
+        setTokenUsage({
+          estimated: newEstimated,
+          limit: 40_000,
+          percentage: Math.round(newEstimated / 400),
+        });
+      }
+      setCompacting(false);
+    }).catch(() => {
+      setCompacting(false);
+    });
+  }, [messages, compacting, submitAndWaitForCompaction]);
+
   const submit = useCallback(
     async (userText: string) => {
       if (!userText.trim()) return;
@@ -328,31 +357,6 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
             limit: 40_000,
             percentage: Math.round(estimated / 400),
           });
-
-          // Trigger background compaction if the context is getting too long.
-          if (shouldCompact(currentMsgs)) {
-            setCompacting(true);
-            compactMessages(currentMsgs, submitAndWaitForCompaction, {
-              onProgress: (phase) => {
-                if (phase === 'done') setCompacting(false);
-              },
-            }).then((result) => {
-              if (result.compacted) {
-                setMessages(result.messages);
-                // Recalculate token usage after compaction.
-                const newEstimated = estimateTokens(result.messages);
-                setTokenUsage({
-                  estimated: newEstimated,
-                  limit: 40_000,
-                  percentage: Math.round(newEstimated / 400),
-                });
-              }
-              setCompacting(false);
-            }).catch(() => {
-              setCompacting(false);
-            });
-          }
-
           return currentMsgs;
         });
       }
@@ -427,6 +431,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
           // Execute the tool locally. PLAN mode blocks write/edit/bash.
           (async () => {
             const output = await runLocalTool(toolName, input, modeRef.current);
+            if (abortRef.current?.signal.aborted) return;
             updateLastMessage((msg) => {
               if (msg.id !== assistantId) return msg;
               return {

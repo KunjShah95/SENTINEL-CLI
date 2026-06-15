@@ -645,9 +645,7 @@ class AnalysisOrchestrator {
     return issues;
   }
 
-  async scanForSecrets(files, options = {}) {
-    const { entropyAnalysis = true, customPatterns = [] } = options;
-
+  async scanForSecrets(files, _options = {}) {
     const allSecrets = [];
     const { readFileSync, existsSync, statSync } = fs;
     const { join } = path;

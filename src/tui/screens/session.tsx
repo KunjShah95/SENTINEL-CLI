@@ -42,6 +42,10 @@ export function Session() {
     limit: 40000,
     get percentage() { return Math.min(100, Math.round(this.estimated / this.limit * 100)); },
   };
+
+  const costUsd = tokenUsage.estimated > 0
+    ? (tokenUsage.estimated / 1_000_000) * 3.0 // ~$3/M tokens blended rate (Claude Sonnet)
+    : 0;
   const [showCommands, setShowCommands] = useState(false);
   const [showSessionPanel, setShowSessionPanel] = useState(false);
   const dialog = useDialog();
@@ -226,7 +230,12 @@ export function Session() {
               const result = await runSast({ target });
               const formatted = formatSastForPrompt(result);
               appendMessage({ role: 'assistant', mode, model, parts: [{ type: 'text', text: formatted }] });
-              if (result.errors.length > 0) toast.error(`SAST warnings: ${result.errors.slice(0, 2).join('; ')}`);
+              if (result.errors.length > 0) {
+                const timeoutErrors = result.errors.filter(e => e.includes('TIMEOUT'));
+                const otherErrors = result.errors.filter(e => !e.includes('TIMEOUT'));
+                if (timeoutErrors.length > 0) toast.warning(`SAST tool timed out: ${timeoutErrors.join('; ')} — results may be partial. Increase timeout or run each tool individually.`);
+                if (otherErrors.length > 0) toast.error(`SAST warnings: ${otherErrors.slice(0, 2).join('; ')}`);
+              }
             } catch (e) { toast.error('SAST failed: ' + String(e)); }
           })();
           return;
@@ -361,7 +370,7 @@ export function Session() {
           return;
         }
         if (cmd === 'help') {
-          toast.info('Commands: /clear /new /wizard /mode /review /loop /watch /pipeline /ci /scan /sast /commit /context /parallel /health /undo /background /agents /help');
+          toast.info('Commands: /clear /new /wizard /mode /review /checks /scan /sast /sarif /loop /pipeline /ci /commit /context /parallel /health /undo /background /agents /help');
           return;
         }
         toast.error('Unknown command. Type /help for commands.');
@@ -455,6 +464,7 @@ export function Session() {
           statusText={`${messages.length} msgs · ${theme.name}`}
           tokenUsage={tokenUsage.estimated > 0 ? tokenUsage : undefined}
           serverStatus={serverStatus}
+          costUsd={costUsd}
         >
           {messages.length === 0 ? (
             <Box padding={2} alignItems="center" justifyContent="center">

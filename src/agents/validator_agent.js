@@ -2,7 +2,6 @@
 // Uses syntax validation for JS/TS, Python, Go, and Rust
 
 import { execSync } from 'child_process';
-import { existsSync } from 'fs';
 
 function validateJS(code) {
   const details = [];

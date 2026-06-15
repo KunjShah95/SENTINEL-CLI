@@ -44,6 +44,7 @@ function getModeColor(mode: string, colors: Record<string, string>): string {
     case 'PLAN': return colors.planMode;
     case 'SCAN': return colors.info;
     case 'FIX': return colors.error;
+    case 'REVIEW': return colors.critical;
     default: return colors.dimSeparator;
   }
 }

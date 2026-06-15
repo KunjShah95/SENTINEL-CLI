@@ -9,7 +9,7 @@
 
 import path from 'node:path';
 import fs from 'node:fs/promises';
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 
 const CHECKPOINT_DIR = '.sentinel/checkpoints';
 const MAX_CHECKPOINTS = 10;

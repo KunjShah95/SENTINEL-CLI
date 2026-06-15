@@ -245,11 +245,11 @@ export class PluginSDK {
             name,
             config,
             
-            analyze: async function(file, content, context = {}) {
+            analyze: async function(file, content, _context = {}) {
                 throw new Error('analyze() must be implemented');
             },
             
-            fix: async function(issue, content) {
+            fix: async function(_issue, _content) {
                 throw new Error('fix() must be implemented');
             },
             

@@ -1,5 +1,5 @@
 import { promises as fs } from 'fs';
-import { join, dirname } from 'path';
+import { join } from 'path';
 
 const TEST_FILE_PATTERNS = [
   /__tests?__/,
@@ -305,7 +305,7 @@ export class ContextAwareSuppression {
     };
   }
 
-  filterIssuesWithContext(issues, projectPath) {
+  filterIssuesWithContext(issues, _projectPath) {
     const filtered = [];
     const suppressed = [];
 

@@ -88,7 +88,7 @@ export function authenticateRequest(request) {
   if (process.env.CLERK_SECRET_KEY && process.env.CLERK_PUBLISHABLE_KEY) {
     try {
       // eslint-disable-next-line global-require
-      const { createClerkClient } = require("@clerk/backend");
+      require("@clerk/backend");
       // Note: full Clerk validation requires async authenticateRequest,
       // which we don't block on. For the dev fallback we accept dev tokens.
     } catch {

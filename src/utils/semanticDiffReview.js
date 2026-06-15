@@ -9,7 +9,7 @@ export class SemanticDiffReview {
     this.analysisDepth = options.analysisDepth || 'deep';
   }
 
-  async analyzePullRequest(projectPath, prData = {}) {
+  async analyzePullRequest(projectPath, _prData = {}) {
     const changes = await this.getChangedFiles(projectPath);
     const diffStats = this.getDiffStats(projectPath, changes);
     const securityChanges = await this.analyzeSecurityChanges(projectPath, changes);

@@ -4,7 +4,7 @@
  * throw on invalid input and return the (possibly default-filled) value.
  */
 
-import { Mode, isReadOnlyTool } from '../schemas/mode.js';
+import { isReadOnlyTool } from '../schemas/mode.js';
 
 function validator(check) {
   const v = (input = {}) => {
@@ -30,21 +30,6 @@ function str(field, opts = {}) {
     }
     if (typeof v !== 'string') {
       return { ok: false, error: `${field} must be a string` };
-    }
-    return { ok: true, value: v };
-  });
-}
-
-function num(field, opts = {}) {
-  return validator(input => {
-    const v = input[field];
-    if (v === undefined) {
-      if (opts.optional) return { ok: true, value: undefined };
-      if ('default' in opts) return { ok: true, value: opts.default };
-      return { ok: false, error: `${field} is required` };
-    }
-    if (typeof v !== 'number' || !Number.isFinite(v)) {
-      return { ok: false, error: `${field} must be a finite number` };
     }
     return { ok: true, value: v };
   });

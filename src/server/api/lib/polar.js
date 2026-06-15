@@ -60,7 +60,7 @@ export async function createCheckoutUrl({ customerExternalId, requestUrl }) {
   return result.url;
 }
 
-export async function createCustomerPortalUrl({ customerExternalId, requestUrl }) {
+export async function createCustomerPortalUrl({ externalCustomerId, requestUrl }) {
   const client = getClient();
   if (!client) {
     return `${requestUrl}/billing/success?dev=1`;

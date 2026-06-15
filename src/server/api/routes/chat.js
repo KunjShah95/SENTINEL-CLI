@@ -83,7 +83,6 @@ chat.post('/', async c => {
   }
   const merged = Array.from(byId.values());
 
-  const startTime = Date.now();
   let completedUsage = null;
   let finalMessages = null;
   let aborted = false;

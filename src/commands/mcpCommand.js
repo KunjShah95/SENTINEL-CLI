@@ -3,7 +3,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { readFile, writeFile, unlink } from "node:fs/promises";
+import { writeFile, unlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -263,7 +263,7 @@ export async function runMCPServer() {
       directory: z.string().optional().default(".").describe("Directory containing package.json."),
       severity: z.enum(["critical", "high", "moderate", "low"]).optional().default("moderate"),
     },
-    async ({ directory, severity }) => {
+    async ({ directory }) => {
       const result = await runSentinel(["analyze", directory, "--analyzers", "dependency"], directory);
       return { content: [{ type: "text", text: formatResult(result) }] };
     }

@@ -197,11 +197,9 @@ export class DoctorCommand {
       const nodeModules = path.join(this.projectPath, 'node_modules');
       await fs.access(nodeModules);
 
-      const { stdout } = await execAsync('npm ls --depth=0 2>/dev/null | head -20', {
+      await execAsync('npm ls --depth=0 2>/dev/null | head -20', {
         cwd: this.projectPath,
       });
-      const depCount = (stdout.match(/\s+/g) || []).length;
-
       return {
         name: 'Dependencies',
         status: 'pass',

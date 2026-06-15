@@ -260,7 +260,27 @@ export class UniversalAgent {
     });
   }
 
+  _isBlockedUrl(url) {
+    try {
+      const parsed = new URL(url);
+      const hostname = parsed.hostname.toLowerCase();
+      if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return true;
+      if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1' || hostname === '0.0.0.0') return true;
+      if (/^127\.\d+\.\d+\.\d+$/.test(hostname)) return true;
+      if (/^10\.\d+\.\d+\.\d+$/.test(hostname)) return true;
+      if (/^172\.(1[6-9]|2\d|3[01])\.\d+\.\d+$/.test(hostname)) return true;
+      if (/^192\.168\.\d+\.\d+$/.test(hostname)) return true;
+      if (/^169\.254\.\d+\.\d+$/.test(hostname)) return true;
+      return false;
+    } catch {
+      return true;
+    }
+  }
+
   async fetchUrl(url) {
+    if (this._isBlockedUrl(url)) {
+      return { success: false, error: 'URL blocked for security reasons', url };
+    }
     return new Promise((resolve) => {
       const client = url.startsWith('https') ? https : http;
 

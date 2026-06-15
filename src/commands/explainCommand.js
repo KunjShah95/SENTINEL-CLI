@@ -1,8 +1,6 @@
 import chalk from 'chalk';
 import { promises as fs } from 'fs';
 import path from 'path';
-import https from 'https';
-import http from 'http';
 
 export class ExplainCommand {
     constructor(options = {}) {
@@ -100,7 +98,7 @@ export class ExplainCommand {
         }
     }
 
-    analyzeLine(line, filename) {
+    analyzeLine(line, _filename) {
         const analysis = {
             issue: null,
             severity: 'medium',

@@ -169,11 +169,12 @@ export class SarifGenerator {
     async saveToFile(issues, outputPath) {
         const path = await import('path');
         
-        // Validate and sanitize output path
-        const normalizedPath = path.normalize(outputPath);
-        if (normalizedPath.includes('..')) {
+        // Validate no path traversal in output path
+        if (outputPath.includes('..')) {
             throw new Error('Path traversal detected in output path');
         }
+
+        const normalizedPath = path.resolve(outputPath);
         
         const sarif = this.generate(issues);
         await fs.writeFile(normalizedPath, JSON.stringify(sarif, null, 2), 'utf8');

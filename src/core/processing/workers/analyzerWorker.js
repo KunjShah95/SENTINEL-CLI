@@ -231,6 +231,29 @@ function calculateComplexity(code) {
   return complexity;
 }
 
+/**
+ * Determines whether a line of source code is a regex pattern definition
+ * that should be skipped during pattern-based scanning to reduce false positives.
+ *
+ * Returns true if the line is:
+ * - Empty or whitespace-only
+ * - A comment (// prefix)
+ * - A regex pattern definition (pattern: /.../, = /.../, new RegExp(), return /.../)
+ *
+ * @param {string} line - A single line of source code
+ * @returns {boolean} true if the line should be skipped during scanning
+ */
+export function isRegexDefinitionLine(line) {
+  const trimmed = line.trim();
+  if (!trimmed) return true;
+  if (/^\s*\/\//.test(trimmed)) return true;
+  if (/pattern\s*:\s*\//.test(trimmed)) return true;
+  if (/=\s*\//.test(trimmed) && /\/[gimsuy]*\s*[,;)\]}]?\s*$/.test(trimmed)) return true;
+  if (/new\s+RegExp\s*\(/.test(trimmed)) return true;
+  if (/return\s+\//.test(trimmed) && /\/[gimsuy]*\s*[,;]?\s*$/.test(trimmed)) return true;
+  return false;
+}
+
 async function scanContent(type, content, _options) {
   return { type, scanned: true, length: content.length };
 }

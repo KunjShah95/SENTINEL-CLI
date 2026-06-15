@@ -11,50 +11,7 @@
 import chalk from 'chalk';
 import { configManager } from '../config/configManager.js';
 
-const PROVIDERS = [
-  {
-    id: 'openai',
-    name: 'OpenAI',
-    description: 'GPT-4, GPT-4o, GPT-3.5-turbo',
-    envVar: 'OPENAI_API_KEY',
-    placeholder: 'sk-...',
-  },
-  {
-    id: 'anthropic',
-    name: 'Anthropic',
-    description: 'Claude 3.5, Claude 3 Opus/Sonnet',
-    envVar: 'ANTHROPIC_API_KEY',
-    placeholder: 'sk-ant-...',
-  },
-  {
-    id: 'gemini',
-    name: 'Google Gemini',
-    description: 'Gemini Pro, Gemini 1.5 Flash',
-    envVar: 'GEMINI_API_KEY',
-    placeholder: 'AI...',
-  },
-  {
-    id: 'groq',
-    name: 'Groq',
-    description: 'Llama 3, Mixtral (fast inference)',
-    envVar: 'GROQ_API_KEY',
-    placeholder: 'gsk_...',
-  },
-  {
-    id: 'openrouter',
-    name: 'OpenRouter',
-    description: 'Access 100+ models via one API',
-    envVar: 'OPENROUTER_API_KEY',
-    placeholder: 'sk-or-...',
-  },
-  {
-    id: 'ollama',
-    name: 'Ollama',
-    description: 'Local LLMs via Ollama',
-    envVar: 'OLLAMA_HOST',
-    placeholder: 'http://localhost:11434',
-  },
-];
+
 
 function redirectToTui() {
   console.log('');

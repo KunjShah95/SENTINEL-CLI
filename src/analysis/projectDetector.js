@@ -36,6 +36,6 @@ export function detectProjectType(dirPath) {
   return 'default';
 }
 
-export function getAnalyzerPreset(projectType) {
+export function getAnalyzerPreset() {
   return ['securityAnalyzer'];
 }

@@ -93,7 +93,7 @@ export class StreamingAnalyzer {
         return this.issues;
     }
 
-    async analyzeFile(file, analyzers) {
+    async analyzeFile(_file, _analyzers) {
         return [];
     }
 

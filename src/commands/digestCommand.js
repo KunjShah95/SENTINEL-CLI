@@ -188,8 +188,6 @@ export class DigestCommand {
     }
 
     async sendToWebhook(webhook, digest) {
-        const isSlack = webhook.includes('slack.com') || process.env.SLACK_WEBHOOK_URL;
-        
         const body = JSON.stringify(digest);
 
         return new Promise((resolve, reject) => {
@@ -217,8 +215,6 @@ export class DigestCommand {
     }
 
     async previewDigest() {
-        const digest = await this.buildDigest();
-        
         console.log(chalk.cyan('\n  Digest Preview:\n'));
         
         console.log(chalk.white('  🛡️ Sentinel Weekly Security Digest\n'));

@@ -1,13 +1,8 @@
 #!/usr/bin/env node
 
-import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import chalk from "chalk";
 import { getAuth } from "../../server/api/client.js";
-
-const CONFIG_DIR =
-  process.env.SENTINEL_HOME ||
-  path.join(process.env.HOME || process.env.USERPROFILE || ".", ".sentinel");
 
 export function runWhoami() {
   const auth = getAuth();

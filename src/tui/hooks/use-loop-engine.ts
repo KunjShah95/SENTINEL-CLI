@@ -65,8 +65,12 @@ export function useLoopEngine(): UseLoopEngineReturn {
       setMode(loopMode as AgentMode);
     }
     await submit(prompt);
-    // After submit resolves, find the last assistant message added after this call
-    const after = messagesRef.current.slice(prevCount);
+    let after: typeof messagesRef.current = [];
+    for (let i = 0; i < 20; i++) {
+      await new Promise(r => setTimeout(r, 50));
+      after = messagesRef.current.slice(prevCount);
+      if (after.some(m => m.role === 'assistant')) break;
+    }
     const response = [...after].reverse().find(m => m.role === 'assistant');
     const textPart = response?.parts?.find((p): p is { type: 'text'; text: string } => p.type === 'text');
     return textPart?.text ?? '';

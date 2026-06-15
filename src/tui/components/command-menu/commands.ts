@@ -1,5 +1,5 @@
-import { getMruBoost } from '../../lib/command-mru';
-import type { Command, CommandContext } from './types';
+import { getMruBoost } from '../../lib/command-mru.js';
+import type { Command, CommandContext } from './types.js';
 
 function nav(path: string) {
   return (ctx: CommandContext) => ctx.navigate(path);
@@ -363,6 +363,36 @@ export const COMMANDS: Command[] = [
     name: 'sessions',
     description: 'Browse past chat sessions',
     value: '/sessions',
+    category: 'views',
+  },
+  {
+    name: 'test',
+    description: 'Generate unit test stubs for a file',
+    value: '/test <filepath>',
+    category: 'actions',
+  },
+  {
+    name: 'export',
+    description: 'Export current session as markdown report',
+    value: '/export',
+    category: 'output',
+  },
+  {
+    name: 'dismiss',
+    description: 'Dismiss a finding (file:line:rule)',
+    value: '/dismiss <key> [reason]',
+    category: 'output',
+  },
+  {
+    name: 'undismiss',
+    description: 'Undismiss a previously dismissed finding',
+    value: '/undismiss <key>',
+    category: 'output',
+  },
+  {
+    name: 'dismissed',
+    description: 'List all dismissed findings',
+    value: '/dismissed',
     category: 'views',
   },
 ];

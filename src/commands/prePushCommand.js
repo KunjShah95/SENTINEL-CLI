@@ -141,7 +141,7 @@ exit 0
         console.log(chalk.gray('\n  Testing Sentinel pre-push...\n'));
 
         try {
-            const { stdout, stderr } = await execAsync('node src/core/cli.js analyze --format json', {
+            const { stdout } = await execAsync('node src/core/cli.js analyze --format json', {
                 cwd: this.projectPath,
                 maxBuffer: 10 * 1024 * 1024
             });

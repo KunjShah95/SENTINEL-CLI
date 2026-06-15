@@ -382,13 +382,6 @@ exit $?
             // No config exists
         }
         
-        const keyEnvMap = {
-            groq: 'GROQ_API_KEY',
-            openai: 'OPENAI_API_KEY',
-            gemini: 'GEMINI_API_KEY',
-            anthropic: 'ANTHROPIC_API_KEY'
-        };
-        
         globalConfig.providers = globalConfig.providers || {};
         globalConfig.providers[this.answers.provider] = {
             apiKey: this.answers.apiKey,

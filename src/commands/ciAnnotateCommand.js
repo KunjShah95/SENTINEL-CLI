@@ -1,11 +1,7 @@
 import chalk from 'chalk';
-import { exec } from 'child_process';
-import { promisify } from 'util';
 import { CodeReviewBot } from '../core/bot.js';
 import Config from '../config/config.js';
 import { glob } from 'glob';
-
-const execAsync = promisify(exec);
 
 export class CIAnnotateCommand {
     constructor(options = {}) {
@@ -68,7 +64,7 @@ export class CIAnnotateCommand {
         return options;
     }
 
-    async analyzeCode(options) {
+    async analyzeCode(_options) {
         const config = new Config();
         await config.load();
 

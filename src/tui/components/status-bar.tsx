@@ -11,6 +11,7 @@ type Props = {
   tokenUsage?: { estimated: number; limit: number; percentage: number };
   compacting?: boolean;
   serverStatus?: 'connected' | 'local';
+  costUsd?: number;
 };
 
 const MODE_SYMBOL: Record<Mode, string> = {
@@ -31,7 +32,7 @@ function Pipe({ colors }: { colors: any }) {
   return <Text color={colors.dimSeparator}>{' │ '}</Text>;
 }
 
-export function StatusBar({ mode = 'BUILD', model, statusText, sessionId, tokenUsage, compacting, serverStatus }: Props) {
+export function StatusBar({ mode = 'BUILD', model, statusText, sessionId, tokenUsage, compacting, serverStatus, costUsd }: Props) {
   const { colors } = useTheme();
   const branch = useGitBranch();
 
@@ -96,6 +97,13 @@ export function StatusBar({ mode = 'BUILD', model, statusText, sessionId, tokenU
           }>
             {`~${(tokenUsage.estimated / 1000).toFixed(1)}k/${(tokenUsage.limit / 1000).toFixed(0)}k tok`}
           </Text>
+        </>
+      )}
+
+      {costUsd !== undefined && costUsd > 0 && (
+        <>
+          <Pipe colors={colors} />
+          <Text dimColor>{`~$${costUsd.toFixed(3)}`}</Text>
         </>
       )}
 

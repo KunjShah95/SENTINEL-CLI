@@ -22,6 +22,7 @@ type Props = {
   tokenUsage?: { estimated: number; limit: number; percentage: number };
   compacting?: boolean;
   serverStatus?: 'connected' | 'local';
+  costUsd?: number;
 };
 
 export function SessionShell({
@@ -40,6 +41,7 @@ export function SessionShell({
   tokenUsage,
   compacting,
   serverStatus,
+  costUsd,
 }: Props) {
   const { colors } = useTheme();
 
@@ -106,6 +108,7 @@ export function SessionShell({
           tokenUsage={tokenUsage}
           compacting={compacting}
           serverStatus={serverStatus}
+          costUsd={costUsd}
         />
       </Box>
     </Box>

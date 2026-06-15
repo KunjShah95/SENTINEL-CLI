@@ -43,7 +43,7 @@ export class BaseAnalyzer {
     for (const chunk of chunks) {
       const promises = chunk
         .filter(file => this.shouldAnalyzeFile(file.path))
-        .map(async (file) => {
+        .map(async file => {
           this.stats.filesAnalyzed++;
           this.stats.linesAnalyzed += file.content.split('\n').length;
 
@@ -106,20 +106,13 @@ export class BaseAnalyzer {
    */
   addIssue(issue) {
     const formattedIssue = {
+      ...issue,
       id: this.generateIssueId(),
       analyzer: this.name,
       severity: issue.severity || 'info',
       type: issue.type || 'general',
-      title: issue.title,
-      message: issue.message,
-      file: issue.file,
-      line: issue.line,
-      column: issue.column,
-      snippet: issue.snippet,
-      suggestion: issue.suggestion,
       confidence: issue.confidence || 0.8,
       tags: issue.tags || [],
-      ...issue,
     };
 
     this.issues.push(formattedIssue);
@@ -173,14 +166,19 @@ export class BaseAnalyzer {
    * Check if file path matches glob pattern
    */
   matchesPattern(filePath, pattern) {
-    // Simple glob matching for common patterns
+    const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
     if (pattern.includes('**')) {
-      const regex = new RegExp(pattern.replace(/\*\*/g, '.*').replace(/\*/g, '[^/]*'));
+      const regexStr = escapeRegex(pattern)
+        .replace(/\\\*\\\*/g, '[^/]*')
+        .replace(/\\\*/g, '[^/]*');
+      const regex = new RegExp(regexStr);
       return regex.test(filePath);
     }
 
     if (pattern.includes('*')) {
-      const regex = new RegExp(pattern.replace(/\*/g, '[^/]*'));
+      const regexStr = escapeRegex(pattern).replace(/\\\*/g, '[^/]*');
+      const regex = new RegExp(regexStr);
       return regex.test(filePath);
     }
 
@@ -278,7 +276,7 @@ export class BaseAnalyzer {
     const securityPatterns = [
       {
         name: 'SQL Injection',
-        pattern: /(SELECT|INSERT|UPDATE|DELETE).*\+.*|execute\s*\(\s*['"][^'"]*['"]/gi,
+        pattern: /(SELECT|INSERT|UPDATE|DELETE).*\+.*|execute\s*\(\s*['"][^'"]*['"]\s*\+/gi,
         severity: 'high',
         type: 'security',
       },
@@ -290,7 +288,8 @@ export class BaseAnalyzer {
       },
       {
         name: 'AWS Credentials',
-        pattern: /(AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY|(?:AKIA|ASIA|AID|AROA)[0-9A-Z]{16}|A3T[A-Z0-9]{15}|A3TX[A-Z0-9]{14})\s*=\s*['"][^'"]+['"]/gi,
+        pattern:
+          /(AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY|(?:AKIA|ASIA|AID|AROA)[0-9A-Z]{16}|A3T[A-Z0-9]{15}|A3TX[A-Z0-9]{14})\s*=\s*['"][^'"]+['"]/g,
         severity: 'critical',
         type: 'security',
       },
@@ -363,13 +362,13 @@ export class BaseAnalyzer {
    */
   formatSeverity(severity) {
     const colors = {
-      critical: '🔴',
-      high: '🟠',
-      medium: '🟡',
-      low: '🔵',
-      info: 'ℹ️',
+      critical: '\u{1F534}',
+      high: '\u{1F7E0}',
+      medium: '\u{1F7E1}',
+      low: '\u{1F535}',
+      info: '\u2139\uFE0F',
     };
-    return colors[severity] || 'ℹ️';
+    return colors[severity] || '\u2139\uFE0F';
   }
 
   /**

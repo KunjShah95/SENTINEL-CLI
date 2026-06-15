@@ -11,8 +11,6 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { request as httpRequest } from "node:http";
-import { request as httpsRequest } from "node:https";
 import { URL } from "node:url";
 
 const CONFIG_DIR =

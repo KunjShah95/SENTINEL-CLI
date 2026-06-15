@@ -54,7 +54,7 @@ export class InteractiveFixCommand {
         return options;
     }
 
-    async scanIssues(options) {
+    async scanIssues(_options) {
         const config = new Config();
         await config.load();
 

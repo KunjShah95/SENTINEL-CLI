@@ -86,7 +86,7 @@ export class BugAnalyzer extends BaseAnalyzer {
       },
 
       arrayIndexOutOfBounds: {
-        patterns: [/\[.*\]\[.*\]/gi, /arr\[.*length.*\]/gi, /list\[.*\.size\(\).*\]/gi],
+        patterns: [/arr\[.*length.*\]/gi, /list\[.*\.size\(\).*\]/gi],
         severity: 'high',
         type: 'bug',
       },

@@ -1,5 +1,5 @@
 import { execSync } from 'child_process';
-import { existsSync, readFileSync, readdirSync, unlinkSync } from 'fs';
+import { existsSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from 'fs';
 import { TOOLS, type ToolResult } from './tools';
 import { THEMES, DEFAULT_THEME } from '../theme';
 import { chat, getProviderInfo, getOllamaModels } from './chat';
@@ -48,6 +48,11 @@ const sentinelCmds: Record<string, string[]> = {
   ollama: ['ollama'],
   sessions: ['sessions'],
   wizard: ['wizard'],
+  test: ['test'],
+  export: ['export'],
+  dismiss: ['dismiss'],
+  undismiss: ['undismiss'],
+  dismissed: ['dismissed'],
 };
 
 function formatResult(result: ToolResult): string {
@@ -572,8 +577,22 @@ export const COMMAND_HANDLERS: Record<string, CommandHandler> = {
     },
   },
   sarif: {
-    description: 'Generate SARIF report',
-    handler: buildCommandHandler('sarif'),
+    description: 'Generate SARIF report and write to sentinel-results.sarif',
+    handler: async (args: string) => {
+      try {
+        const { CodeReviewBot } = await import('../../core/bot.js');
+        const bot = new CodeReviewBot();
+        await bot.initialize();
+        const issues = await bot.analyzeFiles([args || '.'], { format: 'sarif' });
+        await bot.shutdown();
+        const sarifOutput = JSON.stringify(issues, null, 2);
+        const outPath = 'sentinel-results.sarif';
+        writeFileSync(outPath, sarifOutput, 'utf-8');
+        return `SARIF report written to ${outPath} (${sarifOutput.length} bytes)\n\n${sarifOutput.slice(0, 1000)}${sarifOutput.length > 1000 ? '\n... (truncated)' : ''}`;
+      } catch (err) {
+        return `SARIF export error: ${err}`;
+      }
+    },
   },
   badge: {
     description: 'Generate security score badges',
@@ -891,6 +910,124 @@ export const COMMAND_HANDLERS: Record<string, CommandHandler> = {
         { systemPrompt: 'You are a test expert. Suggest specific test cases with frameworks.' }
       );
       return result || '(no response)';
+    },
+  },
+  test: {
+    description: 'Generate unit test stubs for a file (/test <filepath>)',
+    handler: async (args: string) => {
+      const target = args.trim();
+      if (!target) return 'Usage: /test <filepath>\nExample: /test src/utils/parser.js';
+      if (!existsSync(target)) return `File not found: ${target}`;
+      try {
+        const source = readFileSync(target, 'utf-8');
+        const ext = target.match(/\.(\w+)$/)?.[1] || 'js';
+        const testExt = ext === 'ts' ? 'test.ts' : ext === 'tsx' ? 'test.tsx' : 'test.js';
+        const testPath = target.replace(/\.\w+$/, `.${testExt}`);
+        const result = await chat(
+          `Generate a comprehensive unit test file for the following source code. Use the appropriate testing framework (Jest/Vitest for JS/TS). Include tests for all exports, edge cases, and error paths. Output ONLY the test code, no explanations.\n\nFile: ${target}\n\n\`\`\`${ext}\n${source}\n\`\`\``,
+          { systemPrompt: 'You are a test engineer. Output valid test code only.' }
+        );
+        const code = (result || '').replace(/```\w*/g, '').trim();
+        if (!code) return 'AI did not generate test code. Try again.';
+        writeFileSync(testPath, code, 'utf-8');
+        return `Test file written to ${testPath}\n\n${code.slice(0, 500)}${code.length > 500 ? '\n... (truncated)' : ''}`;
+      } catch (e) {
+        return `Error generating tests: ${e}`;
+      }
+    },
+  },
+  dismiss: {
+    description: 'Dismiss a finding by file:line:rule key',
+    handler: async (args: string) => {
+      const trimmed = args.trim();
+      if (!trimmed) return 'Usage: /dismiss <file:line:rule> [reason]\nExample: /dismiss src/index.js:42:no-eval false positive - not user input';
+      const match = trimmed.match(/^(\S+)\s*(.*)$/);
+      if (!match) return 'Invalid format. Use: /dismiss <file:line:rule> [reason]';
+      const key = match[1];
+      const reason = match[2] || 'User dismissed';
+      const parts = key.split(':');
+      if (parts.length < 2) return 'Key must be file:line:rule or file:rule';
+      try {
+        const { dismissIssue } = await import('../../utils/dismissedIssues.js');
+        const file = parts[0];
+        const line = parseInt(parts[1]) || 0;
+        const rule = parts.slice(2).join(':') || 'unknown';
+        dismissIssue(file, line, rule, reason);
+        return `\u2713 Dismissed ${key} (${reason})`;
+      } catch (e) {
+        return `Error: ${e}`;
+      }
+    },
+  },
+  undismiss: {
+    description: 'Undismiss a previously dismissed finding',
+    handler: async (args: string) => {
+      const key = args.trim();
+      if (!key) return 'Usage: /undismiss <file:line:rule>\nExample: /undismiss src/index.js:42:no-eval';
+      const parts = key.split(':');
+      if (parts.length < 2) return 'Key must be file:line:rule or file:rule';
+      try {
+        const { undismissIssue } = await import('../../utils/dismissedIssues.js');
+        const file = parts[0];
+        const line = parseInt(parts[1]) || 0;
+        const rule = parts.slice(2).join(':') || 'unknown';
+        const ok = undismissIssue(file, line, rule);
+        return ok ? `\u2713 Undismissed ${key}` : `Not found: ${key}`;
+      } catch (e) {
+        return `Error: ${e}`;
+      }
+    },
+  },
+  dismissed: {
+    description: 'List all dismissed findings',
+    handler: async () => {
+      try {
+        const { getDismissals } = await import('../../utils/dismissedIssues.js');
+        const data = getDismissals();
+        const entries = Object.entries(data.dismissals);
+        if (entries.length === 0) return 'No dismissed findings.';
+        let out = `Dismissed findings (${entries.length}):\n`;
+        for (const [key, val] of entries) {
+          const entry = val as { reason?: string };
+          out += `  \u25CB ${key} — ${entry.reason || 'no reason'}\n`;
+        }
+        out += '\nUsage: /dismiss <key> [reason] | /undismiss <key>';
+        return out;
+      } catch (e) {
+        return `Error: ${e}`;
+      }
+    },
+  },
+  export: {
+    description: 'Export current session as markdown report to ./sentinel-report.md',
+    handler: async () => {
+      try {
+        const home = process.env.HOME || process.env.USERPROFILE || '~';
+        const sessDir = `${home}/.sentinel/sessions`;
+        if (!existsSync(sessDir)) return 'No session data to export.';
+        const files = readdirSync(sessDir).filter(f => f.endsWith('.json')).sort().reverse();
+        if (files.length === 0) return 'No session data to export.';
+        const latest = files[0];
+        const data = JSON.parse(readFileSync(`${sessDir}/${latest}`, 'utf-8'));
+        const messages = Array.isArray(data) ? data : [];
+        let md = `# Sentinel Security Report\n\n`;
+        md += `**Generated:** ${new Date().toISOString()}\n`;
+        md += `**Session:** ${latest.replace('.json', '')}\n`;
+        md += `**Messages:** ${messages.length}\n\n`;
+        md += `---\n\n`;
+        for (const msg of messages.slice(-50)) {
+          const role = (msg.role || 'unknown').toUpperCase();
+          const content = (msg.content || msg.text || '').trim();
+          if (content) {
+            md += `### ${role}\n\n${content}\n\n---\n\n`;
+          }
+        }
+        const outputPath = 'sentinel-report.md';
+        writeFileSync(outputPath, md, 'utf-8');
+        return `Report exported to ${outputPath} (${messages.length} messages, ${md.length} chars)`;
+      } catch (e) {
+        return `Export error: ${e}`;
+      }
     },
   },
   'pr-description': {

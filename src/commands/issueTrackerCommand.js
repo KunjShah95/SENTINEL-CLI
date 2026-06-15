@@ -3,7 +3,6 @@ import inquirer from 'inquirer';
 import { promises as fs } from 'fs';
 import path from 'path';
 import https from 'https';
-import http from 'http';
 
 export class IssueTrackerCommand {
     constructor(options = {}) {

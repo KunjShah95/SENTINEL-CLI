@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Box, Text, useInput } from 'ink';
+import os from 'os';
 import { useTheme } from '../providers/theme/index.js';
 import { StatusBar } from '../components/status-bar.js';
 import { TOOLS } from '../lib/tools.js';
@@ -32,6 +33,8 @@ export function Dashboard() {
   const [cacheStats, setCacheStats] = useState<string>('...');
   const [configStatus, setConfigStatus] = useState<string>('...');
   const [gitInfo, setGitInfo] = useState<string>('...');
+  const [memoryUsage, setMemoryUsage] = useState({ heapUsed: 0, heapTotal: 0, rss: 0 });
+  const [cpuLoad, setCpuLoad] = useState(0);
 
   useEffect(() => {
     async function load() {
@@ -69,6 +72,14 @@ export function Dashboard() {
         const commit = execSync('git rev-parse --short HEAD', { encoding: 'utf-8' }).trim();
         setGitInfo(`${branch} @ ${commit}`);
       } catch { setGitInfo('not a git repo'); }
+      try {
+        const mem = process.memoryUsage();
+        setMemoryUsage({ heapUsed: mem.heapUsed, heapTotal: mem.heapTotal, rss: mem.rss });
+        const cpus = os.cpus();
+        const totalIdle = cpus.reduce((s, c) => s + c.times.idle, 0);
+        const totalTick = cpus.reduce((s, c) => s + Object.values(c.times).reduce((a, b) => a + b, 0), 0);
+        setCpuLoad(Math.round((1 - totalIdle / totalTick) * 100));
+      } catch {}
     }
     load();
   }, []);
@@ -101,6 +112,14 @@ export function Dashboard() {
             <Box flexDirection="row" justifyContent="space-between">
               <Text dimColor>{'Uptime:'}</Text>
               <Text>{data?.uptime ? `${Math.floor(data.uptime / 60)}m` : '...'}</Text>
+            </Box>
+            <Box flexDirection="row" justifyContent="space-between">
+              <Text dimColor>{'Memory:'}</Text>
+              <Text>{(memoryUsage.heapUsed / 1024 / 1024).toFixed(0)}MB / {(memoryUsage.rss / 1024 / 1024).toFixed(0)}MB RSS</Text>
+            </Box>
+            <Box flexDirection="row" justifyContent="space-between">
+              <Text dimColor>{'CPU:'}</Text>
+              <Text color={cpuLoad > 80 ? colors.error : cpuLoad > 50 ? colors.warning : colors.success}>{cpuLoad}%</Text>
             </Box>
           </Box>
 

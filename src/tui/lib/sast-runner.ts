@@ -54,7 +54,9 @@ function tryExec(cmd: string, options: { timeout?: number; cwd?: string } = {}):
       (e?.stdout as string) ||
       (e?.output?.filter(Boolean).join('') as string) ||
       '';
-    return { stdout, error: e?.message || String(e) };
+    const msg = e?.message || String(e);
+    const isTimeout = msg.includes('timeout') || e?.code === 'ETIMEDOUT' || msg.includes('ETIMEDOUT');
+    return { stdout, error: isTimeout ? `TIMEOUT after ${options.timeout || 30000}ms: ${msg}` : msg };
   }
 }
 
@@ -399,6 +401,26 @@ function runNpmAudit(cwd: string): { findings: SastFinding[]; error: string | nu
 
 // ─── Main entry point ─────────────────────────────────────────────────────────
 
+function loadDismissedKeys(): Set<string> {
+  try {
+    const fp = join(process.cwd(), '.sentinel', 'dismissed.json');
+    if (!existsSync(fp)) return new Set();
+    const data = JSON.parse(readFileSync(fp, 'utf-8'));
+    return new Set(Object.keys(data.dismissals || {}));
+  } catch {
+    return new Set();
+  }
+}
+
+function filterDismissed(findings: SastFinding[]): SastFinding[] {
+  const dismissed = loadDismissedKeys();
+  if (dismissed.size === 0) return findings;
+  return findings.filter(f => {
+    const key = `${f.file || ''}:${f.line || 0}:${f.rule || ''}`;
+    return !dismissed.has(key);
+  });
+}
+
 export async function runSast(options: { target?: string; tools?: string[] } = {}): Promise<SastRunResult> {
   const startTime = Date.now();
   const cwd = resolve(options.target ?? process.cwd());
@@ -457,7 +479,7 @@ export async function runSast(options: { target?: string; tools?: string[] } = {
   findings.sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
 
   return {
-    findings,
+    findings: filterDismissed(findings),
     toolsRun,
     errors,
     durationMs: Date.now() - startTime,

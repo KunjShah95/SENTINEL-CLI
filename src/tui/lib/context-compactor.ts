@@ -112,7 +112,16 @@ export async function compactMessages(
     .join('\n');
 
   const summaryPrompt =
-    `You are a context compactor. Summarize the following conversation history into 3-5 bullet points capturing the key decisions, code changes made, and issues found. Be specific about file names and actions taken. Output ONLY the bullet list.\n\n${headText}`;
+    `You are a context compactor. Summarize the following conversation history into a JSON object with these fields:
+- "filesRead": array of file paths that were read or discussed
+- "issuesFound": array of { file, line?, severity, title } objects for each issue discovered
+- "fixesApplied": array of { file, description } objects for changes made
+- "decisions": array of key decisions made during the conversation
+- "summary": 2-3 sentence plain-text overview
+
+Output ONLY valid JSON, no markdown fences, no extra text.
+
+Conversation:\n\n${headText}`;
 
   onProgress?.('summarizing');
 
@@ -135,13 +144,45 @@ export async function compactMessages(
 
   const tokensBefore = estimateTokens(head);
 
+  let displayText: string;
+  try {
+    const parsed = JSON.parse(summary);
+    const lines: string[] = [`**[Compacted Context — ${head.length} messages summarized]**`];
+    if (parsed.summary) lines.push('', parsed.summary);
+    if (Array.isArray(parsed.filesRead) && parsed.filesRead.length > 0) {
+      lines.push('', `**Files read:** ${parsed.filesRead.join(', ')}`);
+    }
+    if (Array.isArray(parsed.issuesFound) && parsed.issuesFound.length > 0) {
+      lines.push('', `**Issues found (${parsed.issuesFound.length}):**`);
+      for (const issue of parsed.issuesFound.slice(0, 5)) {
+        const loc = issue.file ? `${issue.file}${issue.line ? `:${issue.line}` : ''}` : '';
+        lines.push(`  - [${issue.severity || '?'}] ${loc} ${issue.title}`);
+      }
+    }
+    if (Array.isArray(parsed.fixesApplied) && parsed.fixesApplied.length > 0) {
+      lines.push('', `**Fixes applied (${parsed.fixesApplied.length}):**`);
+      for (const fix of parsed.fixesApplied) {
+        lines.push(`  - ${fix.file}: ${fix.description}`);
+      }
+    }
+    if (Array.isArray(parsed.decisions) && parsed.decisions.length > 0) {
+      lines.push('', `**Decisions:**`);
+      for (const d of parsed.decisions) {
+        lines.push(`  - ${d}`);
+      }
+    }
+    displayText = lines.join('\n');
+  } catch {
+    displayText = `**[Compacted Context — ${head.length} messages summarized]**\n\n${summary}`;
+  }
+
   const syntheticMessage: AgentMessage = {
     id: `compaction-${Date.now()}`,
     role: 'assistant',
     parts: [
       {
         type: 'text',
-        text: `**[Compacted Context — ${head.length} messages summarized]**\n\n${summary}`,
+        text: displayText,
       },
     ],
     timestamp: Date.now(),

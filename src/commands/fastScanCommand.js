@@ -1,6 +1,4 @@
 import chalk from 'chalk';
-import { CodeReviewBot } from '../core/bot.js';
-import Config from '../config/config.js';
 import { glob } from 'glob';
 import { promises as fs } from 'fs';
 import path from 'path';

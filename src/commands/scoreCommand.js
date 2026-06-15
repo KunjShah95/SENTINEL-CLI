@@ -189,7 +189,6 @@ export class ScoreCommand {
     calculateCodeHealthScore(analysis) {
         let score = 80;
         
-        const avgFileSize = 200;
         const complexity = Math.min(20, analysis.files / 50);
         score -= complexity;
         
@@ -202,7 +201,7 @@ export class ScoreCommand {
         let weightedSum = 0;
         let totalWeight = 0;
         
-        for (const [category, data] of Object.entries(scores)) {
+        for (const [, data] of Object.entries(scores)) {
             weightedSum += data.score * data.weight;
             totalWeight += data.weight;
         }

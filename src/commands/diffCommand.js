@@ -2,9 +2,6 @@ import chalk from 'chalk';
 import { EnhancedGit } from '../utils/enhancedGit.js';
 import { CodeReviewBot } from '../core/bot.js';
 import Config from '../config/config.js';
-import { diffLines } from 'diff';
-import { promises as fs } from 'fs';
-import path from 'path';
 import https from 'https';
 import http from 'http';
 
@@ -21,12 +18,6 @@ export class DiffCommand {
 
     const [from, to] = this.parseDiffSpec(diffSpec);
     console.log(chalk.gray(`  Comparing ${chalk.yellow(from)} → ${chalk.green(to)}\n`));
-
-    const spinner = {
-      start: () => console.log(chalk.gray('  Analyzing changes...')),
-      succeed: () => {},
-      fail: () => {},
-    };
 
     try {
       const changes = await this.getChangedFiles(from, to);
@@ -128,18 +119,12 @@ export class DiffCommand {
     };
   }
 
-  async analyzeChanges(changes, from, to) {
+  async analyzeChanges(changes, _from, _to) {
     const config = new Config();
     await config.load();
 
     const bot = new CodeReviewBot();
     await bot.initialize();
-
-    const filesToAnalyze = changes
-      .map(c => c.file)
-      .filter(
-        f => !f.includes('node_modules') && !f.includes('.git') && !f.match(/\.(lock|md|json)$/)
-      );
 
     const analysisResults = {
       security: [],
@@ -163,7 +148,7 @@ export class DiffCommand {
     return analysisResults;
   }
 
-  async analyzeFile(change, bot) {
+  async analyzeFile(change, _bot) {
     const results = {
       security: [],
       quality: [],

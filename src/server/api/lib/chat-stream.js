@@ -18,8 +18,6 @@
  * the final message list and usage for persistence + billing.
  */
 
-import { getToolContracts } from "../../../shared/index.js";
-
 /**
  * JSON Schema for each tool name. AI SDK 3.x's streamText accepts
  * plain JSON Schema objects for tool `parameters`. We look up by name

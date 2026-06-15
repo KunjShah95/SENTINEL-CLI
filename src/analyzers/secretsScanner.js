@@ -327,7 +327,7 @@ class SecretsScanner {
   scanHighEntropy(content, filePath) {
     const issues = [];
     const lines = content.split('\n');
-    const secretlikePatterns = [
+    const getSecretlikePatterns = () => [
       /['"]([A-Za-z0-9+/]{32,})['"]/g,
       /(?:key|token|secret|password|cred)[_]?(?:val|value)?\s*[:=]\s*['"]([A-Za-z0-9+/]{32,})['"]/gi,
     ];
@@ -344,7 +344,7 @@ class SecretsScanner {
         continue;
       }
 
-      for (const pattern of secretlikePatterns) {
+      for (const pattern of getSecretlikePatterns()) {
         const matches = line.matchAll(pattern);
         for (const match of matches) {
           const potentialSecret = match[1] || match[0].replace(/['"]/g, '');
@@ -376,16 +376,8 @@ class SecretsScanner {
   /**
    * Check for known false positives
    */
-  isKnownFalsePositive(secret, line) {
-    const falsePositivePatterns = [
-      /base64|encoding|hash|md5|sha\d?|crc/,
-      /\b\d+\b/,
-      /^[A-Za-z0-9+/]+==$/,
-      /example|test|foo|bar|baz|placeholder/,
-      /^[0-9a-f]{32,}$/i,
-    ];
-
-    const lowerLine = line.toLowerCase();
+  isKnownFalsePositive(secret, _line) {
+    const lowerSecret = secret.toLowerCase();
     const falsePositiveValues = [
       'changeme',
       'password123',
@@ -394,12 +386,29 @@ class SecretsScanner {
       'aaaaaaa',
       'bbbbbbb',
       'cccccc',
+      'example',
+      'test',
+      'foo',
+      'bar',
+      'baz',
+      'placeholder',
     ];
 
-    return (
-      falsePositivePatterns.some(p => p.test(lowerLine)) ||
-      falsePositiveValues.some(v => secret.toLowerCase().includes(v))
-    );
+    if (falsePositiveValues.some(v => lowerSecret.includes(v))) return true;
+
+    if (/^\d+$/.test(secret)) return true;
+
+    if (/^[A-Za-z0-9+/]+==$/.test(secret)) return true;
+
+    if (/^[0-9a-f]{32,}$/i.test(secret)) return true;
+
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(secret)) return true;
+
+    if (/^[0-9a-f]{40}$/i.test(secret) || /^[0-9a-f]{64}$/i.test(secret)) return true;
+
+    if (/^(base64|encoding|hash|md5|sha\d?|crc)/i.test(lowerSecret)) return true;
+
+    return false;
   }
 
   isHighEntropy(str) {
