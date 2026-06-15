@@ -1,3 +1,3 @@
-export { UserMessage } from "./user-message";
-export { BotMessage } from "./bot-message";
-export { ErrorMessage } from "./error-message";
+export { UserMessage } from './user-message.js';
+export { BotMessage } from './bot-message.js';
+export { ErrorMessage } from './error-message.js';

@@ -29,7 +29,7 @@ export function Session() {
 
   const {
     messages, loading, mode, setMode, toggleMode,
-    submit, stop, clear, appendMessage, model, setModel, status,
+    submit, stop, clear, appendMessage, model, setModel, status, sessionId,
   } = useAgentChat({
     initialMode: initialMode === 'BUILD' || initialMode === 'PLAN' || initialMode === 'REVIEW' ? initialMode : undefined,
   });
@@ -288,7 +288,8 @@ export function Session() {
           onModeToggle={handleModeToggle}
           onCommandPalette={handleCommandPalette}
           model={model}
-          statusText={`${messages.length} msgs | ${theme.name}`}
+          sessionId={sessionId ?? undefined}
+          statusText={`${messages.length} msgs · ${theme.name}`}
         >
           {messages.length === 0 ? (
             <Box padding={2} alignItems="center" justifyContent="center">

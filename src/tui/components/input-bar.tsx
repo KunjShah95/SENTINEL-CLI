@@ -1,9 +1,17 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import { useTheme } from '../providers/theme/index.js';
 
 type Mode = 'BUILD' | 'PLAN' | 'REVIEW' | 'SCAN' | 'FIX';
+
+const MODE_SYMBOL: Record<Mode, string> = {
+  BUILD: '⬡', PLAN: '◎', REVIEW: '⊕', SCAN: '◈', FIX: '⚙',
+};
+
+const MODE_COLOR_KEY: Record<Mode, string> = {
+  BUILD: 'success', PLAN: 'planMode', REVIEW: 'critical', SCAN: 'warning', FIX: 'error',
+};
 
 type Props = {
   onSubmit: (value: string) => void;
@@ -20,8 +28,8 @@ const MAX_SUGGESTIONS = 10;
 const MENTION_REGEX = /(?:^|\s)@([^\s@]*)$/;
 
 function extractMentionToken(text: string): string | null {
-  const match = text.match(MENTION_REGEX);
-  return match ? match[1] : null;
+  const m = text.match(MENTION_REGEX);
+  return m ? m[1] : null;
 }
 
 export function InputBar({
@@ -29,7 +37,7 @@ export function InputBar({
   onCommand,
   onSlashCommand,
   disabled = false,
-  placeholder = 'Ask Sentinel to do anything...',
+  placeholder = 'Ask Sentinel anything, or /command...',
   mode = 'BUILD',
   onModeToggle,
   onCommandPalette,
@@ -40,11 +48,8 @@ export function InputBar({
   const [selectedIndex, setSelectedIndex] = useState(0);
   const { colors } = useTheme();
 
-  const activeColor = mode === 'PLAN' ? colors.planMode
-    : mode === 'REVIEW' ? colors.critical
-    : mode === 'SCAN' ? colors.warning
-    : mode === 'FIX' ? colors.error
-    : colors.primary;
+  const activeColor = (colors as any)[MODE_COLOR_KEY[mode]] ?? colors.primary;
+  const modeSymbol  = MODE_SYMBOL[mode];
 
   useEffect(() => {
     if (mentionToken === null) { setSuggestions([]); return; }
@@ -55,12 +60,10 @@ export function InputBar({
         const pattern = mentionToken.length > 0 ? `**/*${mentionToken}*` : '**/*';
         const result = await executeLocalTool('glob', { pattern });
         if (cancelled) return;
-        const files: string[] = Array.isArray(result?.files) ? result.files : [];
+        const files: string[] = Array.isArray((result as any)?.files) ? (result as any).files : [];
         setSuggestions(files.slice(0, MAX_SUGGESTIONS));
         setSelectedIndex(0);
-      } catch {
-        if (!cancelled) setSuggestions([]);
-      }
+      } catch { if (!cancelled) setSuggestions([]); }
     })();
     return () => { cancelled = true; };
   }, [mentionToken]);
@@ -69,21 +72,20 @@ export function InputBar({
     if (mentionToken === null || suggestions.length === 0) return;
     const selected = suggestions[selectedIndex];
     if (!selected) return;
-    const newValue = value.replace(/@[^\s@]*$/, `@${selected} `);
-    setValue(newValue);
+    setValue(value.replace(/@[^\s@]*$/, `@${selected} `));
     setMentionToken(null);
     setSuggestions([]);
   }, [mentionToken, suggestions, selectedIndex, value]);
 
   useInput((input, key) => {
     if (mentionToken !== null && suggestions.length > 0) {
-      if (key.upArrow) { setSelectedIndex(p => Math.max(0, p - 1)); return; }
+      if (key.upArrow)   { setSelectedIndex(p => Math.max(0, p - 1)); return; }
       if (key.downArrow) { setSelectedIndex(p => Math.min(suggestions.length - 1, p + 1)); return; }
-      if (key.tab) { insertSelected(); return; }
-      if (key.escape) { setMentionToken(null); setSuggestions([]); return; }
+      if (key.tab)       { insertSelected(); return; }
+      if (key.escape)    { setMentionToken(null); setSuggestions([]); return; }
       return;
     }
-    if (key.tab) { onModeToggle?.(); return; }
+    if (key.tab)                   { onModeToggle?.(); return; }
     if (key.ctrl && input === 'p') { onCommandPalette?.(); return; }
   });
 
@@ -93,15 +95,12 @@ export function InputBar({
   }, []);
 
   const handleSubmit = useCallback((submitted: string) => {
-    if (mentionToken !== null && suggestions.length > 0) {
-      insertSelected();
-      return;
-    }
+    if (mentionToken !== null && suggestions.length > 0) { insertSelected(); return; }
     const trimmed = submitted.trim();
     if (!trimmed) return;
     if (trimmed.startsWith('/')) {
       if (onSlashCommand) { onSlashCommand(); return; }
-      if (onCommand) { onCommand(trimmed); return; }
+      if (onCommand)      { onCommand(trimmed); return; }
     }
     onSubmit(trimmed);
     setValue('');
@@ -113,25 +112,42 @@ export function InputBar({
 
   return (
     <Box flexDirection="column" width="100%">
+      {/* @mention file suggestions */}
       {showSuggestions ? (
-        <Box flexDirection="column" paddingX={1} borderStyle="single" borderColor={colors.info}>
-          {suggestions.map((filePath, i) => {
-            const isSelected = i === selectedIndex;
+        <Box
+          flexDirection="column"
+          borderStyle="single"
+          borderColor={colors.info}
+          paddingX={2}
+          marginBottom={0}
+        >
+          {suggestions.map((fp, i) => {
+            const isSel = i === selectedIndex;
             return (
-              <Text key={filePath} bold={isSelected} color={isSelected ? colors.primary : colors.info}>
-                {`${isSelected ? '> ' : '  '}${filePath}`}
-              </Text>
+              <Box key={fp} flexDirection="row" gap={1}>
+                <Text color={isSel ? colors.primary : colors.dimSeparator}>{isSel ? '▶' : ' '}</Text>
+                <Text bold={isSel} color={isSel ? colors.primary : colors.info}>{fp}</Text>
+              </Box>
             );
           })}
         </Box>
       ) : null}
-      <Box flexDirection="row" borderStyle="single" borderColor={activeColor} paddingX={1}>
-        <Text color={activeColor}>{`[${mode}] `}</Text>
+
+      {/* Main input */}
+      <Box
+        flexDirection="row"
+        borderStyle="round"
+        borderColor={disabled ? colors.dimSeparator : activeColor}
+        paddingX={1}
+        width="100%"
+        alignItems="center"
+      >
+        <Text bold color={activeColor}>{`${modeSymbol} `}</Text>
         <TextInput
           value={value}
           onChange={handleChange}
           onSubmit={handleSubmit}
-          placeholder={disabled ? 'Processing...' : placeholder}
+          placeholder={disabled ? '  Processing...' : placeholder}
           focus={!disabled}
         />
       </Box>
