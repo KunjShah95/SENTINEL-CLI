@@ -29,7 +29,15 @@ export type AvailableModels = {
   anthropic: string[];
   openai: string[];
   groq: string[];
+  mistral: string[];
+  deepseek: string[];
+  xai: string[];
+  together: string[];
+  fireworks: string[];
+  perplexity: string[];
+  openrouter: string[];
   ollama: string[];
+  lmstudio: string[];
 };
 
 // ─── Routing table ────────────────────────────────────────────────────────────
@@ -53,49 +61,49 @@ type RoutingEntry = {
 
 const ROUTING_TABLE: Record<TaskType, RoutingEntry> = {
   'security-review': {
-    tier1: 'claude-opus-4-8',
-    tier2: 'claude-sonnet-4-6',
-    tier3: 'gpt-4o',
+    tier1: 'claude-opus-4-6',
+    tier2: 'deepseek-reasoner',
+    tier3: 'grok-3',
     reason: 'highest reasoning capability',
     maxTokens: 8192,
     temperature: 0.1,
   },
   'fix-code': {
-    tier1: 'claude-opus-4-8',
-    tier2: 'claude-sonnet-4-6',
-    tier3: 'gpt-4-turbo',
-    reason: 'capable code generation',
+    tier1: 'claude-sonnet-4-6',
+    tier2: 'codestral-latest',
+    tier3: 'Qwen/Qwen2.5-Coder-32B-Instruct',
+    reason: 'strong code generation',
     maxTokens: 8192,
     temperature: 0.2,
   },
   'plan': {
-    tier1: 'claude-opus-4-8',
-    tier2: 'o1-preview',
-    tier3: 'claude-sonnet-4-6',
+    tier1: 'claude-opus-4-6',
+    tier2: 'deepseek-reasoner',
+    tier3: 'grok-3-mini',
     reason: 'deep reasoning for architecture',
     maxTokens: 4096,
     temperature: 0.3,
   },
   'ci-fix': {
     tier1: 'claude-sonnet-4-6',
-    tier2: 'gpt-4o',
-    tier3: 'claude-haiku-4-5',
+    tier2: 'gpt-5.4',
+    tier3: 'llama-3.3-70b-versatile',
     reason: 'good model for test-failure analysis',
     maxTokens: 4096,
     temperature: 0.15,
   },
   'quick-scan': {
     tier1: 'claude-haiku-4-5',
-    tier2: 'gpt-4o-mini',
-    tier3: 'claude-haiku-4-5',
+    tier2: 'llama-3.1-8b-instant',
+    tier3: 'gemma2-9b-it',
     reason: 'fast and cost-efficient for quick scans',
     maxTokens: 2048,
     temperature: 0.0,
   },
   'explain': {
     tier1: 'claude-haiku-4-5',
-    tier2: 'gpt-4o-mini',
-    tier3: 'claude-haiku-4-5',
+    tier2: 'mistral-small-latest',
+    tier3: 'llama-3.1-8b-instant',
     reason: 'any capable model for explanations',
     maxTokens: 2048,
     temperature: 0.4,

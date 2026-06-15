@@ -291,6 +291,31 @@ export function Session() {
           })();
           return;
         }
+        if (cmd === 'models') {
+          (async () => {
+            try {
+              const { SUPPORTED_CHAT_MODELS } = await import('../../shared/models/index.js');
+              const byProvider: Record<string, string[]> = {};
+              for (const m of SUPPORTED_CHAT_MODELS as any[]) {
+                if (!byProvider[m.provider]) byProvider[m.provider] = [];
+                const price = m.inputUsdPerMillionTokens > 0
+                  ? ` ($${m.inputUsdPerMillionTokens}/$${m.outputUsdPerMillionTokens} per M)`
+                  : ' (free/local)';
+                const flag = m.thinking ? ' 🧠' : '';
+                byProvider[m.provider].push(`  \`${m.id}\` — ${m.label}${flag}${price}`);
+              }
+              const lines = ['## Available Models by Provider', ''];
+              for (const [provider, models] of Object.entries(byProvider)) {
+                lines.push(`### ${provider.charAt(0).toUpperCase() + provider.slice(1)}`);
+                lines.push(...models);
+                lines.push('');
+              }
+              lines.push('> Switch model: type the model ID in your message, or set `MODEL=<id>` env var.');
+              appendMessage({ role: 'assistant', mode, model, parts: [{ type: 'text', text: lines.join('\n') }] });
+            } catch (e) { toast.error('Failed to list models: ' + String(e)); }
+          })();
+          return;
+        }
         if (cmd === 'health') {
           (async () => {
             try {
@@ -301,16 +326,23 @@ export function Session() {
               const uptimeStr = `${Math.floor(uptime / 60)}m ${Math.floor(uptime % 60)}s`;
               const heapMB = (mem.heapUsed / 1024 / 1024).toFixed(1);
               const rssMB = (mem.rss / 1024 / 1024).toFixed(1);
-              const hasAnthropic = !!process.env.ANTHROPIC_API_KEY;
-              const hasOpenAI = !!process.env.OPENAI_API_KEY;
-              const hasGemini = !!(process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GEMINI_API_KEY);
-              const hasGroq = !!process.env.GROQ_API_KEY;
-              const providers = [
-                hasAnthropic && 'Anthropic ✓',
-                hasOpenAI && 'OpenAI ✓',
-                hasGemini && 'Gemini ✓',
-                hasGroq && 'Groq ✓',
-              ].filter(Boolean).join(' · ') || 'None configured — set ANTHROPIC_API_KEY etc.';
+              const providerChecks: Array<[string, boolean]> = [
+                ['Anthropic', !!process.env.ANTHROPIC_API_KEY],
+                ['OpenAI', !!process.env.OPENAI_API_KEY],
+                ['Gemini', !!(process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GEMINI_API_KEY)],
+                ['Groq', !!process.env.GROQ_API_KEY],
+                ['Mistral', !!process.env.MISTRAL_API_KEY],
+                ['DeepSeek', !!process.env.DEEPSEEK_API_KEY],
+                ['xAI/Grok', !!process.env.XAI_API_KEY],
+                ['Together', !!process.env.TOGETHER_API_KEY],
+                ['Fireworks', !!process.env.FIREWORKS_API_KEY],
+                ['Perplexity', !!process.env.PERPLEXITY_API_KEY],
+                ['OpenRouter', !!process.env.OPENROUTER_API_KEY],
+                ['Ollama', !!(process.env.OLLAMA_HOST || true)],
+                ['LM Studio', !!(process.env.LMSTUDIO_HOST || true)],
+              ];
+              const activeProviders = providerChecks.filter(([, ok]) => ok).map(([n]) => `${n} ✓`).join(' · ');
+              const providers = activeProviders || 'None configured — set ANTHROPIC_API_KEY etc.';
               const tokenEst = Math.round(tokenUsage.estimated);
               const healthText = [
                 '## System Health',

@@ -14,8 +14,15 @@ export const SupportedProvider = Object.freeze({
   OPENAI: "openai",
   GOOGLE: "google",
   GROQ: "groq",
+  MISTRAL: "mistral",
+  DEEPSEEK: "deepseek",
+  XAI: "xai",
+  TOGETHER: "together",
+  FIREWORKS: "fireworks",
   OPENROUTER: "openrouter",
   OLLAMA: "ollama",
+  LMSTUDIO: "lmstudio",
+  PERPLEXITY: "perplexity",
 });
 
 /**
@@ -46,9 +53,55 @@ export const SUPPORTED_CHAT_MODELS = Object.freeze([
   { id: "gemini-2.5-pro", provider: SupportedProvider.GOOGLE, inputUsdPerMillionTokens: 1.25, outputUsdPerMillionTokens: 10, thinking: true, label: "Gemini 2.5 Pro" },
   { id: "gemini-2.5-flash", provider: SupportedProvider.GOOGLE, inputUsdPerMillionTokens: 0.3, outputUsdPerMillionTokens: 2.5, label: "Gemini 2.5 Flash" },
 
-  // Groq (openai-compatible pricing)
+  // Groq — ultra-fast inference
   { id: "llama-3.3-70b-versatile", provider: SupportedProvider.GROQ, inputUsdPerMillionTokens: 0.59, outputUsdPerMillionTokens: 0.79, label: "Llama 3.3 70B (Groq)" },
+  { id: "llama-3.1-8b-instant", provider: SupportedProvider.GROQ, inputUsdPerMillionTokens: 0.05, outputUsdPerMillionTokens: 0.08, label: "Llama 3.1 8B Instant (Groq)" },
   { id: "mixtral-8x7b-32768", provider: SupportedProvider.GROQ, inputUsdPerMillionTokens: 0.24, outputUsdPerMillionTokens: 0.24, label: "Mixtral 8x7B (Groq)" },
+  { id: "gemma2-9b-it", provider: SupportedProvider.GROQ, inputUsdPerMillionTokens: 0.20, outputUsdPerMillionTokens: 0.20, label: "Gemma2 9B (Groq)" },
+  { id: "qwen-qwq-32b", provider: SupportedProvider.GROQ, inputUsdPerMillionTokens: 0.29, outputUsdPerMillionTokens: 0.39, thinking: true, label: "Qwen QwQ 32B (Groq)" },
+
+  // Mistral — strong European models + Codestral for code
+  { id: "mistral-large-latest", provider: SupportedProvider.MISTRAL, inputUsdPerMillionTokens: 2.0, outputUsdPerMillionTokens: 6.0, label: "Mistral Large" },
+  { id: "codestral-latest", provider: SupportedProvider.MISTRAL, inputUsdPerMillionTokens: 0.3, outputUsdPerMillionTokens: 0.9, label: "Codestral (Mistral)" },
+  { id: "mistral-small-latest", provider: SupportedProvider.MISTRAL, inputUsdPerMillionTokens: 0.1, outputUsdPerMillionTokens: 0.3, label: "Mistral Small" },
+  { id: "open-mistral-nemo", provider: SupportedProvider.MISTRAL, inputUsdPerMillionTokens: 0.15, outputUsdPerMillionTokens: 0.15, label: "Mistral Nemo" },
+
+  // DeepSeek — strong reasoning, very cheap
+  { id: "deepseek-chat", provider: SupportedProvider.DEEPSEEK, inputUsdPerMillionTokens: 0.27, outputUsdPerMillionTokens: 1.1, label: "DeepSeek V3" },
+  { id: "deepseek-reasoner", provider: SupportedProvider.DEEPSEEK, inputUsdPerMillionTokens: 0.55, outputUsdPerMillionTokens: 2.19, thinking: true, label: "DeepSeek R1 (Reasoner)" },
+
+  // xAI / Grok — very large context, fast
+  { id: "grok-3", provider: SupportedProvider.XAI, inputUsdPerMillionTokens: 3.0, outputUsdPerMillionTokens: 15.0, label: "Grok 3 (xAI)" },
+  { id: "grok-3-mini", provider: SupportedProvider.XAI, inputUsdPerMillionTokens: 0.3, outputUsdPerMillionTokens: 0.5, thinking: true, label: "Grok 3 Mini (xAI)" },
+
+  // Together AI — fast open-source inference
+  { id: "meta-llama/Meta-Llama-3.3-70B-Instruct-Turbo", provider: SupportedProvider.TOGETHER, inputUsdPerMillionTokens: 0.88, outputUsdPerMillionTokens: 0.88, label: "Llama 3.3 70B (Together)" },
+  { id: "Qwen/Qwen2.5-Coder-32B-Instruct", provider: SupportedProvider.TOGETHER, inputUsdPerMillionTokens: 0.8, outputUsdPerMillionTokens: 0.8, label: "Qwen 2.5 Coder 32B (Together)" },
+  { id: "deepseek-ai/DeepSeek-V3", provider: SupportedProvider.TOGETHER, inputUsdPerMillionTokens: 1.25, outputUsdPerMillionTokens: 1.25, label: "DeepSeek V3 (Together)" },
+
+  // Fireworks AI — fastest inference for open models
+  { id: "accounts/fireworks/models/deepseek-v3", provider: SupportedProvider.FIREWORKS, inputUsdPerMillionTokens: 0.9, outputUsdPerMillionTokens: 0.9, label: "DeepSeek V3 (Fireworks)" },
+  { id: "accounts/fireworks/models/llama-v3p3-70b-instruct", provider: SupportedProvider.FIREWORKS, inputUsdPerMillionTokens: 0.9, outputUsdPerMillionTokens: 0.9, label: "Llama 3.3 70B (Fireworks)" },
+  { id: "accounts/fireworks/models/qwen2p5-coder-32b-instruct", provider: SupportedProvider.FIREWORKS, inputUsdPerMillionTokens: 0.9, outputUsdPerMillionTokens: 0.9, label: "Qwen2.5 Coder 32B (Fireworks)" },
+
+  // Perplexity — online search capability
+  { id: "llama-3.1-sonar-large-128k-online", provider: SupportedProvider.PERPLEXITY, inputUsdPerMillionTokens: 1.0, outputUsdPerMillionTokens: 1.0, label: "Sonar Large Online (Perplexity)" },
+  { id: "llama-3.1-sonar-small-128k-online", provider: SupportedProvider.PERPLEXITY, inputUsdPerMillionTokens: 0.2, outputUsdPerMillionTokens: 0.2, label: "Sonar Small Online (Perplexity)" },
+
+  // OpenRouter — meta-provider routing 200+ models
+  { id: "openrouter/auto", provider: SupportedProvider.OPENROUTER, inputUsdPerMillionTokens: 0, outputUsdPerMillionTokens: 0, label: "Auto (OpenRouter)" },
+  { id: "openrouter/anthropic/claude-opus-4", provider: SupportedProvider.OPENROUTER, inputUsdPerMillionTokens: 15, outputUsdPerMillionTokens: 75, label: "Claude Opus 4 (OpenRouter)" },
+  { id: "openrouter/google/gemini-2.5-pro", provider: SupportedProvider.OPENROUTER, inputUsdPerMillionTokens: 1.25, outputUsdPerMillionTokens: 10, label: "Gemini 2.5 Pro (OpenRouter)" },
+
+  // Ollama — fully local, no API key needed
+  { id: "ollama/llama3.2", provider: SupportedProvider.OLLAMA, inputUsdPerMillionTokens: 0, outputUsdPerMillionTokens: 0, label: "Llama 3.2 (Ollama)" },
+  { id: "ollama/codellama", provider: SupportedProvider.OLLAMA, inputUsdPerMillionTokens: 0, outputUsdPerMillionTokens: 0, label: "CodeLlama (Ollama)" },
+  { id: "ollama/qwen2.5-coder", provider: SupportedProvider.OLLAMA, inputUsdPerMillionTokens: 0, outputUsdPerMillionTokens: 0, label: "Qwen2.5 Coder (Ollama)" },
+  { id: "ollama/deepseek-coder-v2", provider: SupportedProvider.OLLAMA, inputUsdPerMillionTokens: 0, outputUsdPerMillionTokens: 0, label: "DeepSeek Coder V2 (Ollama)" },
+  { id: "ollama/mistral", provider: SupportedProvider.OLLAMA, inputUsdPerMillionTokens: 0, outputUsdPerMillionTokens: 0, label: "Mistral 7B (Ollama)" },
+
+  // LM Studio — local OpenAI-compatible server
+  { id: "lmstudio/local-model", provider: SupportedProvider.LMSTUDIO, inputUsdPerMillionTokens: 0, outputUsdPerMillionTokens: 0, label: "Local Model (LM Studio)" },
 ]);
 
 export const DEFAULT_CHAT_MODEL_ID = "claude-sonnet-4-6";
@@ -57,8 +110,27 @@ export function findSupportedChatModel(modelId) {
   return SUPPORTED_CHAT_MODELS.find((m) => m.id === modelId) || null;
 }
 
+/** Detect provider from a free-form model ID for dynamic models (Ollama, OpenRouter, LM Studio). */
+export function inferProviderFromModelId(modelId) {
+  if (modelId.startsWith("ollama/")) return SupportedProvider.OLLAMA;
+  if (modelId.startsWith("openrouter/")) return SupportedProvider.OPENROUTER;
+  if (modelId.startsWith("lmstudio/")) return SupportedProvider.LMSTUDIO;
+  if (modelId.startsWith("accounts/fireworks/")) return SupportedProvider.FIREWORKS;
+  return null;
+}
+
 export function isSupportedChatModel(modelId) {
-  return findSupportedChatModel(modelId) !== null;
+  if (findSupportedChatModel(modelId) !== null) return true;
+  // Allow dynamic prefixes for local/OpenRouter models
+  return inferProviderFromModelId(modelId) !== null;
+}
+
+/** Return the bare model ID (strip provider prefix for local/openrouter). */
+export function getBareModelId(modelId) {
+  for (const prefix of ["ollama/", "openrouter/", "lmstudio/"]) {
+    if (modelId.startsWith(prefix)) return modelId.slice(prefix.length);
+  }
+  return modelId;
 }
 
 /**
@@ -140,11 +212,23 @@ export function calculateCreditsForUsage({ provider, model, usage }) {
  */
 export function resolveChatModel(modelId) {
   const model = findSupportedChatModel(modelId);
-  if (!model) throw new Error(`Unsupported model: ${modelId}`);
-  return {
-    modelId: model.id,
-    provider: model.provider,
-    providerOptions: getProviderOptions(modelId),
-    label: model.label,
-  };
+  if (model) {
+    return {
+      modelId: model.id,
+      provider: model.provider,
+      providerOptions: getProviderOptions(modelId),
+      label: model.label,
+    };
+  }
+  // Handle dynamic model IDs (ollama/*, openrouter/*, lmstudio/*, fireworks/*)
+  const inferredProvider = inferProviderFromModelId(modelId);
+  if (inferredProvider) {
+    return {
+      modelId,
+      provider: inferredProvider,
+      providerOptions: undefined,
+      label: modelId,
+    };
+  }
+  throw new Error(`Unsupported model: ${modelId}`);
 }
