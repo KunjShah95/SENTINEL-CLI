@@ -99,9 +99,14 @@ export function Session() {
           (async () => {
             try {
               const { getGitDiff, buildReviewPrompt } = await import('../lib/security-reviewer.js');
+              const { injectContextIntoPrompt } = await import('../lib/context-file.js');
+              const { runSast, formatSastForPrompt } = await import('../lib/sast-runner.js');
               const diff = getGitDiff({ file: arg });
               if (!diff) { toast.info(`No changes detected for ${arg}.`); setMode(prevMode); return; }
-              submit(buildReviewPrompt(diff, { files: [arg], focus: 'security' }));
+              const [sast] = await Promise.all([runSast()]);
+              const sastSummary = sast.findings.length > 0 ? formatSastForPrompt(sast) : undefined;
+              const basePrompt = buildReviewPrompt(diff, { files: [arg], focus: 'security', sastSummary });
+              submit(injectContextIntoPrompt(basePrompt));
             } catch (e) { toast.error('Review failed: ' + String(e)); setMode(prevMode); }
           })();
           return;
@@ -114,10 +119,15 @@ export function Session() {
           (async () => {
             try {
               const { getGitDiff, getChangedFiles, buildReviewPrompt } = await import('../lib/security-reviewer.js');
+              const { injectContextIntoPrompt } = await import('../lib/context-file.js');
+              const { runSast, formatSastForPrompt } = await import('../lib/sast-runner.js');
               const diff = getGitDiff({ branch });
               if (!diff) { toast.info(`No changes detected vs ${branch}.`); setMode(prevMode); return; }
               const files = getChangedFiles({ branch });
-              submit(buildReviewPrompt(diff, { files, focus: 'all' }));
+              const sast = await runSast();
+              const sastSummary = sast.findings.length > 0 ? formatSastForPrompt(sast) : undefined;
+              const basePrompt = buildReviewPrompt(diff, { files, focus: 'all', sastSummary });
+              submit(injectContextIntoPrompt(basePrompt));
             } catch (e) { toast.error('Review failed: ' + String(e)); setMode(prevMode); }
           })();
           return;
@@ -197,8 +207,83 @@ export function Session() {
           toast.info('Loop Engine opened. Select CI Loop and press Enter.');
           return;
         }
+        if (cmd === 'sast') {
+          const target = value.replace(/^\/sast\s*/i, '').trim() || '.';
+          (async () => {
+            try {
+              appendMessage({ role: 'user', mode, model, parts: [{ type: 'text', text: `/sast ${target}` }] });
+              const { runSast, formatSastForPrompt } = await import('../lib/sast-runner.js');
+              toast.info('Running SAST analysis…');
+              const result = await runSast({ target });
+              const formatted = formatSastForPrompt(result);
+              appendMessage({ role: 'assistant', mode, model, parts: [{ type: 'text', text: formatted }] });
+              if (result.errors.length > 0) toast.error(`SAST warnings: ${result.errors.slice(0, 2).join('; ')}`);
+            } catch (e) { toast.error('SAST failed: ' + String(e)); }
+          })();
+          return;
+        }
+        if (cmd === 'commit') {
+          (async () => {
+            try {
+              const { getGitDiff, getChangedFiles } = await import('../lib/security-reviewer.js');
+              const diff = getGitDiff({ staged: true }) || getGitDiff();
+              if (!diff) { toast.error('No changes to commit.'); return; }
+              const files = getChangedFiles({ staged: true });
+              const prompt = `Generate a concise git commit message for these changes. Output ONLY the commit message (subject line + optional body). No preamble.\n\nChanged files: ${files.join(', ')}\n\n\`\`\`diff\n${diff.slice(0, 6000)}\n\`\`\``;
+              const prevMode = mode;
+              setMode('PLAN' as AgentMode);
+              await submit(prompt);
+              setMode(prevMode);
+            } catch (e) { toast.error('Commit generation failed: ' + String(e)); }
+          })();
+          return;
+        }
+        if (cmd === 'context') {
+          (async () => {
+            try {
+              const { loadContextFiles, createDefaultContextFile } = await import('../lib/context-file.js');
+              const files = loadContextFiles();
+              if (files.length === 0) {
+                createDefaultContextFile();
+                toast.success('Created SENTINEL.md — edit it to add project context.');
+                appendMessage({ role: 'assistant', mode, model, parts: [{ type: 'text', text: '## Context File Created\n\nA `SENTINEL.md` file was created in your project root. Edit it to add:\n- Project overview\n- Security-sensitive areas\n- Architecture notes\n- Areas to exclude from review\n\nSentinel will auto-inject this context into every review.' }] });
+              } else {
+                const content = files.map(f => `**${f.source}** (${f.content.length} chars)\n\`\`\`\n${f.content.slice(0, 500)}${f.content.length > 500 ? '\n...' : ''}\n\`\`\``).join('\n\n');
+                appendMessage({ role: 'assistant', mode, model, parts: [{ type: 'text', text: `## Active Context Files\n\n${content}` }] });
+              }
+            } catch (e) { toast.error('Context command failed: ' + String(e)); }
+          })();
+          return;
+        }
+        if (cmd === 'parallel') {
+          const target = value.replace(/^\/parallel\s*/i, '').trim();
+          (async () => {
+            try {
+              const { getGitDiff, getChangedFiles } = await import('../lib/security-reviewer.js');
+              const diff = getGitDiff();
+              if (!diff) { toast.error('No git diff found for parallel scan.'); return; }
+              const files = getChangedFiles();
+              toast.info('Launching 4 specialist agents in parallel…');
+              const { runParallelAgents } = await import('../lib/parallel-agents.js');
+              const result = await runParallelAgents(diff, files, async (prompt, m) => {
+                const prevMode = mode;
+                setMode((m || 'REVIEW') as AgentMode);
+                await submit(prompt);
+                setMode(prevMode);
+                return '';
+              }, {
+                onProgress: (agent, done) => {
+                  if (done) toast.info(`Agent done: ${agent}`);
+                },
+              });
+              const summary = `## Parallel Scan Complete\n\n**${result.mergedIssues.length} unique issues** across ${result.agentResults.length} agents\n\n${result.agentResults.map(a => `- **${a.agent}**: ${a.issues.length} issues (${Math.round(a.durationMs / 1000)}s)`).join('\n')}`;
+              appendMessage({ role: 'assistant', mode, model, parts: [{ type: 'text', text: summary }] });
+            } catch (e) { toast.error('Parallel scan failed: ' + String(e)); }
+          })();
+          return;
+        }
         if (cmd === 'help') {
-          toast.info('Commands: /clear /new /wizard /mode /review /loop /watch /pipeline /ci /scan /undo /background /agents /help');
+          toast.info('Commands: /clear /new /wizard /mode /review /loop /watch /pipeline /ci /scan /sast /commit /context /parallel /undo /background /agents /help');
           return;
         }
         toast.error('Unknown command. Type /help for commands.');
@@ -298,12 +383,12 @@ export function Session() {
           ) : null}
           {messages.map(msg => {
             if (msg.role === 'error') {
-              const text = msg.parts.find((p: any) => p.type === 'text')?.text || 'Unknown error';
-              return <ErrorMessage key={msg.id} message={text} />;
+              const textPart = msg.parts.find((p): p is { type: 'text'; text: string } => p.type === 'text');
+              return <ErrorMessage key={msg.id} message={textPart?.text || 'Unknown error'} />;
             }
             if (msg.role === 'user') {
-              const text = msg.parts.find((p: any) => p.type === 'text')?.text || '';
-              return <UserMessage key={msg.id} message={text} mode={msg.mode || mode} />;
+              const textPart = msg.parts.find((p): p is { type: 'text'; text: string } => p.type === 'text');
+              return <UserMessage key={msg.id} message={textPart?.text || ''} mode={msg.mode || mode} />;
             }
             if (msg.role === 'assistant') {
               return <BotMessage key={msg.id} parts={msg.parts} model={msg.model || model} />;

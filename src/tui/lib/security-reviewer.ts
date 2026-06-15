@@ -61,13 +61,23 @@ export function getChangedFiles(options: { staged?: boolean; branch?: string } =
   }
 }
 
-// Build the CodeRabbit-style review prompt
-export function buildReviewPrompt(diff: string, options: { files?: string[]; focus?: 'security' | 'quality' | 'all' } = {}): string {
+// Build the CodeRabbit-style review prompt (optionally enhanced with SAST + context)
+export function buildReviewPrompt(
+  diff: string,
+  options: {
+    files?: string[];
+    focus?: 'security' | 'quality' | 'all';
+    sastSummary?: string;
+    contextInjection?: string;
+  } = {}
+): string {
   const focus = options.focus || 'all';
   const filesHint = options.files?.length ? `Changed files: ${options.files.join(', ')}\n\n` : '';
+  const contextBlock = options.contextInjection ? `${options.contextInjection}\n\n` : '';
+  const sastBlock = options.sastSummary ? `${options.sastSummary}\n\n` : '';
 
-  return `You are performing a CodeRabbit-style code review. ${filesHint}
-
+  return `${contextBlock}You are performing a CodeRabbit-style code review. ${filesHint}
+${sastBlock}
 Review this diff and produce a STRUCTURED security review in the following format:
 
 ## Summary

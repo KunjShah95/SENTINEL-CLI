@@ -68,7 +68,8 @@ export function useLoopEngine(): UseLoopEngineReturn {
     // After submit resolves, find the last assistant message added after this call
     const after = messagesRef.current.slice(prevCount);
     const response = [...after].reverse().find(m => m.role === 'assistant');
-    return response?.parts?.find((p: any) => p.type === 'text')?.text ?? '';
+    const textPart = response?.parts?.find((p): p is { type: 'text'; text: string } => p.type === 'text');
+    return textPart?.text ?? '';
   }, [submit, setMode]);
 
   // ── 1. Review Loop ──────────────────────────────────────────────────────────

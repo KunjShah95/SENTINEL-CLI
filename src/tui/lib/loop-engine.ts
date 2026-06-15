@@ -50,6 +50,21 @@ function now() {
   return Date.now();
 }
 
+// ─── Auto-commit helper ───────────────────────────────────────────────────────
+
+/** Commit all staged+unstaged changes with an AI-generated or provided message. */
+export function autoCommit(message: string): { success: boolean; hash?: string; error?: string } {
+  try {
+    const { execSync } = require('child_process') as typeof import('child_process');
+    execSync('git add -A', { stdio: 'pipe' });
+    execSync(`git commit -m ${JSON.stringify(message)}`, { stdio: 'pipe', encoding: 'utf-8' });
+    const hash = execSync('git rev-parse --short HEAD', { encoding: 'utf-8' }).trim();
+    return { success: true, hash };
+  } catch (e: any) {
+    return { success: false, error: e?.stderr?.toString() || String(e) };
+  }
+}
+
 // ─── Fix prompt builder ───────────────────────────────────────────────────────
 
 export function buildFixPrompt(issues: ReviewIssue[], diff: string, files: string[]): string {
@@ -82,6 +97,7 @@ export type ReviewLoopOptions = {
   maxIterations?: number;
   stopOnSeverity?: string[];
   branch?: string;
+  autoCommitFixes?: boolean;
   onEvent: (event: LoopEvent) => void;
   submitAndWait: SubmitAndWait;
   abortSignal?: { aborted: boolean };
@@ -92,6 +108,7 @@ export async function runReviewLoop(opts: ReviewLoopOptions): Promise<LoopSummar
     maxIterations = 3,
     stopOnSeverity = ['critical', 'high'],
     branch,
+    autoCommitFixes = false,
     onEvent,
     submitAndWait,
     abortSignal,
@@ -158,7 +175,16 @@ export async function runReviewLoop(opts: ReviewLoopOptions): Promise<LoopSummar
     try {
       await submitAndWait(buildFixPrompt(blocking, diff, files), 'BUILD');
       totalIssuesFixed += blocking.length;
-      emit({ type: 'fix', iteration: i + 1, text: `Fixed ${blocking.length} issue(s). Re-running review...` });
+      if (autoCommitFixes) {
+        const commitResult = autoCommit(`fix(sentinel): auto-fix ${blocking.length} security issue(s) [loop iter ${i + 1}]`);
+        if (commitResult.success) {
+          emit({ type: 'fix', iteration: i + 1, text: `Fixed ${blocking.length} issue(s) → committed ${commitResult.hash}. Re-running review...` });
+        } else {
+          emit({ type: 'fix', iteration: i + 1, text: `Fixed ${blocking.length} issue(s). Re-running review...` });
+        }
+      } else {
+        emit({ type: 'fix', iteration: i + 1, text: `Fixed ${blocking.length} issue(s). Re-running review...` });
+      }
     } catch (e) {
       emit({ type: 'error', error: `Fix request failed: ${e}` });
       finalState = 'error';

@@ -233,9 +233,27 @@ export const COMMANDS: Command[] = [
   },
   {
     name: 'parallel',
-    description: 'Run parallel analysis with worker threads',
+    description: 'Run 4 specialist AI agents in parallel (security/deps/logic/style)',
     value: '/parallel',
     category: 'scan',
+  },
+  {
+    name: 'sast',
+    description: 'Run SAST tools: ESLint + Semgrep + secret scan + npm audit',
+    value: '/sast',
+    category: 'scan',
+  },
+  {
+    name: 'context',
+    description: 'Show or create SENTINEL.md project context file',
+    value: '/context',
+    category: 'settings',
+  },
+  {
+    name: 'commit',
+    description: 'AI-generate a commit message for current changes',
+    value: '/commit',
+    category: 'git',
   },
   { name: 'ci', description: 'CI-friendly analysis mode', value: '/ci', category: 'ci' },
   {
