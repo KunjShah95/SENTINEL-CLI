@@ -22,7 +22,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { randomUUID } from "node:crypto";
 import { streamChat, Sessions, checkServerHealth, type ChatEvent } from "../lib/api-client.js";
 import { runLocalTool, Mode, isReadOnlyTool } from "../lib/local-tools.js";
-import { shouldCompact, compactMessages, estimateTokens } from "../lib/context-compactor.js";
+import { shouldCompact, compactMessages, estimateTokens, getCompactionState } from "../lib/context-compactor.js";
+import { DEFAULT_CHAT_MODEL_ID, resolveSmallModel } from "../../shared/models/index.js";
 
 export type AgentMode = "BUILD" | "PLAN" | "REVIEW";
 
@@ -67,9 +68,15 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
   const [status, setStatus] = useState<"idle" | "submitted" | "streaming">("idle");
   const [error, setError] = useState<Error | null>(null);
   const [mode, setMode] = useState<AgentMode>(options.initialMode || "BUILD");
-  const [model, setModel] = useState<string>(options.initialModel || "claude-sonnet-4-6");
+  const [model, setModel] = useState<string>(options.initialModel || DEFAULT_CHAT_MODEL_ID);
   const [streamedText, setStreamedText] = useState<string>("");
   const [compacting, setCompacting] = useState(false);
+  const [compactionState, setCompactionState] = useState<{ estimatedTokens: number; percentage: number; atAsyncThreshold: boolean; atSyncThreshold: boolean }>({
+    estimatedTokens: 0,
+    percentage: 0,
+    atAsyncThreshold: false,
+    atSyncThreshold: false,
+  });
   const [tokenUsage, setTokenUsage] = useState<{ estimated: number; limit: number; percentage: number }>({
     estimated: 0,
     limit: 40_000,
@@ -81,6 +88,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
   const modelRef = useRef(model);
   const abortRef = useRef<AbortController | null>(null);
   const loadedRef = useRef(false);
+  const messagesRef = useRef(messages);
   const [useServer, setUseServer] = useState(true);
   const serverAvailableRef = useRef(true);
   const [serverStatus, setServerStatus] = useState<"connected" | "local">("connected");
@@ -147,6 +155,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
 
   /**
    * Fire-and-collect chat request used exclusively by the context compactor.
+   * Uses the small_model (cheap model) to keep summarization costs low.
    * Does NOT touch React message state — just returns the full response text.
    */
   const submitAndWaitForCompaction = useCallback(
@@ -154,19 +163,21 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
       const sid = sessionIdRef.current;
       if (!sid) return "";
 
+      const compactModel = await resolveSmallModel().catch(() => modelRef.current);
+
       const summaryUserMsg = {
         id: `compaction-req-${Date.now()}`,
         role: "user" as const,
         content: prompt,
         parts: [{ type: "text" as const, text: prompt }],
-        metadata: { mode, model: modelRef.current },
+        metadata: { mode, model: compactModel?.modelId || modelRef.current },
       };
 
       const stream = streamChat({
         id: sid,
         messages: [summaryUserMsg],
         mode,
-        model: modelRef.current,
+        model: compactModel?.modelId || modelRef.current,
       });
 
       let collected = "";
@@ -188,7 +199,9 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
 
   useEffect(() => {
     if (compacting || messages.length === 0) return;
-    if (!shouldCompact(messages)) return;
+    const state = getCompactionState(messages);
+    setCompactionState(state);
+    if (!state.atAsyncThreshold) return;
     setCompacting(true);
     const snapshot = messages;
     compactMessages(snapshot, submitAndWaitForCompaction, {
@@ -248,7 +261,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
       appendMessage({
         role: "user",
         mode: modeRef.current,
-        model: modeRef.current,
+        model: modelRef.current,
         parts: [{ type: "text", text: userText }],
       });
 
@@ -260,7 +273,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
           id: assistantId,
           role: "assistant",
           mode: modeRef.current,
-          model: modeRef.current,
+          model: modelRef.current,
           parts: [],
           timestamp: Date.now(),
         },
@@ -281,7 +294,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
             id: nextId("user"),
             role: "user",
             mode: modeRef.current,
-            model: modeRef.current,
+            model: modelRef.current,
             parts: [{ type: "text", text: userText }],
             timestamp: Date.now(),
           },
@@ -297,7 +310,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
             metadata: { mode: m.mode, model: m.model },
           })),
           mode: modeRef.current,
-          model: modeRef.current,
+          model: modelRef.current,
         });
 
         for await (const ev of stream) {
@@ -430,21 +443,25 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
           });
           // Execute the tool locally. PLAN mode blocks write/edit/bash.
           (async () => {
-            const output = await runLocalTool(toolName, input, modeRef.current);
-            if (abortRef.current?.signal.aborted) return;
-            updateLastMessage((msg) => {
-              if (msg.id !== assistantId) return msg;
-              return {
-                ...msg,
-                parts: msg.parts.map((p) =>
-                  p.type === "tool-call" && p.toolCallId === toolCallId
-                    ? output && typeof output === "object" && "error" in output
-                      ? { ...p, state: "output-error", errorText: output.error as string }
-                      : { ...p, state: "output-available", output }
-                    : p
-                ),
-              };
-            });
+            try {
+              const output = await runLocalTool(toolName, input, modeRef.current);
+              if (abortRef.current?.signal.aborted) return;
+              updateLastMessage((msg) => {
+                if (msg.id !== assistantId) return msg;
+                return {
+                  ...msg,
+                  parts: msg.parts.map((p) =>
+                    p.type === "tool-call" && p.toolCallId === toolCallId
+                      ? output && typeof output === "object" && "error" in output
+                        ? { ...p, state: "output-error", errorText: output.error as string }
+                        : { ...p, state: "output-available", output }
+                      : p
+                  ),
+                };
+              });
+            } catch (e) {
+              // tool execution failed — tool output stays as pending
+            }
           })();
           break;
         }
@@ -471,8 +488,17 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
           break;
         }
         case "finish":
-        case "done":
+        case "done": {
+          const usageData = (ev as any).data?.usage;
+          if (usageData?.totalTokens) {
+            setTokenUsage({
+              estimated: usageData.totalTokens,
+              limit: 40_000,
+              percentage: Math.round((usageData.totalTokens / 40000) * 100),
+            });
+          }
           break;
+        }
       }
     },
     [appendMessage, updateLastMessage]
@@ -505,8 +531,11 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
     setUseServer,
     serverStatus,
     compacting,
+    compactionState,
     tokenUsage,
+    submitAndWaitForCompaction,
   };
 }
 
 export { Mode, isReadOnlyTool };
+export type SubmitAndWait = (prompt: string, mode?: 'BUILD' | 'PLAN' | 'REVIEW') => Promise<string>;
