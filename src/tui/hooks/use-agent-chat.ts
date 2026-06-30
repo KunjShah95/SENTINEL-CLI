@@ -201,6 +201,43 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
     []
   );
 
+  const submitWithModel = useCallback(
+    async (prompt: string, modelId: string, modeOverride?: "BUILD" | "PLAN" | "REVIEW"): Promise<string> => {
+      const sid = sessionIdRef.current || randomUUID();
+      const m = modeOverride || modeRef.current;
+
+      const userMsg = {
+        id: `ensemble-req-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        role: "user" as const,
+        content: prompt,
+        parts: [{ type: "text" as const, text: prompt }],
+        metadata: { mode: m, model: modelId },
+      };
+
+      const stream = streamChat({
+        id: sid,
+        messages: [userMsg],
+        mode: m,
+        model: modelId,
+      });
+
+      let collected = "";
+      try {
+        for await (const ev of stream) {
+          if (ev.event === "text") {
+            collected += ev.data?.delta || "";
+          } else if (ev.event === "done" || ev.event === "finish") {
+            break;
+          }
+        }
+      } catch {
+        // fail silently or return collected
+      }
+      return collected;
+    },
+    []
+  );
+
   useEffect(() => {
     if (compacting || messages.length === 0) return;
     const state = getCompactionState(messages);
@@ -561,6 +598,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
     compactionState,
     tokenUsage,
     submitAndWaitForCompaction,
+    submitWithModel,
   };
 }
 

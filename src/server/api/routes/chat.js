@@ -17,7 +17,7 @@
  */
 
 import { Hono } from 'hono';
-import { z } from '../../../shared/schemas/index.js';
+import { z } from 'zod';
 import { getSession, appendMessages } from '../../database/sessions.js';
 import {
   resolveChatModel,
@@ -31,6 +31,10 @@ import { streamWithAiSdk, streamWithOrchestrator } from '../lib/chat-stream.js';
 import { buildSystemPrompt } from '../lib/system-prompt.js';
 import { createRequire } from 'node:module';
 import { SessionLogger } from '../../database/session-logger.js';
+import { getLogger } from '../../../utils/structuredLogger.js';
+import { validate, chatSubmitSchema } from '../middleware/validate.js';
+
+const chatLogger = getLogger().child({ service: 'chat' });
 
 const require = createRequire(import.meta.url);
 
@@ -38,10 +42,12 @@ const chat = new Hono();
 
 chat.use('*', requireCreditsBalance());
 
-const submitSchema = z.object({
-  id: z.string(),
-  messages: z.array(z.object({})).min(1),
-  mode: z.enum(['BUILD', 'PLAN', 'REVIEW']),
+/**
+ * Extended submit schema that includes the `isSupportedChatModel` refinement.
+ * The base chatSubmitSchema from validate.js handles shape; we layer the
+ * model refinement here since it requires a runtime import.
+ */
+const submitSchema = chatSubmitSchema.extend({
   model: z.string().refine(isSupportedChatModel, 'Unsupported model'),
 });
 
@@ -55,16 +61,13 @@ function hasPendingToolCalls(message) {
   );
 }
 
-chat.post('/', async c => {
-  const userId = c.get('userId');
-  const body = await c.req.json().catch(() => null);
-  const parsed = submitSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json({ error: parsed.error?.message || 'Invalid request' }, 400);
-  }
-  const { id, messages, mode, model } = parsed.data;
+chat.post('/',
+  validate({ body: submitSchema }),
+  async c => {
+    const userId = c.get('userId');
+    const { id, messages, mode, model } = c.get('validatedBody');
 
-  const session = await getSession({ id, userId });
+    const session = await getSession({ id, userId });
   if (!session) {
     return c.json({ error: 'Session not found' }, 404);
   }
@@ -88,7 +91,7 @@ chat.post('/', async c => {
   let finalMessages = null;
   let aborted = false;
 
-  const stream = await pickStreamer().stream({
+  const stream = await pickStreamer(resolved.provider).stream({
     system: systemPrompt,
     messages: merged,
     tools,
@@ -175,7 +178,7 @@ chat.post('/', async c => {
       try {
         await appendMessages({ id, userId, messages: finalMessages });
       } catch (e) {
-        console.error('[chat] persist failed:', e.message);
+        chatLogger.error('persist failed', { err: e });
         await logger.logLLMError(new Error(e.message));
       }
     }
@@ -196,7 +199,7 @@ chat.post('/', async c => {
           sessionId: id,
         });
       } catch (e) {
-        console.error('[chat] billing failed:', e.message);
+        chatLogger.error('billing failed', { err: e });
       }
     }
 
@@ -217,13 +220,46 @@ chat.post('/', async c => {
   });
 });
 
-function pickStreamer() {
-  try {
-    require('ai');
-    return { stream: streamWithAiSdk };
-  } catch {
-    return { stream: streamWithOrchestrator };
+const PROVIDER_KEY_ENV = {
+  anthropic: 'ANTHROPIC_API_KEY',
+  openai: 'OPENAI_API_KEY',
+  google: 'GOOGLE_GENERATIVE_AI_API_KEY',
+  groq: 'GROQ_API_KEY',
+  mistral: 'MISTRAL_API_KEY',
+  deepseek: 'DEEPSEEK_API_KEY',
+  xai: 'XAI_API_KEY',
+  together: 'TOGETHER_API_KEY',
+  fireworks: 'FIREWORKS_API_KEY',
+  perplexity: 'PERPLEXITY_API_KEY',
+  openrouter: 'OPENROUTER_API_KEY',
+  'github-copilot': 'GITHUB_TOKEN',
+};
+
+const LOCAL_STREAM_PROVIDERS = new Set(['ollama', 'lmstudio']);
+
+function pickStreamer(provider) {
+  // Route to the AI SDK only when the provider can actually be served:
+  //   - local providers (Ollama / LM Studio) need no key, OR
+  //   - the cloud provider's API key is present.
+  // Otherwise use the orchestrator, which degrades gracefully to a local
+  // response instead of erroring on a keyless cloud provider.
+  //
+  // Probe with require.resolve, NOT require: the AI SDK packages are ESM-only,
+  // so require() throws ERR_REQUIRE_ESM; resolve just checks they're installed,
+  // and streamWithAiSdk loads them via dynamic import().
+  const isLocal = LOCAL_STREAM_PROVIDERS.has(provider);
+  const hasKey = provider && PROVIDER_KEY_ENV[provider] && !!process.env[PROVIDER_KEY_ENV[provider]];
+
+  if (isLocal || hasKey) {
+    try {
+      require.resolve('ai');
+      if (isLocal) require.resolve('@ai-sdk/openai');
+      return { stream: streamWithAiSdk };
+    } catch {
+      // AI SDK not installed — fall through to the orchestrator.
+    }
   }
+  return { stream: streamWithOrchestrator };
 }
 
 export default chat;

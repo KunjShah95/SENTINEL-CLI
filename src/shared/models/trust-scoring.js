@@ -5,24 +5,24 @@ import os from 'os';
 const TRUST_PATH = path.join(os.homedir(), '.sentinel', 'trust-scores.json');
 
 function emptyStore() {
-  return { version: 1, models: {} };
+  return { version: 1, models: {}, issues: {} };
 }
 
-async function loadStore() {
+async function loadStore(dbPath) {
   try {
-    await fs.mkdir(path.dirname(TRUST_PATH), { recursive: true });
-    const raw = await fs.readFile(TRUST_PATH, 'utf8');
+    await fs.mkdir(path.dirname(dbPath), { recursive: true });
+    const raw = await fs.readFile(dbPath, 'utf8');
     return JSON.parse(raw);
   } catch {
     const store = emptyStore();
-    await fs.writeFile(TRUST_PATH, JSON.stringify(store, null, 2));
+    await fs.writeFile(dbPath, JSON.stringify(store, null, 2));
     return store;
   }
 }
 
-async function saveStore(store) {
-  await fs.mkdir(path.dirname(TRUST_PATH), { recursive: true });
-  await fs.writeFile(TRUST_PATH, JSON.stringify(store, null, 2));
+async function saveStore(dbPath, store) {
+  await fs.mkdir(path.dirname(dbPath), { recursive: true });
+  await fs.writeFile(dbPath, JSON.stringify(store, null, 2));
 }
 
 function ensureModel(store, modelId) {
@@ -58,7 +58,7 @@ export class TrustScorer {
     const { provenance } = issue;
     if (!provenance || !provenance.modelId) return null;
 
-    const store = await loadStore();
+    const store = await loadStore(this._storagePath);
     const model = ensureModel(store, provenance.modelId);
     model.totalIssues++;
     model.unrated++;
@@ -66,33 +66,66 @@ export class TrustScorer {
       const total = model.totalIssues;
       model.avgConfidence = ((model.avgConfidence * (total - 1)) + provenance.confidence) / total;
     }
-    await saveStore(store);
 
     const issueId = nextIssueId();
+    if (!store.issues) {
+      store.issues = {};
+    }
+    store.issues[issueId] = {
+      modelId: provenance.modelId,
+      rated: false,
+    };
+
+    await saveStore(this._storagePath, store);
     return issueId;
   }
 
   async recordFeedback(issueId, accurate) {
-    const match = issueId.match(/^trust-(\d+)-(\d+)$/);
-    if (!match) return false;
+    const store = await loadStore(this._storagePath);
+    
+    // Fallback for old databases without the issues lookup
+    if (!store.issues || !store.issues[issueId]) {
+      const match = issueId.match(/^trust-(\d+)-(\d+)$/);
+      if (!match) return false;
 
-    const store = await loadStore();
-    for (const modelId of Object.keys(store.models)) {
-      const model = store.models[modelId];
-      if (model.unrated > 0) {
-        if (accurate) model.confirmed++;
-        else model.falsePositives++;
-        model.unrated--;
-        model.avgConfidence = recalcConfidence(model);
-        await saveStore(store);
-        return true;
+      for (const modelId of Object.keys(store.models)) {
+        const model = store.models[modelId];
+        if (model.unrated > 0) {
+          if (accurate) model.confirmed++;
+          else model.falsePositives++;
+          model.unrated--;
+          model.avgConfidence = recalcConfidence(model);
+          await saveStore(this._storagePath, store);
+          return true;
+        }
       }
+      return false;
     }
-    return false;
+
+    const record = store.issues[issueId];
+    if (record.rated) {
+      return false; // Already rated
+    }
+
+    const model = ensureModel(store, record.modelId);
+    if (accurate) {
+      model.confirmed++;
+    } else {
+      model.falsePositives++;
+    }
+    if (model.unrated > 0) {
+      model.unrated--;
+    }
+    model.avgConfidence = recalcConfidence(model);
+    record.rated = true;
+    record.verdict = accurate ? 'accurate' : 'fp';
+
+    await saveStore(this._storagePath, store);
+    return true;
   }
 
   async getModelScore(modelId) {
-    const store = await loadStore();
+    const store = await loadStore(this._storagePath);
     const m = store.models[modelId];
     if (!m) return null;
     const rated = m.confirmed + m.falsePositives;
@@ -108,7 +141,7 @@ export class TrustScorer {
   }
 
   async getProviderScore(provider) {
-    const store = await loadStore();
+    const store = await loadStore(this._storagePath);
     const models = Object.entries(store.models)
       .filter(([id]) => id.startsWith(`${provider}/`) || id.startsWith(`${provider}:`));
     if (models.length === 0) return null;
@@ -128,7 +161,7 @@ export class TrustScorer {
   }
 
   async getRankedProviders() {
-    const store = await loadStore();
+    const store = await loadStore(this._storagePath);
     const providers = {};
     for (const [modelId] of Object.entries(store.models)) {
       const provider = modelId.includes('/') ? modelId.split('/')[0] : modelId.includes(':') ? modelId.split(':')[0] : modelId;
@@ -152,7 +185,7 @@ export class TrustScorer {
   }
 
   async getStats() {
-    const store = await loadStore();
+    const store = await loadStore(this._storagePath);
     const models = Object.entries(store.models).map(([id, m]) => {
       const rated = m.confirmed + m.falsePositives;
       return {

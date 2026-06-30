@@ -253,6 +253,10 @@ export async function resolveSmallModel(preferredId) {
     const found = findSupportedChatModel(saved);
     if (found) return resolveChatModel(found.id);
   }
+  // Prefer a detected local model (Ollama / LM Studio) for cheap small-model
+  // tasks — it's free and keyless, matching the free-open-source default.
+  const localSmall = getRankedModels().find(m => isLocalProvider(m.provider));
+  if (localSmall) return resolveChatModel(localSmall.id);
   const model = findSupportedChatModel(DEFAULT_CHAT_MODEL_ID);
   if (model && (model.inputUsdPerMillionTokens || 0) <= 1) {
     return resolveChatModel(model.id);

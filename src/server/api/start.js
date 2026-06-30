@@ -13,6 +13,7 @@
  */
 
 import { setupGlobalErrorHandlers } from '../../utils/errorHandler.js';
+import { getLogger } from '../../utils/structuredLogger.js';
 import { app } from './app.js';
 import { refreshModels } from '../../shared/models/index.js';
 
@@ -27,8 +28,10 @@ async function main() {
 
   let serverHandle = null;
 
+  const log = getLogger().child({ service: 'sentinel-api' });
+
   if (isBun) {
-    console.log(`[sentinel-api] listening on http://localhost:${PORT} (bun)`);
+    log.info(`listening on http://localhost:${PORT} (bun)`);
     serverHandle = Bun.serve({
       port: PORT,
       fetch: app.fetch,
@@ -39,12 +42,10 @@ async function main() {
     try {
       ({ serve } = await import('@hono/node-server'));
     } catch (e) {
-      console.error(
-        '[sentinel-api] No runtime detected. Install Bun (https://bun.sh) or run `npm i @hono/node-server`.'
-      );
+      log.error('No runtime detected. Install Bun or run `npm i @hono/node-server`.', { err: e });
       process.exit(1);
     }
-    console.log(`[sentinel-api] listening on http://localhost:${PORT} (node)`);
+    log.info(`listening on http://localhost:${PORT} (node)`);
     serverHandle = serve({
       port: PORT,
       fetch: app.fetch,
@@ -60,10 +61,10 @@ async function main() {
   const shutdown = async (signal) => {
     if (shuttingDown) return;
     shuttingDown = true;
-    console.log(`[sentinel-api] ${signal} received, shutting down gracefully...`);
+    log.info(`${signal} received, shutting down gracefully...`);
 
     const drainTimer = setTimeout(() => {
-      console.error('[sentinel-api] shutdown timeout reached, forcing exit');
+      log.error('shutdown timeout reached, forcing exit');
       process.exit(1);
     }, SHUTDOWN_TIMEOUT_MS);
     drainTimer.unref?.();
@@ -74,9 +75,9 @@ async function main() {
       } else if (serverHandle && typeof serverHandle.stop === 'function') {
         await serverHandle.stop();
       }
-      console.log('[sentinel-api] server closed');
+      log.info('server closed');
     } catch (err) {
-      console.error('[sentinel-api] error during shutdown:', err.message);
+      log.error('error during shutdown', { err });
     }
 
     clearTimeout(drainTimer);
@@ -88,6 +89,7 @@ async function main() {
 }
 
 main().catch((e) => {
-  console.error('[sentinel-api] fatal:', e);
+  const log = getLogger().child({ service: 'sentinel-api' });
+  log.error('fatal startup error', { err: e });
   process.exit(1);
 });

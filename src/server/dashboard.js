@@ -6,6 +6,9 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { scanCode } from '../agents/scanner_agent.js';
 import { createClient } from 'redis';
+import { getLogger } from '../utils/structuredLogger.js';
+
+const dashLogger = getLogger().child({ service: 'dashboard' });
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -33,8 +36,8 @@ class SentinelDashboard {
 
     this.server = createServer(this.app);
     this.server.listen(this.port, this.host, () => {
-      console.log(`🚀 Sentinel Dashboard running at http://${this.host}:${this.port}`);
-      console.log('📊 WebSocket server ready for real-time updates');
+      dashLogger.info(`Dashboard running at http://${this.host}:${this.port}`);
+      dashLogger.info('WebSocket server ready for real-time updates');
     });
 
     return this;
@@ -54,9 +57,9 @@ class SentinelDashboard {
           this.localBroadcast(data);
         } catch (e) {}
       });
-      console.log('✅ Redis Pub/Sub connected for horizontal scaling');
+      dashLogger.info('Redis Pub/Sub connected for horizontal scaling');
     } catch (e) {
-      console.warn('Failed to connect to Redis:', e.message);
+      dashLogger.warn('Failed to connect to Redis', { err: e });
       this.pubClient = null;
       this.subClient = null;
     }
@@ -226,7 +229,7 @@ class SentinelDashboard {
 
     this.wss.on('connection', (ws) => {
       this.clients.add(ws);
-      console.log(`Client connected. Total: ${this.clients.size}`);
+      dashLogger.info(`Client connected. Total: ${this.clients.size}`);
 
       ws.on('message', (message) => {
         this.handleWebSocketMessage(ws, message);
@@ -234,11 +237,11 @@ class SentinelDashboard {
 
       ws.on('close', () => {
         this.clients.delete(ws);
-        console.log(`Client disconnected. Total: ${this.clients.size}`);
+        dashLogger.info(`Client disconnected. Total: ${this.clients.size}`);
       });
 
       ws.on('error', (error) => {
-        console.error('WebSocket error:', error);
+        dashLogger.error('WebSocket error', { err: error });
         this.clients.delete(ws);
       });
 
@@ -261,10 +264,10 @@ class SentinelDashboard {
         ws.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
         break;
       default:
-        console.log('Unknown message type:', data.type);
+        dashLogger.warn('Unknown message type', { type: data.type });
       }
     } catch (error) {
-      console.error('Failed to parse WebSocket message:', error);
+      dashLogger.error('Failed to parse WebSocket message', { err: error });
     }
   }
 
@@ -550,7 +553,7 @@ class SentinelDashboard {
       await new Promise(resolve => this.server.close(resolve));
     }
 
-    console.log('Dashboard stopped');
+    dashLogger.info('Dashboard stopped');
   }
 }
 

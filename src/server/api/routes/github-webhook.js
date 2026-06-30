@@ -11,8 +11,11 @@
 
 import { Hono } from 'hono';
 import crypto from 'node:crypto';
+import { getLogger } from '../../../utils/structuredLogger.js';
 import { GitHubIntegration } from '../../../integrations/github.js';
 import reviewPullRequest from '../lib/pr-review-orchestrator.js';
+
+const webhookLogger = getLogger().child({ service: 'github-webhook' });
 
 const app = new Hono();
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || '';
@@ -83,7 +86,7 @@ app.post('/github', async (c) => {
   // Acknowledge immediately
   c.executionCtx.waitUntil(
     runReviewPipeline(owner, repoName, pr.number).catch(e => {
-      console.error('[github-webhook] Review pipeline failed:', e.message);
+      webhookLogger.error('Review pipeline failed', { err: e });
     })
   );
 

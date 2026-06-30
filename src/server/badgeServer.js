@@ -2,9 +2,12 @@
  * Express server for badge API endpoints
  */
 import express from 'express';
+import { getLogger } from '../utils/structuredLogger.js';
 import { BadgeAPIServer } from './utils/badgeGenerator.js';
 import { cache } from './utils/cache.js';
 import { errorHandler } from './utils/errorHandler.js';
+
+const badgeLogger = getLogger().child({ service: 'badge-server' });
 
 const app = express();
 const PORT = process.env.BADGE_API_PORT || 3001;
@@ -87,8 +90,8 @@ app.get('/health', (req, res) => {
  */
 export function startBadgeServer() {
   app.listen(PORT, () => {
-    console.log(`🎖️  Sentinel Badge API running on port ${PORT}`);
-    console.log(`📊 Badge URL: http://localhost:${PORT}/badge/:owner/:repo/:type.svg`);
+    badgeLogger.info(`Badge API running on port ${PORT}`);
+    badgeLogger.info(`Badge URL: http://localhost:${PORT}/badge/:owner/:repo/:type.svg`);
   });
 
   return app;

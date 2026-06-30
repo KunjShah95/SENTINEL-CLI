@@ -1,10 +1,8 @@
 /**
  * Tests for ConfigManager — covers load, get/set, permissions, and path filters.
  */
-import { jest } from '@jest/globals';
 import path from 'node:path';
 import fs from 'node:fs/promises';
-import { existsSync } from 'node:fs';
 
 const TEST_DIR = path.resolve('.sentinel/test-config-' + Date.now());
 
@@ -13,16 +11,16 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  try { await fs.rm(TEST_DIR, { recursive: true, force: true }); } catch {}
+  try { await fs.rm(TEST_DIR, { recursive: true, force: true }); } catch { /* ignore */ }
 });
 
 describe('ConfigManager', () => {
   let configManager;
 
   beforeEach(async () => {
-    // Fresh import to reset singleton
+    // ConfigManager is exported as the class — instantiate a fresh one per test.
     const mod = await import('../src/config/configManager.js');
-    configManager = new mod.ConfigManager.constructor();
+    configManager = new mod.ConfigManager();
   });
 
   test('has correct default config structure', () => {

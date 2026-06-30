@@ -7,6 +7,9 @@
 
 import { GitHubIntegration } from '../../../integrations/github.js';
 import { getKnowledgeBase } from '../../../shared/security/knowledge-base.js';
+import { getLogger } from '../../../utils/structuredLogger.js';
+
+const reviewLogger = getLogger().child({ service: 'pr-review' });
 
 
 // ─── Provider config ───────────────────────────────────────────────────────────
@@ -95,7 +98,7 @@ export async function callLLM(prompt, systemPrompt = 'You are a code review assi
       if (text) return text;
     } catch (err) {
       errors.push(`${provider.type}: ${err.message}`);
-      console.warn(`[callLLM] ${provider.type} failed: ${err.message}`);
+      reviewLogger.warn(`callLLM: ${provider.type} failed`, { err });
     }
   }
   throw new Error(`All LLM providers failed: ${errors.join('; ')}`);
@@ -144,11 +147,11 @@ export async function enrichWithLspContext(files, cwd) {
     const { getLspDiagnostics } = await import('../../../tui/lib/lsp-client.js');
     const result = await getLspDiagnostics(files, cwd);
     if (result && result.diagnostics.length > 0) {
-      console.log(`[lsp] ${result.serverName}: ${result.diagnostics.length} diagnostic(s) found (${result.elapsed}ms)`);
+      reviewLogger.info(`lsp: ${result.serverName}: ${result.diagnostics.length} diagnostic(s) found (${result.elapsed}ms)`);
     }
     return result;
   } catch (err) {
-    console.warn(`[lsp] enrichment skipped: ${err.message}`);
+    reviewLogger.warn('lsp enrichment skipped', { err });
     return null;
   }
 }
@@ -251,14 +254,14 @@ export default async function reviewPullRequest(owner, repo, prNumber, options =
     files = prData.files;
     headSha = prData.headSha;
   } catch (err) {
-    console.warn(`[pr-review] Failed to fetch PR diff: ${err.message}`);
+    reviewLogger.warn('Failed to fetch PR diff', { err });
     throw err;
   }
 
   try {
     await github.postReviewStatus(owner, repo, prNumber, 'in_progress', { mode: 'standard' });
   } catch (err) {
-    console.warn(`[pr-review] Failed to post in_progress status: ${err.message}`);
+    reviewLogger.warn('Failed to post in_progress status', { err });
   }
 
   const sastFindings = [];
@@ -267,7 +270,7 @@ export default async function reviewPullRequest(owner, repo, prNumber, options =
     const sastResult = await runSast({ target: process.cwd() });
     sastFindings.push(...(sastResult.findings || []));
   } catch (err) {
-    console.warn(`[pr-review] SAST runner failed: ${err.message}`);
+    reviewLogger.warn('SAST runner failed', { err });
   }
 
   const lspContext = await enrichWithLspContext(files);
@@ -276,7 +279,7 @@ export default async function reviewPullRequest(owner, repo, prNumber, options =
   try {
     aiIssues = await runAiReview(diff, files, lspContext);
   } catch (err) {
-    console.warn(`[pr-review] AI review failed: ${err.message}`);
+    reviewLogger.warn('AI review failed', { err });
   }
 
   const allIssues = mergeResults(sastFindings, aiIssues);
@@ -289,7 +292,7 @@ export default async function reviewPullRequest(owner, repo, prNumber, options =
       await scorer.recordIssue(issue);
     }
   } catch (err) {
-    console.warn(`[pr-review] Failed to record trust data: ${err.message}`);
+    reviewLogger.warn('Failed to record trust data', { err });
   }
 
   try {
@@ -299,14 +302,14 @@ export default async function reviewPullRequest(owner, repo, prNumber, options =
       await github.createReview(owner, repo, prNumber, headSha, formatted);
     }
   } catch (err) {
-    console.warn(`[pr-review] Failed to post inline comments: ${err.message}`);
+    reviewLogger.warn('Failed to post inline comments', { err });
   }
 
   try {
     const summary = github.generateSummaryComment(allIssues);
     await github.postComment(owner, repo, prNumber, summary);
   } catch (err) {
-    console.warn(`[pr-review] Failed to post summary: ${err.message}`);
+    reviewLogger.warn('Failed to post summary', { err });
   }
 
   const criticalCount = allIssues.filter(i => i.severity === 'critical').length;
@@ -327,13 +330,13 @@ export default async function reviewPullRequest(owner, repo, prNumber, options =
       },
     });
   } catch (err) {
-    console.warn(`[pr-review] Check run failed: ${err.message}`);
+    reviewLogger.warn('Check run failed', { err });
   }
 
   try {
     await uploadSarif(owner, repo, headSha, allIssues, github);
   } catch (err) {
-    console.warn(`[pr-review] SARIF upload failed: ${err.message}`);
+    reviewLogger.warn('SARIF upload failed', { err });
   }
 
   const duration = Date.now() - startTime;
@@ -343,7 +346,7 @@ export default async function reviewPullRequest(owner, repo, prNumber, options =
       duration,
     });
   } catch (err) {
-    console.warn(`[pr-review] Failed to post completion status: ${err.message}`);
+    reviewLogger.warn('Failed to post completion status', { err });
   }
 
   const severityCounts = {

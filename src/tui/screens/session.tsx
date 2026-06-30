@@ -38,7 +38,7 @@ export function Session() {
   const {
     messages, loading, mode, setMode, toggleMode,
     submit, stop, clear, appendMessage, model, setModel, status, sessionId,
-    serverStatus, compacting, submitAndWaitForCompaction,
+    serverStatus, compacting, submitAndWaitForCompaction, submitWithModel,
   } = useAgentChat({
     initialMode: initialMode === 'BUILD' || initialMode === 'PLAN' || initialMode === 'REVIEW' ? initialMode : undefined,
     onPermissionRequest: useCallback(async (toolName: string, toolCallId: string, input: unknown) => {
@@ -180,7 +180,7 @@ export function Session() {
   const handleThinkingToggle = useCallback(() => setShowThinking(v => !v), []);
 
   const wrappedSubmit = useCallback(
-    (value: string) => {
+    async (value: string) => {
       if (value.startsWith('/')) {
         const cmd = value.replace(/^\//, '').split(/\s+/)[0].toLowerCase();
         const args = value.replace(/^\/(\w+)\s*/i, '').trim();
@@ -188,8 +188,8 @@ export function Session() {
         // Route to extracted command handlers
         const handled = await executeCommand(cmd, {
           cmd, args, mode, model, messages, showThinking, showDetails,
-          loading, compacting, sessionId,
-          navigate, toast, dialog, appendMessage, submit, clear,
+          loading, compacting, sessionId: sessionId || null,
+          navigate, toast, dialog, appendMessage: appendMessage as any, submit, clear,
           setMode, setModel, toggleMode, setShowThinking, setShowDetails,
           setLoopState, handleExternalEditor, handleSelectSession,
           submitAndWaitForCompaction,
@@ -204,6 +204,43 @@ export function Session() {
         if (cmd === 'details') { setShowDetails(v => !v); toast.info(`Tool details ${showDetails ? 'hidden' : 'shown'}`); return; }
         if (cmd === 'watch') { navigate('/loop'); toast.info('Loop Engine opened. Select Watch Loop and press Enter.'); return; }
         if (cmd === 'pipeline') { navigate('/loop'); toast.info('Loop Engine opened. Select Pipeline Loop and press Enter.'); return; }
+
+        if (cmd === 'ensemble') {
+          const args = value.replace(/^\/ensemble\s*/i, '').trim();
+          const modeOverride = args.match(/--mode\s+(\w+)/)?.[1]?.toUpperCase() as 'BUILD' | 'PLAN' | 'REVIEW' | undefined;
+
+          (async () => {
+            try {
+              const { getGitDiff, getChangedFiles } = await import('../lib/security-reviewer.js');
+              const { runEnsembleReview, formatEnsembleResult } = await import('../lib/ensemble-review.js');
+              const diff = getGitDiff();
+              if (!diff) {
+                toast.error('No git diff found for ensemble review.');
+                return;
+              }
+              const files = getChangedFiles();
+
+              toast.info('Running 3-model ensemble review (Critic has veto power)...');
+              const result = await runEnsembleReview(
+                diff,
+                files,
+                (prompt, modelId) => submitWithModel(prompt, modelId, modeOverride || 'REVIEW')
+              );
+
+              // Show results
+              const formatted = formatEnsembleResult(result);
+              appendMessage({ role: 'assistant', mode, model, parts: [{ type: 'text', text: formatted }] });
+
+              // Summary toast
+              const highCount = result.issues.filter(i => i.ensembleConfidence >= 0.7).length;
+              const medCount = result.issues.filter(i => i.ensembleConfidence >= 0.4 && i.ensembleConfidence < 0.7).length;
+              toast.success(`Ensemble complete: ${highCount} high-confidence, ${medCount} medium-confidence findings`);
+            } catch (e) {
+              toast.error('Ensemble failed: ' + String(e));
+            }
+          })();
+          return;
+        }
 
         if (cmd === 'compact') {
           (async () => {

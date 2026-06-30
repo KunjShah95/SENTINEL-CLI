@@ -54,7 +54,7 @@ if [ "$SENTINEL_SKIP" = "1" ]; then
     DATE=$(date '+%Y-%m-%d %H:%M:%S')
     USER=$(whoami)
     BRANCH=$(git symbolic-ref --short HEAD 2>/dev/null || echo "unknown")
-    echo "[$DATE] Bypassed by $USER on branch $BRANCH" >> "${SENTINEL_AUDIT_LOG:-.sentinel/hook-audit.log}"
+    echo "[$DATE] Bypassed by $USER on branch $BRANCH" >> "\${SENTINEL_AUDIT_LOG:-.sentinel/hook-audit.log}"
     exit 0
 fi
 
@@ -65,7 +65,7 @@ CURRENT_BRANCH=$(git symbolic-ref --short HEAD 2>/dev/null || echo "")
 for branch in $PROTECTED_BRANCHES; do
     if [ "$CURRENT_BRANCH" = "$branch" ]; then
         echo "🛡️  Running Sentinel security check for $branch..."
-        node "${SENTINEL_PATH:-$(dirname $0)/../../src/core/cli.js}" ci --fail-on critical
+        node "\${SENTINEL_PATH:-$(dirname $0)/../../src/core/cli.js}" ci --fail-on critical
         RESULT=$?
         if [ $RESULT -ne 0 ]; then
             echo "❌ Push blocked by Sentinel - critical issues found"

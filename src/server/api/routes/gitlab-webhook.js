@@ -8,7 +8,10 @@
  */
 
 import { Hono } from 'hono';
+import { getLogger } from '../../../utils/structuredLogger.js';
 import { GitLabWebhookHandler } from '../../../automation/gitlabWebhookHandler.js';
+
+const webhookLogger = getLogger().child({ service: 'gitlab-webhook' });
 
 const app = new Hono();
 const WEBHOOK_SECRET = process.env.GITLAB_WEBHOOK_SECRET || '';
@@ -53,7 +56,7 @@ app.post('/gitlab', async (c) => {
       ...result,
     });
   } catch (error) {
-    console.error('[gitlab-webhook] Error:', error.message);
+    webhookLogger.error('Webhook processing error', { err: error });
     return c.json({ error: error.message }, 500);
   }
 });

@@ -54,5 +54,9 @@ export default {
     '/__tests__/configValidator.test.js',
     '/__tests__/configManager.test.js',
     '/__tests__/security-middleware.test.js',
+    '/__tests__/trust-scoring.test.js',
+    '/__tests__/ensemble-review.test.js',
+    '/__tests__/vulnerabilityDatabase.test.js',
+    '/__tests__/llmOrchestrator.test.js',
   ],
 };

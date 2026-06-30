@@ -12,6 +12,7 @@
  */
 
 import { Hono } from 'hono';
+import { getLogger } from '../../utils/structuredLogger.js';
 import authRoutes from './routes/auth.js';
 import billingRoutes from './routes/billing.js';
 import sessionRoutes from './routes/sessions.js';
@@ -55,7 +56,7 @@ app.use('*', auditMiddleware());
 
 app.onError((err, c) => {
   const reqId = c.get('requestId') || 'unknown';
-  console.error(`[server] unhandled error (reqId=${reqId}):`, err);
+  getLogger().error(`[server] unhandled error (reqId=${reqId})`, { err, requestId: reqId });
   if (err instanceof Error && err.name === 'HTTPException') {
     return c.json({ error: err.message, requestId: reqId }, err.status || 500);
   }

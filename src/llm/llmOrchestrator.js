@@ -1,5 +1,29 @@
 import axios from 'axios';
 import enhancedRateLimiter from '../utils/enhancedRateLimiter.js';
+import { getRankedModels, isLocalProvider, getBareModelId } from '../shared/models/index.js';
+
+// Build the provider list when the caller passes no explicit providers. Prefers
+// a detected local model (Ollama / LM Studio — keyless), then any provider with
+// an API key in the environment, and only then the offline stub. This is what
+// lets agents/fixer/review use a local model with no key, same as chat.
+function buildDefaultProviders() {
+  try {
+    const local = getRankedModels().find(m => isLocalProvider(m.provider));
+    if (local) {
+      return [{ id: local.provider, provider: local.provider, model: getBareModelId(local.id), enabled: true, weight: 1 }];
+    }
+  } catch { /* model registry not ready — fall through */ }
+
+  const envProviders = [
+    ['groq', 'GROQ_API_KEY'], ['openai', 'OPENAI_API_KEY'], ['anthropic', 'ANTHROPIC_API_KEY'],
+    ['gemini', 'GEMINI_API_KEY'], ['openrouter', 'OPENROUTER_API_KEY'],
+  ];
+  for (const [provider, env] of envProviders) {
+    if (process.env[env]) return [{ id: provider, provider, enabled: true, weight: 1 }];
+  }
+
+  return [{ id: 'local', provider: 'local', model: 'gpt-3.5-turbo', enabled: true }];
+}
 
 // Module-level SDK constructors (lazy-loaded, cached across instances)
 let _GroqModule = null;
@@ -38,14 +62,18 @@ export default class LLMOrchestrator {
     const configuredProviders =
       Array.isArray(aiConfig.providers) && aiConfig.providers.length > 0
         ? aiConfig.providers
-        : [
-          {
-            id: aiConfig.provider || 'local',
-            provider: aiConfig.provider || 'local',
-            model: aiConfig.model || 'gpt-3.5-turbo',
-            enabled: true,
-          },
-        ];
+        : (aiConfig.provider || aiConfig.model)
+          // Honor an explicit single-provider config when given.
+          ? [
+            {
+              id: aiConfig.provider || 'local',
+              provider: aiConfig.provider || 'local',
+              model: aiConfig.model || 'gpt-3.5-turbo',
+              enabled: true,
+            },
+          ]
+          // Nothing specified — auto-detect local model, then env keys, then stub.
+          : buildDefaultProviders();
 
     return configuredProviders
       .map((providerConfig, index) => {
@@ -589,6 +617,9 @@ export default class LLMOrchestrator {
     case 'ollama':
       response = await this.callOllama(provider, prompt, options);
       break;
+    case 'lmstudio':
+      response = await this.callLMStudio(provider, prompt, options);
+      break;
     case 'local':
     default:
       response =
@@ -708,6 +739,22 @@ export default class LLMOrchestrator {
     const response = await enhancedRateLimiter.schedule('ollama', () =>
       axios.post(`${host}/v1/chat/completions`, {
         model: provider.model || 'llama3.2',
+        temperature: this.temperature,
+        max_tokens: this.maxTokens,
+        stream: false,
+        messages,
+      })
+    );
+    return response.data.choices?.[0]?.message?.content || '';
+  }
+
+  async callLMStudio(provider, prompt, options = {}) {
+    // LM Studio exposes an OpenAI-compatible server (default localhost:1234). No key.
+    const host = provider.apiKey || process.env.LMSTUDIO_HOST || 'http://localhost:1234';
+    const messages = this.buildMessages(options.systemPrompt, prompt);
+    const response = await enhancedRateLimiter.schedule('lmstudio', () =>
+      axios.post(`${host}/v1/chat/completions`, {
+        model: provider.model || 'local-model',
         temperature: this.temperature,
         max_tokens: this.maxTokens,
         stream: false,
