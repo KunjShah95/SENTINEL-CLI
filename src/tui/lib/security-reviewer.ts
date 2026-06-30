@@ -2,8 +2,16 @@
 
 import { execSync } from 'child_process';
 import type { ThemeColors } from '../theme';
+import type { LspContext } from './lsp-client';
 
 export type ReviewSeverity = 'critical' | 'high' | 'medium' | 'low' | 'info';
+
+export type IssueProvenance = {
+  modelId: string;
+  provider: string;
+  timestamp: number;
+  confidence?: number;
+};
 
 export type ReviewIssue = {
   severity: ReviewSeverity;
@@ -13,6 +21,7 @@ export type ReviewIssue = {
   description: string;
   suggestion?: string;
   category: 'security' | 'bug' | 'quality' | 'performance' | 'style';
+  provenance?: IssueProvenance;
 };
 
 export type ReviewSummary = {
@@ -61,7 +70,7 @@ export function getChangedFiles(options: { staged?: boolean; branch?: string } =
   }
 }
 
-// Build the CodeRabbit-style review prompt (optionally enhanced with SAST + context)
+// Build the CodeRabbit-style review prompt (optionally enhanced with SAST + context + LSP)
 export function buildReviewPrompt(
   diff: string,
   options: {
@@ -69,14 +78,16 @@ export function buildReviewPrompt(
     focus?: 'security' | 'quality' | 'all';
     sastSummary?: string;
     contextInjection?: string;
+    lspContext?: LspContext;
   } = {}
 ): string {
   const focus = options.focus || 'all';
   const filesHint = options.files?.length ? `Changed files: ${options.files.join(', ')}\n\n` : '';
   const contextBlock = options.contextInjection ? `${options.contextInjection}\n\n` : '';
   const sastBlock = options.sastSummary ? `${options.sastSummary}\n\n` : '';
+  const lspBlock = options.lspContext ? formatLspBlock(options.lspContext) : '';
 
-  return `${contextBlock}You are performing a CodeRabbit-style code review. ${filesHint}
+  return `${contextBlock}${lspBlock}You are performing a CodeRabbit-style code review. ${filesHint}
 ${sastBlock}
 Review this diff and produce a STRUCTURED security review in the following format:
 
@@ -115,6 +126,13 @@ Review this diff and produce a STRUCTURED security review in the following forma
 - [ ] Path traversal: checked
 - [ ] Missing auth: checked
 - [ ] Input validation: checked
+- [ ] SSRF (Server-Side Request Forgery): checked
+- [ ] Prototype pollution: checked
+- [ ] Supply-chain/ dependency confusion: checked
+- [ ] LLM prompt injection: checked
+- [ ] Async race conditions / TOCTOU: checked
+- [ ] Insecure deserialization: checked
+- [ ] Path traversal in file uploads: checked
 
 ## Score: [A/B/C/D/F]
 [Justification]
@@ -122,13 +140,23 @@ Review this diff and produce a STRUCTURED security review in the following forma
 ---
 
 If no issues found in a severity category, omit that section.
-Focus especially on: ${focus === 'security' ? 'security vulnerabilities (OWASP Top 10, CWE)' : focus === 'quality' ? 'code quality, bugs, and maintainability' : 'security, bugs, performance, and code quality'}.
+Focus especially on: ${focus === 'security' ? 'security vulnerabilities (OWASP Top 10, CWE, modern threats like supply-chain, prompt injection, SSRF, async race conditions)' : focus === 'quality' ? 'code quality, bugs, and maintainability' : 'security, bugs, performance, and code quality'}.
 
 Here is the diff to review:
 
 \`\`\`diff
 ${diff.slice(0, 15000)}
 \`\`\``;
+}
+
+function formatLspBlock(ctx: LspContext): string {
+  const lines = ctx.diagnostics.slice(0, 30).map(d =>
+    `- [${d.severity.toUpperCase()}] ${d.file}:${d.line}:${d.column} ${d.message}${d.code ? ` (${d.code})` : ''}`
+  );
+  if (ctx.diagnostics.length > 30) {
+    lines.push(`... and ${ctx.diagnostics.length - 30} more diagnostic(s)`);
+  }
+  return `## LSP Diagnostics (${ctx.serverName}, ${ctx.diagnostics.length} issues, ${ctx.elapsed}ms)\n\n${lines.join('\n')}\n\n`;
 }
 
 // Parse severity emoji from review text

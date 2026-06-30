@@ -6,12 +6,17 @@ import { SessionPanel } from '../components/session-panel.js';
 import { UserMessage, BotMessage, ErrorMessage } from '../components/messages/index.js';
 import { CommandMenu } from '../components/command-menu/index.js';
 import { MultiStepAnalyzeDialog } from '../components/dialogs/multi-step-analyze.js';
+import { ProviderSetupDialog } from '../components/dialogs/provider-setup.js';
+import { PROVIDER_ENV_KEYS } from '../components/dialogs/provider-setup.js';
+import { ModelPickerDialog } from '../components/dialogs/model-picker.js';
 import { useTheme } from '../providers/theme/index.js';
 import { useDialog } from '../providers/dialog/index.js';
 import { useToast } from '../providers/toast/index.js';
 import { useAgentChat } from '../hooks/use-agent-chat.js';
 import { Sessions } from '../lib/api-client.js';
 import { TOOLS } from '../lib/tools.js';
+import { listCustomCommandNames, executeCustomCommand } from '../lib/custom-commands.js';
+import { parseMentions, buildAgentPrompt } from '../../shared/tools/agent-mentions.js';
 import type { CommandContext } from '../components/command-menu/types.js';
 import type { AgentMode, AgentMessagePart } from '../hooks/use-agent-chat.js';
 
@@ -30,15 +35,69 @@ export function Session() {
   const {
     messages, loading, mode, setMode, toggleMode,
     submit, stop, clear, appendMessage, model, setModel, status, sessionId,
-    serverStatus,
+    serverStatus, compacting, submitAndWaitForCompaction,
   } = useAgentChat({
     initialMode: initialMode === 'BUILD' || initialMode === 'PLAN' || initialMode === 'REVIEW' ? initialMode : undefined,
   });
 
+  const [showThinking, setShowThinking] = useState(true);
+  const [showDetails, setShowDetails] = useState(true);
+
+  const [loopState, setLoopState] = useState<{
+    active: boolean;
+    prompt: string;
+    iterations: number;
+    maxIterations: number;
+  }>({ active: false, prompt: '', iterations: 0, maxIterations: 20 });
+
+  const prevLoadingRef = useRef(loading);
+  const loopPromptRef = useRef('');
+  const loopActiveRef = useRef(false);
+  const loopIterationsRef = useRef(0);
+  const loopTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Detect agent idle while loop is active
+  useEffect(() => {
+    if (prevLoadingRef.current && !loading && loopActiveRef.current) {
+      const lastMsg = messages[messages.length - 1];
+      const hasPromise = lastMsg?.parts?.some(p =>
+        p.type === 'text' && typeof p.text === 'string' && p.text.includes('<promise>DONE</promise>')
+      );
+
+      if (hasPromise) {
+        toast.success(`Loop completed after ${loopIterationsRef.current} iteration(s)`);
+        setLoopState({ active: false, prompt: '', iterations: 0, maxIterations: 20 });
+        loopActiveRef.current = false;
+        appendMessage({ role: 'assistant', mode, model, parts: [{ type: 'text', text: `✓ Loop completed after ${loopIterationsRef.current} iteration(s).` }] });
+      } else {
+        const nextIter = loopIterationsRef.current + 1;
+        if (nextIter >= (loopState.maxIterations || 20)) {
+          toast.warning('Max iterations reached, stopping loop');
+          appendMessage({ role: 'assistant', mode, model, parts: [{ type: 'text', text: `⚠ Loop stopped after ${nextIter} iterations (max reached).` }] });
+          setLoopState({ active: false, prompt: '', iterations: 0, maxIterations: 20 });
+          loopActiveRef.current = false;
+        } else {
+          loopIterationsRef.current = nextIter;
+          setLoopState(s => ({ ...s, iterations: nextIter }));
+          toast.info(`Loop iteration ${nextIter}/${loopState.maxIterations}`);
+          if (loopTimeoutRef.current) clearTimeout(loopTimeoutRef.current);
+          loopTimeoutRef.current = setTimeout(() => submit(loopPromptRef.current), 500);
+        }
+      }
+    }
+    prevLoadingRef.current = loading;
+    return () => {
+      if (loopTimeoutRef.current) {
+        clearTimeout(loopTimeoutRef.current);
+        loopTimeoutRef.current = null;
+      }
+    };
+  }, [loading, messages]);
+
   const tokenUsage = {
     estimated: messages.reduce((acc, m) =>
       acc + m.parts.reduce((s, p) => s + (p.type === 'text' || p.type === 'reasoning' ? (p as any).text?.length ?? 0 : 0), 0), 0
-    ) / 4,
+    ) / 3.8,
     limit: 40000,
     get percentage() { return Math.min(100, Math.round(this.estimated / this.limit * 100)); },
   };
@@ -67,12 +126,82 @@ export function Session() {
     setMode: handleSetMode,
   };
 
+  const handleShell = useCallback(async (cmd: string) => {
+    appendMessage({ role: 'user', mode, model, parts: [{ type: 'text', text: `! ${cmd}` }] });
+    try {
+      const { execSync } = await import('child_process');
+      const output = execSync(cmd, { encoding: 'utf-8', maxBuffer: 10 * 1024 * 1024, timeout: 30000 });
+      const truncated = output.length > 4000 ? output.slice(0, 4000) + '\n... (output truncated)' : output;
+      appendMessage({ role: 'assistant', mode, model, parts: [{ type: 'text', text: `\`\`\`\n${truncated}\n\`\`\`` }] });
+    } catch (e: any) {
+      appendMessage({ role: 'error', mode, model, parts: [{ type: 'text', text: `Shell error: ${e.stderr || e.message}` }] });
+    }
+  }, [appendMessage, mode, model]);
+
+  const handleThinkingToggle = useCallback(() => setShowThinking(v => !v), []);
+
   const wrappedSubmit = useCallback(
     (value: string) => {
       if (value.startsWith('/')) {
         const cmd = value.replace(/^\//, '').split(/\s+/)[0].toLowerCase();
         if (cmd === 'clear') { clear(); return; }
         if (cmd === 'new') { navigate('/'); return; }
+        if (cmd === 'init') {
+          (async () => {
+            try {
+              const { analyzeProject, generateAgentsMd } = await import('../lib/init.js');
+              const path = await import('node:path');
+              const fs = await import('node:fs/promises');
+              toast.info('Analyzing project structure...');
+              const info = await analyzeProject();
+              const md = generateAgentsMd(process.cwd(), info);
+              await fs.writeFile(path.join(process.cwd(), 'AGENTS.md'), md, 'utf-8');
+              toast.success('AGENTS.md created');
+              appendMessage({ role: 'assistant', mode, model, parts: [{ type: 'text', text: `✅ Project initialized!\n\n**Detected:** ${info.language}, ${info.frameworks.join(', ') || 'no frameworks'}, ${info.packageManager}\n**Test:** ${info.testFramework}\n**Entry:** ${info.entryPoints.join(', ') || 'none'}\n\nCreated \`AGENTS.md\` with project context. Commit it to share conventions with other agents.` }] });
+            } catch (e) { toast.error('Init failed: ' + String(e)); }
+          })();
+          return;
+        }
+        if (cmd === 'thinking') { setShowThinking(v => !v); toast.info(`Thinking blocks ${showThinking ? 'hidden' : 'shown'}`); return; }
+        if (cmd === 'details') { setShowDetails(v => !v); toast.info(`Tool details ${showDetails ? 'hidden' : 'shown'}`); return; }
+        if (cmd === 'compact') {
+          (async () => {
+            try {
+              const { compactMessages } = await import('../lib/context-compactor.js');
+              toast.info('Compacting session...');
+              const result = await compactMessages(messages, submitAndWaitForCompaction);
+              if (result.compacted && Array.isArray(result.messages)) {
+                clear();
+                for (const msg of result.messages) {
+                  appendMessage({ role: msg.role as any, parts: msg.parts, mode: (msg as any).mode, model: (msg as any).model });
+                }
+                toast.success(`Compacted: ${result.oldCount} → ${result.newCount} messages, saved ~${result.estimatedTokensSaved} tokens`);
+              } else {
+                toast.info('Session already compact, nothing to do');
+              }
+            } catch (e) { toast.error('Compact failed: ' + String(e)); }
+          })();
+          return;
+        }
+        if (cmd === 'redo') {
+          (async () => {
+            try {
+              const { executeLocalTool } = await import('../../shared/tools/index.js');
+              const result = await executeLocalTool('redoLastUndo', {}, 'BUILD');
+              if (result?.success) {
+                toast.success(result.message || 'Changes redone.');
+                appendMessage({ role: 'assistant', mode, model, parts: [{ type: 'text', text: `✅ Redo complete: ${result.message}` }] });
+              } else {
+                toast.error('Nothing to redo.');
+              }
+            } catch (e) { toast.error('Redo failed: ' + String(e)); }
+          })();
+          return;
+        }
+        if (cmd === 'editor') {
+          appendMessage({ role: 'assistant', mode, model, parts: [{ type: 'text', text: 'Set EDITOR env var to use external editor (e.g., `export EDITOR="code --wait"`).' }] });
+          return;
+        }
         if (cmd === 'wizard') {
           dialog.open({
             title: 'Multi-Step Analysis Wizard',
@@ -99,6 +228,20 @@ export function Session() {
                   }
                 }}
               />
+            ),
+          });
+          return;
+        }
+        if (cmd === 'setup' || cmd === 'connect') {
+          dialog.open({
+            title: 'AI Provider Setup',
+            width: 72,
+            height: 35,
+            children: (
+              <ProviderSetupDialog onComplete={() => {
+                toast.success('Provider setup complete. Run /health to verify.');
+                dialog.close();
+              }} />
             ),
           });
           return;
@@ -202,7 +345,20 @@ export function Session() {
           return;
         }
         if (cmd === 'loop') {
-          navigate('/loop');
+          const loopPrompt = value.replace(/^\/loop\s*/i, '').trim();
+          if (!loopPrompt) {
+            navigate('/loop');
+            return;
+          }
+          const maxIterMatch = loopPrompt.match(/--max-iter\s+(\d+)/i);
+          const maxIter = maxIterMatch ? parseInt(maxIterMatch[1], 10) : 20;
+          const cleanPrompt = loopPrompt.replace(/--max-iter\s+\d+/i, '').trim();
+          toast.info(`Loop started: ${cleanPrompt.slice(0, 60)}... (max ${maxIter} iterations)`);
+          setLoopState({ active: true, prompt: cleanPrompt, iterations: 0, maxIterations: maxIter });
+          loopActiveRef.current = true;
+          loopPromptRef.current = cleanPrompt;
+          loopIterationsRef.current = 0;
+          submit(cleanPrompt);
           return;
         }
         if (cmd === 'watch') {
@@ -256,6 +412,236 @@ export function Session() {
           })();
           return;
         }
+        if (cmd === 'dismiss') {
+          const args = value.replace(/^\/dismiss\s*/i, '').trim();
+          if (!args) { toast.error('Usage: /dismiss <file:line:rule> [reason]'); return; }
+          (async () => {
+            try {
+              const { dismissIssue } = await import('../../utils/dismissedIssues.js');
+              const parts = args.split(/\s+/);
+              const key = parts[0];
+              const reason = parts.slice(1).join(' ') || 'User dismissed';
+              const keyParts = key.split(':');
+              if (keyParts.length < 3) { toast.error('Key format: file:line:rule (e.g., src/app.ts:42:no-eval)'); return; }
+              const [file, lineStr, ...ruleParts] = keyParts;
+              const line = parseInt(lineStr, 10);
+              const rule = ruleParts.join(':');
+              dismissIssue(file, line, rule, reason, {});
+              toast.success(`Dismissed ${key}`);
+              appendMessage({ role: 'assistant', mode, model, parts: [{ type: 'text', text: `✅ Dismissed finding: ${key}\nReason: ${reason}\n\nThis finding will be skipped in future scans. Use /dismiss-list to show all dismissals, /dismiss-remove to undo.` }] });
+            } catch (e) { toast.error('Dismiss failed: ' + String(e)); }
+          })();
+          return;
+        }
+        if (cmd === 'dismiss-list') {
+          (async () => {
+            try {
+              const { getDismissals } = await import('../../utils/dismissedIssues.js');
+              const data = getDismissals();
+              const keys = Object.keys(data.dismissals || {});
+              if (keys.length === 0) { toast.info('No dismissed findings.'); return; }
+              const lines = keys.map(k => `• ${k} — ${data.dismissals[k].reason || 'No reason'}`).join('\n');
+              appendMessage({ role: 'assistant', mode, model, parts: [{ type: 'text', text: `## Dismissed Findings (${keys.length})\n\n${lines}` }] });
+            } catch (e) { toast.error('Failed to list dismissals: ' + String(e)); }
+          })();
+          return;
+        }
+        if (cmd === 'dismiss-remove') {
+          const args = value.replace(/^\/dismiss-remove\s*/i, '').trim();
+          if (!args) { toast.error('Usage: /dismiss-remove <file:line:rule>'); return; }
+          (async () => {
+            try {
+              const { undismissIssue } = await import('../../utils/dismissedIssues.js');
+              const keyParts = args.split(':');
+              if (keyParts.length < 3) { toast.error('Key format: file:line:rule'); return; }
+              const [file, lineStr, ...ruleParts] = keyParts;
+              const line = parseInt(lineStr, 10);
+              const rule = ruleParts.join(':');
+              const ok = undismissIssue(file, line, rule);
+              if (ok) { toast.success(`Removed dismissal for ${args}`); } else { toast.error('Dismissal not found'); }
+            } catch (e) { toast.error('Failed to remove dismissal: ' + String(e)); }
+          })();
+          return;
+        }
+        if (cmd === 'test') {
+          const file = value.replace(/^\/test\s*/i, '').trim();
+          if (!file) { toast.error('Usage: /test <file-path> — Generate AI unit tests for the specified file'); return; }
+          (async () => {
+            try {
+              appendMessage({ role: 'user', mode, model, parts: [{ type: 'text', text: `/test ${file}` }] });
+              const fs = await import('fs');
+              if (!fs.existsSync(file)) { toast.error(`File not found: ${file}`); return; }
+              toast.info(`Generating tests for ${file}...`);
+              const content = fs.readFileSync(file, 'utf-8');
+              const testPrompt = `Generate a comprehensive unit test file for the following code. Use the project's existing test framework (Jest/Vitest). Output ONLY valid test code, no explanations. Include edge cases, error paths, and main success paths.\n\nFile: ${file}\n\n\`\`\`\n${content.slice(0, 8000)}\n\`\`\``;
+              submit(testPrompt);
+            } catch (e) { toast.error('Test generation failed: ' + String(e)); }
+          })();
+          return;
+        }
+        if (cmd === 'export') {
+          (async () => {
+            try {
+              toast.info('Exporting session...');
+              const lines: string[] = ['# Sentinel Session Export', '', `**Date:** ${new Date().toISOString()}`, `**Mode:** ${mode}`, `**Model:** ${model}`, `**Messages:** ${messages.length}`, ''];
+              for (const msg of messages) {
+                const role = msg.role.toUpperCase();
+                const text = msg.parts.filter(p => p.type === 'text').map(p => (p as any).text).join('\n');
+                if (text) { lines.push(`### ${role}`); lines.push(''); lines.push(text); lines.push(''); }
+                const toolCalls = msg.parts.filter(p => p.type === 'tool-call');
+                for (const tc of toolCalls) { lines.push(`> _Tool: ${(tc as any).toolName}_`); }
+              }
+              const exportDir = process.cwd() + '/.sentinel/exports';
+              const fs = await import('fs');
+              fs.mkdirSync(exportDir, { recursive: true });
+              const exportPath = `${exportDir}/session-${sessionId || Date.now()}.md`;
+              fs.writeFileSync(exportPath, lines.join('\n'), 'utf-8');
+              toast.success(`Session exported to ${exportPath}`);
+              appendMessage({ role: 'assistant', mode, model, parts: [{ type: 'text', text: `✅ Session exported to \`${exportPath}\`` }] });
+            } catch (e) { toast.error('Export failed: ' + String(e)); }
+          })();
+          return;
+        }
+        if (cmd === 'sessions' || cmd === 'session') {
+          const sub = value.replace(/^\/sessions?\s*/i, '').trim();
+          (async () => {
+            try {
+              if (!sub || sub === 'list') {
+                const list = await Sessions.list();
+                if (!list || list.length === 0) { appendMessage({ role: 'assistant', mode, model, parts: [{ type: 'text', text: 'No sessions found.' }] }); return; }
+                const lines = list.map((s: any, i: number) => `${i + 1}. \`${s.id.slice(0, 8)}\` — ${s.title || 'untitled'} (${s.mode || '?'}, ${new Date(s.createdAt).toLocaleDateString()})`);
+                appendMessage({ role: 'assistant', mode, model, parts: [{ type: 'text', text: `**Sessions:**\n${lines.join('\n')}\n\nUse \`/session switch <id>\` to load a session.` }] });
+              } else if (sub.startsWith('switch ') || sub.startsWith('load ')) {
+                const id = sub.replace(/^(switch|load)\s+/i, '');
+                await handleSelectSession(id);
+              } else if (sub.startsWith('delete ') || sub.startsWith('rm ')) {
+                const id = sub.replace(/^(delete|rm)\s+/i, '');
+                const ok = await Sessions.delete(id);
+                toast.success(ok ? 'Session deleted' : 'Failed to delete session');
+              } else {
+                toast.error('Usage: /session [list|switch <id>|delete <id>]');
+              }
+            } catch (e) { toast.error('Session command failed: ' + String(e)); }
+          })();
+          return;
+        }
+        if (cmd === 'mcp') {
+          appendMessage({ role: 'assistant', mode, model, parts: [{ type: 'text', text: '## MCP Server\n\nThe Sentinel MCP server exposes these tools to MCP-compatible AI assistants (Claude Code, Cursor, Zed):\n- 📄 `sentinel_analyze` — Scan files/directories\n- 🔒 `sentinel_security_audit` — Security audit\n- 📝 `sentinel_review_code` — Review code snippets\n- 🔄 `sentinel_review_pr` — Review PR changes\n- 💡 `sentinel_explain_issue` — Explain findings\n- 🔧 `sentinel_fix` — Auto-fix issues\n- 📊 `sentinel_score` — Project health score\n- 📦 `sentinel_check_dependencies` — CVE scan\n\n**How to start:** The MCP server needs its own terminal. Open a **new terminal** and run:\n\n```bash\nsentinel mcp\n```\n\nThen configure your AI tool to connect to it. See `mcp/README.md` for setup instructions per tool (Cursor, Claude Code, Codex, Continue).' }] });
+          return;
+        }
+        if (cmd === 'sarif') {
+          const target = value.replace(/^\/sarif\s*/i, '').trim() || 'sentinel-results.sarif';
+          (async () => {
+            try {
+              const { SarifGenerator } = await import('../../output/sarifGenerator.js');
+              const { runSast } = await import('../lib/sast-runner.js');
+              toast.info('Running SAST scan for SARIF export...');
+              const sast = await runSast();
+              const generator = new SarifGenerator();
+              const sarifPath = await generator.saveToFile(sast.findings, target);
+              toast.success(`SARIF report saved to ${sarifPath}`);
+              appendMessage({ role: 'assistant', mode, model, parts: [{ type: 'text', text: `✅ SARIF report exported to \`${sarifPath}\`\n\n**Findings:** ${sast.findings.length} issues\n**Tools run:** ${sast.toolsRun.join(', ')}` }] });
+            } catch (e) { toast.error('SARIF export failed: ' + String(e)); }
+          })();
+          return;
+        }
+        if (cmd === 'diff') {
+          const arg = value.replace(/^\/diff\s*/i, '').trim();
+          (async () => {
+            try {
+              const { getGitDiff } = await import('../lib/security-reviewer.js');
+              const isStaged = arg === '--staged';
+              const branch = !isStaged && arg ? arg : undefined;
+              const file = !isStaged && !branch && arg ? arg : undefined;
+
+              const diff = isStaged ? getGitDiff({ staged: true })
+                : branch ? getGitDiff({ branch })
+                : file ? getGitDiff({ file })
+                : getGitDiff();
+
+              if (!diff) {
+                toast.info('No changes detected.');
+                return;
+              }
+
+              // Parse diff into per-file sections with line counts
+              const fileSections: Array<{ path: string; added: number; deleted: number; hunks: string[] }> = [];
+              let currentFile: { path: string; added: number; deleted: number; hunks: string[] } | null = null;
+
+              for (const line of diff.split('\n')) {
+                if (line.startsWith('diff --git ')) {
+                  const m = line.match(/diff --git a\/(.+) b\/(.+)/);
+                  const path = m ? m[2] : 'unknown';
+                  if (currentFile) fileSections.push(currentFile);
+                  currentFile = { path, added: 0, deleted: 0, hunks: [] };
+                }
+                if (currentFile) {
+                  if (line.startsWith('+') && !line.startsWith('+++')) currentFile.added++;
+                  else if (line.startsWith('-') && !line.startsWith('---')) currentFile.deleted++;
+                  currentFile.hunks.push(line);
+                }
+              }
+              if (currentFile) fileSections.push(currentFile);
+
+              // Build formatted diff output
+              const totalAdded = fileSections.reduce((s, f) => s + f.added, 0);
+              const totalDeleted = fileSections.reduce((s, f) => s + f.deleted, 0);
+              const lines: string[] = [];
+              lines.push(`## Git Diff Preview`);
+              lines.push('');
+              if (branch) lines.push(`**Branch:** \`${branch}\``);
+              if (isStaged) lines.push('**Scope:** Staged changes');
+              if (file) lines.push(`**File:** \`${file}\``);
+              lines.push(`**Files changed:** ${fileSections.length}  **+${totalAdded}**  **-${totalDeleted}**`);
+              lines.push('');
+              lines.push('```diff');
+
+              for (const section of fileSections) {
+                lines.push(`--- a/${section.path}`);
+                lines.push(`+++ b/${section.path}`);
+                lines.push(`# change: -${section.deleted} +${section.added} lines`);
+
+                // Show up to 50 lines per file to avoid huge messages
+                const maxLines = 50;
+                const hunkLines = section.hunks.filter(l => {
+                  // Keep content lines (+/-/space) AND @@ hunk headers
+                  if (l.startsWith('@@')) return true;
+                  if (l.startsWith('+') || l.startsWith('-') || l.startsWith(' ')) {
+                    return !l.startsWith('+++') && !l.startsWith('---') && !l.startsWith('diff --git');
+                  }
+                  return false;
+                });
+
+                if (hunkLines.length > maxLines) {
+                  // Show first 20 + last 20 lines with [...] in between
+                  lines.push(...hunkLines.slice(0, 20));
+                  lines.push(`  ... ${hunkLines.length - 40} lines truncated ...`);
+                  lines.push(...hunkLines.slice(hunkLines.length - 20));
+                } else {
+                  lines.push(...hunkLines);
+                }
+                lines.push('');
+              }
+
+              lines.push('```');
+              lines.push('');
+
+              // Summary per file
+              lines.push('### Summary');
+              lines.push('');
+              for (const section of fileSections) {
+                const icon = section.deleted > section.added
+                  ? '🔴' : section.added > 0 ? '🟢' : '⚪';
+                lines.push(`- ${icon} \`${section.path}\` — **+${section.added}** **-${section.deleted}**`);
+              }
+
+              appendMessage({ role: 'assistant', mode, model, parts: [{ type: 'text', text: lines.join('\n') }] });
+            } catch (e) {
+              toast.error('Diff failed: ' + String(e));
+            }
+          })();
+          return;
+        }
         if (cmd === 'context') {
           (async () => {
             try {
@@ -303,25 +689,92 @@ export function Session() {
         if (cmd === 'models') {
           (async () => {
             try {
-              const { SUPPORTED_CHAT_MODELS } = await import('../../shared/models/index.js');
+              const { getRankedModels } = await import('../../shared/models/index.js');
+              const ranked = getRankedModels();
               const byProvider: Record<string, string[]> = {};
-              for (const m of SUPPORTED_CHAT_MODELS as any[]) {
+              for (const m of ranked) {
                 if (!byProvider[m.provider]) byProvider[m.provider] = [];
                 const price = m.inputUsdPerMillionTokens > 0
-                  ? ` ($${m.inputUsdPerMillionTokens}/$${m.outputUsdPerMillionTokens} per M)`
+                  ? ` (\$${m.inputUsdPerMillionTokens}/\$${m.outputUsdPerMillionTokens} per M)`
                   : ' (free/local)';
                 const flag = m.thinking ? ' 🧠' : '';
                 byProvider[m.provider].push(`  \`${m.id}\` — ${m.label}${flag}${price}`);
               }
-              const lines = ['## Available Models by Provider', ''];
+              const lines = ['## Available Models', '', 'Free models listed first, then by capability:', ''];
               for (const [provider, models] of Object.entries(byProvider)) {
-                lines.push(`### ${provider.charAt(0).toUpperCase() + provider.slice(1)}`);
+                const capName = provider.charAt(0).toUpperCase() + provider.slice(1);
+                lines.push(`### ${capName}`);
                 lines.push(...models);
                 lines.push('');
               }
-              lines.push('> Switch model: type the model ID in your message, or set `MODEL=<id>` env var.');
+              lines.push('> Switch: `/model <id>` in chat, or set `MODEL=<id>` env var.');
               appendMessage({ role: 'assistant', mode, model, parts: [{ type: 'text', text: lines.join('\n') }] });
             } catch (e) { toast.error('Failed to list models: ' + String(e)); }
+          })();
+          return;
+        }
+        if (cmd === 'trust') {
+          const target = value.replace(/^\/trust\s*/i, '').trim();
+          (async () => {
+            try {
+              const { TrustScorer } = await import('../../shared/models/trust-scoring.js');
+              const scorer = new TrustScorer();
+              if (target) {
+                const score = await scorer.getModelScore(target);
+                if (!score) { toast.error(`No trust data for model "${target}"`); return; }
+                const fpPct = (score.fpRate * 100).toFixed(1);
+                const accPct = (score.accuracy * 100).toFixed(1);
+                const lines = [
+                  `## Trust Score: ${target}`,
+                  '',
+                  `  Total issues:  ${score.totalIssues}`,
+                  `  Confirmed:     ${score.confirmed}`,
+                  `  False pos:     ${score.falsePositives} (${fpPct}% FP rate)`,
+                  `  Unrated:       ${score.unrated}`,
+                  `  Accuracy:      ${accPct}%`,
+                  `  Avg confidence: ${(score.avgConfidence * 100).toFixed(1)}%`,
+                ];
+                appendMessage({ role: 'assistant', mode, model, parts: [{ type: 'text', text: lines.join('\n') }] });
+              } else {
+                const stats = await scorer.getStats();
+                if (stats.models.length === 0) {
+                  appendMessage({ role: 'assistant', mode, model, parts: [{ type: 'text', text: 'No trust data available yet. Run some reviews first!' }] });
+                  return;
+                }
+                const lines = ['## Model Trust Scores', '', 'Ranked by false-positive rate (lowest first):', ''];
+                for (const m of stats.models) {
+                  const fpPct = (m.fpRate * 100).toFixed(1);
+                  const accPct = (m.accuracy * 100).toFixed(1);
+                  const icon = m.fpRate === 0 ? '🟢' : m.fpRate < 0.2 ? '🟡' : '🔴';
+                  lines.push(`  ${icon} ${m.modelId}`);
+                  lines.push(`      ${m.totalIssues} issues · ${accPct}% accuracy · ${fpPct}% FP · ${m.unrated} unrated`);
+                  lines.push('');
+                }
+                lines.push('> Use `/trust <modelId>` for details, `/feedback <issueId> accurate|fp` to rate.');
+                appendMessage({ role: 'assistant', mode, model, parts: [{ type: 'text', text: lines.join('\n') }] });
+              }
+            } catch (e) { toast.error('Trust command failed: ' + String(e)); }
+          })();
+          return;
+        }
+        if (cmd === 'feedback') {
+          const args = value.replace(/^\/feedback\s*/i, '').trim();
+          if (!args) { toast.error('Usage: /feedback <issueId> accurate|fp'); return; }
+          const parts = args.split(/\s+/);
+          if (parts.length < 2) { toast.error('Usage: /feedback <issueId> accurate|fp'); return; }
+          const [issueId, verdict] = parts;
+          if (verdict !== 'accurate' && verdict !== 'fp') { toast.error('Verdict must be "accurate" or "fp"'); return; }
+          (async () => {
+            try {
+              const { TrustScorer } = await import('../../shared/models/trust-scoring.js');
+              const scorer = new TrustScorer();
+              const ok = await scorer.recordFeedback(issueId, verdict === 'accurate');
+              if (ok) {
+                toast.success(`Feedback recorded: ${issueId} → ${verdict}`);
+              } else {
+                toast.error('Could not record feedback — issue ID not found');
+              }
+            } catch (e) { toast.error('Feedback failed: ' + String(e)); }
           })();
           return;
         }
@@ -347,8 +800,8 @@ export function Session() {
                 ['Fireworks', !!process.env.FIREWORKS_API_KEY],
                 ['Perplexity', !!process.env.PERPLEXITY_API_KEY],
                 ['OpenRouter', !!process.env.OPENROUTER_API_KEY],
-                ['Ollama', !!(process.env.OLLAMA_HOST || true)],
-                ['LM Studio', !!(process.env.LMSTUDIO_HOST || true)],
+                ['Ollama', !!process.env.OLLAMA_HOST],
+                ['LM Studio', !!process.env.LMSTUDIO_HOST],
               ];
               const activeProviders = providerChecks.filter(([, ok]) => ok).map(([n]) => `${n} ✓`).join(' · ');
               const providers = activeProviders || 'None configured — set ANTHROPIC_API_KEY etc.';
@@ -369,12 +822,88 @@ export function Session() {
           })();
           return;
         }
-        if (cmd === 'help') {
-          toast.info('Commands: /clear /new /wizard /mode /review /checks /scan /sast /sarif /loop /pipeline /ci /commit /context /parallel /health /undo /background /agents /help');
+        if (cmd === 'model') {
+          const target = value.replace(/^\/model\s*/i, '').trim();
+          if (!target) {
+            dialog.open({
+              title: 'Select Model',
+              width: 72,
+              height: 35,
+              children: (
+                <ModelPickerDialog
+                  currentModel={model}
+                  onSelect={(modelId) => {
+                    setModel(modelId);
+                    toast.success(`Switched to ${modelId}`);
+                    dialog.close();
+                  }}
+                />
+              ),
+            });
+            return;
+          }
+          (async () => {
+            try {
+              const { findSupportedChatModel, getRankedModels } = await import('../../shared/models/index.js');
+              const exact = findSupportedChatModel(target);
+              if (exact) {
+                setModel(exact.id);
+                toast.success(`Switched to ${exact.label}`);
+                return;
+              }
+              const ranked = getRankedModels();
+              const matches = ranked.filter(m =>
+                m.id.toLowerCase().includes(target.toLowerCase()) ||
+                m.label.toLowerCase().includes(target.toLowerCase())
+              );
+              if (matches.length === 0) {
+                toast.error(`No model matches "${target}". Use /models to list available.`);
+                return;
+              }
+              if (matches.length === 1) {
+                setModel(matches[0].id);
+                toast.success(`Switched to ${matches[0].label}`);
+                return;
+              }
+              const suggestions = matches.slice(0, 8).map(m => `\`${m.id}\` — ${m.label}`).join('\n');
+              appendMessage({ role: 'assistant', mode, model, parts: [{ type: 'text', text: `Models matching "${target}":\n${suggestions}\n\nUse \`/model <exact-id>\` to switch.` }] });
+            } catch (e) { toast.error('Failed to switch model: ' + String(e)); }
+          })();
           return;
         }
-        toast.error('Unknown command. Type /help for commands.');
+        if (cmd === 'help') {
+          const custom = listCustomCommandNames();
+          const customStr = custom.length > 0 ? custom.join(', ') : '';
+          const builtin = '/clear /new /wizard /mode /setup /connect /review /review-file /review-branch /scan /sast /sarif /dismiss /test /export /loop /pipeline /ci /commit /context /parallel /models /health /model /trust /feedback /undo /redo /background /agents /thinking /details /init /session';
+          appendMessage({ role: 'assistant', mode, model, parts: [{ type: 'text', text: customStr ? `**Built-in commands:**\n${builtin}\n\n**Custom commands:**\n${customStr}` : builtin }] });
+          return;
+        }
+        // Check custom commands from .sentinel/commands/
+        const customPrompt = executeCustomCommand(cmd, value.replace(/^\/(\w+)/, '').trim(), { mode, model });
+        if (customPrompt) {
+          toast.info(`Running custom command: /${cmd}`);
+          submit(customPrompt);
+          return;
+        }
+        toast.error(`Unknown command "${cmd}". Type /help for commands.`);
         return;
+      }
+      // Check for @agent mentions and route accordingly
+      const { mentions, cleanMessage } = parseMentions(value);
+      if (mentions.length > 0) {
+        const agentResult = buildAgentPrompt(mentions[0].name, cleanMessage, { mode, model });
+        if (agentResult) {
+          const prevMode = mode;
+          if (agentResult.mode !== mode && (agentResult.mode === 'BUILD' || agentResult.mode === 'PLAN' || agentResult.mode === 'REVIEW')) {
+            setMode(agentResult.mode as AgentMode);
+          }
+          const enhancedPrompt = `[Agent: ${agentResult.agent.label}]\n${agentResult.agentHint}\n\n${agentResult.prompt}`;
+          submit(enhancedPrompt);
+          if (agentResult.mode !== prevMode) {
+            setTimeout(() => setMode(prevMode), 100);
+          }
+          return;
+        }
       }
       submit(value);
     },
@@ -412,19 +941,56 @@ export function Session() {
         model: session.model,
         projectPath: process.cwd(),
       });
-      if (!newSession) { toast.error('Failed to create session'); return; }
+      if (!newSession || !newSession.id) { toast.error('Failed to create session'); return; }
       await handleSelectSession(newSession.id);
       toast.success('Session forked');
     } catch { toast.error('Failed to fork session'); }
   }, [handleSelectSession, toast]);
 
-  const handleDeleteSession = useCallback((_id: string) => {
-    if (messages.length > 0) clear();
-  }, [clear, messages.length]);
+  const handleDeleteSession = useCallback(async (id: string) => {
+    try {
+      const ok = await Sessions.delete(id);
+      if (ok) {
+        if (messages.length > 0) clear();
+        toast.success('Session deleted');
+      } else {
+        toast.error('Failed to delete session');
+      }
+    } catch {
+      toast.error('Failed to delete session');
+    }
+  }, [clear, toast]);
+
+  const [leaderKey, setLeaderKey] = useState<'none' | 'ctrl-x'>('none');
+  const leaderTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useInput((input, key) => {
+    if (leaderKey === 'ctrl-x') {
+      clearTimeout(leaderTimeoutRef.current);
+      setLeaderKey('none');
+      const ch = input.toLowerCase();
+      if (ch === 't')       { setShowThinking(v => !v); toast.info(`Thinking ${showThinking ? 'hidden' : 'shown'}`); return; }
+      if (ch === 'd')       { setShowDetails(v => !v); toast.info(`Details ${showDetails ? 'hidden' : 'shown'}`); return; }
+      if (ch === 'm')       { dialog.open({ title: 'Model Picker', width: 60, height: 25, children: <ModelPickerDialog currentModel={model} onSelect={(m) => { setModel(m); dialog.close(); }} /> }); return; }
+      if (ch === 'p')       { setShowCommands(v => !v); return; }
+      if (ch === 'c')       { clear(); return; }
+      if (ch === 'n')       { navigate('/'); return; }
+      if (ch === 's')       { setShowSessionPanel(v => !v); return; }
+      if (input === 'x')    { return; } // ignore double Ctrl+X
+      toast.info(`Unknown leader key: ${ch}`);
+      return;
+    }
+
     if (key.ctrl && input === 's') {
       setShowSessionPanel(v => !v);
+      return;
+    }
+
+    if (key.ctrl && input === 'x') {
+      setLeaderKey('ctrl-x');
+      toast.info('Leader: press T(thinking) D(details) M(model) P(palette) C(clear) N(new) S(session)');
+      leaderTimeoutRef.current = setTimeout(() => { setLeaderKey('none'); }, 3000);
+      return;
     }
   });
 
@@ -434,6 +1000,51 @@ export function Session() {
       submit(initialMessage);
     }
   }, [initialMessage, submit]);
+
+  const lastModelRef = useRef(model);
+  useEffect(() => {
+    if (lastModelRef.current === model) return;
+    lastModelRef.current = model;
+    import('../../shared/models/prefs.js').then(m => m.saveLastModel(model)).catch(() => {});
+  }, [model]);
+
+  const firstRunChecked = useRef(false);
+  useEffect(() => {
+    if (firstRunChecked.current) return;
+    firstRunChecked.current = true;
+    (async () => {
+      const { loadLastModel } = await import('../../shared/models/prefs.js');
+      const saved = await loadLastModel();
+      if (saved) {
+        const { findSupportedChatModel } = await import('../../shared/models/index.js');
+        if (findSupportedChatModel(saved)) {
+          setModel(saved);
+          return;
+        }
+      }
+      const { configManager } = await import('../../config/configManager.js');
+      await configManager.load();
+      const configured = configManager.getConfiguredProviders();
+      const hasEnvKeys = PROVIDER_ENV_KEYS.some(k => process.env[k]);
+      if (configured.length > 0 || hasEnvKeys) {
+        const { autoSelectBestModel } = await import('../../shared/models/index.js');
+        const best = autoSelectBestModel();
+        if (best) setModel(best);
+        return;
+      }
+      dialog.open({
+        title: 'Welcome to Sentinel — Set Up AI Providers',
+        width: 72,
+        height: 35,
+        children: (
+          <ProviderSetupDialog onComplete={() => {
+            toast.success('Providers configured!');
+            dialog.close();
+          }} />
+        ),
+      });
+    })();
+  }, []);
 
   const handleModeToggle = useCallback(() => toggleMode(), [toggleMode]);
   const handleCommandPalette = useCallback(() => setShowCommands(v => !v), []);
@@ -454,6 +1065,7 @@ export function Session() {
       <Box flexGrow={1} flexDirection="column">
         <SessionShell
           onSubmit={wrappedSubmit}
+          onShellCommand={handleShell}
           inputDisabled={isLoading}
           loading={isLoading}
           mode={mode}
@@ -465,6 +1077,9 @@ export function Session() {
           tokenUsage={tokenUsage.estimated > 0 ? tokenUsage : undefined}
           serverStatus={serverStatus}
           costUsd={costUsd}
+          showThinking={showThinking}
+          showDetails={showDetails}
+          compacting={compacting}
         >
           {messages.length === 0 ? (
             <Box padding={2} alignItems="center" justifyContent="center">
@@ -481,7 +1096,7 @@ export function Session() {
               return <UserMessage key={msg.id} message={textPart?.text || ''} mode={msg.mode || mode} />;
             }
             if (msg.role === 'assistant') {
-              return <BotMessage key={msg.id} parts={msg.parts} model={msg.model || model} />;
+              return <BotMessage key={msg.id} parts={msg.parts} model={msg.model || model} showThinking={showThinking} showDetails={showDetails} />;
             }
             return null;
           })}

@@ -134,9 +134,26 @@ export async function fetchPrDiff(owner, repo, prNumber, github) {
   };
 }
 
-// ─── 3. runAiReview ─────────────────────────────────────────────────────────────
+// ─── 3. enrichWithLspContext ────────────────────────────────────────────────────
 
-export async function runAiReview(diff, files) {
+export async function enrichWithLspContext(files, cwd) {
+  if (!process.env.LSP_ENABLED || process.env.LSP_ENABLED !== 'true') return null;
+  try {
+    const { getLspDiagnostics } = await import('../../../tui/lib/lsp-client.js');
+    const result = await getLspDiagnostics(files, cwd);
+    if (result && result.diagnostics.length > 0) {
+      console.log(`[lsp] ${result.serverName}: ${result.diagnostics.length} diagnostic(s) found (${result.elapsed}ms)`);
+    }
+    return result;
+  } catch (err) {
+    console.warn(`[lsp] enrichment skipped: ${err.message}`);
+    return null;
+  }
+}
+
+// ─── 4. runAiReview ─────────────────────────────────────────────────────────────
+
+export async function runAiReview(diff, files, lspContext = null) {
   const { buildReviewPrompt, parseReviewResponse } = await import('../../../tui/lib/security-reviewer.js');
 
   const MAX_DIFF_LENGTH = 15000;
@@ -144,13 +161,29 @@ export async function runAiReview(diff, files) {
     ? diff.slice(0, MAX_DIFF_LENGTH) + '\n\n[Diff truncated at 15000 characters — review limited to visible portion]'
     : diff;
 
-  const prompt = buildReviewPrompt(truncatedDiff, { files, focus: 'all' });
+  const prompt = buildReviewPrompt(truncatedDiff, { files, focus: 'all', lspContext: lspContext || undefined });
   const response = await callLLM(prompt);
   const parsed = parseReviewResponse(response, files);
+
+  // Stamp provenance on each issue using the first working provider
+  const provider = PROVIDERS.find(p => p.key());
+  const modelId = provider?.model || 'unknown';
+  const providerName = provider?.type || 'unknown';
+  const now = Date.now();
+
+  for (const issue of parsed.issues) {
+    issue.provenance = {
+      modelId,
+      provider: providerName,
+      timestamp: now,
+      confidence: issue.severity === 'critical' ? 0.9 : issue.severity === 'high' ? 0.8 : issue.severity === 'medium' ? 0.6 : 0.4,
+    };
+  }
+
   return parsed.issues;
 }
 
-// ─── 4. mergeResults ────────────────────────────────────────────────────────────
+// ─── 5. mergeResults ────────────────────────────────────────────────────────────
 
 const SEVERITY_ORDER = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
 
@@ -163,6 +196,12 @@ export function mergeResults(sastFindings, aiIssues) {
     description: f.message,
     suggestion: f.suggestion,
     category: 'security',
+    provenance: {
+      modelId: 'sast',
+      provider: 'sentinel-sast',
+      timestamp: Date.now(),
+      confidence: 0.95,
+    },
   }));
 
   const seen = new Set();
@@ -179,7 +218,7 @@ export function mergeResults(sastFindings, aiIssues) {
   return merged;
 }
 
-// ─── 5. uploadSarif ─────────────────────────────────────────────────────────────
+// ─── 6. uploadSarif ─────────────────────────────────────────────────────────────
 
 export async function uploadSarif(owner, repo, headSha, issues, github) {
   const { default: SarifGenerator } = await import('../../../output/sarifGenerator.js');
@@ -196,7 +235,7 @@ export async function uploadSarif(owner, repo, headSha, issues, github) {
   await github.uploadSarif(owner, repo, headSha, JSON.stringify(sarifJson));
 }
 
-// ─── 6. reviewPullRequest (default export) ──────────────────────────────────────
+// ─── 7. reviewPullRequest (default export) ──────────────────────────────────────
 
 export default async function reviewPullRequest(owner, repo, prNumber, options = {}) {
   const startTime = Date.now();
@@ -228,14 +267,27 @@ export default async function reviewPullRequest(owner, repo, prNumber, options =
     console.warn(`[pr-review] SAST runner failed: ${err.message}`);
   }
 
+  const lspContext = await enrichWithLspContext(files);
+
   let aiIssues = [];
   try {
-    aiIssues = await runAiReview(diff, files);
+    aiIssues = await runAiReview(diff, files, lspContext);
   } catch (err) {
     console.warn(`[pr-review] AI review failed: ${err.message}`);
   }
 
   const allIssues = mergeResults(sastFindings, aiIssues);
+
+  // Record all issues in trust scoring
+  try {
+    const { TrustScorer } = await import('../../../shared/models/trust-scoring.js');
+    const scorer = new TrustScorer();
+    for (const issue of allIssues) {
+      await scorer.recordIssue(issue);
+    }
+  } catch (err) {
+    console.warn(`[pr-review] Failed to record trust data: ${err.message}`);
+  }
 
   try {
     const inlineIssues = allIssues.filter(i => i.file && i.line);
