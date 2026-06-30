@@ -12,6 +12,7 @@
 import { Hono } from 'hono';
 import crypto from 'node:crypto';
 import { GitHubIntegration } from '../../../integrations/github.js';
+import reviewPullRequest from '../lib/pr-review-orchestrator.js';
 
 const app = new Hono();
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || '';
@@ -29,59 +30,7 @@ function verifySignature(rawBody, signature) {
 }
 
 async function runReviewPipeline(owner, repo, prNumber) {
-  const github = new GitHubIntegration({ token: process.env.GITHUB_TOKEN || '' });
-
-  const prDetails = await github.getPrDetails(owner, repo, prNumber);
-  const headSha = prDetails.head.sha;
-
-  // Run local SAST if available
-  const allIssues = [];
-  try {
-    const { runSast } = await import('../../../tui/lib/sast-runner.js');
-    const sast = await runSast({ target: process.cwd() });
-    allIssues.push(...(sast.findings || []));
-  } catch {
-    // SAST runner not available — skip
-  }
-
-  // Post inline comments
-  const inlineIssues = allIssues.filter(i => i.file && i.line);
-  if (inlineIssues.length > 0) {
-    const formatted = github.formatIssuesForReview(inlineIssues);
-    try {
-      await github.createReview(owner, repo, prNumber, headSha, formatted);
-    } catch {
-      // fall through — summary comment alone is fine
-    }
-  }
-
-  // Post summary
-  const summary = github.generateSummaryComment(allIssues);
-  await github.postComment(owner, repo, prNumber, summary);
-
-  // Create check run
-  const criticalCount = allIssues.filter(i => i.severity === 'critical').length;
-  const highCount = allIssues.filter(i => i.severity === 'high').length;
-  const conclusion = criticalCount > 0 ? 'action_required'
-    : highCount > 0 ? 'neutral' : 'success';
-
-  try {
-    await github.createCheckRun(owner, repo, headSha, {
-      status: 'completed',
-      conclusion,
-      output: {
-        title: `Sentinel: ${allIssues.length} issue(s) found`,
-        summary: `${criticalCount} critical, ${highCount} high, ${allIssues.filter(i => i.severity === 'medium').length} medium, ${allIssues.filter(i => i.severity === 'low').length} low`,
-        text: allIssues.slice(0, 50).map(i =>
-          `- [${i.severity?.toUpperCase()}] ${i.file ? `${i.file}:${i.line || ''} ` : ''}${i.message || i.title}`
-        ).join('\n'),
-      },
-    });
-  } catch {
-    // check run is optional
-  }
-
-  return { issuesFound: allIssues.length, conclusion };
+  return reviewPullRequest(owner, repo, prNumber);
 }
 
 app.post('/github', async (c) => {

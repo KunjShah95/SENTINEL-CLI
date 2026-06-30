@@ -157,7 +157,7 @@ services:
       - ./:/workspace:ro
     working_dir: /workspace
     # Usage: docker-compose run sentinel-pr review-pr https://github.com/owner/repo/pull/123
-    entrypoint: ['node', 'src/dist/cli.js']
+    entrypoint: ['node', 'src/server/api/start.js']
     command: ['--help']
 
   # Notification service (Slack/Discord)
@@ -176,6 +176,61 @@ services:
       - ./:/workspace:ro
     working_dir: /workspace
     command: ['notify', '--slack', '--discord', '--project', 'MyProject']
+
+  # ============================================================
+  # Sentinel API Server (Hono — port 3000)
+  # Required by the PR Bot for session management and persistence.
+  # ============================================================
+  sentinel-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    image: sentinel-cli:2.0.2
+    container_name: sentinel-api
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - SENTINEL_DOCKER=true
+    ports:
+      - '3000:3000'
+    entrypoint: ['node', 'src/server/api/start.js']
+    healthcheck:
+      test: ['CMD', 'node', '-e', 'fetch("http://localhost:3000/health").then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # ============================================================
+  # GitHub PR Bot — Express webhook server (port 3001)
+  # Auto-reviews pull requests on open/synchronize/reopen.
+  # Requires GITHUB_TOKEN. Optionally uses WEBHOOK_SECRET.
+  # ============================================================
+  sentinel-pr-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: pr-bot
+    image: sentinel-cli:2.0.2-pr-bot
+    container_name: sentinel-pr-bot
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - SENTINEL_DOCKER=true
+      - GITHUB_TOKEN=${GITHUB_TOKEN:?GITHUB_TOKEN is required}
+      - WEBHOOK_SECRET=${WEBHOOK_SECRET:-}
+    ports:
+      - '3001:3001'
+    depends_on:
+      sentinel-api:
+        condition: service_started
+    healthcheck:
+      test: ['CMD', 'node', '-e', 'fetch("http://localhost:3001/health").then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
 
 # ============================================================
 # Volume definitions for persistent data
