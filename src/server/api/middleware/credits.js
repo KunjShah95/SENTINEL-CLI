@@ -7,7 +7,7 @@
  * user has no balance.
  */
 
-import { getAvailableCreditsBalance, ingestAiUsage } from "../lib/polar.js";
+import { getAvailableCreditsBalance, ingestAiUsage } from '../lib/polar.js';
 
 export function requireCreditsBalance() {
   return async (c, next) => {
@@ -17,20 +17,20 @@ export function requireCreditsBalance() {
       return;
     }
 
-    const userId = c.get("userId");
+    const userId = c.get('userId');
     if (!userId) {
-      return c.json({ error: "Unauthorized" }, 401);
+      return c.json({ error: 'Unauthorized' }, 401);
     }
     try {
       const balance = await getAvailableCreditsBalance(userId);
       if (balance <= 0) {
         return c.json(
-          { error: "No credits remaining. Run /upgrade to buy more credits." },
+          { error: 'No credits remaining. Run /upgrade to buy more credits.' },
           402
         );
       }
     } catch (e) {
-      return c.json({ error: "Unable to verify credits balance right now." }, 503);
+      return c.json({ error: 'Unable to verify credits balance right now.' }, 503);
     }
     await next();
   };

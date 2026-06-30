@@ -1,0 +1,62 @@
+id: stored-xss-via-innerhtml
+title: Stored Cross-Site Scripting via innerHTML / dangerouslySetInnerHTML
+severity: critical
+languages: [javascript, typescript]
+cwe: [CWE-79]
+tags: [xss, injection, browser, dom]
+description: |
+  Stored XSS occurs when user-supplied content is rendered as raw HTML without
+  sanitization. In browser JavaScript, `innerHTML` assignments and React's
+  `dangerouslySetInnerHTML` bypass the DOM's built-in protections against script
+  injection. If the rendered content includes attacker-controlled data (saved from
+  a previous request, a database field, or an API response), injected `<script>`
+  tags or event handlers execute in the context of the victim's session.
+
+  This is classified as stored (or persistent) XSS because the payload persists
+  on the server and executes when any user views the affected page.
+
+detection: |
+  Search for assignments to `innerHTML`, `outerHTML`, `insertAdjacentHTML`, and
+  React's `dangerouslySetInnerHTML={{ __html: ... }}`. Trace the data source
+  backward: if the HTML string contains any user-supplied, database-sourced, or
+  API-derived content, it's a finding.
+
+  Also check for:
+  - jQuery `.html()` method with unsanitized data
+  - DOMParser `parseFromString()` results inserted into the DOM
+  - Templates compiled from user content (e.g. Handlebars `new Template(str)`)
+  - `srcdoc` attribute on iframes with interpolated content
+
+remediation: |
+  Use safe DOM APIs that treat content as text, not HTML:
+  - `textContent` instead of `innerHTML`
+  - React children directly instead of `dangerouslySetInnerHTML`
+  - `createTextNode()` for dynamic text in the DOM
+
+  When HTML rendering is genuinely required (rich text editors, markdown renderers):
+  - Sanitize with a library like DOMPurify before insertion
+  - Use a sandboxed iframe for untrusted rich content
+  - Validate and encode output on the server side as defense in depth
+
+example:
+  vulnerable: |
+    const comments = await fetchComments(postId);
+    const container = document.getElementById('comments');
+    container.innerHTML = comments.map(c =>
+      `<div class="comment">${c.body}</div>`
+    ).join('');
+
+  fixed: |
+    import DOMPurify from 'dompurify';
+
+    const comments = await fetchComments(postId);
+    const container = document.getElementById('comments');
+    container.innerHTML = DOMPurify.sanitize(
+      comments.map(c => `<div class="comment">${c.body}</div>`).join('')
+    );
+
+references:
+  - url: https://owasp.org/www-community/attacks/xss/
+    title: OWASP Cross-Site Scripting
+  - url: https://cwe.mitre.org/data/definitions/79.html
+    title: CWE-79: Improper Neutralization of Input During Web Page Generation

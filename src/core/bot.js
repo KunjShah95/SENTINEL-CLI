@@ -23,6 +23,7 @@ import {
   globalEventBus,
   globalMetrics,
 } from './index.js';
+import { getRuleEngine } from '../rules/rule-engine.js';
 
 const config = new Config();
 
@@ -57,50 +58,38 @@ export class CodeReviewBot {
 
       await this.initializeScalableComponents();
 
+      const ruleEngine = await getRuleEngine();
       const enabledAnalyzers = config.getAnalyzers();
+      const analyzerMap = {
+        security: SecurityAnalyzer,
+        quality: QualityAnalyzer,
+        bugs: BugAnalyzer,
+        performance: PerformanceAnalyzer,
+        dependency: DependencyAnalyzer,
+        deps: DependencyAnalyzer,
+        accessibility: AccessibilityAnalyzer,
+        a11y: AccessibilityAnalyzer,
+        typescript: TypeScriptAnalyzer,
+        ts: TypeScriptAnalyzer,
+        react: ReactAnalyzer,
+        jsx: ReactAnalyzer,
+        api: APISecurityAnalyzer,
+        'api-security': APISecurityAnalyzer,
+        secrets: EnvSecurityAnalyzer,
+        env: EnvSecurityAnalyzer,
+        docker: DockerAnalyzer,
+        dockerfile: DockerAnalyzer,
+      };
 
-      if (enabledAnalyzers.includes('security')) {
-        this.analyzers.push(new SecurityAnalyzer(config));
-      }
-
-      if (enabledAnalyzers.includes('quality')) {
-        this.analyzers.push(new QualityAnalyzer(config));
-      }
-
-      if (enabledAnalyzers.includes('bugs')) {
-        this.analyzers.push(new BugAnalyzer(config));
-      }
-
-      if (enabledAnalyzers.includes('performance')) {
-        this.analyzers.push(new PerformanceAnalyzer(config));
-      }
-
-      if (enabledAnalyzers.includes('dependency') || enabledAnalyzers.includes('deps')) {
-        this.analyzers.push(new DependencyAnalyzer(config));
-      }
-
-      if (enabledAnalyzers.includes('accessibility') || enabledAnalyzers.includes('a11y')) {
-        this.analyzers.push(new AccessibilityAnalyzer(config));
-      }
-
-      if (enabledAnalyzers.includes('typescript') || enabledAnalyzers.includes('ts')) {
-        this.analyzers.push(new TypeScriptAnalyzer(config));
-      }
-
-      if (enabledAnalyzers.includes('react') || enabledAnalyzers.includes('jsx')) {
-        this.analyzers.push(new ReactAnalyzer(config));
-      }
-
-      if (enabledAnalyzers.includes('api') || enabledAnalyzers.includes('api-security')) {
-        this.analyzers.push(new APISecurityAnalyzer(config));
-      }
-
-      if (enabledAnalyzers.includes('secrets') || enabledAnalyzers.includes('env')) {
-        this.analyzers.push(new EnvSecurityAnalyzer(config));
-      }
-
-      if (enabledAnalyzers.includes('docker') || enabledAnalyzers.includes('dockerfile')) {
-        this.analyzers.push(new DockerAnalyzer(config));
+      const seen = new Set();
+      for (const key of enabledAnalyzers) {
+        const AnalyzerClass = analyzerMap[key];
+        if (AnalyzerClass && !seen.has(AnalyzerClass)) {
+          seen.add(AnalyzerClass);
+          const instance = new AnalyzerClass(config);
+          await instance.setRuleEngine(ruleEngine);
+          this.analyzers.push(instance);
+        }
       }
 
       this.isInitialized = true;
@@ -371,6 +360,41 @@ export class CodeReviewBot {
 
       // Run code review bot analysis
       const allIssues = await this.analyzeFiles(files, options);
+
+      // Run SAST orchestrator if enabled
+      if (options.sast !== false) {
+        try {
+          if (spinner) spinner.text = 'Running SAST analysis...';
+          const { SastOrchestrator } = await import('../sast/sastOrchestrator.js');
+          const orchestrator = new SastOrchestrator({
+            config: options.sastConfig,
+            cwd: process.cwd(),
+            enabledTools: options.sastTools,
+          });
+          const filePaths = files.map(f => f.path);
+          const sastResult = await orchestrator.analyze(filePaths);
+          // Merge SAST findings into issues
+          for (const finding of sastResult.findings) {
+            allIssues.push({
+              file: finding.file,
+              line: finding.line,
+              severity: finding.severity,
+              category: 'sast',
+              title: `[${finding.tool}] ${finding.rule || 'finding'}`,
+              message: finding.message,
+              suggestion: finding.suggestion,
+              analyzer: 'sast-orchestrator',
+              tool: finding.tool,
+            });
+          }
+          if (spinner && sastResult.toolsRun.length > 0) {
+            spinner.text = `SAST: ${sastResult.findings.length} findings from ${sastResult.toolsRun.join(', ')}`;
+          }
+        } catch (sastError) {
+          if (spinner) spinner.text = 'SAST analysis skipped';
+          console.warn(chalk.yellow('⚠') + ` SAST orchestrator: ${sastError.message}`);
+        }
+      }
 
       // Evaluate policies
       const policyResult = await this.evaluatePolicies(allIssues, options);

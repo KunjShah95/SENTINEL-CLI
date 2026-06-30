@@ -40,7 +40,7 @@ export class SlackNotifier {
    */
   async sendAnalysisSummary(results) {
     const { summary, issues, repo } = results;
-    
+
     const blocks = [
       {
         type: 'header',

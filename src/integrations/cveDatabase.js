@@ -103,14 +103,14 @@ export class CVEDatabaseIntegration extends EventEmitter {
       enriched.cveCount = vulnerabilities.length;
       enriched.criticalCVE = vulnerabilities.some(v => v.severity === 'CRITICAL');
       enriched.cvssScore = Math.max(...vulnerabilities.map(v => v.cvssScore || 0), 0);
-      
-      const latestCVE = vulnerabilities.sort((a, b) => 
+
+      const latestCVE = vulnerabilities.sort((a, b) =>
         new Date(b.publishedDate) - new Date(a.publishedDate)
       )[0];
-      
+
       enriched.latestCVE = latestCVE?.cveId;
       enriched.latestCVEDate = latestCVE?.publishedDate;
-      
+
       if (options.getFix) {
         enriched.suggestedFix = this.suggestFixForCVE(vulnerabilities, ecosystem);
       }
@@ -130,21 +130,21 @@ export class CVEDatabaseIntegration extends EventEmitter {
 
   detectEcosystem(filePath) {
     if (!filePath) return 'npm';
-    
+
     if (filePath.includes('package.json')) return 'npm';
     if (filePath.includes('requirements.txt') || filePath.includes('setup.py')) return 'pypi';
     if (filePath.includes('pom.xml') || filePath.includes('build.gradle')) return 'maven';
     if (filePath.includes('Gemfile')) return 'rubygems';
     if (filePath.includes('go.mod')) return 'go';
     if (filePath.includes('Cargo.toml')) return 'crates.io';
-    
+
     return 'npm';
   }
 
   suggestFixForCVE(vulnerabilities, ecosystem) {
     const criticalVulns = vulnerabilities.filter(v => v.severity === 'CRITICAL');
     const highestCVS = Math.max(...vulnerabilities.map(v => v.cvssScore || 0));
-    
+
     const fixes = {
       npm: 'npm audit fix',
       pypi: 'pip install --upgrade',
@@ -200,9 +200,9 @@ export class CVEDatabaseIntegration extends EventEmitter {
       if (newCVEs.length > 0) {
         this.lastUpdate = new Date().toISOString();
         await this.saveCache();
-        
+
         this.emit('cve:synced', { count: newCVEs.length, timestamp: this.lastUpdate });
-        
+
         for (const cve of newCVEs) {
           this.emit('cve:new', cve);
         }

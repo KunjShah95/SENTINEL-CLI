@@ -2,35 +2,35 @@ import chalk from 'chalk';
 import path from 'path';
 
 export class CompletionCommand {
-    constructor(options = {}) {
-        this.projectPath = options.projectPath || process.cwd();
+  constructor(options = {}) {
+    this.projectPath = options.projectPath || process.cwd();
+  }
+
+  async run(args) {
+    const shell = args[0] || 'bash';
+
+    console.log(chalk.cyan('\n═══════════════════════════════════════════════════════════════'));
+    console.log(chalk.cyan('  ') + chalk.white('Sentinel Shell Completion'));
+    console.log(chalk.cyan('═══════════════════════════════════════════════════════════════\n'));
+
+    switch (shell) {
+    case 'bash':
+      return this.generateBashCompletion();
+    case 'zsh':
+      return this.generateZshCompletion();
+    case 'fish':
+      return this.generateFishCompletion();
+    case 'powershell':
+      return this.generatePowerShellCompletion();
+    case 'install':
+      return this.installCompletion();
+    default:
+      this.showHelp();
     }
+  }
 
-    async run(args) {
-        const shell = args[0] || 'bash';
-        
-        console.log(chalk.cyan('\n═══════════════════════════════════════════════════════════════'));
-        console.log(chalk.cyan('  ') + chalk.white('Sentinel Shell Completion'));
-        console.log(chalk.cyan('═══════════════════════════════════════════════════════════════\n'));
-
-        switch (shell) {
-            case 'bash':
-                return this.generateBashCompletion();
-            case 'zsh':
-                return this.generateZshCompletion();
-            case 'fish':
-                return this.generateFishCompletion();
-            case 'powershell':
-                return this.generatePowerShellCompletion();
-            case 'install':
-                return this.installCompletion();
-            default:
-                this.showHelp();
-        }
-    }
-
-    generateBashCompletion() {
-        const completion = `#!/bin/bash
+  generateBashCompletion() {
+    const completion = `#!/bin/bash
 
 # Sentinel CLI Bash Completion
 # Add to your ~/.bashrc: source /path/to/sentinel-completion.bash
@@ -80,18 +80,18 @@ _sentinel_completion() {
 complete -F _sentinel_completion sentinel
 `;
 
-        console.log(chalk.gray('  Bash completion generated.\n'));
-        console.log(chalk.white('  Add to your ~/.bashrc:\n'));
-        console.log(chalk.cyan('    source <(sentinel completion bash)\n'));
-        console.log(chalk.gray('  Or save to file and source:\n'));
-        console.log(chalk.cyan('    sentinel completion bash > ~/.sentinel-completion.bash'));
-        console.log(chalk.gray('    echo "source ~/.sentinel-completion.bash" >> ~/.bashrc\n'));
+    console.log(chalk.gray('  Bash completion generated.\n'));
+    console.log(chalk.white('  Add to your ~/.bashrc:\n'));
+    console.log(chalk.cyan('    source <(sentinel completion bash)\n'));
+    console.log(chalk.gray('  Or save to file and source:\n'));
+    console.log(chalk.cyan('    sentinel completion bash > ~/.sentinel-completion.bash'));
+    console.log(chalk.gray('    echo "source ~/.sentinel-completion.bash" >> ~/.bashrc\n'));
 
-        return { shell: 'bash', completion };
-    }
+    return { shell: 'bash', completion };
+  }
 
-    generateZshCompletion() {
-        const completion = `#compdef sentinel
+  generateZshCompletion() {
+    const completion = `#compdef sentinel
 
 # Sentinel CLI Zsh Completion
 
@@ -161,17 +161,17 @@ fi
 return 0
 `;
 
-        console.log(chalk.gray('  Zsh completion generated.\n'));
-        console.log(chalk.white('  Add to your ~/.zshrc:\n'));
-        console.log(chalk.cyan('    source <(sentinel completion zsh)\n'));
-        console.log(chalk.gray('  Or save to file:\n'));
-        console.log(chalk.cyan('    sentinel completion zsh > ~/.zsh/_sentinel\n'));
+    console.log(chalk.gray('  Zsh completion generated.\n'));
+    console.log(chalk.white('  Add to your ~/.zshrc:\n'));
+    console.log(chalk.cyan('    source <(sentinel completion zsh)\n'));
+    console.log(chalk.gray('  Or save to file:\n'));
+    console.log(chalk.cyan('    sentinel completion zsh > ~/.zsh/_sentinel\n'));
 
-        return { shell: 'zsh', completion };
-    }
+    return { shell: 'zsh', completion };
+  }
 
-    generateFishCompletion() {
-        const completion = `# Sentinel CLI Fish Shell Completion
+  generateFishCompletion() {
+    const completion = `# Sentinel CLI Fish Shell Completion
 
 # Install: sentinel completion fish > ~/.config/fish/completions/sentinel.fish
 
@@ -201,15 +201,15 @@ complete -c sentinel -l verbose -d 'Verbose output'
 complete -c sentinel -l silent -d 'Silent mode'
 `;
 
-        console.log(chalk.gray('  Fish completion generated.\n'));
-        console.log(chalk.white('  Install:\n'));
-        console.log(chalk.cyan('    sentinel completion fish > ~/.config/fish/completions/sentinel.fish\n'));
+    console.log(chalk.gray('  Fish completion generated.\n'));
+    console.log(chalk.white('  Install:\n'));
+    console.log(chalk.cyan('    sentinel completion fish > ~/.config/fish/completions/sentinel.fish\n'));
 
-        return { shell: 'fish', completion };
-    }
+    return { shell: 'fish', completion };
+  }
 
-    generatePowerShellCompletion() {
-        const completion = `
+  generatePowerShellCompletion() {
+    const completion = `
 # Sentinel CLI PowerShell Completion
 # Add to your $PROFILE
 
@@ -242,58 +242,58 @@ Register-ArgumentCompleter -CommandName sentinel -ParameterName Format -ScriptBl
 }
 `;
 
-        console.log(chalk.gray('  PowerShell completion generated.\n'));
-        console.log(chalk.white('  Add to your $PROFILE:\n'));
-        console.log(chalk.cyan('    sentinel completion powershell >> $PROFILE\n'));
+    console.log(chalk.gray('  PowerShell completion generated.\n'));
+    console.log(chalk.white('  Add to your $PROFILE:\n'));
+    console.log(chalk.cyan('    sentinel completion powershell >> $PROFILE\n'));
 
-        return { shell: 'powershell', completion };
-    }
+    return { shell: 'powershell', completion };
+  }
 
-    async installCompletion() {
-        const fs = await import('fs/promises');
-        
-        const shells = ['bash', 'zsh', 'fish'];
-        const home = process.env.HOME || process.env.USERPROFILE;
-        
-        for (const shell of shells) {
-            try {
-                let content;
-                switch (shell) {
-                    case 'bash':
-                        content = this.generateBashCompletion().completion;
-                        break;
-                    case 'zsh':
-                        content = this.generateZshCompletion().completion;
-                        break;
-                    case 'fish':
-                        content = this.generateFishCompletion().completion;
-                        break;
-                }
-                
-                const filePath = path.join(home, `.sentinel-complete-${shell}`);
-                await fs.writeFile(filePath, content);
-                console.log(chalk.green(`  ✓ Installed ${shell} completion`));
-            } catch (e) {
-                console.log(chalk.yellow(`  ⚠ Could not install ${shell} completion`));
-            }
+  async installCompletion() {
+    const fs = await import('fs/promises');
+
+    const shells = ['bash', 'zsh', 'fish'];
+    const home = process.env.HOME || process.env.USERPROFILE;
+
+    for (const shell of shells) {
+      try {
+        let content;
+        switch (shell) {
+        case 'bash':
+          content = this.generateBashCompletion().completion;
+          break;
+        case 'zsh':
+          content = this.generateZshCompletion().completion;
+          break;
+        case 'fish':
+          content = this.generateFishCompletion().completion;
+          break;
         }
-        
-        console.log(chalk.green('\n  ✓ Shell completions installed!\n'));
+
+        const filePath = path.join(home, `.sentinel-complete-${shell}`);
+        await fs.writeFile(filePath, content);
+        console.log(chalk.green(`  ✓ Installed ${shell} completion`));
+      } catch (e) {
+        console.log(chalk.yellow(`  ⚠ Could not install ${shell} completion`));
+      }
     }
 
-    showHelp() {
-        console.log(chalk.cyan('\n  Shell Completion:\n'));
-        console.log(chalk.gray('    sentinel completion bash        Generate bash completion'));
-        console.log(chalk.gray('    sentinel completion zsh         Generate zsh completion'));
-        console.log(chalk.gray('    sentinel completion fish        Generate fish completion'));
-        console.log(chalk.gray('    sentinel completion powershell  Generate PowerShell completion'));
-        console.log(chalk.gray('    sentinel completion install    Install completions\n'));
-    }
+    console.log(chalk.green('\n  ✓ Shell completions installed!\n'));
+  }
+
+  showHelp() {
+    console.log(chalk.cyan('\n  Shell Completion:\n'));
+    console.log(chalk.gray('    sentinel completion bash        Generate bash completion'));
+    console.log(chalk.gray('    sentinel completion zsh         Generate zsh completion'));
+    console.log(chalk.gray('    sentinel completion fish        Generate fish completion'));
+    console.log(chalk.gray('    sentinel completion powershell  Generate PowerShell completion'));
+    console.log(chalk.gray('    sentinel completion install    Install completions\n'));
+  }
 }
 
 export async function runCompletionCommand(args, options = {}) {
-    const command = new CompletionCommand(options);
-    return command.run(args);
+  const command = new CompletionCommand(options);
+  return command.run(args);
 }
 
 export default { CompletionCommand, runCompletionCommand };

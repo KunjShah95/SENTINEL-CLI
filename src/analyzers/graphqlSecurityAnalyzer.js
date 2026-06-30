@@ -51,7 +51,7 @@ export class GraphQLSecurityAnalyzer extends BaseAnalyzer {
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
-      
+
       for (const pattern of introspectionPatterns) {
         if (pattern.test(line)) {
           issues.push(this.addIssue({
@@ -79,11 +79,11 @@ export class GraphQLSecurityAnalyzer extends BaseAnalyzer {
    */
   checkQueryDepth(filePath, content, lines) {
     const issues = [];
-    
+
     // Check if depth limiting is implemented
     const hasDepthLimit = /maxDepth|depth.*limit|queryDepth/i.test(content);
     const isApollo = /apollo.*server|@apollo/i.test(content);
-    
+
     if (isApollo && !hasDepthLimit) {
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
@@ -113,10 +113,10 @@ export class GraphQLSecurityAnalyzer extends BaseAnalyzer {
    */
   checkBatchBatching(filePath, content, lines) {
     const issues = [];
-    
+
     const hasBatchLimit = /batch|throttle|rateLimit|maxBatchSize/i.test(content);
     const isApollo = /apollo|graphql/i.test(content);
-    
+
     if (isApollo && !hasBatchLimit) {
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
@@ -174,9 +174,9 @@ export class GraphQLSecurityAnalyzer extends BaseAnalyzer {
    */
   checkFieldSuggestions(filePath, content, lines) {
     const issues = [];
-    
+
     const hasErrorMasking = /errorMasking|hideError| sanitizeError/i.test(content);
-    
+
     if (!hasErrorMasking) {
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
@@ -206,10 +206,10 @@ export class GraphQLSecurityAnalyzer extends BaseAnalyzer {
    */
   checkCSRF(filePath, content, lines) {
     const issues = [];
-    
+
     const hasCSRFProtection = /csrf|csrfProtection|xsrf|antiCsrf/i.test(content);
     const isApollo = /apollo|graphql/i.test(content);
-    
+
     if (isApollo && !hasCSRFProtection) {
       for (let i = 0; i < Math.min(lines.length, 20); i++) {
         const line = lines[i];
@@ -239,11 +239,11 @@ export class GraphQLSecurityAnalyzer extends BaseAnalyzer {
    */
   checkAuthorization(filePath, content, lines) {
     const issues = [];
-    
+
     const hasAuth = /auth|permission|authorize|isAuthenticated|checkAuth/i.test(content);
     const hasResolverAuth = /@auth|@isAdmin|@hasRole|@requireAuth/i.test(content);
     const hasMiddlewareAuth = /middleware.*auth|auth.*middleware/i.test(content);
-    
+
     if (!hasAuth && !hasResolverAuth && !hasMiddlewareAuth) {
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];

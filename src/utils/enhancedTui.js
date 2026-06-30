@@ -25,11 +25,11 @@ class PanelManager {
   renderPanel(panel, isActive) {
     const border = isActive ? chalk.cyan : chalk.gray;
     let s = border('┌') + '─'.repeat(panel.w - 2) + border('┐') + '\n';
-    
+
     for (let i = 1; i < panel.h - 1; i++) {
       s += border('│') + ' '.repeat(panel.w - 2) + border('│') + '\n';
     }
-    
+
     s += border('└') + '─'.repeat(panel.w - 2) + border('┘');
     return s;
   }
@@ -45,18 +45,18 @@ class ProgressBar {
     const percent = total > 0 ? current / total : 0;
     const filled = Math.round(percent * this.width);
     const empty = this.width - filled;
-    
+
     const colors = {
       cyan: chalk.cyan,
       green: chalk.green,
       yellow: chalk.yellow,
       red: chalk.red,
     };
-    
+
     const c = colors[color] || chalk.cyan;
     const bar = c('█'.repeat(filled)) + chalk.gray('░'.repeat(empty));
     const pct = showPercent ? ` ${Math.round(percent * 100)}%` : '';
-    
+
     return `${label ? label + ': ' : ''}[${bar}]${pct}`;
   }
 }
@@ -65,11 +65,11 @@ class Sparkline {
   static render(data, options = {}) {
     const { width = 20, height = 5, color = 'cyan' } = options;
     if (!data || data.length === 0) return '';
-    
+
     const min = Math.min(...data);
     const max = Math.max(...data);
     const range = max - min || 1;
-    
+
     const colors = {
       cyan: chalk.cyan,
       green: chalk.green,
@@ -77,7 +77,7 @@ class Sparkline {
       red: chalk.red,
     };
     const c = colors[color] || chalk.cyan;
-    
+
     let output = '';
     for (let y = height; y >= 0; y--) {
       let line = '';
@@ -85,7 +85,7 @@ class Sparkline {
         const idx = Math.floor((x / width) * data.length);
         const val = data[idx];
         const threshold = min + (range * (y / height));
-        
+
         if (val >= threshold) {
           line += c('█');
         } else {
@@ -107,8 +107,8 @@ class TableRenderer {
     });
 
     let output = '';
-    
-    const headerLine = headers.map((h, i) => 
+
+    const headerLine = headers.map((h, i) =>
       chalk.bold(h.padEnd(colWidths[i]))
     ).join(chalk.gray(' │ '));
     output += headerLine + '\n';
@@ -130,14 +130,14 @@ class DiffViewer {
   static render(oldCode, newCode) {
     const oldLines = (oldCode || '').split('\n');
     const newLines = (newCode || '').split('\n');
-    
+
     let output = '';
     const maxLines = Math.max(oldLines.length, newLines.length);
-    
+
     for (let i = 0; i < Math.min(maxLines, 20); i++) {
       const oldLine = oldLines[i];
       const newLine = newLines[i];
-      
+
       if (oldLine === newLine) {
         output += chalk.gray(`  ${(i + 1).toString().padStart(3)} │ ${oldLine || ''}\n`);
       } else {
@@ -149,7 +149,7 @@ class DiffViewer {
         }
       }
     }
-    
+
     return output;
   }
 
@@ -157,22 +157,22 @@ class DiffViewer {
     const oldLines = (oldCode || '').split('\n');
     const newLines = (newCode || '').split('\n');
     const maxLines = Math.max(oldLines.length, newLines.length);
-    
+
     let output = '';
     const lineNumWidth = 4;
-    
+
     for (let i = 0; i < Math.min(maxLines, 15); i++) {
       const oldLine = oldLines[i] || '';
       const newLine = newLines[i] || '';
       const isChanged = oldLine !== newLine;
-      
+
       const num = (i + 1).toString().padStart(lineNumWidth);
       const left = isChanged ? chalk.red(oldLine) : chalk.gray(oldLine);
       const right = isChanged ? chalk.green(newLine) : chalk.gray(newLine);
-      
+
       output += `${chalk.cyan(num)} │ ${left.padEnd(30)} │ ${right}\n`;
     }
-    
+
     return output;
   }
 }
@@ -188,7 +188,7 @@ class EnhancedTUI {
       enableAnimations: true,
       ...options,
     };
-    
+
     this.state = {
       currentView: 'dashboard',
       selectedIndex: 0,
@@ -210,7 +210,7 @@ class EnhancedTUI {
       isScanning: false,
       scanProgress: 0,
     };
-    
+
     this.rl = null;
     this.width = process.stdout.columns || 100;
     this.height = process.stdout.rows || 30;
@@ -227,11 +227,11 @@ class EnhancedTUI {
       output: process.stdout,
       terminal: true,
     });
-    
+
     process.stdin.setRawMode(true);
-    
+
     this.rl.on('keypress', (str, key) => this.handleInput(str, key));
-    
+
     return this;
   }
 
@@ -266,74 +266,74 @@ class EnhancedTUI {
     }
 
     switch (key.name) {
-      case 'up':
-      case 'k':
-        this.navigateUp();
-        break;
-      case 'down':
-      case 'j':
-        this.navigateDown();
-        break;
-      case 'left':
-      case 'h':
-        this.navigateLeft();
-        break;
-      case 'right':
-      case 'l':
-        this.navigateRight();
-        break;
-      case 'enter':
-        this.selectCurrent();
-        break;
-      case 'd':
-        if (key.ctrl) {
-          this.toggleDiffView();
-        }
-        break;
-      case 'm':
-        if (key.ctrl) {
-          this.toggleMonitorMode();
-        }
-        break;
-      case 'p':
-        if (key.ctrl) {
-          this.state.commandPalette = true;
-          this.state.commandInput = '';
-        }
-        break;
-      case '/':
-        this.state.searchQuery = '';
-        break;
-      case '1': case '2': case '3': case '4': case '5': case '6':
-        this.selectTab(parseInt(key.name) - 1);
-        break;
-      case 'q':
-        this.quit();
-        break;
-      case 'r':
-        this.refresh();
-        break;
-      case 'g':
-        if (!key.ctrl) {
-          this.toggleGraphView();
-        }
-        break;
-      case '?':
-        this.showKeyboardShortcuts();
-        break;
-      case 's':
-        if (!key.ctrl) {
-          this.runNewScan();
-        }
-        break;
-      case 'e':
-        if (!key.ctrl) {
-          this.addNotification('Export: ' + this.exportToJSON().substring(0, 50) + '...', 'success');
-        }
-        break;
-      case 'G':
-        this.toggleGroupBy();
-        break;
+    case 'up':
+    case 'k':
+      this.navigateUp();
+      break;
+    case 'down':
+    case 'j':
+      this.navigateDown();
+      break;
+    case 'left':
+    case 'h':
+      this.navigateLeft();
+      break;
+    case 'right':
+    case 'l':
+      this.navigateRight();
+      break;
+    case 'enter':
+      this.selectCurrent();
+      break;
+    case 'd':
+      if (key.ctrl) {
+        this.toggleDiffView();
+      }
+      break;
+    case 'm':
+      if (key.ctrl) {
+        this.toggleMonitorMode();
+      }
+      break;
+    case 'p':
+      if (key.ctrl) {
+        this.state.commandPalette = true;
+        this.state.commandInput = '';
+      }
+      break;
+    case '/':
+      this.state.searchQuery = '';
+      break;
+    case '1': case '2': case '3': case '4': case '5': case '6':
+      this.selectTab(parseInt(key.name) - 1);
+      break;
+    case 'q':
+      this.quit();
+      break;
+    case 'r':
+      this.refresh();
+      break;
+    case 'g':
+      if (!key.ctrl) {
+        this.toggleGraphView();
+      }
+      break;
+    case '?':
+      this.showKeyboardShortcuts();
+      break;
+    case 's':
+      if (!key.ctrl) {
+        this.runNewScan();
+      }
+      break;
+    case 'e':
+      if (!key.ctrl) {
+        this.addNotification('Export: ' + this.exportToJSON().substring(0, 50) + '...', 'success');
+      }
+      break;
+    case 'G':
+      this.toggleGroupBy();
+      break;
     }
 
     this.render();
@@ -464,11 +464,11 @@ class EnhancedTUI {
       'refresh': () => { this.refresh(); },
       'monitor': () => { this.toggleMonitorMode(); },
       'diff': () => { this.toggleDiffView(); },
-      'export json': () => { 
+      'export json': () => {
         this.exportToJSON();
         this.addNotification(`Exported ${this.issues.length} issues to JSON`, 'success');
       },
-      'export csv': () => { 
+      'export csv': () => {
         this.exportToCSV();
         this.addNotification(`Exported ${this.issues.length} issues to CSV`, 'success');
       },
@@ -488,14 +488,14 @@ class EnhancedTUI {
 
   getFilteredIssues() {
     let issues = [...this.issues];
-    
+
     if (this.state.filter) {
       issues = issues.filter(i => i.severity === this.state.filter);
     }
-    
+
     if (this.state.searchQuery) {
       const q = this.state.searchQuery.toLowerCase();
-      issues = issues.filter(i => 
+      issues = issues.filter(i =>
         i.message?.toLowerCase().includes(q) ||
         i.file?.toLowerCase().includes(q)
       );
@@ -539,7 +539,7 @@ class EnhancedTUI {
       const bot = new CodeReviewBot();
       await bot.initialize();
       const result = await bot.runAnalysis({ format: 'json', silent: true });
-      
+
       this.issues = result.issues || [];
       this.result = result;
       this.addNotification(`Scan complete: ${this.issues.length} issues found`, 'success');
@@ -614,33 +614,33 @@ class EnhancedTUI {
   render() {
     this.clearScreen();
     this.width = process.stdout.columns || 100;
-    
+
     this.renderHeader();
-    
+
     switch (this.state.currentView) {
-      case 'dashboard':
-        this.renderDashboard();
-        break;
-      case 'issues':
-        this.renderIssuesPanel();
-        break;
-      case 'fixes':
-        this.renderFixesPanel();
-        break;
-      case 'policy':
-        this.renderPolicyPanel();
-        break;
-      case 'monitor':
-        this.renderMonitorPanel();
-        break;
-      case 'settings':
-        this.renderSettingsPanel();
-        break;
+    case 'dashboard':
+      this.renderDashboard();
+      break;
+    case 'issues':
+      this.renderIssuesPanel();
+      break;
+    case 'fixes':
+      this.renderFixesPanel();
+      break;
+    case 'policy':
+      this.renderPolicyPanel();
+      break;
+    case 'monitor':
+      this.renderMonitorPanel();
+      break;
+    case 'settings':
+      this.renderSettingsPanel();
+      break;
     }
 
     this.renderStatusBar();
     this.renderNotifications();
-    
+
     if (this.state.commandPalette) {
       this.renderCommandPalette();
     }
@@ -659,16 +659,16 @@ class EnhancedTUI {
   ██║  ██║███████╗╚██████╔╝╚██████╔╝██║        ██║   
   ╚═╝  ╚═╝╚══════╝ ╚═════╝  ╚═════╝ ╚═╝        ╚═╝   
     `));
-    
+
     console.log(chalk.gray('─'.repeat(this.width)));
-    
+
     let status = '';
     if (this.state.isScanning) {
       status = chalk.yellow(` [SCANNING ${this.state.scanProgress}%]`);
     } else if (this.state.monitorMode) {
       status = chalk.yellow(' [MONITORING]');
     }
-    
+
     const runId = this.result?.runId ? ` | ${chalk.cyan('Run:')} ${this.result.runId.substring(0, 10)}` : '';
     console.log(chalk.white(` 🔒 Sentinel Security CLI${runId}${status} `));
     console.log(chalk.gray('─'.repeat(this.width)));
@@ -677,7 +677,7 @@ class EnhancedTUI {
       console.log(chalk.yellow(`   Scanning... ${this.progressBar.render(this.state.scanProgress, 100, { label: '', color: 'yellow' })}`));
       console.log(chalk.gray('─'.repeat(this.width)));
     }
-    
+
     this.renderTabs();
   }
 
@@ -692,13 +692,13 @@ class EnhancedTUI {
         monitor: '📈',
         settings: '⚙️',
       }[tab] || '•';
-      
+
       if (isActive) {
         return chalk.bgCyan.black(` ${i + 1}. ${icon} ${tab.charAt(0).toUpperCase() + tab.slice(1)} `);
       }
       return chalk.gray(` ${i + 1}. ${icon} ${tab} `);
     });
-    
+
     console.log(tabs.join(' '));
     console.log(chalk.gray('─'.repeat(this.width)));
   }
@@ -708,20 +708,20 @@ class EnhancedTUI {
     const total = this.issues.length;
     const critical = bySeverity.critical || 0;
     const high = bySeverity.high || 0;
-    
+
     console.log(chalk.bold.cyan('\n 📊 Security Dashboard\n'));
-    
+
     console.log(chalk.bold('   Severity Distribution:\n'));
-    
+
     const max = Math.max(critical, high, bySeverity.medium || 0, bySeverity.low || 0) || 1;
-    
+
     console.log(`   ${chalk.red('●')} Critical  ${this.progressBar.render(critical, max, { color: 'red', label: '' })} ${chalk.red(critical)}`);
     console.log(`   ${chalk.yellow('●')} High      ${this.progressBar.render(high, max, { color: 'yellow', label: '' })} ${chalk.yellow(high)}`);
     console.log(`   ${chalk.blue('●')} Medium    ${this.progressBar.render(bySeverity.medium || 0, max, { color: 'cyan', label: '' })} ${chalk.blue(bySeverity.medium || 0)}`);
     console.log(`   ${chalk.gray('●')} Low       ${this.progressBar.render(bySeverity.low || 0, max, { color: 'gray', label: '' })} ${chalk.gray(bySeverity.low || 0)}`);
-    
+
     console.log(chalk.bold('\n   Quick Stats:\n'));
-    
+
     const stats = [
       ['Total Issues', total.toString()],
       ['Critical', chalk.red(critical.toString())],
@@ -729,7 +729,7 @@ class EnhancedTUI {
       ['Policy Score', (this.result?.policyResult?.score || 100).toString() + '/100'],
       ['Compliance', (this.result?.policyResult?.compliant ? chalk.green('PASS') : chalk.red('FAIL'))],
     ];
-    
+
     for (let i = 0; i < stats.length; i += 2) {
       console.log(`   ${stats[i][0]}: ${stats[i][1]}${' '.repeat(20 - stats[i][0].length)}${stats[i+1] ? stats[i+1][0] + ': ' + stats[i+1][1] : ''}`);
     }
@@ -750,9 +750,9 @@ class EnhancedTUI {
   renderIssuesPanel() {
     const issues = this.getFilteredIssues();
     const total = issues.length;
-    
+
     console.log(chalk.bold.cyan(`\n ⚠️ Issues (${total} of ${this.issues.length})\n`));
-    
+
     if (issues.length === 0) {
       console.log(chalk.yellow('   No issues found'));
       return;
@@ -775,24 +775,24 @@ class EnhancedTUI {
   renderIssueRow(issue, isSelected, num) {
     const icons = { critical: '🔴', high: '🟠', medium: '🟡', low: '⚪', info: '📝' };
     const colors = { critical: chalk.red, high: chalk.yellow, medium: chalk.blue, low: chalk.gray, info: chalk.gray };
-    
+
     const icon = icons[issue.severity] || '⚪';
     const color = colors[issue.severity] || chalk.white;
     const sel = isSelected ? chalk.bgCyan.black('▶') : ' ';
-    
+
     const file = (issue.file || '').split('/').pop() || 'unknown';
     const line = issue.line ? `:${issue.line}` : '';
     const msg = (issue.message || '').substring(0, 40);
     const fix = issue.fix ? chalk.green(' [FIX]') : '';
-    
+
     console.log(`${sel} ${chalk.gray(num.toString().padStart(3))} ${icon} ${color(issue.severity.toUpperCase().padEnd(8))} ${chalk.white(file + line)} ${chalk.gray(msg)}${fix}`);
   }
 
   renderFixesPanel() {
     const fixes = this.result?.fixes || [];
-    
+
     console.log(chalk.bold.cyan(`\n 🔧 Available Fixes (${fixes.length})\n`));
-    
+
     if (fixes.length === 0) {
       console.log(chalk.yellow('   No auto-fixes available'));
       return;
@@ -804,35 +804,35 @@ class EnhancedTUI {
       const sel = isSelected ? chalk.bgGreen.black('▶') : ' ';
       const conf = fix.confidence ? (fix.confidence * 100).toFixed(0) + '%' : 'N/A';
       const valid = fix.isValid ? chalk.green('✓') : chalk.red('✗');
-      
+
       console.log(`${sel} ${chalk.gray(i.toString().padStart(3))} ${valid} Confidence: ${chalk.cyan(conf)} ${chalk.gray(fix.id || 'fix-' + i)}`);
     }
   }
 
   renderMonitorPanel() {
     const time = new Date().toLocaleTimeString();
-    
+
     console.log(chalk.bold.cyan(`\n 📈 Real-Time Monitor (${time})\n`));
-    
+
     const data = this.state.monitorData || [];
     const cpu = data.length > 0 ? data[data.length - 1].cpu : 45;
     const mem = data.length > 0 ? data[data.length - 1].memory : 62;
-    
+
     console.log(`   ${chalk.cyan('CPU:')} ${this.progressBar.render(cpu, 100, { label: '', color: cpu > 80 ? 'red' : 'green' })} ${cpu}%`);
     console.log(`   ${chalk.cyan('Memory:')} ${this.progressBar.render(mem, 100, { label: '', color: mem > 80 ? 'red' : 'yellow' })} ${mem}%`);
-    
-    const avgIssues = data.length > 0 
-      ? (data.reduce((a, b) => a + b.issues, 0) / data.length).toFixed(1) 
+
+    const avgIssues = data.length > 0
+      ? (data.reduce((a, b) => a + b.issues, 0) / data.length).toFixed(1)
       : '0';
     console.log(`   ${chalk.cyan('Avg Issues/min:')} ${chalk.white(avgIssues)}`);
     console.log(`   ${chalk.cyan('Fixes/min:')} ${chalk.green('8')}`);
-    
+
     if (data.length > 1) {
       console.log(chalk.bold('\n   Activity Trend:\n'));
       const values = data.map(d => d.issues);
       console.log('   ' + this.sparkline.render(values, { width: 40, height: 4, color: 'cyan' }));
     }
-    
+
     console.log(chalk.bold('\n   Recent Events:\n'));
     console.log(chalk.gray(`   ${time} Analysis running...`));
     console.log(chalk.gray(`   ${time} Monitoring active`));
@@ -841,15 +841,15 @@ class EnhancedTUI {
 
   renderPolicyPanel() {
     const policyResult = this.result?.policyResult || {};
-    
+
     console.log(chalk.bold.cyan('\n 📜 Policy Evaluation\n'));
-    
+
     const score = policyResult.score || 100;
     const scoreColor = score >= 80 ? 'green' : score >= 60 ? 'yellow' : 'red';
-    
+
     console.log(`   ${chalk.cyan('Overall Score:')} ${chalk[scoreColor](score + '/100')}`);
     console.log(`   ${chalk.cyan('Status:')} ${policyResult.compliant ? chalk.green('COMPLIANT') : chalk.red('NON-COMPLIANT')}`);
-    
+
     console.log(chalk.bold('\n   Score Breakdown:\n'));
     const categories = [
       ['Security', policyResult.securityScore || score],
@@ -857,26 +857,26 @@ class EnhancedTUI {
       ['Compliance', policyResult.complianceScore || 90],
       ['Best Practices', policyResult.practicesScore || 88],
     ];
-    
+
     for (const [name, val] of categories) {
       const c = val >= 80 ? 'green' : val >= 60 ? 'yellow' : 'red';
       console.log(`   ${name}: ${chalk[c](val.toString())} ${this.progressBar.render(val, 100, { label: '', color: c })}`);
     }
-    
+
     if (policyResult.violations && policyResult.violations.length > 0) {
       console.log(chalk.bold('\n   Recent Violations:\n'));
       for (const v of policyResult.violations.slice(0, 5)) {
         console.log(`   ${chalk.red('✗')} ${chalk.cyan(v.policyName || 'Policy')}: ${v.count || 1} violation(s)`);
       }
     }
-    
+
     if (policyResult.passed && policyResult.passed.length > 0) {
       console.log(chalk.bold('\n   Passed Policies:\n'));
       for (const p of policyResult.passed.slice(0, 5)) {
         console.log(`   ${chalk.green('✓')} ${p}`);
       }
     }
-    
+
     console.log(chalk.bold('\n   Policy Pack:\n'));
     console.log(`   ${chalk.cyan('Active:')} ${policyResult.policyPack || 'security'}`);
     console.log(`   ${chalk.cyan('Version:')} ${policyResult.version || '1.0.0'}`);
@@ -884,7 +884,7 @@ class EnhancedTUI {
 
   renderSettingsPanel() {
     console.log(chalk.bold.cyan('\n ⚙️ Settings\n'));
-    
+
     const settings = [
       ['Theme', this.config.theme],
       ['Max Issues/Page', this.config.maxIssuesPerPage.toString()],
@@ -892,12 +892,12 @@ class EnhancedTUI {
       ['Auto-fix', 'Enabled'],
       ['Policy Enforcement', 'Active'],
     ];
-    
+
     for (let i = 0; i < settings.length; i++) {
       const [key, value] = settings[i];
       console.log(`   ${i + 1}. ${chalk.cyan(key)}: ${chalk.white(value)}`);
     }
-    
+
     console.log(chalk.bold('\n   Keyboard Shortcuts:\n'));
     const shortcuts = [
       ['↑/↓ or j/k', 'Navigate'],
@@ -909,7 +909,7 @@ class EnhancedTUI {
       ['1-6', 'Go to tab'],
       ['q', 'Quit'],
     ];
-    
+
     for (const [key, action] of shortcuts) {
       console.log(`   ${chalk.yellow(key.padEnd(15))} ${action}`);
     }
@@ -917,7 +917,7 @@ class EnhancedTUI {
 
   renderStatusBar() {
     console.log(chalk.gray('\n' + '─'.repeat(this.width)));
-    
+
     const help = [
       chalk.gray('[') + chalk.cyan('↑↓') + chalk.gray('] Nav'),
       chalk.gray('[') + chalk.cyan('Tab') + chalk.gray('] View'),
@@ -925,7 +925,7 @@ class EnhancedTUI {
       chalk.gray('[') + chalk.cyan('Ctrl+P') + chalk.gray('] Cmd'),
       chalk.gray('[') + chalk.cyan('q') + chalk.gray('] Quit'),
     ];
-    
+
     console.log(help.join(' '));
   }
 
@@ -1083,7 +1083,7 @@ export function displayTUI(issues, result = {}) {
   if (process.stdin.isTTY) {
     return startInteractiveMode(issues, result);
   }
-  
+
   const tui = new EnhancedTUI({ issues, result });
   tui.render();
 }

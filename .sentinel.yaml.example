@@ -1,0 +1,179 @@
+# ═══════════════════════════════════════════════════════════════
+# Sentinel CLI Configuration
+# ═══════════════════════════════════════════════════════════════
+# Copy this file to .sentinel.yaml and customize for your project.
+# See: https://github.com/KunjShah95/SENTINEL-CLI
+
+# ─── Review Settings ──────────────────────────────────────────
+reviews:
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches:
+      - main
+      - develop
+      - master
+    labels: []
+    ignore_title_keywords:
+      - "WIP"
+      - "DO NOT REVIEW"
+    ignore_usernames: []
+    auto_pause_after_reviewed_commits: 5
+    auto_incremental_review: true
+
+  path_filters:
+    include: []
+    exclude:
+      - "node_modules/**"
+      - "dist/**"
+      - "build/**"
+      - ".git/**"
+      - "coverage/**"
+      - "*.min.js"
+      - "*.lock"
+      - "vendor/**"
+
+  # Per-path review instructions
+  path_instructions: []
+  # Example:
+  # - path: "src/api/**"
+  #   instructions: "Focus on security, input validation, and error handling"
+  # - path: "tests/**"
+  #   instructions: "Check test coverage and edge cases"
+
+  review_style:
+    tone: professional    # professional | casual | strict
+    detail_level: standard  # concise | standard | detailed
+    emoji_usage: full     # full | minimal | none
+    assertive_mode: false
+
+# ─── Knowledge Base ───────────────────────────────────────────
+knowledge_base:
+  code_guidelines:
+    enabled: true
+    sources:
+      - .cursorrules
+      - CLAUDE.md
+      - SENTINEL.md
+      - .github/copilot-instructions.md
+
+  learnings:
+    enabled: true
+    storage_path: .sentinel/learnings.json
+
+  linked_issues:
+    github: true
+    gitlab: false
+    jira: false
+    linear: false
+
+  web_search: true
+  past_pr_context: true
+
+  multi_repo:
+    enabled: false
+    repos: []
+    # - url: https://github.com/org/shared-lib
+    #   branches: [main]
+
+  opt_out: false
+
+# ─── Pre-Merge Quality Gates ──────────────────────────────────
+pre_merge_checks:
+  docstring_coverage:
+    enabled: false
+    threshold: 80
+    mode: warning       # error | warning
+
+  pr_title:
+    enabled: false
+    pattern: '^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert):'
+    mode: error
+
+  pr_description:
+    enabled: false
+    template: ""
+    min_length: 50
+    mode: warning
+
+  issue_assessment:
+    enabled: false
+    mode: warning
+
+  custom_checks: []
+  # Example:
+  # - name: "No TODO comments in production code"
+  #   instructions: "Check that no TODO or FIXME comments exist in changed files"
+  #   mode: warning
+
+# ─── SAST Tools ───────────────────────────────────────────────
+sast:
+  auto_detect: true
+  tools:
+    javascript:
+      - eslint
+      - biome
+      - oxlint
+    typescript:
+      - eslint
+      - biome
+    python:
+      - ruff
+      - pylint
+      - flake8
+    go:
+      - golangci-lint
+    java:
+      - pmd
+      - infer
+    kotlin:
+      - detekt
+    rust:
+      - clippy
+    ruby:
+      - rubocop
+      - brakeman
+    swift:
+      - swiftlint
+    php:
+      - phpstan
+      - phpmd
+    c_cpp:
+      - clang-tidy
+      - cppcheck
+    shell:
+      - shellcheck
+    sql:
+      - sqlfluff
+  security:
+    - semgrep
+    - osv-scanner
+    - trufflehog
+    - ast-grep
+  iac:
+    - checkov
+    - trivy
+    - tflint
+    - hadolint
+  cicd:
+    - actionlint
+    - zizmor
+
+# ─── Autofix ──────────────────────────────────────────────────
+autofix:
+  enabled: true
+  auto_push: false
+  generate_docstrings: false
+  generate_tests: false
+  resolve_conflicts: false
+  confidence_threshold: 0.8
+
+# ─── Finishing Touches ────────────────────────────────────────
+finishing_touches:
+  simplify_code: true
+  custom_recipes: []
+  # Example:
+  # - name: "Add license headers"
+  #   instructions: "Add MIT license header to all new source files"
+  # - name: "Sort imports"
+  #   instructions: "Sort all import statements alphabetically"

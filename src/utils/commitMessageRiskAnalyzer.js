@@ -238,7 +238,7 @@ export class CommitMessageRiskAnalyzer {
       riskScore: totalRisk,
       riskLevel,
       flags,
-      message: flags.length > 0 
+      message: flags.length > 0
         ? `${flags.length} risk indicator(s) detected`
         : 'No risk indicators detected'
     };
@@ -290,7 +290,7 @@ export class CommitMessageRiskAnalyzer {
       });
     }
 
-    const hotfixes = riskSummary.flaggedCommits.filter(c => 
+    const hotfixes = riskSummary.flaggedCommits.filter(c =>
       /hotfix/i.test(c.hash) || c.riskScore >= 7
     );
     if (hotfixes.length > 0) {
@@ -302,7 +302,7 @@ export class CommitMessageRiskAnalyzer {
       });
     }
 
-    const disabledSecurity = riskSummary.flaggedCommits.filter(c => 
+    const disabledSecurity = riskSummary.flaggedCommits.filter(c =>
       c.flags.some(f => /security|auth|bypass/i.test(f.message))
     );
     if (disabledSecurity.length > 0) {

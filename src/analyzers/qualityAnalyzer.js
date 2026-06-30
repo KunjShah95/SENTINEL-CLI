@@ -39,19 +39,19 @@ export class QualityAnalyzer extends BaseAnalyzer {
     // Language-specific checks
     const extension = filePath.split('.').pop()?.toLowerCase();
     switch (extension) {
-      case 'js':
-      case 'ts':
-      case 'jsx':
-      case 'tsx':
-        issues.push(...this.checkJavaScriptQuality(content, filePath));
-        issues.push(...this.checkInlineStyles(content, filePath));
-        break;
-      case 'py':
-        issues.push(...this.checkPythonQuality(content, filePath));
-        break;
-      case 'java':
-        issues.push(...this.checkJavaQuality(content, filePath));
-        break;
+    case 'js':
+    case 'ts':
+    case 'jsx':
+    case 'tsx':
+      issues.push(...this.checkJavaScriptQuality(content, filePath));
+      issues.push(...this.checkInlineStyles(content, filePath));
+      break;
+    case 'py':
+      issues.push(...this.checkPythonQuality(content, filePath));
+      break;
+    case 'java':
+      issues.push(...this.checkJavaQuality(content, filePath));
+      break;
     }
 
     // Add issues to the analyzer
@@ -573,6 +573,7 @@ export class QualityAnalyzer extends BaseAnalyzer {
       const line = lines[lineNum];
 
       for (const pattern of functionPatterns) {
+        pattern.lastIndex = 0;
         let match;
         while ((match = pattern.exec(line)) !== null) {
           const funcName = match[1];
@@ -604,6 +605,7 @@ export class QualityAnalyzer extends BaseAnalyzer {
       const line = lines[lineNum];
 
       for (const pattern of classPatterns) {
+        pattern.lastIndex = 0;
         let match;
         while ((match = pattern.exec(line)) !== null) {
           const className = match[1];

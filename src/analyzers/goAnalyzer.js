@@ -168,7 +168,7 @@ export class GoAnalyzer extends BaseAnalyzer {
 
   async analyze(files, context) {
     this.issues = [];
-    
+
     for (const file of files) {
       if (this.shouldAnalyzeFile(file.path)) {
         try {

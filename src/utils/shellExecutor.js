@@ -266,7 +266,7 @@ export class ShellExecutor {
         );
 
         let stdout = '';
-        let stderr = '';
+        const stderr = '';
 
         ptyProcess.onData((data) => {
           stdout += data;

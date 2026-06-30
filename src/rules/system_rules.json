@@ -1,0 +1,75 @@
+{
+  "rules": [
+    {
+      "path": "**/*.{js,jsx,ts,tsx}",
+      "rule": "Check for XSS vulnerabilities: unsafe innerHTML, dangerouslySetInnerHTML, document.write, or direct DOM injection"
+    },
+    {
+      "path": "**/*.{js,jsx,ts,tsx,py,java,go,php}",
+      "rule": "Check for SQL injection: string concatenation in queries, unsanitized user input in execute/query calls"
+    },
+    {
+      "path": "**/*.{java,kt}",
+      "rule": "Check for NullPointerException risks: method parameters, return values, and chained calls without null checks"
+    },
+    {
+      "path": "**/*.{java,kt,go,rs}",
+      "rule": "Check for thread-safety issues: shared mutable state without synchronization, missing locks on concurrent access"
+    },
+    {
+      "path": "**/*.{js,jsx,ts,tsx}",
+      "rule": "Check for eval() usage, Function constructor with string args, and other dynamic code execution patterns"
+    },
+    {
+      "path": "**/*.{py,js,ts,php}",
+      "rule": "Check for command injection: unsanitized input in exec/spawn/shell/system calls"
+    },
+    {
+      "path": "**/*.go",
+      "rule": "Check for Goroutine leaks, missing error handling, and incorrect use of defer"
+    },
+    {
+      "path": "**/*.rs",
+      "rule": "Check for unsafe code blocks, transmute misuse, and Send/Sync trait violations"
+    },
+    {
+      "path": "**/*.sql",
+      "rule": "Check for SQL injection patterns, missing parameterized queries, and privilege escalation risks"
+    },
+    {
+      "path": "**/Dockerfile**",
+      "rule": "Check for security best practices: avoid root user, pin base image versions, minimize layers, no secrets in build args"
+    },
+    {
+      "path": "**/*.{yml,yaml}",
+      "rule": "Check Kubernetes/IaC security: privilege escalation, host network access, secrets in config, missing resource limits"
+    },
+    {
+      "path": "**/*.tf",
+      "rule": "Check Terraform security: hardcoded secrets, open security group rules, unencrypted storage, missing logging"
+    },
+    {
+      "path": "**/*.{xml,gradle,properties}",
+      "rule": "Check dependency configuration: insecure protocols, hardcoded credentials, outdated plugin versions"
+    },
+    {
+      "path": "**/*.{env,env.*}",
+      "rule": "Check for secrets exposure: API keys, tokens, passwords committed to version control"
+    }
+  ],
+  "include": [],
+  "exclude": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/build/**",
+    "**/.git/**",
+    "**/vendor/**",
+    "**/__pycache__/**",
+    "**/.next/**",
+    "**/coverage/**",
+    "**/target/**",
+    "**/bin/**",
+    "**/obj/**",
+    "**/out/**"
+  ]
+}

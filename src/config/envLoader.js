@@ -7,211 +7,211 @@ import path from 'path';
  */
 
 export class EnvLoader {
-    constructor() {
-        this.envCache = new Map();
-        this.loaded = false;
-    }
+  constructor() {
+    this.envCache = new Map();
+    this.loaded = false;
+  }
 
-    /**
+  /**
      * Load .env file from project root or global home directory
      */
-    async loadEnvFile() {
-        if (this.loaded) return;
+  async loadEnvFile() {
+    if (this.loaded) return;
 
-        const localEnvPath = path.join(process.cwd(), '.env');
+    const localEnvPath = path.join(process.cwd(), '.env');
 
-        let loadedAny = false;
+    let loadedAny = false;
 
-        // 1. Try Local First (Highest Priority for file-based config)
-        try {
-            const localContent = await fs.readFile(localEnvPath, 'utf8');
-            this.applyEnvVars(this.parseEnvContent(localContent));
-            loadedAny = true;
-            console.log('✅ Loaded environment variables from .env file');
-        } catch (error) {
-            if (error.code !== 'ENOENT') {
-                console.warn('⚠️  Failed to load local .env file:', error.message);
-            }
-        }
-
-        // 3. Try Sentinel JSON Config (New System)
-        try {
-            const { configManager } = await import('./configManager.js');
-            await configManager.load();
-
-            if (configManager.config?.providers) {
-                const providerMap = {
-                    openai: 'OPENAI_API_KEY',
-                    anthropic: 'ANTHROPIC_API_KEY',
-                    gemini: 'GEMINI_API_KEY',
-                    groq: 'GROQ_API_KEY',
-                    openrouter: 'OPENROUTER_API_KEY'
-                };
-
-                Object.entries(providerMap).forEach(([provider, envKey]) => {
-                    const apiKey = configManager.getApiKey(provider);
-                    if (apiKey && !process.env[envKey]) {
-                        process.env[envKey] = apiKey;
-                        loadedAny = true;
-                    }
-                });
-            }
-        } catch (error) {
-            // Ignore missing or malformed sentinel config
-        }
-
-        if (!loadedAny && !this.loaded) {
-            // Only log if we haven't successfully loaded anything yet
-        }
-
-        this.loaded = true;
+    // 1. Try Local First (Highest Priority for file-based config)
+    try {
+      const localContent = await fs.readFile(localEnvPath, 'utf8');
+      this.applyEnvVars(this.parseEnvContent(localContent));
+      loadedAny = true;
+      console.log('✅ Loaded environment variables from .env file');
+    } catch (error) {
+      if (error.code !== 'ENOENT') {
+        console.warn('⚠️  Failed to load local .env file:', error.message);
+      }
     }
 
-    applyEnvVars(envVars) {
-        Object.entries(envVars).forEach(([key, value]) => {
-            // Only set if not already set (preserve system env vars)
-            // Or should we overwrite? Usually .env overwrites defaults but not system vars passed explicitly?
-            // Standard dotenv behavior: don't overwrite existing process.env
-            if (!process.env[key]) {
-                process.env[key] = value === 'undefined' ? '' : value;
-            }
-        });
-    }
+    // 3. Try Sentinel JSON Config (New System)
+    try {
+      const { configManager } = await import('./configManager.js');
+      await configManager.load();
 
-    /**
-     * Parse .env file content
-     */
-    parseEnvContent(content) {
-        const envVars = {};
-        const lines = content.split('\n');
-
-        for (const line of lines) {
-            const trimmedLine = line.trim();
-
-            // Skip empty lines and comments
-            if (!trimmedLine || trimmedLine.startsWith('#')) {
-                continue;
-            }
-
-            // Parse KEY=VALUE pairs
-            const equalsIndex = trimmedLine.indexOf('=');
-            if (equalsIndex > 0) {
-                const key = trimmedLine.substring(0, equalsIndex).trim();
-                let value = trimmedLine.substring(equalsIndex + 1).trim();
-
-                // Remove quotes if present
-                if (
-                    (value.startsWith('"') && value.endsWith('"')) ||
-                    (value.startsWith('\'') && value.endsWith('\''))
-                ) {
-                    value = value.slice(1, -1);
-                }
-
-                envVars[key] = value;
-            }
-        }
-
-        return envVars;
-    }
-
-    /**
-     * Get API key for provider from environment
-     */
-    getApiKey(provider, apiKeyEnv) {
-        const envKey = apiKeyEnv || this.getDefaultEnvKey(provider);
-
-        if (!envKey) {
-            throw new Error(`No environment variable defined for provider: ${provider}`);
-        }
-
-        const apiKey = process.env[envKey];
-
-        if (!apiKey) {
-            throw new Error(
-                `Environment variable ${envKey} is not set. Please add it to your .env file.`
-            );
-        }
-
-        return apiKey;
-    }
-
-    /**
-     * Get default environment variable key for provider
-     */
-    getDefaultEnvKey(provider) {
-        const envKeyMap = {
-            openai: 'OPENAI_API_KEY',
-            anthropic: 'ANTHROPIC_API_KEY',
-            gemini: 'GEMINI_API_KEY',
-            groq: 'GROQ_API_KEY',
-            openrouter: 'OPENROUTER_API_KEY',
-            github: 'GITHUB_TOKEN',
-            gitlab: 'GITLAB_TOKEN',
+      if (configManager.config?.providers) {
+        const providerMap = {
+          openai: 'OPENAI_API_KEY',
+          anthropic: 'ANTHROPIC_API_KEY',
+          gemini: 'GEMINI_API_KEY',
+          groq: 'GROQ_API_KEY',
+          openrouter: 'OPENROUTER_API_KEY'
         };
 
-        return envKeyMap[provider?.toLowerCase()];
+        Object.entries(providerMap).forEach(([provider, envKey]) => {
+          const apiKey = configManager.getApiKey(provider);
+          if (apiKey && !process.env[envKey]) {
+            process.env[envKey] = apiKey;
+            loadedAny = true;
+          }
+        });
+      }
+    } catch (error) {
+      // Ignore missing or malformed sentinel config
     }
 
-    /**
+    if (!loadedAny && !this.loaded) {
+      // Only log if we haven't successfully loaded anything yet
+    }
+
+    this.loaded = true;
+  }
+
+  applyEnvVars(envVars) {
+    Object.entries(envVars).forEach(([key, value]) => {
+      // Only set if not already set (preserve system env vars)
+      // Or should we overwrite? Usually .env overwrites defaults but not system vars passed explicitly?
+      // Standard dotenv behavior: don't overwrite existing process.env
+      if (!process.env[key]) {
+        process.env[key] = value === 'undefined' ? '' : value;
+      }
+    });
+  }
+
+  /**
+     * Parse .env file content
+     */
+  parseEnvContent(content) {
+    const envVars = {};
+    const lines = content.split('\n');
+
+    for (const line of lines) {
+      const trimmedLine = line.trim();
+
+      // Skip empty lines and comments
+      if (!trimmedLine || trimmedLine.startsWith('#')) {
+        continue;
+      }
+
+      // Parse KEY=VALUE pairs
+      const equalsIndex = trimmedLine.indexOf('=');
+      if (equalsIndex > 0) {
+        const key = trimmedLine.substring(0, equalsIndex).trim();
+        let value = trimmedLine.substring(equalsIndex + 1).trim();
+
+        // Remove quotes if present
+        if (
+          (value.startsWith('"') && value.endsWith('"')) ||
+                    (value.startsWith('\'') && value.endsWith('\''))
+        ) {
+          value = value.slice(1, -1);
+        }
+
+        envVars[key] = value;
+      }
+    }
+
+    return envVars;
+  }
+
+  /**
+     * Get API key for provider from environment
+     */
+  getApiKey(provider, apiKeyEnv) {
+    const envKey = apiKeyEnv || this.getDefaultEnvKey(provider);
+
+    if (!envKey) {
+      throw new Error(`No environment variable defined for provider: ${provider}`);
+    }
+
+    const apiKey = process.env[envKey];
+
+    if (!apiKey) {
+      throw new Error(
+        `Environment variable ${envKey} is not set. Please add it to your .env file.`
+      );
+    }
+
+    return apiKey;
+  }
+
+  /**
+     * Get default environment variable key for provider
+     */
+  getDefaultEnvKey(provider) {
+    const envKeyMap = {
+      openai: 'OPENAI_API_KEY',
+      anthropic: 'ANTHROPIC_API_KEY',
+      gemini: 'GEMINI_API_KEY',
+      groq: 'GROQ_API_KEY',
+      openrouter: 'OPENROUTER_API_KEY',
+      github: 'GITHUB_TOKEN',
+      gitlab: 'GITLAB_TOKEN',
+    };
+
+    return envKeyMap[provider?.toLowerCase()];
+  }
+
+  /**
      * Validate required environment variables
      */
-    validateEnvVars(requiredVars) {
-        const missing = [];
+  validateEnvVars(requiredVars) {
+    const missing = [];
 
-        for (const envVar of requiredVars) {
-            if (!process.env[envVar]) {
-                missing.push(envVar);
-            }
-        }
-
-        if (missing.length > 0) {
-            throw new Error(
-                `Missing required environment variables: ${missing.join(', ')}\n` +
-                'Please add them to your .env file or set them in your system environment.'
-            );
-        }
-
-        return true;
+    for (const envVar of requiredVars) {
+      if (!process.env[envVar]) {
+        missing.push(envVar);
+      }
     }
 
-    /**
+    if (missing.length > 0) {
+      throw new Error(
+        `Missing required environment variables: ${missing.join(', ')}\n` +
+                'Please add them to your .env file or set them in your system environment.'
+      );
+    }
+
+    return true;
+  }
+
+  /**
      * Check if environment variable is set
      */
-    hasEnvVar(envVar) {
-        return Boolean(process.env[envVar]);
-    }
+  hasEnvVar(envVar) {
+    return Boolean(process.env[envVar]);
+  }
 
-    /**
+  /**
      * Get all relevant API keys for Sentinel
      */
-    getAllApiKeys() {
-        const allKeys = [
-            'OPENAI_API_KEY',
-            'ANTHROPIC_API_KEY',
-            'GEMINI_API_KEY',
-            'GROQ_API_KEY',
-            'OPENROUTER_API_KEY',
-            'GITHUB_TOKEN',
-            'GITLAB_TOKEN',
-        ];
+  getAllApiKeys() {
+    const allKeys = [
+      'OPENAI_API_KEY',
+      'ANTHROPIC_API_KEY',
+      'GEMINI_API_KEY',
+      'GROQ_API_KEY',
+      'OPENROUTER_API_KEY',
+      'GITHUB_TOKEN',
+      'GITLAB_TOKEN',
+    ];
 
-        const availableKeys = {};
-        allKeys.forEach(key => {
-            if (process.env[key]) {
-                availableKeys[key] = process.env[key];
-            }
-        });
+    const availableKeys = {};
+    allKeys.forEach(key => {
+      if (process.env[key]) {
+        availableKeys[key] = process.env[key];
+      }
+    });
 
-        return availableKeys;
-    }
+    return availableKeys;
+  }
 
-    /**
+  /**
      * Initialize environment loader
      */
-    async initialize() {
-        await this.loadEnvFile();
-        return this;
-    }
+  async initialize() {
+    await this.loadEnvFile();
+    return this;
+  }
 }
 
 // Export singleton instance

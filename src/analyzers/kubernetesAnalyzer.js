@@ -43,12 +43,12 @@ export default class KubernetesAnalyzer extends BaseAnalyzer {
 
   async analyzeFile(filePath, content, _context) {
     const lines = content.split('\n');
-    
+
     // Parse YAML-like content (simplified)
     const manifest = this.parseKubernetesManifest(content);
-    
+
     if (!manifest) return;
-    
+
     // Security checks
     this.checkPrivilegedContainers(manifest, filePath, content);
     this.checkRootUser(manifest, filePath, content);
@@ -75,17 +75,17 @@ export default class KubernetesAnalyzer extends BaseAnalyzer {
         securityContext: null,
       }
     };
-    
+
     // Extract kind
     const kindMatch = content.match(/^kind:\s*(.+)$/m);
     if (kindMatch) manifest.kind = kindMatch[1].trim();
-    
+
     // Check if it's a K8s resource
     const validKinds = ['Pod', 'Deployment', 'StatefulSet', 'DaemonSet', 'Job', 'CronJob', 'Service'];
     if (!validKinds.some(k => content.includes(`kind: ${k}`))) {
       return null;
     }
-    
+
     // Extract security-relevant fields
     manifest.hasPrivileged = /privileged:\s*true/i.test(content);
     manifest.hasRunAsRoot = /runAsUser:\s*0\s*$/m.test(content);
@@ -98,7 +98,7 @@ export default class KubernetesAnalyzer extends BaseAnalyzer {
     manifest.hasReadOnlyRootFilesystem = /readOnlyRootFilesystem:\s*true/i.test(content);
     manifest.hasAllowPrivilegeEscalation = /allowPrivilegeEscalation:\s*true/i.test(content);
     manifest.hasCapabilities = /capabilities:/i.test(content);
-    
+
     return manifest;
   }
 
@@ -130,7 +130,7 @@ export default class KubernetesAnalyzer extends BaseAnalyzer {
         tags: ['kubernetes', 'security', 'root-user']
       });
     }
-    
+
     if (!manifest.hasSecurityContext || !manifest.hasRunAsRoot) {
       this.addIssue({
         type: 'kubernetes-security',
@@ -164,7 +164,7 @@ export default class KubernetesAnalyzer extends BaseAnalyzer {
         tags: ['kubernetes', 'security', 'securitycontext']
       });
     }
-    
+
     if (manifest.hasAllowPrivilegeEscalation) {
       this.addIssue({
         type: 'kubernetes-security',
@@ -246,7 +246,7 @@ resources:
         tags: ['kubernetes', 'security', 'network', 'hostnetwork']
       });
     }
-    
+
     if (manifest.hasHostPID) {
       this.addIssue({
         type: 'kubernetes-security',
@@ -259,7 +259,7 @@ resources:
         tags: ['kubernetes', 'security', 'hostpid']
       });
     }
-    
+
     if (manifest.hasHostIPC) {
       this.addIssue({
         type: 'kubernetes-security',
@@ -296,7 +296,7 @@ resources:
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
         const lineNumber = i + 1;
-        
+
         // Look for suspicious patterns
         if (/(?:password|token|api_key|secret_key):\s*["']?(?!<|{|\$)[a-zA-Z0-9+/=]{8,}/i.test(line)) {
           this.addIssue({

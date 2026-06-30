@@ -11,7 +11,7 @@
  * - Go (Tree-sitter)
  * - Java (Tree-sitter)
  * - Kotlin (Tree-sitter)
- * 
+ *
  * Installation:
  * npm install tree-sitter tree-sitter-javascript tree-sitter-python tree-sitter-rust
  */
@@ -70,34 +70,34 @@ export class LanguageAgent {
    * Refactor code safely using LLM with AST feedback loop (Harness Engineering)
    */
   async safeRefactor(code, instructions, llmCallback, maxRetries = 3) {
-    let currentCode = code;
+    const currentCode = code;
     let attempt = 0;
     let feedback = '';
-    
+
     while (attempt < maxRetries) {
       attempt++;
       // 1. Call LLM to generate code (passing feedback if any)
-      let generatedCode = await llmCallback(currentCode, instructions, feedback);
-      
+      const generatedCode = await llmCallback(currentCode, instructions, feedback);
+
       // 2. Parse the generated code to check for syntax errors
-      let astResult = await this.parse(generatedCode);
+      const astResult = await this.parse(generatedCode);
       if (!astResult.success) {
-         feedback = `Syntax Error in generated code: ${astResult.error}. Please fix this and try again.`;
-         continue; // Loop back and let LLM try again
+        feedback = `Syntax Error in generated code: ${astResult.error}. Please fix this and try again.`;
+        continue; // Loop back and let LLM try again
       }
-      
+
       // 3. Lint the generated code for simple errors/security flaws
-      let lintResult = await this.lint(generatedCode);
+      const lintResult = await this.lint(generatedCode);
       if (lintResult.success && lintResult.issues && lintResult.issues.some(i => i.severity === 'error')) {
-         let errors = lintResult.issues.filter(i => i.severity === 'error').map(i => i.message).join(', ');
-         feedback = `Lint Errors in generated code: ${errors}. Please fix them and try again.`;
-         continue;
+        const errors = lintResult.issues.filter(i => i.severity === 'error').map(i => i.message).join(', ');
+        feedback = `Lint Errors in generated code: ${errors}. Please fix them and try again.`;
+        continue;
       }
-      
+
       // If we pass AST parse and linting, return success!
       return { success: true, code: generatedCode, attempt };
     }
-    
+
     return { success: false, error: `Failed to generate valid code after ${maxRetries} attempts.` };
   }
 }
@@ -141,7 +141,7 @@ export class JavaScriptAgent extends LanguageAgent {
         const babelModule = await import('@babel/parser');
         this.babelParser = babelModule.default || babelModule;
         if (!this.babelParser) {
-          console.warn(`\u26a0\ufe0f  No JavaScript parser available`);
+          console.warn('\u26a0\ufe0f  No JavaScript parser available');
         }
       } catch (err) {
         console.warn(`\u26a0\ufe0f  Babel parser not available (will use mock): ${err.message}`);
@@ -226,35 +226,35 @@ export class JavaScriptAgent extends LanguageAgent {
     // Walk the tree and collect information
     const walk = (n) => {
       switch (n.type) {
-        case 'function_declaration':
-          analysis.functions.push({
-            name: this.getNodeText(n, 'function_name'),
-            startLine: n.startPosition.row,
-            endLine: n.endPosition.row
-          });
-          break;
+      case 'function_declaration':
+        analysis.functions.push({
+          name: this.getNodeText(n, 'function_name'),
+          startLine: n.startPosition.row,
+          endLine: n.endPosition.row
+        });
+        break;
 
-        case 'class_declaration':
-          analysis.classes.push({
-            name: this.getNodeText(n, 'name'),
-            startLine: n.startPosition.row,
-            endLine: n.endPosition.row
-          });
-          break;
+      case 'class_declaration':
+        analysis.classes.push({
+          name: this.getNodeText(n, 'name'),
+          startLine: n.startPosition.row,
+          endLine: n.endPosition.row
+        });
+        break;
 
-        case 'import_statement':
-          analysis.imports.push({
-            source: this.getNodeText(n, 'source'),
-            startLine: n.startPosition.row
-          });
-          break;
+      case 'import_statement':
+        analysis.imports.push({
+          source: this.getNodeText(n, 'source'),
+          startLine: n.startPosition.row
+        });
+        break;
 
-        case 'export_statement':
-          analysis.exports.push({
-            type: this.getNodeText(n, 'export_type'),
-            startLine: n.startPosition.row
-          });
-          break;
+      case 'export_statement':
+        analysis.exports.push({
+          type: this.getNodeText(n, 'export_type'),
+          startLine: n.startPosition.row
+        });
+        break;
       }
 
       for (const child of n.children) {
@@ -349,17 +349,17 @@ export class JavaScriptAgent extends LanguageAgent {
     const { type } = _transformation;
 
     switch (type) {
-      case 'rename-function':
-        return this.renameFunctionInAST(code, _transformation);
+    case 'rename-function':
+      return this.renameFunctionInAST(code, _transformation);
 
-      case 'extract-function':
-        return this.extractFunctionInAST(code, _transformation);
+    case 'extract-function':
+      return this.extractFunctionInAST(code, _transformation);
 
-      case 'convert-var-let':
-        return this.convertVarToLet(code);
+    case 'convert-var-let':
+      return this.convertVarToLet(code);
 
-      default:
-        return { success: false, error: `Unknown transformation: ${type}` };
+    default:
+      return { success: false, error: `Unknown transformation: ${type}` };
     }
   }
 
@@ -720,70 +720,70 @@ export async function getLanguageAgent(language) {
   let agent;
 
   switch (language.toLowerCase()) {
-    case 'javascript':
-    case 'js':
-    case 'typescript':
-    case 'ts':
-    case 'jsx':
-    case 'tsx':
-      agent = new JavaScriptAgent();
-      break;
+  case 'javascript':
+  case 'js':
+  case 'typescript':
+  case 'ts':
+  case 'jsx':
+  case 'tsx':
+    agent = new JavaScriptAgent();
+    break;
 
-    case 'python':
-    case 'py':
-      agent = new PythonAgent();
-      break;
+  case 'python':
+  case 'py':
+    agent = new PythonAgent();
+    break;
 
-    case 'rust':
-    case 'rs':
-      agent = new RustAgent();
-      break;
+  case 'rust':
+  case 'rs':
+    agent = new RustAgent();
+    break;
 
-    case 'java':
-    case 'jav':
-      agent = new JavaAgent();
-      break;
+  case 'java':
+  case 'jav':
+    agent = new JavaAgent();
+    break;
 
-    case 'go':
-    case 'golang':
-      agent = new GoAgent();
-      break;
+  case 'go':
+  case 'golang':
+    agent = new GoAgent();
+    break;
 
-    case 'csharp':
-    case 'cs':
-    case 'c#':
-      agent = new CSharpAgent();
-      break;
+  case 'csharp':
+  case 'cs':
+  case 'c#':
+    agent = new CSharpAgent();
+    break;
 
-    case 'ruby':
-    case 'rb':
-      agent = new RubyAgent();
-      break;
+  case 'ruby':
+  case 'rb':
+    agent = new RubyAgent();
+    break;
 
-    case 'kotlin':
-    case 'kt':
-      agent = new KotlinAgent();
-      break;
+  case 'kotlin':
+  case 'kt':
+    agent = new KotlinAgent();
+    break;
 
-    case 'swift':
-      agent = new SwiftAgent();
-      break;
+  case 'swift':
+    agent = new SwiftAgent();
+    break;
 
-    case 'php':
-      agent = new PHPAgent();
-      break;
+  case 'php':
+    agent = new PHPAgent();
+    break;
 
-    case 'c':
-      agent = new CAgent();
-      break;
+  case 'c':
+    agent = new CAgent();
+    break;
 
-    case 'cpp':
-    case 'c++':
-      agent = new CppAgent();
-      break;
+  case 'cpp':
+  case 'c++':
+    agent = new CppAgent();
+    break;
 
-    default:
-      throw new Error(`Unsupported language: ${language}`);
+  default:
+    throw new Error(`Unsupported language: ${language}`);
   }
 
   await agent.initialize();

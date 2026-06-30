@@ -619,7 +619,7 @@ export class EnhancedPRReviewer {
     if (suggestions.length > 0) {
       body += '\n### 🛠️ Suggested Fixes:\n\n';
       for (const suggestion of suggestions) {
-        body += `<details>\n<summary>Click to view suggested fix</summary>\n\n`;
+        body += '<details>\n<summary>Click to view suggested fix</summary>\n\n';
 
         if (suggestion.type === 'fix') {
           body += '```suggestion\n';
@@ -634,7 +634,7 @@ export class EnhancedPRReviewer {
 
     // Add footer
     body += '\n---\n';
-    body += `*Analyzed by Sentinel v1.5.0* | `;
+    body += '*Analyzed by Sentinel v1.5.0* | ';
 
     return body;
   }
@@ -714,7 +714,7 @@ export class EnhancedPRReviewer {
     const { summary } = analysis;
 
     // Summary statistics
-    body += `| Metric | Count |\n`;
+    body += '| Metric | Count |\n';
     body += '|--------|-------|\n';
     body += `| 🚨 Critical | ${summary.criticalIssues} |\n`;
     body += `| 🔴 High | ${summary.highIssues} |\n`;

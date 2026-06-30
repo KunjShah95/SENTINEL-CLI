@@ -1,0 +1,55 @@
+id: sql-injection-raw-query
+title: SQL Injection via Raw Query Building
+severity: critical
+languages: [javascript, typescript]
+cwe: [CWE-89]
+tags: [injection, sql, database]
+description: |
+  SQL injection occurs when user-controlled input is concatenated directly into SQL
+  query strings without sanitization or parameterization. An attacker can craft input
+  that escapes the query's intended structure, enabling data exfiltration, modification,
+  or deletion. In Node.js applications using mysql, pg, or sqlite3 drivers, this
+  commonly appears as string interpolation in query builder arguments or raw query
+  methods.
+
+detection: |
+  Look for direct string concatenation or template literal interpolation inside
+  SQL query strings passed to database driver methods. Key patterns:
+  - `SELECT ... WHERE col = '${userInput}'`
+  - `` SELECT ... WHERE col = `$(userInput)` ``
+  - String concatenation with `+` or `.concat()` inside query builder `.whereRaw()`
+    or `.havingRaw()` calls
+  - ORM methods like `.query(sql)` or `.raw(sql)` that accept raw strings with
+    interpolation
+  - Any database method where the SQL string contains `${...}` or user-supplied
+    variables interpolated without prepared statements
+
+remediation: |
+  Always use parameterized queries or prepared statements. Most Node.js database
+  drivers support placeholders:
+  - mysql2/MySQL: `?` placeholders
+  - pg/PostgreSQL: `$1, $2` positional placeholders
+  - sqlite3: `?` placeholders
+  - Knex: `knex.raw('col = ?', [value])`
+  - Sequelize: `{ where: { col: value } }` object syntax or replacements
+
+  If raw SQL is unavoidable, use the driver's escaping functions (e.g.
+  `mysql.escape()`, `pg.escapeLiteral()`), but prefer parameterized queries in
+  all cases.
+
+example:
+  vulnerable: |
+    const userId = req.query.id;
+    const sql = `SELECT * FROM users WHERE id = '${userId}'`;
+    conn.query(sql, (err, rows) => { ... });
+
+  fixed: |
+    const userId = req.query.id;
+    const sql = 'SELECT * FROM users WHERE id = ?';
+    conn.query(sql, [userId], (err, rows) => { ... });
+
+references:
+  - url: https://owasp.org/www-community/attacks/SQL_Injection
+    title: OWASP SQL Injection
+  - url: https://cwe.mitre.org/data/definitions/89.html
+    title: CWE-89: Improper Neutralization of Special Elements used in an SQL Command

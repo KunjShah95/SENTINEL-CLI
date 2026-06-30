@@ -1,0 +1,56 @@
+﻿id: unsafe-pickle-deserialization
+title: Remote Code Execution via Unsafe Pickle Deserialization
+severity: critical
+languages: [python]
+cwe: [CWE-502]
+tags: [deserialization, rce, pickle, injection]
+description: |
+  Python's pickle module is fundamentally unsafe for untrusted data. The
+  pickle protocol can encode arbitrary Python object graphs, including objects
+  whose __reduce__ method executes arbitrary code during unpickling. Loading
+  pickle data from an untrusted source (user upload, network socket, message
+  queue, cache, cookie) gives the attacker full code execution in the context
+  of the unpickling process.
+
+  This is not a bug in pickle — it is a documented design constraint. Any code
+  that calls pickle.loads() on data that could have been tampered with is
+  exploitable.
+detection: |
+  Search for all usages of:
+  - pickle.loads() / pickle.load()
+  - Unpickler() and its methods
+  - cloudpickle.loads() / cloudpickle.load()
+  - dill.loads() / dill.load()
+  - joblib.load() with untrusted file paths
+  - Any serialization library that uses pickle as a backend
+
+  For each call, determine the data source:
+  - Is the data from an HTTP request (file upload, cookie, form field)?
+  - Is the data from a network socket or message queue without authentication?
+  - Is the file written by a different trust boundary (e.g. shared filesystem)?
+  - Is the cache keyed by user input (cache poisoning → pickle injection)?
+remediation: |
+  Replace pickle with a safe serialization format:
+  - JSON for structured data (use standard library json module)
+  - MessagePack for binary data (msgpack library)
+  - YAML (use safe_load, never load/FullLoader)
+
+  If pickle is unavoidable:
+  - Only unpickle data signed with HMAC (verify integrity before unpickling)
+  - Unpickle in an isolated process with minimal privileges (sandbox, container)
+  - Use a restricted unpickler like picksafe that limits allowed classes
+  - Never expose unpickling to untrusted network input
+example:
+  vulnerable: |
+    import pickle
+    session_data = request.COOKIES.get("session")
+    user = pickle.loads(base64.b64decode(session_data))
+  fixed: |
+    import json
+    session_data = request.COOKIES.get("session")
+    user = json.loads(base64.b64decode(session_data))
+references:
+  - url: https://docs.python.org/3/library/pickle.html
+    title: Python pickle module documentation (security warning)
+  - url: https://cwe.mitre.org/data/definitions/502.html
+    title: CWE-502: Deserialization of Untrusted Data

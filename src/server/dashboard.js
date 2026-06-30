@@ -34,7 +34,7 @@ class SentinelDashboard {
     this.server = createServer(this.app);
     this.server.listen(this.port, this.host, () => {
       console.log(`🚀 Sentinel Dashboard running at http://${this.host}:${this.port}`);
-      console.log(`📊 WebSocket server ready for real-time updates`);
+      console.log('📊 WebSocket server ready for real-time updates');
     });
 
     return this;
@@ -47,12 +47,12 @@ class SentinelDashboard {
       this.subClient = this.pubClient.duplicate();
       await this.pubClient.connect();
       await this.subClient.connect();
-      
+
       this.subClient.subscribe('dashboard_events', (message) => {
-         try {
-           const data = JSON.parse(message);
-           this.localBroadcast(data);
-         } catch (e) {}
+        try {
+          const data = JSON.parse(message);
+          this.localBroadcast(data);
+        } catch (e) {}
       });
       console.log('✅ Redis Pub/Sub connected for horizontal scaling');
     } catch (e) {
@@ -254,14 +254,14 @@ class SentinelDashboard {
       const data = JSON.parse(message);
 
       switch (data.type) {
-        case 'subscribe':
-          ws.subscriptions = data.channels || [];
-          break;
-        case 'ping':
-          ws.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
-          break;
-        default:
-          console.log('Unknown message type:', data.type);
+      case 'subscribe':
+        ws.subscriptions = data.channels || [];
+        break;
+      case 'ping':
+        ws.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
+        break;
+      default:
+        console.log('Unknown message type:', data.type);
       }
     } catch (error) {
       console.error('Failed to parse WebSocket message:', error);
@@ -341,20 +341,20 @@ class SentinelDashboard {
   calculateTrends(period = '7d', analyzer = null) {
     const days = parseInt(period) || 7;
     const cutoff = Date.now() - (days * 24 * 60 * 60 * 1000);
-    
-    const filtered = this.analysisHistory.filter(a => 
+
+    const filtered = this.analysisHistory.filter(a =>
       a.timestamp > cutoff && (!analyzer || a.analyzer === analyzer)
     );
 
     const dailyData = {};
-    
+
     for (const analysis of filtered) {
       const date = new Date(analysis.timestamp).toISOString().split('T')[0];
-      
+
       if (!dailyData[date]) {
         dailyData[date] = { issues: 0, fixes: 0, scans: 0 };
       }
-      
+
       dailyData[date].issues += analysis.results?.issues || 0;
       dailyData[date].fixes += analysis.results?.fixes || 0;
       dailyData[date].scans += 1;
@@ -373,7 +373,7 @@ class SentinelDashboard {
     const secondHalf = trendData.slice(Math.floor(trendData.length / 2));
     const firstAvg = firstHalf.reduce((s, d) => s + d.issues, 0) / Math.max(firstHalf.length, 1);
     const secondAvg = secondHalf.reduce((s, d) => s + d.issues, 0) / Math.max(secondHalf.length, 1);
-    
+
     const trend = secondAvg > firstAvg ? 'increasing' : secondAvg < firstAvg ? 'decreasing' : 'stable';
     const changePercent = firstAvg > 0 ? (((secondAvg - firstAvg) / firstAvg) * 100).toFixed(1) : 0;
 
@@ -394,9 +394,9 @@ class SentinelDashboard {
   getSeverityTrends(period = '30d') {
     const days = parseInt(period) || 30;
     const cutoff = Date.now() - (days * 24 * 60 * 60 * 1000);
-    
+
     const severityCounts = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
-    
+
     for (const analysis of this.analysisHistory) {
       if (analysis.timestamp > cutoff && analysis.results?.bySeverity) {
         for (const [sev, count] of Object.entries(analysis.results.bySeverity)) {
@@ -423,9 +423,9 @@ class SentinelDashboard {
   getRemediationTrends(period = '30d') {
     const days = parseInt(period) || 30;
     const cutoff = Date.now() - (days * 24 * 60 * 60 * 1000);
-    
+
     let generated = 0, validated = 0, accepted = 0, rejected = 0;
-    
+
     for (const analysis of this.analysisHistory) {
       if (analysis.timestamp > cutoff && analysis.results) {
         generated += analysis.results.fixesGenerated || 0;
@@ -435,7 +435,7 @@ class SentinelDashboard {
       }
     }
 
-    const acceptanceRate = (generated + validated) > 0 
+    const acceptanceRate = (generated + validated) > 0
       ? (((accepted) / (accepted + rejected)) * 100).toFixed(1)
       : 0;
 
@@ -453,7 +453,7 @@ class SentinelDashboard {
 
   getConfidenceTrends() {
     const byAnalyzer = {};
-    
+
     for (const analysis of this.analysisHistory) {
       if (analysis.results?.avgConfidence) {
         const analyzer = analysis.analyzer || 'overall';
@@ -480,15 +480,15 @@ class SentinelDashboard {
   getComplianceTrends(period = '30d') {
     const days = parseInt(period) || 30;
     const cutoff = Date.now() - (days * 24 * 60 * 60 * 1000);
-    
+
     let compliant = 0, nonCompliant = 0;
     let totalScore = 0, count = 0;
-    
+
     for (const analysis of this.analysisHistory) {
       if (analysis.timestamp > cutoff && analysis.results?.policyResult) {
         if (analysis.results.policyResult.compliant) compliant++;
         else nonCompliant++;
-        
+
         totalScore += analysis.results.policyResult.score || 0;
         count++;
       }
@@ -499,7 +499,7 @@ class SentinelDashboard {
       summary: {
         compliant,
         nonCompliant,
-        complianceRate: (compliant + nonCompliant) > 0 
+        complianceRate: (compliant + nonCompliant) > 0
           ? ((compliant / (compliant + nonCompliant)) * 100).toFixed(1)
           : 100,
         avgScore: count > 0 ? (totalScore / count).toFixed(1) : 100,
@@ -511,7 +511,7 @@ class SentinelDashboard {
     if (this.pubClient) {
       this.pubClient.publish('dashboard_events', JSON.stringify(message));
       // Local broadcast is handled by the subscription callback so we don't duplicate
-      this.localBroadcast(message); 
+      this.localBroadcast(message);
       // Wait, if we do both, we might duplicate. The publisher doesn't receive its own messages if we use proper channels, but we can just broadcast locally too.
       // Better: let's just localBroadcast, and other instances get it via Redis.
       // Actually, duplicate() client will receive published messages if not configured.

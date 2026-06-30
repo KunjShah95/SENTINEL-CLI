@@ -556,11 +556,11 @@ export function registerLearningCommand(program) {
 // Helper functions
 function getRiskColor(risk) {
   switch (risk.toLowerCase()) {
-    case 'critical': return chalk.red.bold;
-    case 'high': return chalk.red;
-    case 'medium': return chalk.yellow;
-    case 'low': return chalk.green;
-    default: return chalk.white;
+  case 'critical': return chalk.red.bold;
+  case 'high': return chalk.red;
+  case 'medium': return chalk.yellow;
+  case 'low': return chalk.green;
+  default: return chalk.white;
   }
 }
 

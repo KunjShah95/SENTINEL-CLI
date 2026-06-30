@@ -1,9 +1,9 @@
 /**
  * SELF-LEARNING SYSTEM
- * 
+ *
  * Inspired by DeepMind's self-play approach and Andrew Ng's data-centric AI principles.
  * This system learns from user feedback to improve security analysis over time.
- * 
+ *
  * Key Features:
  * - Feedback collection and analysis
  * - Confidence calibration
@@ -58,7 +58,7 @@ export class SelfLearningSystem extends EventEmitter {
     this.feedbackHistory = [];
     this.positiveFeedback = [];
     this.negativeFeedback = [];
-    
+
     // Model state
     this.modelWeights = {
       severity: {},
@@ -258,38 +258,38 @@ export class SelfLearningSystem extends EventEmitter {
    * Calculate performance metrics
    */
   _calculatePerformanceMetrics() {
-    const tp = this.positiveFeedback.filter(f => 
+    const tp = this.positiveFeedback.filter(f =>
       f.type === FeedbackType.TRUE_POSITIVE || f.type === FeedbackType.ACCEPT
     ).length;
-    
-    const fp = this.negativeFeedback.filter(f => 
+
+    const fp = this.negativeFeedback.filter(f =>
       f.type === FeedbackType.FALSE_POSITIVE || f.type === FeedbackType.REJECT
     ).length;
-    
-    const fn = this.feedbackHistory.filter(f => 
+
+    const fn = this.feedbackHistory.filter(f =>
       f.type === FeedbackType.IGNORE
     ).length;
-    
-    const tn = this.feedbackHistory.filter(f => 
+
+    const tn = this.feedbackHistory.filter(f =>
       f.type === FeedbackType.ACCEPT && f.confidence < 0.5
     ).length;
 
     // Precision
     this.performanceMetrics.precision = tp / (tp + fp) || 0;
-    
+
     // Recall
     this.performanceMetrics.recall = tp / (tp + fn) || 0;
-    
+
     // F1 Score
     const precision = this.performanceMetrics.precision;
     const recall = this.performanceMetrics.recall;
-    this.performanceMetrics.f1Score = 
+    this.performanceMetrics.f1Score =
       (2 * precision * recall) / (precision + recall) || 0;
-    
+
     // Accuracy
-    this.performanceMetrics.accuracy = (tp + tn) / 
+    this.performanceMetrics.accuracy = (tp + tn) /
       (tp + tn + fp + fn) || 0;
-    
+
     this.performanceMetrics.totalFeedback = this.feedbackHistory.length;
   }
 
@@ -298,7 +298,7 @@ export class SelfLearningSystem extends EventEmitter {
    */
   async _updateWeights() {
     const learningRate = this.options.learningRate;
-    
+
     // Group feedback by rule ID
     const ruleFeedback = {};
     for (const feedback of this.feedbackHistory) {
@@ -317,23 +317,23 @@ export class SelfLearningSystem extends EventEmitter {
     // Update false positive rates
     for (const [ruleId, stats] of Object.entries(ruleFeedback)) {
       const fpRate = stats.negative / stats.total || 0;
-      const currentFpRate = this.modelWeights.falsePositiveRate[ruleId] || 
+      const currentFpRate = this.modelWeights.falsePositiveRate[ruleId] ||
         this.modelWeights.falsePositiveRate.default;
-      
+
       // Exponential moving average
-      this.modelWeights.falsePositiveRate[ruleId] = 
-        currentFpRate * this.options.decayFactor + 
+      this.modelWeights.falsePositiveRate[ruleId] =
+        currentFpRate * this.options.decayFactor +
         fpRate * (1 - this.options.decayFactor);
     }
 
     // Update true positive rates
     for (const [ruleId, stats] of Object.entries(ruleFeedback)) {
       const tpRate = stats.positive / stats.total || 0;
-      const currentTpRate = this.modelWeights.truePositiveRate[ruleId] || 
+      const currentTpRate = this.modelWeights.truePositiveRate[ruleId] ||
         this.modelWeights.truePositiveRate.default;
-      
-      this.modelWeights.truePositiveRate[ruleId] = 
-        currentTpRate * this.options.decayFactor + 
+
+      this.modelWeights.truePositiveRate[ruleId] =
+        currentTpRate * this.options.decayFactor +
         tpRate * (1 - this.options.decayFactor);
     }
 
@@ -354,7 +354,7 @@ export class SelfLearningSystem extends EventEmitter {
     for (const [severity, stats] of Object.entries(severityFeedback)) {
       const accuracy = stats.correct / stats.total || 0;
       const currentWeight = this.modelWeights.severity[severity] || 0.5;
-      this.modelWeights.severity[severity] = 
+      this.modelWeights.severity[severity] =
         currentWeight + learningRate * (accuracy - currentWeight);
     }
   }
@@ -379,10 +379,10 @@ export class SelfLearningSystem extends EventEmitter {
     for (let i = 0; i < 20; i++) {
       const mid = (low + high) / 2;
       const predicted = severities.filter(s => s.confidence >= mid);
-      const correct = predicted.filter(p => 
+      const correct = predicted.filter(p =>
         this._isPositiveFeedback(p.type)
       ).length;
-      
+
       if (correct / predicted.length > 0.8) {
         low = mid;
       } else {
@@ -394,7 +394,7 @@ export class SelfLearningSystem extends EventEmitter {
 
     // Optimize false positive likelihood threshold
     const fpRate = this.negativeFeedback.length / this.feedbackHistory.length || 0;
-    this.thresholds.falsePositiveLikelihood = 
+    this.thresholds.falsePositiveLikelihood =
       Math.max(0.1, Math.min(0.5, fpRate * 1.5));
   }
 
@@ -403,10 +403,10 @@ export class SelfLearningSystem extends EventEmitter {
    */
   _calibrateConfidence() {
     const calibrations = [];
-    
+
     for (const feedback of this.feedbackHistory) {
       if (feedback.confidence === undefined) continue;
-      
+
       const isCorrect = this._isPositiveFeedback(feedback.type);
       calibrations.push({
         predicted: feedback.confidence,
@@ -419,7 +419,7 @@ export class SelfLearningSystem extends EventEmitter {
     // Simple calibration: compute bins
     const bins = {};
     const binSize = 0.1;
-    
+
     for (const cal of calibrations) {
       const bin = Math.floor(cal.predicted / binSize) * binSize;
       if (!bins[bin]) {
@@ -445,19 +445,19 @@ export class SelfLearningSystem extends EventEmitter {
    */
   predictAcceptance(finding) {
     const ruleId = finding.ruleId || 'default';
-    
-    const fpRate = this.modelWeights.falsePositiveRate[ruleId] || 
+
+    const fpRate = this.modelWeights.falsePositiveRate[ruleId] ||
       this.modelWeights.falsePositiveRate.default;
-    const tpRate = this.modelWeights.truePositiveRate[ruleId] || 
+    const tpRate = this.modelWeights.truePositiveRate[ruleId] ||
       this.modelWeights.truePositiveRate.default;
-    
+
     const severityWeight = this.modelWeights.severity[finding.severity] || 0.5;
-    
+
     // Calculate prediction score
-    const score = 
+    const score =
       (finding.confidence || 0.5) * tpRate * severityWeight +
       (1 - fpRate) * (1 - severityWeight) * 0.5;
-    
+
     return {
       score,
       likelyAccepted: score > this.thresholds.confidence,
@@ -476,13 +476,13 @@ export class SelfLearningSystem extends EventEmitter {
    */
   adjustConfidence(finding) {
     const prediction = this.predictAcceptance(finding);
-    
+
     // Adjust confidence based on historical accuracy
     const historicalAccuracy = this.performanceMetrics.accuracy || 0.5;
-    
-    const adjustedConfidence = finding.confidence * prediction.score * 
+
+    const adjustedConfidence = finding.confidence * prediction.score *
       (0.5 + historicalAccuracy * 0.5);
-    
+
     return {
       ...finding,
       originalConfidence: finding.confidence,
@@ -582,7 +582,7 @@ export class SelfLearningSystem extends EventEmitter {
     if (model.performanceMetrics) {
       this.performanceMetrics = model.performanceMetrics;
     }
-    
+
     this.emit('model:imported', model);
   }
 
@@ -610,7 +610,7 @@ export class SelfLearningSystem extends EventEmitter {
       confidenceCalibration: [],
       learningProgress: []
     };
-    
+
     this.emit('model:reset');
   }
 
@@ -620,11 +620,11 @@ export class SelfLearningSystem extends EventEmitter {
   getStatistics() {
     return {
       ...this.statistics,
-      positiveRatio: this.feedbackHistory.length > 0 
-        ? this.positiveFeedback.length / this.feedbackHistory.length 
+      positiveRatio: this.feedbackHistory.length > 0
+        ? this.positiveFeedback.length / this.feedbackHistory.length
         : 0,
-      negativeRatio: this.feedbackHistory.length > 0 
-        ? this.negativeFeedback.length / this.feedbackHistory.length 
+      negativeRatio: this.feedbackHistory.length > 0
+        ? this.negativeFeedback.length / this.feedbackHistory.length
         : 0
     };
   }

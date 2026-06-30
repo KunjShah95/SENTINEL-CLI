@@ -7,6 +7,11 @@ import { Session } from './screens/session.js';
 import { Dashboard } from './screens/dashboard.js';
 import { Review } from './screens/review.js';
 import { Loop } from './screens/loop.js';
+import { ErrorBoundary } from './components/error-boundary.js';
+
+// Kick off model discovery in background — replaces the hardcoded model list
+// with live data from provider APIs. Falls back gracefully if APIs are down.
+import('../shared/models/index.js').then(m => m.refreshModels()).catch(() => {});
 
 const router = createMemoryRouter([
   {
@@ -23,7 +28,16 @@ const router = createMemoryRouter([
 ]);
 
 function App() {
-  return <RouterProvider router={router} />;
+  return (
+    <ErrorBoundary>
+      <RouterProvider router={router} />
+    </ErrorBoundary>
+  );
 }
 
-render(<App />);
+try {
+  render(<App />);
+} catch (e) {
+  console.error('Failed to start Sentinel TUI:', e instanceof Error ? e.message : e);
+  process.exit(1);
+}

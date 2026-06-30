@@ -1,149 +1,229 @@
 /**
- * Test suite for Error Handler
+ * Unit tests for errorHandler — error classes and ErrorHandler methods.
+ *
+ * Tests SentinelError subclasses, toJSON serialization, ErrorHandler
+ * singleton methods: logError, handle, wrapAsync, tryExecute, registerHandler.
+ *
+ * Run with:
+ *   node --test __tests__/errorHandler.test.js
  */
-import {
-    SentinelError,
-    SecurityError,
-    ValidationError,
-    ConfigurationError,
-    AnalyzerError,
-    errorHandler
-} from '../src/utils/errorHandler.js';
+
+import { test, describe, before } from 'node:test';
+import assert from 'node:assert/strict';
+
+let SentinelError, ValidationError, SecurityError, ConfigurationError, AnalyzerError;
+let errorHandler, ErrorHandler;
+
+before(async () => {
+  const mod = await import('../src/utils/errorHandler.js');
+  SentinelError = mod.SentinelError;
+  ValidationError = mod.ValidationError;
+  SecurityError = mod.SecurityError;
+  ConfigurationError = mod.ConfigurationError;
+  AnalyzerError = mod.AnalyzerError;
+  errorHandler = mod.errorHandler;
+  ErrorHandler = mod.ErrorHandler;
+});
+
+// ─── SentinelError ──────────────────────────────────────────────────────────
 
 describe('SentinelError', () => {
-    it('should create error with all properties', () => {
-        const error = new SentinelError(
-            'Test error',
-            'TEST_ERROR',
-            'high',
-            { foo: 'bar' }
-        );
+  test('creates error with message, code, severity, context', () => {
+    const err = new SentinelError('Something broke', 'TEST_ERR', 'high', { file: 'test.js' });
+    assert.equal(err.message, 'Something broke');
+    assert.equal(err.code, 'TEST_ERR');
+    assert.equal(err.severity, 'high');
+    assert.equal(err.context.file, 'test.js');
+    assert.equal(err.name, 'SentinelError');
+    assert.ok(err.timestamp);
+    assert.ok(err.stack);
+  });
 
-        expect(error.message).toBe('Test error');
-        expect(error.code).toBe('TEST_ERROR');
-        expect(error.severity).toBe('high');
-        expect(error.context).toEqual({ foo: 'bar' });
-        expect(error.timestamp).toBeDefined();
-        expect(error.name).toBe('SentinelError');
-    });
+  test('uses default severity and context', () => {
+    const err = new SentinelError('test');
+    assert.equal(err.severity, 'medium');
+    assert.deepEqual(err.context, {});
+    assert.equal(err.code, undefined);
+  });
 
-    it('should have proper JSON representation', () => {
-        const error = new SentinelError('Test', 'TEST', 'medium', { key: 'value' });
-        const json = error.toJSON();
-
-        expect(json).toHaveProperty('name');
-        expect(json).toHaveProperty('message');
-        expect(json).toHaveProperty('code');
-        expect(json).toHaveProperty('severity');
-        expect(json).toHaveProperty('context');
-        expect(json).toHaveProperty('timestamp');
-        expect(json).toHaveProperty('stack');
-    });
+  test('toJSON returns structured error data', () => {
+    const err = new SentinelError('Fail', 'ERR_1', 'critical', { id: 42 });
+    const json = err.toJSON();
+    assert.equal(json.name, 'SentinelError');
+    assert.equal(json.message, 'Fail');
+    assert.equal(json.code, 'ERR_1');
+    assert.equal(json.severity, 'critical');
+    assert.equal(json.context.id, 42);
+    assert.ok(json.timestamp);
+    assert.ok(json.stack);
+  });
 });
 
-describe('Specialized Error Classes', () => {
-    it('should create SecurityError with critical severity', () => {
-        const error = new SecurityError('Security issue', { file: 'test.js' });
+// ─── Error subclasses ───────────────────────────────────────────────────────
 
-        expect(error.name).toBe('SecurityError');
-        expect(error.code).toBe('SECURITY_ERROR');
-        expect(error.severity).toBe('critical');
-        expect(error.context).toEqual({ file: 'test.js' });
-    });
-
-    it('should create ValidationError with low severity', () => {
-        const error = new ValidationError('Invalid input', { field: 'email' });
-
-        expect(error.name).toBe('ValidationError');
-        expect(error.code).toBe('VALIDATION_ERROR');
-        expect(error.severity).toBe('low');
-    });
-
-    it('should create ConfigurationError with high severity', () => {
-        const error = new ConfigurationError('Bad config', { setting: 'apiKey' });
-
-        expect(error.name).toBe('ConfigurationError');
-        expect(error.code).toBe('CONFIG_ERROR');
-        expect(error.severity).toBe('high');
-    });
-
-    it('should create AnalyzerError with analyzer context', () => {
-        const error = new AnalyzerError('Analysis failed', 'SecurityAnalyzer', { file: 'test.js' });
-
-        expect(error.name).toBe('AnalyzerError');
-        expect(error.code).toBe('ANALYZER_ERROR');
-        expect(error.severity).toBe('medium');
-        expect(error.context.analyzer).toBe('SecurityAnalyzer');
-    });
+describe('ValidationError', () => {
+  test('inherits from SentinelError', () => {
+    const err = new ValidationError('Invalid input', { field: 'email' });
+    assert.ok(err instanceof SentinelError);
+    assert.ok(err instanceof Error);
+    assert.equal(err.name, 'ValidationError');
+    assert.equal(err.code, 'VALIDATION_ERROR');
+    assert.equal(err.severity, 'low');
+  });
 });
 
-describe('ErrorHandler', () => {
-    beforeEach(() => {
-        errorHandler.handlers = [];
-        errorHandler.monitoringEnabled = false;
+describe('SecurityError', () => {
+  test('inherits from SentinelError with critical severity', () => {
+    const err = new SecurityError('SSRF detected', { hostname: 'evil.com' });
+    assert.ok(err instanceof SentinelError);
+    assert.equal(err.name, 'SecurityError');
+    assert.equal(err.code, 'SECURITY_ERROR');
+    assert.equal(err.severity, 'critical');
+    assert.equal(err.context.hostname, 'evil.com');
+  });
+});
+
+describe('ConfigurationError', () => {
+  test('inherits from SentinelError with high severity', () => {
+    const err = new ConfigurationError('Missing key', { key: 'GITHUB_TOKEN' });
+    assert.equal(err.name, 'ConfigurationError');
+    assert.equal(err.code, 'CONFIG_ERROR');
+    assert.equal(err.severity, 'high');
+  });
+});
+
+describe('AnalyzerError', () => {
+  test('includes analyzer name in context', () => {
+    const err = new AnalyzerError('Failed to analyze', 'security', { file: 'app.js' });
+    assert.equal(err.name, 'AnalyzerError');
+    assert.equal(err.code, 'ANALYZER_ERROR');
+    assert.equal(err.severity, 'medium');
+    assert.equal(err.context.analyzer, 'security');
+    assert.equal(err.context.file, 'app.js');
+  });
+});
+
+// ─── ErrorHandler.logError ──────────────────────────────────────────────────
+
+describe('ErrorHandler.logError', () => {
+  test('returns structured error data', async () => {
+    const err = new SentinelError('Test log', 'TEST', 'low');
+    const data = await errorHandler.logError(err);
+    assert.equal(data.level, 'error');
+    assert.equal(data.name, 'SentinelError');
+    assert.equal(data.message, 'Test log');
+    assert.equal(data.code, 'TEST');
+    assert.equal(data.severity, 'low');
+    assert.ok(data.timestamp);
+    assert.ok(data.stack);
+  });
+
+  test('handles plain Error objects', async () => {
+    const err = new Error('Plain error');
+    const data = await errorHandler.logError(err);
+    assert.equal(data.name, 'Error');
+    assert.equal(data.message, 'Plain error');
+    assert.equal(data.code, 'UNKNOWN_ERROR');
+  });
+});
+
+// ─── ErrorHandler.handle ────────────────────────────────────────────────────
+
+describe('ErrorHandler.handle', () => {
+  test('converts plain Error to SentinelError', async () => {
+    const data = await errorHandler.handle(new Error('Raw error'));
+    assert.equal(data.name, 'SentinelError');
+    assert.equal(data.code, 'UNKNOWN_ERROR');
+    assert.equal(data.severity, 'medium');
+  });
+
+  test('preserves SentinelError properties', async () => {
+    const err = new SecurityError('Real security issue', { important: true });
+    const data = await errorHandler.handle(err);
+    assert.equal(data.name, 'SecurityError');
+    assert.equal(data.code, 'SECURITY_ERROR');
+    assert.equal(data.severity, 'critical');
+  });
+
+  test('executes registered handlers', async () => {
+    const calls = [];
+    errorHandler.registerHandler((err, data) => {
+      calls.push({ err: err.message, data: data.message });
     });
 
-    it('should register custom handlers', () => {
-        let called = false;
-        const handler = () => { called = true; };
-        errorHandler.registerHandler(handler);
+    await errorHandler.handle(new Error('Handler test'));
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].err, 'Handler test');
+  });
+});
 
-        expect(errorHandler.handlers).toContain(handler);
+// ─── ErrorHandler.wrapAsync ─────────────────────────────────────────────────
+
+describe('ErrorHandler.wrapAsync', () => {
+  test('wraps function, propagates result on success', async () => {
+    const wrapped = errorHandler.wrapAsync(async () => 'success');
+    const result = await wrapped();
+    assert.equal(result, 'success');
+  });
+
+  test('wraps function, handles error on failure', async () => {
+    const wrapped = errorHandler.wrapAsync(async () => {
+      throw new Error('Wrapped failure');
     });
+    await assert.rejects(() => wrapped(), /Wrapped failure/);
+  });
+});
 
-    it('should execute custom handlers on error', async () => {
-        let handlerArgs = null;
-        const handler = (...args) => {
-            handlerArgs = args;
-        };
-        errorHandler.registerHandler(handler);
+// ─── ErrorHandler.tryExecute ────────────────────────────────────────────────
 
-        const error = new SentinelError('Test', 'TEST', 'medium');
-        await errorHandler.handle(error);
+describe('ErrorHandler.tryExecute', () => {
+  test('returns function result on success', async () => {
+    const result = await errorHandler.tryExecute(async () => 42);
+    assert.equal(result, 42);
+  });
 
-        expect(handlerArgs).toHaveLength(2);
-        expect(handlerArgs[0]).toBe(error);
-        expect(handlerArgs[1]).toEqual(expect.objectContaining({
-            message: 'Test',
-            code: 'TEST',
-            severity: 'medium'
-        }));
+  test('returns fallback on failure', async () => {
+    const result = await errorHandler.tryExecute(async () => {
+      throw new Error('Fail');
+    }, 'fallback');
+    assert.equal(result, 'fallback');
+  });
+
+  test('returns null fallback by default', async () => {
+    const result = await errorHandler.tryExecute(async () => {
+      throw new Error('Fail');
     });
+    assert.equal(result, null);
+  });
+});
 
-    it('should convert regular errors to SentinelError', async () => {
-        const regularError = new Error('Regular error');
-        const result = await errorHandler.handle(regularError);
+// ─── ErrorHandler constructor defaults ──────────────────────────────────────
 
-        expect(result.code).toBe('UNKNOWN_ERROR');
-        expect(result.severity).toBe('medium');
-        expect(result.message).toBe('Regular error');
-    });
+describe('ErrorHandler defaults', () => {
+  test('initializes with empty handlers and monitoring disabled', () => {
+    const handler = new ErrorHandler();
+    assert.deepEqual(handler.handlers, []);
+    assert.equal(handler.monitoringEnabled, false);
+  });
 
-    it('should wrap async functions with error handling', async () => {
-        const throwingFn = async () => {
-            throw new Error('Test error');
-        };
+  test('registerHandler adds function', () => {
+    const handler = new ErrorHandler();
+    const fn = () => {};
+    handler.registerHandler(fn);
+    assert.equal(handler.handlers.length, 1);
+    assert.equal(handler.handlers[0], fn);
+  });
 
-        const wrapped = errorHandler.wrapAsync(throwingFn);
+  test('registerHandler ignores non-function', () => {
+    const handler = new ErrorHandler();
+    handler.registerHandler('not-a-function');
+    assert.equal(handler.handlers.length, 0);
+  });
 
-        await expect(wrapped()).rejects.toThrow('Test error');
-    });
-
-    it('should provide tryExecute with fallback', async () => {
-        const throwingFn = async () => {
-            throw new Error('Test error');
-        };
-
-        const result = await errorHandler.tryExecute(throwingFn, 'fallback');
-
-        expect(result).toBe('fallback');
-    });
-
-    it('should return result when no error occurs', async () => {
-        const successFn = async () => 'success';
-
-        const result = await errorHandler.tryExecute(successFn, 'fallback');
-
-        expect(result).toBe('success');
-    });
+  test('enableMonitoring sets flag', () => {
+    const handler = new ErrorHandler();
+    handler.enableMonitoring({ sentryDsn: 'https://key@sentry.io/project' });
+    assert.equal(handler.monitoringEnabled, true);
+    assert.equal(handler.monitoringConfig.sentryDsn, 'https://key@sentry.io/project');
+  });
 });

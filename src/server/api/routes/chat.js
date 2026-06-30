@@ -30,6 +30,7 @@ import { ingestAiUsage } from '../lib/polar.js';
 import { streamWithAiSdk, streamWithOrchestrator } from '../lib/chat-stream.js';
 import { buildSystemPrompt } from '../lib/system-prompt.js';
 import { createRequire } from 'node:module';
+import { SessionLogger } from '../../database/session-logger.js';
 
 const require = createRequire(import.meta.url);
 
@@ -128,25 +129,57 @@ chat.post('/', async c => {
     },
   });
 
-  // Background tasks: persist + bill. Fire-and-forget; the response has
+  // Background tasks: persist + bill + log. Fire-and-forget; the response has
   // already been sent so we just attach a handler.
   (async () => {
+    const logger = new SessionLogger({ sessionId: id });
+    await logger.start(id);
+    await logger.logLLMRequest({
+      model: resolved.modelId,
+      messages: messages.slice(-3),
+      tools: Object.keys(tools || {}),
+      maxTokens: resolved.maxTokens || 4096,
+    });
+
     try {
-      // Wait for the stream to fully drain by attaching to it.
       await stream.cancel().catch(() => {});
     } catch {
-      // ignore
+      // stream already drained
     }
-    if (aborted) return;
+
+    if (completedUsage) {
+      await logger.logLLMResponse({
+        model: resolved.modelId,
+        usage: completedUsage,
+        finishReason: aborted ? 'aborted' : 'stop',
+      });
+    } else {
+      await logger.logLLMResponse({
+        model: resolved.modelId,
+        usage: {},
+        finishReason: aborted ? 'aborted' : 'unknown',
+      });
+    }
+
+    if (aborted) {
+      await logger.end({ duration: 0, totalMessages: merged.length, totalToolCalls: 0, totalErrors: 1 });
+      return;
+    }
+
     if (finalMessages && finalMessages.length > 0) {
       const last = finalMessages[finalMessages.length - 1];
-      if (hasPendingToolCalls(last)) return;
+      if (hasPendingToolCalls(last)) {
+        await logger.end({ duration: 0, totalMessages: merged.length, totalToolCalls: 0, totalErrors: 0 });
+        return;
+      }
       try {
         await appendMessages({ id, userId, messages: finalMessages });
       } catch (e) {
         console.error('[chat] persist failed:', e.message);
+        await logger.logLLMError(new Error(e.message));
       }
     }
+
     if (completedUsage) {
       try {
         const { credits } = calculateCreditsForUsage({
@@ -166,6 +199,13 @@ chat.post('/', async c => {
         console.error('[chat] billing failed:', e.message);
       }
     }
+
+    await logger.end({
+      duration: completedUsage?.totalDuration || 0,
+      totalMessages: finalMessages?.length || merged.length,
+      totalToolCalls: 0,
+      totalErrors: aborted ? 1 : 0,
+    });
   })();
 
   return new Response(readable, {
@@ -178,10 +218,6 @@ chat.post('/', async c => {
 });
 
 function pickStreamer() {
-  const hasKey = ['ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'GOOGLE_GENERATIVE_AI_API_KEY'].some(
-    k => process.env[k]
-  );
-  if (!hasKey) return { stream: streamWithOrchestrator };
   try {
     require('ai');
     return { stream: streamWithAiSdk };

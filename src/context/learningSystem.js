@@ -41,7 +41,7 @@ export class LearningSystem {
   async learnFromFeedback(finding, action, _reason) {
     const ruleId = finding.ruleId || finding.rule;
 
-      // If marked as false positive multiple times, suggest custom suppression
+    // If marked as false positive multiple times, suggest custom suppression
     if (action === 'false_positive') {
       const falsePositives = this.sessionStore.getFalsePositivePatterns(ruleId);
 

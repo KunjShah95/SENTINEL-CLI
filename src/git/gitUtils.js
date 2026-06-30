@@ -97,7 +97,7 @@ export class GitUtils {
     try {
       const staged = await this.getStagedChanges();
       const unstaged = await this.getUnstagedChanges();
-      
+
       const allFiles = [...new Set([...staged.files, ...unstaged.files])];
 
       return {

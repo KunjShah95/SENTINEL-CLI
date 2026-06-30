@@ -92,13 +92,13 @@ export class SemanticCodeSearch {
    */
   async splitIntoLogicalChunks(content, file) {
     const ext = file.split('.').pop();
-    let chunks = [];
-    
+    const chunks = [];
+
     try {
       const { getLanguageAgent } = await import('../agents/languageAgents.js');
       const agent = await getLanguageAgent(ext);
       const analysisResult = await agent.analyze(content);
-      
+
       if (analysisResult.success && analysisResult.analysis) {
         const lines = content.split('\n');
         const extractChunk = (items, type) => {
@@ -107,17 +107,17 @@ export class SemanticCodeSearch {
             // Some agents return startLine/endLine, others return line. We assume we can slice based on this.
             // If endLine is missing, we fall back to fixed size or regex.
             if (item.startLine !== undefined && item.endLine !== undefined) {
-               chunks.push({
-                 type,
-                 name: item.name,
-                 content: lines.slice(item.startLine, item.endLine + 1).join('\n'),
-                 startLine: item.startLine,
-                 endLine: item.endLine
-               });
+              chunks.push({
+                type,
+                name: item.name,
+                content: lines.slice(item.startLine, item.endLine + 1).join('\n'),
+                startLine: item.startLine,
+                endLine: item.endLine
+              });
             }
           }
         };
-        
+
         extractChunk(analysisResult.analysis.functions, 'function');
         extractChunk(analysisResult.analysis.classes, 'class');
         extractChunk(analysisResult.analysis.structs, 'struct');

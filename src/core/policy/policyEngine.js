@@ -25,7 +25,7 @@ class PolicyEngine {
 
   createPolicyBundle(policies, metadata = {}) {
     const bundleId = `bundle_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
+
     const policiesData = {};
     for (const policyId of policies) {
       const policy = this.policies.get(policyId);
@@ -69,10 +69,10 @@ class PolicyEngine {
       version: bundle.version,
       checksum: bundle.checksum,
     }));
-    
+
     bundle.signature = hmac.digest('hex');
     bundle.signedAt = new Date().toISOString();
-    
+
     return bundle;
   }
 
@@ -119,7 +119,7 @@ class PolicyEngine {
       ['org', 'repo', 'local'],
       ['local', 'repo', 'org'],
     ];
-    
+
     if (validOrders.some(order => JSON.stringify(order) === JSON.stringify(precedence))) {
       this.policyPrecedence = precedence;
     }
@@ -165,16 +165,16 @@ class PolicyEngine {
     this.policies.set(policy.id, policy);
 
     switch (scope) {
-      case 'org':
-        this.organizationPolicies.set(policy.id, policy);
-        break;
-      case 'repo':
-        this.repositoryPolicies.set(policy.id, policy);
-        break;
-      case 'local':
-      default:
-        this.localPolicies.set(policy.id, policy);
-        break;
+    case 'org':
+      this.organizationPolicies.set(policy.id, policy);
+      break;
+    case 'repo':
+      this.repositoryPolicies.set(policy.id, policy);
+      break;
+    case 'local':
+    default:
+      this.localPolicies.set(policy.id, policy);
+      break;
     }
 
     return true;
@@ -249,8 +249,8 @@ class PolicyEngine {
   }
 
   async loadPolicies(policyPaths = []) {
-    const paths = policyPaths.length > 0 
-      ? policyPaths 
+    const paths = policyPaths.length > 0
+      ? policyPaths
       : [this.policyDir];
 
     const { stat, readdir } = await import('fs/promises');
@@ -283,7 +283,7 @@ class PolicyEngine {
     try {
       const content = await readFile(policyPath, 'utf8');
       const policy = this.parsePolicy(content, policyPath);
-      
+
       if (this.validatePolicy(policy)) {
         this.policies.set(policy.id, policy);
       }
@@ -297,16 +297,16 @@ class PolicyEngine {
   parsePolicy(content, sourcePath) {
     // Support YAML, JSON, or JavaScript policies
     const ext = path.extname(sourcePath);
-    
+
     if (ext === '.json') {
       return JSON.parse(content);
     }
-    
+
     if (ext === '.yaml' || ext === '.yml') {
       // Simple YAML parser for basic structures
       return this.parseYAML(content);
     }
-    
+
     if (ext === '.js') {
       // Dynamic import for JS policies
       return import(sourcePath).then(m => m.default || m);
@@ -321,10 +321,10 @@ class PolicyEngine {
     let currentArray = null;
 
     const lines = content.split('\n');
-    
+
     for (const line of lines) {
       const trimmed = line.trim();
-      
+
       // Skip empty lines and comments
       if (!trimmed || trimmed.startsWith('#')) continue;
 
@@ -351,7 +351,7 @@ class PolicyEngine {
       if (colonIndex > 0) {
         const key = trimmed.slice(0, colonIndex).trim();
         const value = trimmed.slice(colonIndex + 1).trim();
-        
+
         if (currentSection && policy[currentSection]) {
           policy[currentSection][key] = this.parseValue(value);
         } else {
@@ -367,14 +367,14 @@ class PolicyEngine {
     // Try to parse as boolean
     if (value === 'true') return true;
     if (value === 'false') return false;
-    
+
     // Try to parse as number
     if (/^-?\d+$/.test(value)) return parseInt(value, 10);
     if (/^-?\d+\.\d+$/.test(value)) return parseFloat(value);
-    
+
     // Remove quotes if present
     if ((value.startsWith('"') && value.endsWith('"')) ||
-        (value.startsWith("'") && value.endsWith("'"))) {
+        (value.startsWith('\'') && value.endsWith('\''))) {
       return value.slice(1, -1);
     }
 
@@ -383,7 +383,7 @@ class PolicyEngine {
 
   validatePolicy(policy) {
     const required = ['id', 'name', 'rules'];
-    
+
     for (const field of required) {
       if (!policy[field]) {
         console.warn(`Policy missing required field: ${field}`);
@@ -400,7 +400,7 @@ class PolicyEngine {
 
     for (const [policyId, policy] of this.policies) {
       const result = this.evaluatePolicy(policy, issues, context);
-      
+
       if (result.violations.length > 0) {
         violations.push({
           policy: policyId,
@@ -438,11 +438,11 @@ class PolicyEngine {
           const severityOrder = ['info', 'low', 'medium', 'high', 'critical'];
           const vIndex = severityOrder.indexOf(violation.severity?.toLowerCase() || 'info');
           const hIndex = severityOrder.indexOf(highestSeverity);
-          
+
           if (vIndex > hIndex) {
             highestSeverity = violation.severity;
           }
-          
+
           if (violation.severity === 'critical' || violation.severity === 'high') {
             hasBlockingViolation = true;
           }
@@ -468,7 +468,7 @@ class PolicyEngine {
     const violations = [];
 
     for (const rule of policy.rules || []) {
-      const matchingIssues = issues.filter(issue => 
+      const matchingIssues = issues.filter(issue =>
         this.matchesRule(issue, rule, context)
       );
 
@@ -547,10 +547,10 @@ class PolicyEngine {
     let penalty = 0;
     for (const v of violations) {
       switch (v.severity) {
-        case 'critical': penalty += 25; break;
-        case 'error': penalty += 15; break;
-        case 'warning': penalty += 5; break;
-        case 'info': penalty += 1; break;
+      case 'critical': penalty += 25; break;
+      case 'error': penalty += 15; break;
+      case 'warning': penalty += 5; break;
+      case 'info': penalty += 1; break;
       }
     }
 
@@ -646,7 +646,7 @@ class PolicyEngine {
     // Convert to YAML
     let yaml = `# ${policy.name}\n`;
     yaml += `# ${policy.description}\n\n`;
-    
+
     for (const [key, value] of Object.entries(policy)) {
       if (key === 'rules' && Array.isArray(value)) {
         yaml += `${key}:\n`;
@@ -658,7 +658,7 @@ class PolicyEngine {
           if (rule.analyzer) yaml += `    analyzer: ${rule.analyzer}\n`;
           if (rule.type) yaml += `    type: ${rule.type}\n`;
           if (rule.maxCount !== undefined) yaml += `    maxCount: ${rule.maxCount}\n`;
-          if (rule.mustNotExist) yaml += `    mustNotExist: true\n`;
+          if (rule.mustNotExist) yaml += '    mustNotExist: true\n';
         }
       } else if (typeof value === 'object') {
         yaml += `${key}:\n`;
@@ -718,7 +718,7 @@ class PolicyEngine {
 
   validateWaiver(waiverId) {
     const waiver = this.waivers.get(waiverId);
-    
+
     if (!waiver) {
       return { valid: false, reason: 'Waiver not found' };
     }
@@ -744,7 +744,7 @@ class PolicyEngine {
         continue;
       }
 
-      const isMatch = 
+      const isMatch =
         waiver.issueId === issue.id ||
         (waiver.issueType === issue.type && waiver.file === issue.file && waiver.line === issue.line) ||
         (waiver.analyzer === issue.analyzer && waiver.file === issue.file);
@@ -787,7 +787,7 @@ class PolicyEngine {
 
   evaluateWithWaivers(issues, context = {}) {
     const result = this.evaluate(issues, context);
-    
+
     const waivedViolations = [];
     const activeViolations = [];
 

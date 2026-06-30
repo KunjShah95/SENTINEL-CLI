@@ -13,36 +13,36 @@
  * Clerk isn't configured.
  */
 
-import { Hono } from "hono";
-import { issueDevToken, revokeDevToken } from "../middleware/auth.js";
+import { Hono } from 'hono';
+import { issueDevToken, revokeDevToken } from '../middleware/auth.js';
 
 const auth = new Hono();
 
-auth.get("/callback", (c) => {
-  const code = c.req.query("code");
-  const state = c.req.query("state");
-  const error = c.req.query("error");
-  const errorDescription = c.req.query("error_description");
+auth.get('/callback', (c) => {
+  const code = c.req.query('code');
+  const state = c.req.query('state');
+  const error = c.req.query('error');
+  const errorDescription = c.req.query('error_description');
 
   if (error) {
     return c.text(errorDescription || error, 400);
   }
   if (!code || !state) {
-    return c.text("Missing authorization code or state", 400);
+    return c.text('Missing authorization code or state', 400);
   }
 
   let port;
   try {
     // state is `<base64url(JSON({port, nonce}))>.<rest>`
-    const b64 = state.split(".")[0];
-    const json = Buffer.from(b64.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf-8");
+    const b64 = state.split('.')[0];
+    const json = Buffer.from(b64.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf-8');
     const payload = JSON.parse(json);
-    if (!payload || typeof payload.port !== "number") {
-      throw new Error("Missing port in state");
+    if (!payload || typeof payload.port !== 'number') {
+      throw new Error('Missing port in state');
     }
     port = payload.port;
   } catch (e) {
-    return c.text("Invalid authentication state", 400);
+    return c.text('Invalid authentication state', 400);
   }
 
   const target = `http://localhost:${port}/callback?code=${encodeURIComponent(
@@ -51,14 +51,14 @@ auth.get("/callback", (c) => {
   return c.redirect(target);
 });
 
-auth.post("/dev-login", async (c) => {
+auth.post('/dev-login', async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const userId = (body && body.userId) || `local-${Math.random().toString(36).slice(2, 10)}`;
   const token = issueDevToken(userId);
   return c.json({ token, userId });
 });
 
-auth.post("/dev-logout", async (c) => {
+auth.post('/dev-logout', async (c) => {
   const body = await c.req.json().catch(() => ({}));
   if (body && body.token) revokeDevToken(body.token);
   return c.json({ ok: true });

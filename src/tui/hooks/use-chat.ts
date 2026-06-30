@@ -60,19 +60,6 @@ export function useChat(options: UseChatOptions = {}) {
   }, [messages, persistKey]);
 
   const addMessage = useCallback((msg: Omit<Message, 'id' | 'timestamp'>) => {
-    try {
-      // debug: append messages being added to a debug log file to diagnose text rendering errors
-      import('fs')
-        .then(({ appendFileSync }) => {
-          try {
-            appendFileSync(
-              '.opentui-debug.log',
-              `[${new Date().toISOString()}] addMessage: ${JSON.stringify(msg)}\n`
-            );
-          } catch (e) {}
-        })
-        .catch(() => {});
-    } catch (e) {}
     setMessages(prev => [...prev, { ...msg, id: generateId(), timestamp: Date.now() }]);
   }, []);
 

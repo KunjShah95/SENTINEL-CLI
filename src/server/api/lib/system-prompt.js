@@ -19,7 +19,7 @@ export function buildSystemPrompt({ mode }) {
   let modeDescription = '';
   if (mode === Mode.PLAN) {
     modeDescription =
-      "You are in PLAN mode. Do not modify any files. Analyse the user's request, gather context, and respond with a clear plan.";
+      'You are in PLAN mode. Do not modify any files. Analyse the user\'s request, gather context, and respond with a clear plan.';
   } else if (mode === Mode.REVIEW) {
     modeDescription = [
       'You are SENTINEL — a CodeRabbit-style AI code reviewer. Your job is to review diffs and produce structured security reviews.',
@@ -68,7 +68,7 @@ export function buildSystemPrompt({ mode }) {
     ].join('\n');
   } else {
     modeDescription =
-      "You are in BUILD mode. You have full read/write access to the user's project directory. Make changes decisively. If you encounter missing packages/commands while running bash, you MUST auto-install them (e.g., npm install, pip install).";
+      'You are in BUILD mode. You have full read/write access to the user\'s project directory. Make changes decisively. If you encounter missing packages/commands while running bash, you MUST auto-install them (e.g., npm install, pip install).';
   }
 
   const toolList =
@@ -77,8 +77,8 @@ export function buildSystemPrompt({ mode }) {
       : 'Available tools: readFile, listDirectory, glob, grep, writeFile, editFile, batchEdit, bash, searchWeb, diffFile, undoLastChange.';
 
   const rulesArray = [
-    "Be decisive — pick a plan and execute it. Don't ask the user to choose between equally-valid options unless absolutely necessary.",
-    "Never re-read files you've already read in this conversation.",
+    'Be decisive — pick a plan and execute it. Don\'t ask the user to choose between equally-valid options unless absolutely necessary.',
+    'Never re-read files you\'ve already read in this conversation.',
     'Batch independent tool calls into a single message.',
   ];
 

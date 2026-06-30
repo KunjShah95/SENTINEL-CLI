@@ -313,7 +313,7 @@ export class ThreatModelingEngine {
     // Missing audit logging
     if (attackSurface.authenticationPoints.length > 0) {
       threats.push({
-        id: `R-1`,
+        id: 'R-1',
         category: 'Repudiation',
         title: 'Insufficient Audit Logging',
         description: 'Authentication events may not be properly logged',
@@ -395,7 +395,7 @@ export class ThreatModelingEngine {
 
     if (noRateLimit.length > 0) {
       threats.push({
-        id: `D-1`,
+        id: 'D-1',
         category: 'Denial of Service',
         title: 'Missing Rate Limiting',
         description: `${noRateLimit.length} endpoints lack rate limiting`,

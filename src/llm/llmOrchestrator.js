@@ -1,8 +1,9 @@
 import axios from 'axios';
 import enhancedRateLimiter from '../utils/enhancedRateLimiter.js';
 
-let GoogleGenerativeAIClient = null;
-let GroqClient = null;
+// Module-level SDK constructors (lazy-loaded, cached across instances)
+let _GroqModule = null;
+let _GeminiModule = null;
 
 const ENV_FALLBACKS = {
   openai: 'OPENAI_API_KEY',
@@ -12,6 +13,10 @@ const ENV_FALLBACKS = {
   anthropic: 'ANTHROPIC_API_KEY',
   ollama: 'OLLAMA_HOST',
 };
+
+// Providers that run on the user's machine and need no API key. They are enabled
+// purely by being reachable (Ollama defaults to http://localhost:11434).
+const LOCAL_LLM_PROVIDERS = new Set(['local', 'ollama', 'lmstudio']);
 
 const SEVERITY_ORDER = {
   critical: 0,
@@ -25,6 +30,7 @@ export default class LLMOrchestrator {
   constructor(aiConfig = {}) {
     this.temperature = aiConfig.temperature ?? 0.3;
     this.maxTokens = aiConfig.maxTokens ?? 2000;
+    this.sdkOverrides = aiConfig.sdkOverrides || {};
     this.providers = this.normalizeProviders(aiConfig);
   }
 
@@ -44,7 +50,7 @@ export default class LLMOrchestrator {
     return configuredProviders
       .map((providerConfig, index) => {
         const envKey = providerConfig.apiKeyEnv || ENV_FALLBACKS[providerConfig.provider];
-        let apiKey = envKey ? process.env[envKey] : undefined;
+        const apiKey = envKey ? process.env[envKey] : undefined;
 
         return {
           id: providerConfig.id || `${providerConfig.provider || 'provider'}-${index}`,
@@ -56,7 +62,7 @@ export default class LLMOrchestrator {
           metadata: providerConfig.metadata || {},
         };
       })
-      .filter(provider => provider.enabled && (provider.provider === 'local' || provider.apiKey));
+      .filter(provider => provider.enabled && (LOCAL_LLM_PROVIDERS.has(provider.provider) || provider.apiKey));
   }
 
   async review(prompt, { filePath } = {}) {
@@ -158,7 +164,7 @@ export default class LLMOrchestrator {
       'You are Sentinel CLI, a concise and upbeat assistant for developers.';
 
     // Find the best provider that supports streaming
-    const provider = this.providers.find(p => p.provider === 'openai' || p.provider === 'groq');
+    const provider = this.providers.find(p => p.provider === 'openai' || p.provider === 'groq' || p.provider === 'ollama');
 
     if (!provider) {
       // Fall back to non-streaming
@@ -186,12 +192,14 @@ export default class LLMOrchestrator {
     const messages = this.buildMessages(options.systemPrompt, prompt);
 
     switch (provider.provider) {
-      case 'openai':
-        return this.streamOpenAI(provider, messages, options);
-      case 'groq':
-        return this.streamGroq(provider, messages, options);
-      default:
-        throw new Error(`Streaming not supported for provider: ${provider.provider}`);
+    case 'openai':
+      return this.streamOpenAI(provider, messages, options);
+    case 'groq':
+      return this.streamGroq(provider, messages, options);
+    case 'ollama':
+      return this.streamOllama(provider, messages, options);
+    default:
+      throw new Error(`Streaming not supported for provider: ${provider.provider}`);
     }
   }
 
@@ -235,7 +243,7 @@ export default class LLMOrchestrator {
   }
 
   async *streamGroq(provider, messages, _options = {}) {
-    const groq = GroqClient ? new GroqClient({ apiKey: provider.apiKey }) : await this.getGroqClient(provider.apiKey);
+    const groq = await this.getGroqClient(provider.apiKey);
 
     const response = await groq.chat.completions.create({
       model: provider.model || 'llama3-70b-8192',
@@ -256,11 +264,61 @@ export default class LLMOrchestrator {
     }
   }
 
-  async getGroqClient(apiKey) {
-    if (!GroqClient) {
-      const module = await import('groq-sdk');
-      GroqClient = module.default || module.Groq || module;
+  async *streamOllama(provider, messages, _options = {}) {
+    const host = provider.apiKey || 'http://localhost:11434';
+    const response = await axios.post(
+      `${host}/v1/chat/completions`,
+      {
+        model: provider.model || 'llama3.2',
+        temperature: this.temperature,
+        max_tokens: this.maxTokens,
+        messages,
+        stream: true,
+      },
+      { responseType: 'stream' }
+    );
+
+    for await (const chunk of response.data) {
+      const lines = chunk.toString().split('\n').filter(line => line.startsWith('data: '));
+      for (const line of lines) {
+        const data = line.slice(6);
+        if (data === '[DONE]') {
+          yield { type: 'done' };
+          return;
+        }
+        try {
+          const parsed = JSON.parse(data);
+          const content = parsed.choices?.[0]?.delta?.content;
+          if (content) {
+            yield { type: 'content', content };
+          }
+        } catch (e) {
+          // Skip invalid JSON tokens
+        }
+      }
     }
+  }
+
+  async _resolveGroqModule() {
+    if (this.sdkOverrides['groq-sdk']) return this.sdkOverrides['groq-sdk'];
+    if (!_GroqModule) {
+      const module = await import('groq-sdk');
+      _GroqModule = module.default || module.Groq || module;
+    }
+    return _GroqModule;
+  }
+
+  async _resolveGeminiModule() {
+    if (this.sdkOverrides['@google/generative-ai']) return this.sdkOverrides['@google/generative-ai'];
+    if (!_GeminiModule) {
+      const module = await import('@google/generative-ai');
+      _GeminiModule = module.GoogleGenerativeAI || module.default;
+    }
+    return _GeminiModule;
+  }
+
+  async getGroqClient(apiKey) {
+    const GroqClient = await this._resolveGroqModule();
     return new GroqClient({ apiKey });
   }
 
@@ -288,17 +346,17 @@ export default class LLMOrchestrator {
 
       let result;
       switch (provider.provider) {
-        case 'openai':
-          result = await this.callOpenAIWithFunctions(provider, messages, toolsFormatted, options);
-          break;
-        case 'groq':
-          result = await this.callGroqWithFunctions(provider, messages, toolsFormatted, options);
-          break;
-        case 'openrouter':
-          result = await this.callOpenRouterWithFunctions(provider, messages, toolsFormatted, options);
-          break;
-        default:
-          return { success: false, error: 'Provider not supported for function calling' };
+      case 'openai':
+        result = await this.callOpenAIWithFunctions(provider, messages, toolsFormatted, options);
+        break;
+      case 'groq':
+        result = await this.callGroqWithFunctions(provider, messages, toolsFormatted, options);
+        break;
+      case 'openrouter':
+        result = await this.callOpenRouterWithFunctions(provider, messages, toolsFormatted, options);
+        break;
+      default:
+        return { success: false, error: 'Provider not supported for function calling' };
       }
 
       return result;
@@ -513,31 +571,31 @@ export default class LLMOrchestrator {
     let response = '';
 
     switch (provider.provider) {
-      case 'openai':
-        response = await this.callOpenAI(provider, prompt, options);
-        break;
-      case 'anthropic':
-        response = await this.callAnthropic(provider, prompt, options);
-        break;
-      case 'groq':
-        response = await this.callGroq(provider, prompt, options);
-        break;
-      case 'gemini':
-        response = await this.callGemini(provider, prompt, options);
-        break;
-      case 'openrouter':
-        response = await this.callOpenRouter(provider, prompt, options);
-        break;
-      case 'ollama':
-        response = await this.callOllama(provider, prompt, options);
-        break;
-      case 'local':
-      default:
-        response =
+    case 'openai':
+      response = await this.callOpenAI(provider, prompt, options);
+      break;
+    case 'anthropic':
+      response = await this.callAnthropic(provider, prompt, options);
+      break;
+    case 'groq':
+      response = await this.callGroq(provider, prompt, options);
+      break;
+    case 'gemini':
+      response = await this.callGemini(provider, prompt, options);
+      break;
+    case 'openrouter':
+      response = await this.callOpenRouter(provider, prompt, options);
+      break;
+    case 'ollama':
+      response = await this.callOllama(provider, prompt, options);
+      break;
+    case 'local':
+    default:
+      response =
           options.responseFormat === 'json_object'
             ? JSON.stringify({ issues: [] })
             : this.generateLocalResponse(prompt);
-        break;
+      break;
     }
 
     const issues =
@@ -588,10 +646,7 @@ export default class LLMOrchestrator {
   }
 
   async callGroq(provider, prompt, options = {}) {
-    if (!GroqClient) {
-      const module = await import('groq-sdk');
-      GroqClient = module.default || module.Groq || module;
-    }
+    const GroqClient = await this._resolveGroqModule();
     const groq = new GroqClient({ apiKey: provider.apiKey });
     const messages = this.buildMessages(options.systemPrompt, prompt);
 
@@ -610,11 +665,8 @@ export default class LLMOrchestrator {
   }
 
   async callGemini(provider, prompt, options = {}) {
-    if (!GoogleGenerativeAIClient) {
-      const module = await import('@google/generative-ai');
-      GoogleGenerativeAIClient = module.GoogleGenerativeAI || module.default;
-    }
-    const genAI = new GoogleGenerativeAIClient(provider.apiKey);
+    const GeminiClient = await this._resolveGeminiModule();
+    const genAI = new GeminiClient(provider.apiKey);
     const model = genAI.getGenerativeModel({ model: provider.model || 'gemini-1.5-flash' });
     const finalPrompt = options.systemPrompt
       ? `${options.systemPrompt}\n\nUser:\n${prompt}`
@@ -693,7 +745,7 @@ export default class LLMOrchestrator {
       ? prompt.map(m => m.content).join(' ')
       : prompt;
     return `Sentinel-local: "${promptText.slice(0, 80)}"${promptText.length > 80 ? '...' : ''
-      } (add API keys to get real answers).`;
+    } (add API keys to get real answers).`;
   }
 
   parseResponse(rawResponse) {

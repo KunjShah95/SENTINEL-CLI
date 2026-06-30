@@ -61,7 +61,7 @@ export class DistributedAnalysisEngine extends EventEmitter {
     // Start task distributor
     this.startTaskDistributor();
 
-    console.log(`✅ Worker pool initialized`);
+    console.log('✅ Worker pool initialized');
   }
 
   /**
@@ -98,23 +98,23 @@ export class DistributedAnalysisEngine extends EventEmitter {
     const { type, taskId, result, error, metrics } = message;
 
     switch (type) {
-      case 'ready':
-        workerState.busy = false;
-        workerState.lastActivity = Date.now();
-        this.emit('worker:ready', workerState.id);
-        break;
+    case 'ready':
+      workerState.busy = false;
+      workerState.lastActivity = Date.now();
+      this.emit('worker:ready', workerState.id);
+      break;
 
-      case 'progress':
-        this.emit('task:progress', { taskId, progress: result });
-        break;
+    case 'progress':
+      this.emit('task:progress', { taskId, progress: result });
+      break;
 
-      case 'result':
-        this.handleTaskComplete(taskId, result, metrics, workerState);
-        break;
+    case 'result':
+      this.handleTaskComplete(taskId, result, metrics, workerState);
+      break;
 
-      case 'error':
-        this.handleTaskError(taskId, error, workerState);
-        break;
+    case 'error':
+      this.handleTaskError(taskId, error, workerState);
+      break;
     }
   }
 

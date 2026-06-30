@@ -296,27 +296,27 @@ export class ActiveLearningSystem {
    */
   combineScores(score, strategy) {
     switch (strategy) {
-      case 'uncertainty':
-        return score.uncertainty;
+    case 'uncertainty':
+      return score.uncertainty;
 
-      case 'diversity':
-        return (
-          score.diversity * 0.6 +
+    case 'diversity':
+      return (
+        score.diversity * 0.6 +
           score.representativeness * 0.4
-        );
+      );
 
-      case 'hybrid':
-        return (
-          score.uncertainty * 0.5 +
+    case 'hybrid':
+      return (
+        score.uncertainty * 0.5 +
           score.diversity * this.options.diversityWeight +
           score.representativeness * this.options.representativenessWeight
-        );
+      );
 
-      case 'expected_change':
-        return score.expectedChange;
+    case 'expected_change':
+      return score.expectedChange;
 
-      default:
-        return score.uncertainty;
+    default:
+      return score.uncertainty;
     }
   }
 
@@ -693,6 +693,147 @@ export class ActiveLearningSystem {
       committeeSize: this.committee.length,
       recentLabels: this.labelingHistory.slice(-10)
     };
+  }
+
+  // ─── CodeRabbit-style Learnings ──────────────────────────────────────────
+
+  /**
+   * Learn from review feedback (accepted/rejected comments).
+   * Boosts confidence for accepted patterns, reduces for rejected ones.
+   *
+   * @param {Array} feedbackItems - [{ issue, accepted: boolean, comment?: string }]
+   */
+  learnFromReviewFeedback(feedbackItems) {
+    if (!this.learnings) this.learnings = new Map();
+
+    for (const item of feedbackItems) {
+      const key = this._normalizePatternKey(item.issue);
+
+      if (!this.learnings.has(key)) {
+        this.learnings.set(key, {
+          pattern: key,
+          confidence: 0.5,
+          acceptCount: 0,
+          rejectCount: 0,
+          lastSeen: null,
+          examples: [],
+        });
+      }
+
+      const learning = this.learnings.get(key);
+      learning.lastSeen = new Date().toISOString();
+
+      if (item.accepted) {
+        learning.acceptCount++;
+        learning.confidence = Math.min(1.0, learning.confidence + 0.1);
+      } else {
+        learning.rejectCount++;
+        learning.confidence = Math.max(0.0, learning.confidence - 0.15);
+      }
+
+      if (item.comment) {
+        learning.examples.push({
+          accepted: item.accepted,
+          comment: item.comment.slice(0, 500),
+          timestamp: new Date().toISOString(),
+        });
+        // Keep only last 10 examples
+        if (learning.examples.length > 10) {
+          learning.examples = learning.examples.slice(-10);
+        }
+      }
+    }
+
+    return {
+      processed: feedbackItems.length,
+      totalLearnings: this.learnings.size,
+    };
+  }
+
+  /**
+   * Apply learned patterns to adjust confidence scores for new issues.
+   *
+   * @param {Array} issues - Issues from current review
+   * @returns {Array} Issues with adjusted confidence scores
+   */
+  applyLearnings(issues) {
+    if (!this.learnings || this.learnings.size === 0) return issues;
+
+    return issues.map(issue => {
+      const key = this._normalizePatternKey(issue);
+      const learning = this.learnings.get(key);
+
+      if (!learning) return issue;
+
+      // Adjust confidence based on learned acceptance rate
+      const adjustedConfidence = (issue.confidence || 0.5) * learning.confidence * 2;
+      const clampedConfidence = Math.max(0, Math.min(1, adjustedConfidence));
+
+      return {
+        ...issue,
+        confidence: clampedConfidence,
+        learningApplied: true,
+        learningConfidence: learning.confidence,
+        learningPattern: key,
+        // Suppress issues with very low learning confidence
+        suppressed: learning.confidence < 0.2 ? 'rejected_pattern' : false,
+      };
+    });
+  }
+
+  /**
+   * Get all learned patterns.
+   */
+  getLearnings() {
+    if (!this.learnings) return [];
+    return [...this.learnings.values()].sort((a, b) => b.confidence - a.confidence);
+  }
+
+  /**
+   * Save learnings to disk.
+   */
+  async saveLearnings(filePath) {
+    const { promises: fs } = await import('fs');
+    const path = await import('path');
+    const dir = path.dirname(filePath);
+
+    try {
+      await fs.mkdir(dir, { recursive: true });
+    } catch {
+      // dir exists
+    }
+
+    const data = this.learnings
+      ? Object.fromEntries(this.learnings)
+      : {};
+
+    await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf8');
+  }
+
+  /**
+   * Load learnings from disk.
+   */
+  async loadLearnings(filePath) {
+    const { promises: fs } = await import('fs');
+
+    try {
+      const content = await fs.readFile(filePath, 'utf8');
+      const data = JSON.parse(content);
+      this.learnings = new Map(Object.entries(data));
+    } catch {
+      this.learnings = new Map();
+    }
+  }
+
+  /**
+   * Normalize an issue into a pattern key for learning.
+   */
+  _normalizePatternKey(issue) {
+    const parts = [];
+    if (issue.category || issue.analyzer) parts.push(issue.category || issue.analyzer);
+    if (issue.rule || issue.ruleId) parts.push(issue.rule || issue.ruleId);
+    if (issue.severity) parts.push(issue.severity);
+    return parts.join(':') || (issue.title || 'unknown').toLowerCase().slice(0, 100);
   }
 }
 

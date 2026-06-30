@@ -8,14 +8,14 @@
  * endpoints require auth.
  */
 
-import { Hono } from "hono";
-import { createCheckoutUrl, createCustomerPortalUrl } from "../lib/polar.js";
-import { requireAuth } from "../middleware/auth.js";
+import { Hono } from 'hono';
+import { createCheckoutUrl, createCustomerPortalUrl } from '../lib/polar.js';
+import { requireAuth } from '../middleware/auth.js';
 
 const billing = new Hono();
 
-billing.post("/checkout", requireAuth(), async (c) => {
-  const userId = c.get("userId");
+billing.post('/checkout', requireAuth(), async (c) => {
+  const userId = c.get('userId');
   try {
     const url = await createCheckoutUrl({
       customerExternalId: userId,
@@ -23,12 +23,12 @@ billing.post("/checkout", requireAuth(), async (c) => {
     });
     return c.json({ url });
   } catch (e) {
-    return c.json({ error: e.message || "Checkout failed" }, 500);
+    return c.json({ error: e.message || 'Checkout failed' }, 500);
   }
 });
 
-billing.post("/portal", requireAuth(), async (c) => {
-  const userId = c.get("userId");
+billing.post('/portal', requireAuth(), async (c) => {
+  const userId = c.get('userId');
   try {
     const url = await createCustomerPortalUrl({
       customerExternalId: userId,
@@ -36,12 +36,12 @@ billing.post("/portal", requireAuth(), async (c) => {
     });
     return c.json({ url });
   } catch (e) {
-    return c.json({ error: e.message || "Portal failed" }, 500);
+    return c.json({ error: e.message || 'Portal failed' }, 500);
   }
 });
 
-billing.get("/success", (c) => {
-  return c.text("Done. You can close this tab and return to Sentinel.");
+billing.get('/success', (c) => {
+  return c.text('Done. You can close this tab and return to Sentinel.');
 });
 
 export default billing;

@@ -13,7 +13,7 @@ class PrometheusExporter {
     let output = '';
 
     // Add metadata
-    output += `# Sentinel Security CLI Metrics\n`;
+    output += '# Sentinel Security CLI Metrics\n';
     output += `# Generated: ${new Date().toISOString()}\n\n`;
 
     // Export counters
@@ -35,18 +35,18 @@ class PrometheusExporter {
     // Export histograms
     for (const [key, hist] of Object.entries(data.histograms || {})) {
       const metricName = `${this.prefix}_${this.sanitizeName(key)}`;
-      
+
       output += `# TYPE ${metricName} histogram\n`;
-      
+
       // Export buckets
       const buckets = hist.values || [];
       const sortedBuckets = [...buckets].sort((a, b) => a - b);
-      
+
       for (const bucket of [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10]) {
         const count = sortedBuckets.filter(v => v <= bucket).length;
         output += `${metricName}_bucket{le="${bucket}"}${this.formatLabels()} ${count}\n`;
       }
-      
+
       output += `${metricName}_bucket{le="+Inf"}${this.formatLabels()} ${buckets.length}\n`;
       output += `${metricName}_sum${this.formatLabels()} ${hist.sum || 0}\n`;
       output += `${metricName}_count${this.formatLabels()} ${hist.count || 0}\n\n`;
@@ -66,7 +66,7 @@ class PrometheusExporter {
     const labels = Object.entries(this.defaultLabels)
       .map(([k, v]) => `${k}="${v}"`)
       .join(',');
-    
+
     return labels ? `{${labels}}` : '';
   }
 

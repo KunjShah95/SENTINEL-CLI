@@ -17,12 +17,12 @@ class ScannerAgent {
   async run(code) {
     const prompt = `You are a scanner that finds bugs, edge-cases and TODOs in the given code.\n\nCode:\n${code}\n\nRespond with a JSON array of findings where each finding has {file, line, issue, snippet}.`;
     const res = await this.client.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [{ role: "user", content: prompt }],
+      model: 'gpt-4o-mini',
+      messages: [{ role: 'user', content: prompt }],
       max_tokens: 800,
     });
 
-    const text = res.choices?.[0]?.message?.content ?? res.output?.[0]?.content?.[0]?.text ?? "";
+    const text = res.choices?.[0]?.message?.content ?? res.output?.[0]?.content?.[0]?.text ?? '';
     try { return JSON.parse(text); } catch (e) { return [{ issue: text }]; }
   }
 }
@@ -33,12 +33,12 @@ class FixerAgent {
   async run(finding, originalCode) {
     const prompt = `You are a fixer. Apply a minimal, well-tested fix to the code based on this finding: ${JSON.stringify(finding)}.\nReturn the full updated file content only.\n\nOriginal:\n${originalCode}`;
     const res = await this.client.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [{ role: "user", content: prompt }],
+      model: 'gpt-4o-mini',
+      messages: [{ role: 'user', content: prompt }],
       max_tokens: 2000,
     });
 
-    const updated = res.choices?.[0]?.message?.content ?? res.output?.[0]?.content?.[0]?.text ?? "";
+    const updated = res.choices?.[0]?.message?.content ?? res.output?.[0]?.content?.[0]?.text ?? '';
     return updated;
   }
 }
@@ -49,12 +49,12 @@ class ValidatorAgent {
   async run(fixedCode) {
     const prompt = `You are a validator. Determine whether the following changes fix the reported issues. Provide a JSON object: { valid: boolean, details: string }.\n\nCode:\n${fixedCode}`;
     const res = await this.client.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [{ role: "user", content: prompt }],
+      model: 'gpt-4o-mini',
+      messages: [{ role: 'user', content: prompt }],
       max_tokens: 800,
     });
 
-    const text = res.choices?.[0]?.message?.content ?? res.output?.[0]?.content?.[0]?.text ?? "";
+    const text = res.choices?.[0]?.message?.content ?? res.output?.[0]?.content?.[0]?.text ?? '';
     try { return JSON.parse(text); } catch (e) { return { valid: false, details: text }; }
   }
 }

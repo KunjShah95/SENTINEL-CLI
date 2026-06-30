@@ -1,0 +1,39 @@
+﻿id: insecure-eval-usage
+title: Insecure eval() Usage Leading to Code Injection
+severity: critical
+languages: [javascript, typescript]
+cwe: [CWE-95, CWE-94]
+tags: [injection, rce, eval, code-injection]
+description: |
+  The eval() function executes an arbitrary string as code in the current
+  execution context. When user input reaches eval(), attackers can inject
+  arbitrary JavaScript — leading to full server-side compromise, data
+  exfiltration, or client-side session theft.
+
+  Related dangerous APIs include Function() constructor, setTimeout/setInterval
+  with string arguments, vm.runInNewContext(), and dynamic require() with
+  user-controlled paths.
+detection: |
+  Flag all uses of eval(), Function(), setTimeout/setInterval with first
+  argument as a string, and vm module APIs with string input. For each use,
+  trace whether user input reaches the evaluated string.
+remediation: |
+  Replace eval() with safer alternatives. For JSON, use JSON.parse(). For
+  dynamic property access, use bracket notation. For math expressions, use
+  a safe expression parser. If code evaluation is unavoidable, run in an
+  isolated process with strict input validation.
+example:
+  vulnerable: |
+    const userInput = req.body.expression;
+    const result = eval(userInput);
+    res.json({ result });
+  fixed: |
+    import { evaluate } from 'mathjs';
+    const userInput = req.body.expression;
+    const result = evaluate(userInput);
+    res.json({ result });
+references:
+  - url: https://owasp.org/www-community/attacks/Code_Injection
+    title: OWASP Code Injection
+  - url: https://cwe.mitre.org/data/definitions/94.html
+    title: CWE-94: Improper Control of Generation of Code

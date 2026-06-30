@@ -53,20 +53,20 @@ parentPort.on('message', async (message) => {
  */
 async function executeTask(task) {
   switch (task.type) {
-    case 'analyze_file':
-      return await analyzeFile(task.data);
+  case 'analyze_file':
+    return await analyzeFile(task.data);
 
-    case 'generate_embedding':
-      return await generateEmbedding(task.data);
+  case 'generate_embedding':
+    return await generateEmbedding(task.data);
 
-    case 'check_security':
-      return await checkSecurity(task.data);
+  case 'check_security':
+    return await checkSecurity(task.data);
 
-    case 'trace_dependency':
-      return await traceDependency(task.data);
+  case 'trace_dependency':
+    return await traceDependency(task.data);
 
-    default:
-      throw new Error(`Unknown task type: ${task.type}`);
+  default:
+    throw new Error(`Unknown task type: ${task.type}`);
   }
 }
 

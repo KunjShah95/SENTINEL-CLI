@@ -22,11 +22,11 @@ function applyMinimalFixes(code) {
 
 async function generateLLMFix(code, error, _context = {}) {
   const orchestrator = getLLMOrchestrator();
-  
+
   if (!orchestrator?.providers?.length) {
     return null;
   }
-  
+
   const prompt = `You are a code fixer. Given the following code and error, provide a fixed version of the code.
 
 Error: ${error.type} - ${error.message}
@@ -44,7 +44,7 @@ Provide ONLY the fixed code without any explanation or markdown formatting. If n
       temperature: 0.2,
       maxTokens: 4000
     });
-    
+
     if (result?.text) {
       const fixed = result.text.trim();
       if (fixed.startsWith('```')) {
@@ -55,46 +55,78 @@ Provide ONLY the fixed code without any explanation or markdown formatting. If n
   } catch (e) {
     console.warn('LLM fix generation failed:', e.message);
   }
-  
+
   return null;
+}
+
+// Redact hardcoded secrets so the leak no longer scans positive.
+// Replaces the secret literal with an env-var reference (keeps code runnable).
+function redactSecret(code) {
+  // Each pattern optionally consumes a wrapping quote pair (\1 backref) so a
+  // quoted literal `"ghp_..."` becomes a bare `process.env.REDACTED_SECRET`
+  // reference, not a string containing that text.
+  const patterns = [
+    /(['"`]?)ghp_[A-Za-z0-9_]{36,}\1/g,
+    /(['"`]?)(?:AKIA|ABIA|ACCA)[A-Z0-9]{16}\1/g,
+    /(['"`]?)-----BEGIN (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----\1/g
+  ];
+
+  let redacted = code;
+  for (const re of patterns) {
+    redacted = redacted.replace(re, 'process.env.REDACTED_SECRET');
+  }
+
+  // Inline assignment: api_key = "value" -> api_key = process.env.REDACTED_SECRET
+  redacted = redacted.replace(
+    /\b(api_?key|apiKey|token|secret|password|passwd)\b(\s*[:=]\s*)(['"`])[A-Za-z0-9_.\-/]{8,}\3/gi,
+    '$1$2process.env.REDACTED_SECRET'
+  );
+
+  return redacted;
 }
 
 async function proposeFixes(code, errors, options = {}) {
   const { useLLM = true, context = {} } = options;
-  
-  // Apply minimal syntax fixes first
-  let fixedCode = applyMinimalFixes(code);
-  
+
+  // Thread a single working copy so fixes compound instead of overwriting.
+  let working = applyMinimalFixes(code);
+
   const proposals = [];
-  
+
   for (const error of (errors || [])) {
     let fixApplied = false;
-    let fixedVersion = fixedCode;
-    
-    // Try LLM-based fix for complex errors
-    if (useLLM && error.type !== 'SecretLeak') {
-      const llmFix = await generateLLMFix(code, error, context);
-      if (llmFix && llmFix !== code) {
-        fixedVersion = llmFix;
+    const before = working;
+
+    if (error.type === 'SecretLeak') {
+      const redacted = redactSecret(working);
+      if (redacted !== working) {
+        working = redacted;
+        fixApplied = true;
+      }
+    } else if (useLLM) {
+      // Fix on the accumulated `working` copy so prior fixes are preserved.
+      const llmFix = await generateLLMFix(working, error, context);
+      if (llmFix && llmFix !== working) {
+        working = llmFix;
         fixApplied = true;
       }
     }
-    
+
     const desc = `Proposed fix for ${error.type || 'Error'}${error.line ? ` at line ${error.line}` : ''}: ${error.message}`;
-    const preview = fixedVersion.slice(-200);
-    
+
     proposals.push({
       id: proposals.length + 1,
       type: error.type,
       description: desc,
       originalError: error,
-      patchPreview: preview,
-      fixedCode: fixedVersion,
+      patchPreview: working.slice(-200),
+      fixedCode: working,
+      changed: working !== before,
       fixApplied
     });
   }
-  
-  return { fixedCode, proposals };
+
+  return { fixedCode: working, proposals };
 }
 
-export { proposeFixes, applyMinimalFixes, generateLLMFix };
+export { proposeFixes, applyMinimalFixes, generateLLMFix, redactSecret };

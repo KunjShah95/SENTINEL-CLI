@@ -101,7 +101,7 @@ class AnalyzerRegistry {
 
       return metadata.id;
     } catch (error) {
-      console.error(`Failed to register analyzer:`, error.message);
+      console.error('Failed to register analyzer:', error.message);
       throw error;
     }
   }

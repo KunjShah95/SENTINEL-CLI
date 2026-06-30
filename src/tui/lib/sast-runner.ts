@@ -13,11 +13,12 @@
 import { execSync } from 'child_process';
 import { existsSync, readFileSync } from 'fs';
 import { join, resolve } from 'path';
+import { globSync } from 'glob';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type SastFinding = {
-  tool: 'eslint' | 'semgrep' | 'secrets' | 'npm-audit' | 'custom';
+  tool: 'eslint' | 'semgrep' | 'secrets' | 'npm-audit' | 'bandit' | 'gosec' | 'hadolint' | 'clippy' | 'custom';
   severity: 'critical' | 'high' | 'medium' | 'low' | 'info';
   file?: string;
   line?: number;
@@ -60,7 +61,7 @@ function tryExec(cmd: string, options: { timeout?: number; cwd?: string } = {}):
   }
 }
 
-function severityFromString(s: string): SastFinding['severity'] {
+export function severityFromString(s: string): SastFinding['severity'] {
   const lower = s.toLowerCase();
   if (lower === 'critical') return 'critical';
   if (lower === 'high' || lower === 'error' || lower === '2') return 'high';
@@ -319,6 +320,284 @@ function runSecretScan(cwd: string): { findings: SastFinding[]; error: string | 
   return { findings, error: null };
 }
 
+// ─── 5. Bandit (Python) ────────────────────────────────────────────────────────
+
+function findBinary(name: string): string | null {
+  const cmd = process.platform === 'win32' ? 'where' : 'which';
+  const { error } = tryExec(`${cmd} ${name}`);
+  return error ? null : name;
+}
+
+/** Check if the directory has any files matching the given extension(s) */
+function hasMatchingFiles(cwd: string, exts: string[]): boolean {
+  const { stdout } = tryExec(`git ls-files 2>/dev/null || echo .`, { cwd });
+  if (!stdout) return false;
+  return stdout.split('\n').some(f =>
+    exts.some(ext => f.trim().endsWith(ext))
+  );
+}
+
+function runBandit(cwd: string): { findings: SastFinding[]; error: string | null; ran: boolean } {
+  if (!findBinary('bandit')) {
+    return { findings: [], error: null, ran: false };
+  }
+  if (!hasMatchingFiles(cwd, ['.py', '.pyw'])) {
+    return { findings: [], error: null, ran: false };
+  }
+
+  const { stdout, error } = tryExec('bandit -r . -f json --quiet 2>/dev/null || true', { cwd, timeout: 120_000 });
+  if (!stdout.trim()) {
+    return { findings: [], error, ran: true };
+  }
+
+  const findings: SastFinding[] = [];
+  try {
+    // bandit may wrap output in `|| true` — extract the first JSON object
+    const jsonStart = stdout.indexOf('{');
+    const jsonEnd = stdout.lastIndexOf('}') + 1;
+    if (jsonStart === -1 || jsonEnd <= jsonStart) {
+      return { findings, error: 'No JSON in bandit output', ran: true };
+    }
+    const parsed = JSON.parse(stdout.slice(jsonStart, jsonEnd));
+    const results: Array<{
+      filename: string;
+      line_number: number;
+      line_range?: number[];
+      issue_severity: string;
+      issue_confidence: string;
+      test_id: string;
+      test_name: string;
+      issue_text: string;
+      more_info?: string;
+    }> = parsed.results ?? [];
+
+    for (const r of results) {
+      const rawSev = r.issue_severity || 'MEDIUM';
+      const rawConf = r.issue_confidence || 'MEDIUM';
+      // Only include HIGH/MEDIUM confidence findings to reduce noise
+      if (rawConf !== 'HIGH' && rawConf !== 'MEDIUM') continue;
+      if (rawSev === 'LOW') continue;
+
+      findings.push({
+        tool: 'bandit',
+        severity: rawSev === 'HIGH' ? 'high' : rawSev === 'MEDIUM' ? 'medium' : 'low',
+        file: r.filename,
+        line: r.line_number,
+        rule: r.test_id ? `bandit:${r.test_id}` : `bandit:${r.test_name}`,
+        message: r.issue_text || `${r.test_name} (${r.test_id})`,
+        suggestion: r.more_info ? `See: ${r.more_info}` : 'Review the flagged code for security issues.',
+      });
+    }
+  } catch (parseErr) {
+    return { findings, error: `Bandit JSON parse failed: ${parseErr}`, ran: true };
+  }
+
+  return { findings, error, ran: true };
+}
+
+// ─── 6. Gosec (Go) ────────────────────────────────────────────────────────────
+
+function runGosec(cwd: string): { findings: SastFinding[]; error: string | null; ran: boolean } {
+  if (!findBinary('gosec')) {
+    return { findings: [], error: null, ran: false };
+  }
+  if (!hasMatchingFiles(cwd, ['.go'])) {
+    return { findings: [], error: null, ran: false };
+  }
+
+  const { stdout, error } = tryExec('gosec -fmt=json ./... 2>/dev/null || true', { cwd, timeout: 120_000 });
+  if (!stdout.trim()) {
+    return { findings: [], error, ran: true };
+  }
+
+  const findings: SastFinding[] = [];
+  try {
+    const jsonStart = stdout.indexOf('{');
+    const jsonEnd = stdout.lastIndexOf('}') + 1;
+    if (jsonStart === -1 || jsonEnd <= jsonStart) {
+      return { findings, error: 'No JSON in gosec output', ran: true };
+    }
+    const parsed = JSON.parse(stdout.slice(jsonStart, jsonEnd));
+    const issues: Array<{
+      severity: string;
+      confidence: string;
+      cwe?: { ID?: string };
+      rule_id: string;
+      details: string;
+      file: string;
+      line: string;
+      column?: string;
+    }> = parsed.Issues ?? [];
+
+    for (const issue of issues) {
+      const sev = issue.severity?.toLowerCase() || 'medium';
+      const conf = issue.confidence?.toLowerCase() || 'medium';
+      if (conf === 'low' || sev === 'low') continue;
+
+      findings.push({
+        tool: 'gosec',
+        severity: sev === 'high' ? 'high' : 'medium',
+        file: issue.file,
+        line: parseInt(issue.line, 10) || undefined,
+        rule: `gosec:${issue.rule_id}`,
+        message: issue.details,
+        suggestion: issue.cwe?.ID ? `CWE-${issue.cwe.ID}: https://cwe.mitre.org/data/definitions/${issue.cwe.ID}.html` : undefined,
+      });
+    }
+  } catch (parseErr) {
+    return { findings, error: `Gosec JSON parse failed: ${parseErr}`, ran: true };
+  }
+
+  return { findings, error, ran: true };
+}
+
+// ─── 7. Hadolint (Docker) ──────────────────────────────────────────────────────
+
+function runHadolint(cwd: string): { findings: SastFinding[]; error: string | null; ran: boolean } {
+  if (!findBinary('hadolint')) {
+    return { findings: [], error: null, ran: false };
+  }
+
+  // Find Dockerfiles using Node.js glob (cross-platform)
+  let dockerFiles: string[] = [];
+  try {
+    // Look for files matching Dockerfile pattern
+    dockerFiles = globSync('**/Dockerfile*', {
+      cwd,
+      nodir: true,
+      ignore: ['**/node_modules/**', '**/.git/**', '**/dist/**', '**/build/**'],
+    });
+    // Also match lowercase 'dockerfile' (common on some platforms)
+    if (dockerFiles.length === 0) {
+      dockerFiles = globSync('**/dockerfile*', {
+        cwd,
+        nodir: true,
+        ignore: ['**/node_modules/**', '**/.git/**', '**/dist/**', '**/build/**'],
+      });
+    }
+  } catch {
+    return { findings: [], error: null, ran: false };
+  }
+
+  if (dockerFiles.length === 0) {
+    return { findings: [], error: null, ran: false };
+  }
+
+  const findings: SastFinding[] = [];
+  let lastError: string | null = null;
+
+  for (const df of dockerFiles) {
+    const absPath = join(cwd, df);
+    const { stdout, error } = tryExec(`hadolint --format json "${absPath}" 2>/dev/null || true`, { cwd, timeout: 30_000 });
+    if (error) lastError = error;
+    if (!stdout.trim()) continue;
+
+    try {
+      const jsonStart = stdout.indexOf('[');
+      const jsonEnd = stdout.lastIndexOf(']') + 1;
+      if (jsonStart === -1 || jsonEnd <= jsonStart) continue;
+
+      const results: Array<{
+        code: string;
+        line: number;
+        column?: number;
+        level: string;
+        message: string;
+        file?: string;
+      }> = JSON.parse(stdout.slice(jsonStart, jsonEnd));
+
+      for (const r of results) {
+        const level = r.level?.toLowerCase() || 'info';
+        if (level === 'info' || level === 'style') continue;
+
+        findings.push({
+          tool: 'hadolint',
+          severity: level === 'error' ? 'high' : 'medium',
+          file: r.file && r.file !== '-' ? r.file : df,
+          line: r.line,
+          rule: `hadolint:${r.code}`,
+          message: r.message,
+          suggestion: `Rule ${r.code} — https://github.com/hadolint/hadolint/wiki/${r.code}`,
+        });
+      }
+    } catch (parseErr) {
+      lastError = `Hadolint JSON parse failed for ${df}: ${parseErr}`;
+    }
+  }
+
+  return { findings, error: lastError, ran: true };
+}
+
+// ─── 8. Clippy (Rust) ──────────────────────────────────────────────────────────
+
+function runClippy(cwd: string): { findings: SastFinding[]; error: string | null; ran: boolean } {
+  if (!findBinary('cargo')) {
+    return { findings: [], error: null, ran: false };
+  }
+  if (!hasMatchingFiles(cwd, ['.rs', 'Cargo.toml', 'Cargo.lock'])) {
+    return { findings: [], error: null, ran: false };
+  }
+
+  const { stdout, error } = tryExec('cargo clippy --message-format=json 2>/dev/null || true', { cwd, timeout: 180_000 });
+  if (!stdout.trim()) {
+    return { findings: [], error, ran: true };
+  }
+
+  const findings: SastFinding[] = [];
+  try {
+    // Cargo outputs one JSON object per line (NDJSON)
+    const lines = stdout.split('\n').filter(l => l.trim().startsWith('{'));
+
+    for (const line of lines) {
+      let parsed: {
+        message?: {
+          message?: string;
+          level?: string;
+          code?: { code?: string };
+          spans?: Array<{ file_name?: string; line_start?: number; column_start?: number }>;
+        };
+        reason?: string;
+      };
+      try {
+        parsed = JSON.parse(line);
+      } catch {
+        continue;
+      }
+
+      // Only process diagnostic messages (not compiler artifact messages)
+      if (!parsed.message || parsed.reason === 'compiler-artifact') continue;
+
+      const msg = parsed.message;
+      const level = msg.level?.toLowerCase() || '';
+
+      // Only include warnings and errors, not notes/help
+      if (level !== 'warning' && level !== 'error') continue;
+
+      const clippyCode = msg.code?.code || '';
+      // Skip non-clippy diagnostics
+      if (!clippyCode.startsWith('clippy::')) continue;
+
+      const span = msg.spans?.[0];
+
+      findings.push({
+        tool: 'clippy',
+        severity: level === 'error' ? 'medium' : 'low',
+        file: span?.file_name,
+        line: span?.line_start,
+        rule: clippyCode,
+        message: msg.message || '',
+        suggestion: clippyCode
+          ? `See: https://rust-lang.github.io/rust-clippy/master/index.html#${clippyCode.replace('::', '/')}`
+          : 'Review the flagged code.',
+      });
+    }
+  } catch (parseErr) {
+    return { findings, error: `Clippy parse failed: ${parseErr}`, ran: true };
+  }
+
+  return { findings, error: null, ran: true };
+}
+
 // ─── 4. npm audit ─────────────────────────────────────────────────────────────
 
 function runNpmAudit(cwd: string): { findings: SastFinding[]; error: string | null; ran: boolean } {
@@ -412,7 +691,7 @@ function loadDismissedKeys(): Set<string> {
   }
 }
 
-function filterDismissed(findings: SastFinding[]): SastFinding[] {
+export function filterDismissed(findings: SastFinding[]): SastFinding[] {
   const dismissed = loadDismissedKeys();
   if (dismissed.size === 0) return findings;
   return findings.filter(f => {
@@ -421,10 +700,67 @@ function filterDismissed(findings: SastFinding[]): SastFinding[] {
   });
 }
 
+/**
+ * Run SAST using the new orchestrator (50+ tools).
+ * Falls back to legacy runSast if orchestrator fails.
+ */
+export async function runSastOrchestrator(options: {
+  target?: string;
+  files?: string[];
+  tools?: string[];
+  disabledTools?: string[];
+} = {}): Promise<SastRunResult> {
+  const startTime = Date.now();
+  const cwd = resolve(options.target ?? process.cwd());
+
+  try {
+    // Dynamic import of the ESM orchestrator
+    const { SastOrchestrator } = await import('../../sast/sastOrchestrator.js');
+    const orchestrator = new SastOrchestrator({
+      cwd,
+      enabledTools: options.tools || null,
+      disabledTools: options.disabledTools || [],
+    });
+
+    // Get files to analyze
+    let files = options.files || [];
+    if (files.length === 0) {
+      const { globSync } = await import('glob');
+      files = globSync('**/*.{js,ts,jsx,tsx,py,go,java,kt,rs,rb,php,sh,sql,tf,yaml,yml}', {
+        cwd,
+        ignore: ['**/node_modules/**', '**/dist/**', '**/build/**', '**/.git/**'],
+      });
+    }
+
+    const result = await orchestrator.analyze(files, { cwd });
+
+    // Map findings to SastFinding format
+    const findings: SastFinding[] = result.findings.map(f => ({
+      tool: f.tool as SastFinding['tool'],
+      severity: f.severity as SastFinding['severity'],
+      file: f.file,
+      line: f.line,
+      rule: f.rule,
+      message: f.message,
+      suggestion: f.suggestion,
+    }));
+
+    return {
+      findings: filterDismissed(findings),
+      toolsRun: result.toolsRun,
+      errors: result.errors,
+      durationMs: Date.now() - startTime,
+    };
+  } catch {
+    // Fall back to legacy runner
+    return runSast({ target: cwd, tools: options.tools });
+  }
+}
+
 export async function runSast(options: { target?: string; tools?: string[] } = {}): Promise<SastRunResult> {
   const startTime = Date.now();
   const cwd = resolve(options.target ?? process.cwd());
-  const enabledTools = options.tools ?? ['eslint', 'semgrep', 'secrets', 'npm-audit'];
+  const enabledTools = options.tools ?? ['eslint', 'semgrep', 'secrets', 'npm-audit', 'bandit', 'gosec', 'hadolint', 'clippy'];
 
   const findings: SastFinding[] = [];
   const toolsRun: string[] = [];
@@ -465,6 +801,46 @@ export async function runSast(options: { target?: string; tools?: string[] } = {
       toolsRun.push('npm-audit');
       findings.push(...nf);
       if (error) errors.push(`npm-audit: ${error}`);
+    }
+  }
+
+  // Run Bandit (Python)
+  if (enabledTools.includes('bandit')) {
+    const { findings: bf, error, ran } = runBandit(cwd);
+    if (ran) {
+      toolsRun.push('bandit');
+      findings.push(...bf);
+      if (error) errors.push(`bandit: ${error}`);
+    }
+  }
+
+  // Run Gosec (Go)
+  if (enabledTools.includes('gosec')) {
+    const { findings: gf, error, ran } = runGosec(cwd);
+    if (ran) {
+      toolsRun.push('gosec');
+      findings.push(...gf);
+      if (error) errors.push(`gosec: ${error}`);
+    }
+  }
+
+  // Run Hadolint (Docker)
+  if (enabledTools.includes('hadolint')) {
+    const { findings: hf, error, ran } = runHadolint(cwd);
+    if (ran) {
+      toolsRun.push('hadolint');
+      findings.push(...hf);
+      if (error) errors.push(`hadolint: ${error}`);
+    }
+  }
+
+  // Run Clippy (Rust)
+  if (enabledTools.includes('clippy')) {
+    const { findings: cf, error, ran } = runClippy(cwd);
+    if (ran) {
+      toolsRun.push('clippy');
+      findings.push(...cf);
+      if (error) errors.push(`clippy: ${error}`);
     }
   }
 

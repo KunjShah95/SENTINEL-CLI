@@ -170,7 +170,7 @@ export class SemanticDiffReview {
       flags: []
     };
 
-    const securityRelatedPaths = changes.filter(c => 
+    const securityRelatedPaths = changes.filter(c =>
       /auth|security|login|password|token|credential|permission/i.test(c.path)
     );
 
@@ -297,7 +297,7 @@ export class SemanticDiffReview {
       });
     }
 
-    const hardcodedSecrets = securityChanges.introduced.filter(f => 
+    const hardcodedSecrets = securityChanges.introduced.filter(f =>
       f.type.includes('hardcoded') || f.type.includes('secret')
     );
     if (hardcodedSecrets.length > 0) {

@@ -1,9 +1,9 @@
 /**
  * SYNTHETIC DATA GENERATOR
- * 
+ *
  * Inspired by DeepMind's synthetic data generation for training ML models.
  * Generates realistic vulnerable code samples for training and testing security models.
- * 
+ *
  * Key Features:
  * - Template-based generation
  * - Mutation-based generation
@@ -63,10 +63,10 @@ export class SyntheticDataGenerator extends EventEmitter {
 
     // Templates for different vulnerability types
     this.templates = this._initializeTemplates();
-    
+
     // Generated data storage
     this.generatedData = [];
-    
+
     // Statistics
     this.statistics = {
       totalGenerated: 0,
@@ -87,20 +87,20 @@ export class SyntheticDataGenerator extends EventEmitter {
       [VulnerabilityType.SQL_INJECTION]: {
         javascript: [
           {
-            vulnerable: "const query = `SELECT * FROM users WHERE id = '${userInput}'`;",
-            fixed: "const query = 'SELECT * FROM users WHERE id = ?'; db.execute(query, [userInput]);",
+            vulnerable: 'const query = `SELECT * FROM users WHERE id = \'${userInput}\'`;',
+            fixed: 'const query = \'SELECT * FROM users WHERE id = ?\'; db.execute(query, [userInput]);',
             severity: 'critical'
           },
           {
-            vulnerable: "db.query('SELECT * FROM users WHERE name = \"' + name + '\"');",
-            fixed: "db.query('SELECT * FROM users WHERE name = ?', [name]);",
+            vulnerable: 'db.query(\'SELECT * FROM users WHERE name = "\' + name + \'"\');',
+            fixed: 'db.query(\'SELECT * FROM users WHERE name = ?\', [name]);',
             severity: 'critical'
           }
         ],
         python: [
           {
-            vulnerable: "cursor.execute(f'SELECT * FROM users WHERE id = {user_id}')",
-            fixed: "cursor.execute('SELECT * FROM users WHERE id = %s', (user_id,))",
+            vulnerable: 'cursor.execute(f\'SELECT * FROM users WHERE id = {user_id}\')',
+            fixed: 'cursor.execute(\'SELECT * FROM users WHERE id = %s\', (user_id,))',
             severity: 'critical'
           }
         ]
@@ -108,20 +108,20 @@ export class SyntheticDataGenerator extends EventEmitter {
       [VulnerabilityType.XSS]: {
         javascript: [
           {
-            vulnerable: "document.innerHTML = '<div>' + userInput + '</div>';",
-            fixed: "document.textContent = userInput;",
+            vulnerable: 'document.innerHTML = \'<div>\' + userInput + \'</div>\';',
+            fixed: 'document.textContent = userInput;',
             severity: 'high'
           },
           {
-            vulnerable: "element.innerHTML = userData;",
-            fixed: "element.textContent = userData;",
+            vulnerable: 'element.innerHTML = userData;',
+            fixed: 'element.textContent = userData;',
             severity: 'high'
           }
         ],
         python: [
           {
-            vulnerable: "response.write('<h1>' + name + '</h1>')",
-            fixed: "response.write('<h1>' + escape_html(name) + '</h1>')",
+            vulnerable: 'response.write(\'<h1>\' + name + \'</h1>\')',
+            fixed: 'response.write(\'<h1>\' + escape_html(name) + \'</h1>\')',
             severity: 'high'
           }
         ]
@@ -129,20 +129,20 @@ export class SyntheticDataGenerator extends EventEmitter {
       [VulnerabilityType.COMMAND_INJECTION]: {
         javascript: [
           {
-            vulnerable: "exec('ls ' + userDir);",
-            fixed: "execFile('ls', [userDir]);",
+            vulnerable: 'exec(\'ls \' + userDir);',
+            fixed: 'execFile(\'ls\', [userDir]);',
             severity: 'critical'
           },
           {
-            vulnerable: "child_process.execSync('cat ' + filename);",
-            fixed: "child_process.execFile('cat', [filename]);",
+            vulnerable: 'child_process.execSync(\'cat \' + filename);',
+            fixed: 'child_process.execFile(\'cat\', [filename]);',
             severity: 'critical'
           }
         ],
         python: [
           {
-            vulnerable: "os.system('ls ' + directory)",
-            fixed: "os.listdir(directory)",
+            vulnerable: 'os.system(\'ls \' + directory)',
+            fixed: 'os.listdir(directory)',
             severity: 'critical'
           }
         ]
@@ -150,15 +150,15 @@ export class SyntheticDataGenerator extends EventEmitter {
       [VulnerabilityType.PATH_TRAVERSAL]: {
         javascript: [
           {
-            vulnerable: "fs.readFileSync('/var/www/' + filename);",
-            fixed: "path.resolve('/var/www/', filename).startsWith('/var/www/') ? fs.readFileSync(filename) : null;",
+            vulnerable: 'fs.readFileSync(\'/var/www/\' + filename);',
+            fixed: 'path.resolve(\'/var/www/\', filename).startsWith(\'/var/www/\') ? fs.readFileSync(filename) : null;',
             severity: 'high'
           }
         ],
         python: [
           {
-            vulnerable: "open('uploads/' + filename)",
-            fixed: "open(os.path.join('uploads', os.path.basename(filename)))",
+            vulnerable: 'open(\'uploads/\' + filename)',
+            fixed: 'open(os.path.join(\'uploads\', os.path.basename(filename)))',
             severity: 'high'
           }
         ]
@@ -166,15 +166,15 @@ export class SyntheticDataGenerator extends EventEmitter {
       [VulnerabilityType.INSECURE_DESERIALIZATION]: {
         javascript: [
           {
-            vulnerable: "const obj = JSON.parse(untrustedData);",
-            fixed: "const obj = JSON.parse(untrustedData); // Use safe parsing",
+            vulnerable: 'const obj = JSON.parse(untrustedData);',
+            fixed: 'const obj = JSON.parse(untrustedData); // Use safe parsing',
             severity: 'critical'
           }
         ],
         python: [
           {
-            vulnerable: "obj = pickle.loads(data)",
-            fixed: "obj = json.loads(data)  # Use JSON instead of pickle",
+            vulnerable: 'obj = pickle.loads(data)',
+            fixed: 'obj = json.loads(data)  # Use JSON instead of pickle',
             severity: 'critical'
           }
         ]
@@ -182,20 +182,20 @@ export class SyntheticDataGenerator extends EventEmitter {
       [VulnerabilityType.SENSITIVE_DATA_EXPOSURE]: {
         javascript: [
           {
-            vulnerable: "console.log('API Key:', apiKey);",
-            fixed: "console.log('API Key:', apiKey.substring(0, 4) + '****');",
+            vulnerable: 'console.log(\'API Key:\', apiKey);',
+            fixed: 'console.log(\'API Key:\', apiKey.substring(0, 4) + \'****\');',
             severity: 'medium'
           },
           {
-            vulnerable: "localStorage.setItem('token', jwt);",
-            fixed: "sessionStorage.setItem('token', jwt);",
+            vulnerable: 'localStorage.setItem(\'token\', jwt);',
+            fixed: 'sessionStorage.setItem(\'token\', jwt);',
             severity: 'medium'
           }
         ],
         python: [
           {
-            vulnerable: "logging.info(f'Password: {password}')",
-            fixed: "logging.info('Password: [REDACTED]')",
+            vulnerable: 'logging.info(f\'Password: {password}\')',
+            fixed: 'logging.info(\'Password: [REDACTED]\')',
             severity: 'medium'
           }
         ]
@@ -203,15 +203,15 @@ export class SyntheticDataGenerator extends EventEmitter {
       [VulnerabilityType.AUTH_BYPASS]: {
         javascript: [
           {
-            vulnerable: "if (user.isAdmin) { return true; }",
-            fixed: "if (await verifyAdmin(user.id)) { return true; }",
+            vulnerable: 'if (user.isAdmin) { return true; }',
+            fixed: 'if (await verifyAdmin(user.id)) { return true; }',
             severity: 'critical'
           }
         ],
         python: [
           {
-            vulnerable: "if username == 'admin' and password == 'admin':",
-            fixed: "if verify_credentials(username, password):",
+            vulnerable: 'if username == \'admin\' and password == \'admin\':',
+            fixed: 'if verify_credentials(username, password):',
             severity: 'critical'
           }
         ]
@@ -219,15 +219,15 @@ export class SyntheticDataGenerator extends EventEmitter {
       [VulnerabilityType.CRYPTO_FAILURES]: {
         javascript: [
           {
-            vulnerable: "const hash = crypto.createHash('md5').update(data).digest('hex');",
-            fixed: "const hash = crypto.createHash('sha256').update(data).digest('hex');",
+            vulnerable: 'const hash = crypto.createHash(\'md5\').update(data).digest(\'hex\');',
+            fixed: 'const hash = crypto.createHash(\'sha256\').update(data).digest(\'hex\');',
             severity: 'high'
           }
         ],
         python: [
           {
-            vulnerable: "hashlib.md5(data).hexdigest()",
-            fixed: "hashlib.sha256(data).hexdigest()",
+            vulnerable: 'hashlib.md5(data).hexdigest()',
+            fixed: 'hashlib.sha256(data).hexdigest()',
             severity: 'high'
           }
         ]
@@ -235,8 +235,8 @@ export class SyntheticDataGenerator extends EventEmitter {
       [VulnerabilityType.CSRF]: {
         javascript: [
           {
-            vulnerable: "fetch('/api/transfer', { method: 'POST', body: data })",
-            fixed: "fetch('/api/transfer', { method: 'POST', body: data, headers: { 'X-CSRF-Token': token } })",
+            vulnerable: 'fetch(\'/api/transfer\', { method: \'POST\', body: data })',
+            fixed: 'fetch(\'/api/transfer\', { method: \'POST\', body: data, headers: { \'X-CSRF-Token\': token } })',
             severity: 'high'
           }
         ]
@@ -244,8 +244,8 @@ export class SyntheticDataGenerator extends EventEmitter {
       [VulnerabilityType.SSRF]: {
         javascript: [
           {
-            vulnerable: "fetch(userUrl).then(res => res.text())",
-            fixed: "if (isInternalUrl(userUrl)) throw new Error('Internal URL not allowed'); fetch(userUrl)",
+            vulnerable: 'fetch(userUrl).then(res => res.text())',
+            fixed: 'if (isInternalUrl(userUrl)) throw new Error(\'Internal URL not allowed\'); fetch(userUrl)',
             severity: 'high'
           }
         ]
@@ -253,8 +253,8 @@ export class SyntheticDataGenerator extends EventEmitter {
       [VulnerabilityType.IDOR]: {
         javascript: [
           {
-            vulnerable: "const user = db.query('SELECT * FROM users WHERE id = ' + req.params.id);",
-            fixed: "const user = db.query('SELECT * FROM users WHERE id = ? AND owner_id = ?', [req.params.id, currentUser.id]);",
+            vulnerable: 'const user = db.query(\'SELECT * FROM users WHERE id = \' + req.params.id);',
+            fixed: 'const user = db.query(\'SELECT * FROM users WHERE id = ? AND owner_id = ?\', [req.params.id, currentUser.id]);',
             severity: 'high'
           }
         ]
@@ -262,8 +262,8 @@ export class SyntheticDataGenerator extends EventEmitter {
       [VulnerabilityType.BROKEN_ACCESS_CONTROL]: {
         javascript: [
           {
-            vulnerable: "app.get('/admin/users', (req, res) => { res.json(users); });",
-            fixed: "app.get('/admin/users', requireAuth, requireAdmin, (req, res) => { res.json(users); });",
+            vulnerable: 'app.get(\'/admin/users\', (req, res) => { res.json(users); });',
+            fixed: 'app.get(\'/admin/users\', requireAuth, requireAdmin, (req, res) => { res.json(users); });',
             severity: 'critical'
           }
         ]
@@ -285,25 +285,25 @@ export class SyntheticDataGenerator extends EventEmitter {
     const generated = [];
 
     // Select vulnerability types
-    const types = vulnerabilityType 
-      ? [vulnerabilityType] 
+    const types = vulnerabilityType
+      ? [vulnerabilityType]
       : Object.keys(this.templates);
 
     // Select languages
-    const langs = language 
-      ? [language] 
+    const langs = language
+      ? [language]
       : this.options.languages;
 
     for (let i = 0; i < count; i++) {
       // Random selection
       const vType = types[Math.floor(Math.random() * types.length)];
       const lang = langs[Math.floor(Math.random() * langs.length)];
-      
+
       const sample = this._generateSample(vType, lang, difficulty);
       if (sample) {
         generated.push(sample);
         this.generatedData.push(sample);
-        
+
         // Update statistics
         this.statistics.totalGenerated++;
         this.statistics.byVulnerability[vType] = (this.statistics.byVulnerability[vType] || 0) + 1;
@@ -393,13 +393,13 @@ export class SyntheticDataGenerator extends EventEmitter {
   _obfuscateCode(code, _language) {
     // Simple obfuscation - rename variables
     const variables = ['userInput', 'data', 'name', 'value', 'input', 'param'];
-    
+
     let result = code;
     for (const v of variables) {
       const randomName = v[0] + Math.random().toString(36).substr(2, 5);
       result = result.replace(new RegExp(v, 'g'), randomName);
     }
-    
+
     return result;
   }
 
@@ -416,7 +416,7 @@ export class SyntheticDataGenerator extends EventEmitter {
    */
   async _augmentData(data) {
     const augmented = [];
-    
+
     for (const sample of data) {
       for (let i = 0; i < this.options.augmentationFactor; i++) {
         const augmentedSample = this._augmentSample(sample);
@@ -425,7 +425,7 @@ export class SyntheticDataGenerator extends EventEmitter {
         this.statistics.totalGenerated++;
       }
     }
-    
+
     return augmented;
   }
 
@@ -442,7 +442,7 @@ export class SyntheticDataGenerator extends EventEmitter {
     ];
 
     const transform = transformations[Math.floor(Math.random() * transformations.length)];
-    
+
     return {
       ...sample,
       id: `synth-aug-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -489,7 +489,7 @@ export class SyntheticDataGenerator extends EventEmitter {
   _reorderCode(code) {
     // For single-line code, just return as is
     if (!code.includes('\n')) return code;
-    
+
     const lines = code.split('\n');
     const first = lines.shift();
     lines.push(first);
@@ -520,11 +520,11 @@ export class SyntheticDataGenerator extends EventEmitter {
     for (let i = 0; i < count; i++) {
       // Select random parent
       const parent = this.seedData[Math.floor(Math.random() * this.seedData.length)];
-      
+
       // Apply mutation
       const child = this._mutateSample(parent);
       mutated.push(child);
-      
+
       this.generatedData.push(child);
       this.statistics.totalGenerated++;
     }
@@ -601,15 +601,15 @@ export class SyntheticDataGenerator extends EventEmitter {
     if (format === 'json') {
       return JSON.stringify(this.generatedData, null, 2);
     }
-    
+
     if (format === 'csv') {
       const headers = ['id', 'vulnerabilityType', 'language', 'difficulty', 'vulnerable', 'fixed'];
-      const rows = this.generatedData.map(d => 
+      const rows = this.generatedData.map(d =>
         headers.map(h => (d[h] || '').replace(/,/g, ';')).join(',')
       );
       return [headers.join(','), ...rows].join('\n');
     }
-    
+
     return this.generatedData;
   }
 

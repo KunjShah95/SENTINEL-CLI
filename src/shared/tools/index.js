@@ -14,7 +14,7 @@ import { realpathSync } from 'node:fs';
 import { createPatch } from 'diff';
 import { Mode, isReadOnlyTool } from '../schemas/mode.js';
 import { runSandboxed } from './sandbox.js';
-import { createCheckpoint, restoreCheckpoint } from './checkpoint.js';
+import { createCheckpoint, restoreCheckpoint, redoCheckpoint } from './checkpoint.js';
 import { toolInputSchemas, READ_ONLY_TOOL_NAMES, BUILD_TOOL_NAMES, isReadOnly } from './schemas.js';
 
 // Re-export so callers can do `import { Mode, toolInputSchemas } from "./tools"`.
@@ -36,11 +36,28 @@ export const DEFAULT_TIMEOUT = 30_000;
 export function resolveInsideCwd(inputPath) {
   const cwd = process.cwd();
   const target = path.isAbsolute(inputPath) ? inputPath : path.resolve(cwd, inputPath);
-  const rel = path.relative(cwd, target);
+
+  if (process.platform === 'win32') {
+    if (target.startsWith('\\\\')) {
+      throw new Error('Path is outside the project directory');
+    }
+    if (target.includes(':') && !/^[a-zA-Z]:[\\/]/.test(target)) {
+      throw new Error('Path is outside the project directory');
+    }
+  }
+
+  let resolvedTarget = target;
+  let resolvedCwd = cwd;
+  try {
+    resolvedTarget = realpathSync(target);
+    resolvedCwd = realpathSync(cwd);
+  } catch {}
+
+  const rel = path.relative(resolvedCwd, resolvedTarget);
   if (rel.startsWith('..') || path.isAbsolute(rel)) {
     throw new Error('Path is outside the project directory');
   }
-  return { cwd, resolved: target, relative: rel || '.' };
+  return { cwd: resolvedCwd, resolved: resolvedTarget, relative: rel || '.' };
 }
 
 export function truncate(value, limit) {
@@ -132,12 +149,13 @@ async function walkDir(base, rel, out, pattern, cap) {
 }
 
 function matchGlob(name, pattern) {
-  // Very small glob: only supports `*` and `**`. Good enough for sentinel.
-  if (!pattern.includes('*')) return name === pattern;
+  // Small glob: supports `*`, `**`, and `?`. Does NOT support `{a,b}`, `[abc]`.
+  if (!pattern.includes('*') && !pattern.includes('?')) return name === pattern;
   const re = new RegExp(
     '^' +
       pattern
         .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+        .replace(/\?/g, '[^/]')
         .replace(/\*\*/g, '::')
         .replace(/\*/g, '[^/]*')
         .replace(/::/g, '.*') +
@@ -162,7 +180,7 @@ async function grepImpl(input) {
   if (typeof pattern !== 'string' || pattern.length === 0) {
     throw new Error('pattern is required');
   }
-  const { resolved, relative } = resolveInsideCwd(cwdDir);
+  const { resolved } = resolveInsideCwd(cwdDir);
   let regex;
   try {
     validateRegexPattern(pattern);
@@ -466,17 +484,29 @@ async function undoLastChangeImpl(_input) {
   };
 }
 
+async function redoLastUndoImpl(_input) {
+  const result = await redoCheckpoint();
+  return {
+    success: true,
+    restored: result.restored,
+    deleted: result.deleted,
+    message: `Redid ${result.restored.length} file(s)${result.deleted.length > 0 ? `, removed ${result.deleted.length} new file(s)` : ''}.`,
+  };
+}
+
 const TOOL_IMPLS = {
   readFile: readFileImpl,
   listDirectory: listDirectoryImpl,
   glob: globImpl,
   grep: grepImpl,
+  searchWeb: searchWebImpl,
   writeFile: writeFileImpl,
   editFile: editFileImpl,
   batchEdit: batchEditImpl,
   bash: runBashImpl,
   diffFile: diffFileImpl,
   undoLastChange: undoLastChangeImpl,
+  redoLastUndo: redoLastUndoImpl,
 };
 
 export const readOnlyToolContracts = Object.freeze({
@@ -543,15 +573,41 @@ export function getToolNames(mode) {
 }
 
 /**
- * Execute a local tool call. PLAN/REVIEW modes reject write/edit/bash/diffFile/undoLastChange.
+ * Execute a local tool call.
+ * 1. Permission check (allow/deny/ask) — runs first
+ * 2. Mode check (PLAN/REVIEW/SCAN block writes; FIX blocks shell)
+ * 3. Execute the tool implementation
+ *
  * @param {string} toolName
  * @param {object} input
  * @param {string} mode
+ * @param {object} [options]
+ * @param {function} [options.onPermissionAsk] — callback for 'ask' policy
  */
-export async function executeLocalTool(toolName, input, mode = Mode.BUILD) {
-  if ((mode === Mode.PLAN || mode === Mode.REVIEW) && !isReadOnlyTool(toolName)) {
+export async function executeLocalTool(toolName, input, mode = Mode.BUILD, options = {}) {
+  // ── Permission check (opencode-inspired) ──────────────────────────
+  let permCheck;
+  try {
+    const { checkPermission } = await import('./permissions.js');
+    permCheck = checkPermission(toolName);
+    if (!permCheck.allowed) {
+      throw new Error(permCheck.message || `Tool ${toolName} is denied by permission policy`);
+    }
+    // If policy is 'ask' and no auto-confirm callback, still allow in CLI mode
+    // (the TUI handles the confirmation UI separately)
+  } catch (permErr) {
+    if (permErr.message?.includes('permission policy') || permErr.message?.includes('denied')) {
+      throw permErr;
+    }
+    // If permissions module isn't available, fall through
+  }
+
+  // ── Mode check ─────────────────────────────────────────────────────
+  const { isToolAllowedInMode } = await import('../schemas/mode.js');
+  if (!isToolAllowedInMode(toolName, mode)) {
     throw new Error(`Tool ${toolName} is not available in ${mode} mode`);
   }
+
   const impl = TOOL_IMPLS[toolName];
   if (!impl) {
     throw new Error(`Unknown tool: ${toolName}`);

@@ -233,11 +233,11 @@ export class DiffCommand {
     review += chalk.gray('  ───────────────────────────────────────────────────────\n');
     review += chalk.white('  ') + chalk.bold('Summary') + '\n';
     review += chalk.gray('  ───────────────────────────────────────────────────────\n');
-    review += chalk.white(`  Files changed:  `) + chalk.green(changes.length) + '\n';
-    review += chalk.white(`  Lines added:    `) + chalk.green(`+${totalAdditions}`) + '\n';
-    review += chalk.white(`  Lines removed:  `) + chalk.red(`-${totalDeletions}`) + '\n';
+    review += chalk.white('  Files changed:  ') + chalk.green(changes.length) + '\n';
+    review += chalk.white('  Lines added:    ') + chalk.green(`+${totalAdditions}`) + '\n';
+    review += chalk.white('  Lines removed:  ') + chalk.red(`-${totalDeletions}`) + '\n';
     review +=
-      chalk.white(`  Issues found:   `) +
+      chalk.white('  Issues found:   ') +
       (totalIssues > 0 ? chalk.yellow(totalIssues) : chalk.green('0')) +
       '\n';
     review += '\n';

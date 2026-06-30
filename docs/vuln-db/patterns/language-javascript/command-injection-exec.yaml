@@ -1,0 +1,69 @@
+id: command-injection-exec
+title: Command Injection via child_process exec / execSync
+severity: critical
+languages: [javascript, typescript]
+cwe: [CWE-78]
+tags: [injection, rce, command, shell]
+description: |
+  Node.js `child_process.exec()` and `execSync()` spawn a shell (/bin/sh or cmd.exe)
+  to execute the provided command string. When user-controlled input is concatenated
+  into the command string, an attacker can inject shell metacharacters (;, &&, |, `,
+  $(), etc.) to execute arbitrary commands on the server. This frequently leads to
+  full remote code execution (RCE).
+
+  Unlike `spawn()`/`spawnSync()`, which execute a specific binary with an arguments
+  array and no shell, `exec()` builds a shell command — making it inherently more
+  dangerous with unsanitized input.
+
+detection: |
+  Find all calls to `exec()`, `execSync()`, `execFile()` with shell enabled, and
+  `spawn()` with `{ shell: true }`. For each call, determine whether the command
+  string or any of its arguments contain user-controlled values. Key sources of
+  unsanitized input:
+  - `req.query`, `req.body`, `req.params` (Express/HTTP handlers)
+  - File names, URLs, or paths from user uploads
+  - Environment variables that flow from external input
+  - Database values rendered into shell commands
+
+remediation: |
+  Prefer `child_process.spawn()` / `spawnSync()` with an arguments array — this
+  avoids shell interpretation entirely:
+
+  Instead of: `exec('ffmpeg -i ' + inputFile + ' output.mp4')`
+  Use: `spawn('ffmpeg', ['-i', inputFile, 'output.mp4'])`
+
+  If shell execution is genuinely required:
+  - Validate input against an allowlist of expected characters
+  - Escape shell metacharacters using a library like `shell-escape`
+  - Never pass user-supplied file names, URLs, or free-text input to a shell
+  - Consider sandboxing the process (containers, seccomp, reduced privileges)
+
+example:
+  vulnerable: |
+    const { exec } = require('child_process');
+    const filename = req.query.file;
+    exec(`ffmpeg -i "${filename}" -vcodec libx264 output.mp4`, (err, stdout) => {
+      res.send(stdout);
+    });
+
+  fixed: |
+    const { spawn } = require('child_process');
+    const filename = req.query.file;
+
+    // Validate filename against an allowlist
+    if (!/^[\w.-]+$/.test(filename)) {
+      return res.status(400).send('Invalid filename');
+    }
+
+    const proc = spawn('ffmpeg', [
+      '-i', filename,
+      '-vcodec', 'libx264',
+      'output.mp4'
+    ]);
+    proc.stdout.pipe(res);
+
+references:
+  - url: https://owasp.org/www-community/attacks/Command_Injection
+    title: OWASP Command Injection
+  - url: https://cwe.mitre.org/data/definitions/78.html
+    title: CWE-78: Improper Neutralization of Special Elements used in an OS Command

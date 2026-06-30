@@ -15,7 +15,7 @@ type MessagePart = {
   output?: unknown;
   errorText?: string;
 };
-type Props = { parts: MessagePart[]; model?: string; duration?: number };
+type Props = { parts: MessagePart[]; model?: string; duration?: number; showThinking?: boolean; showDetails?: boolean };
 
 function ToolRow({ part }: { part: MessagePart }) {
   const { colors } = useTheme();
@@ -23,12 +23,12 @@ function ToolRow({ part }: { part: MessagePart }) {
   if (part.toolCall) {
     const done = !!part.toolCall.result;
     return (
-      <Box flexDirection="column" paddingLeft={6} marginY={0}>
+      <Box flexDirection="column" paddingLeft={4} marginY={0}>
         <Box flexDirection="row" gap={1}>
           <Text color={colors.dimSeparator}>{'↳'}</Text>
           <Text color={colors.info}>{part.toolCall.name}</Text>
           {part.toolCall.args
-            ? <Text dimColor>{Object.values(part.toolCall.args).slice(0, 2).map(String).join('  ')}</Text>
+            ? <Text dimColor>{Object.values(part.toolCall.args).slice(0, 2).map(String).join(' ')}</Text>
             : null}
           {done
             ? <Text color={colors.success}>{'✓'}</Text>
@@ -53,7 +53,7 @@ function ToolRow({ part }: { part: MessagePart }) {
     : '';
 
   return (
-    <Box flexDirection="column" paddingLeft={6} marginY={0}>
+    <Box flexDirection="column" paddingLeft={4} marginY={0}>
       <Box flexDirection="row" gap={1} alignItems="center">
         <Text color={colors.dimSeparator}>{'↳'}</Text>
         <Text color={colors.info}>{name}</Text>
@@ -73,7 +73,7 @@ function ToolRow({ part }: { part: MessagePart }) {
 function ReasoningRow({ text }: { text: string }) {
   const { colors } = useTheme();
   return (
-    <Box paddingLeft={6} marginY={0}>
+    <Box paddingLeft={4} marginY={0}>
       <Box flexDirection="row" gap={1}>
         <Text color={colors.dimSeparator}>{'⊹'}</Text>
         <Text dimColor color={colors.thinking}>{text.trim()}</Text>
@@ -86,53 +86,66 @@ function renderLine(line: string, colors: Record<string, string>, key: number) {
   if (!line.trim()) return <Text key={key}>{''}</Text>;
 
   if (line.startsWith('```'))
-    return <Box key={key} paddingLeft={4}><Text dimColor>{line}</Text></Box>;
+    return <Box key={key} paddingLeft={3}><Text dimColor>{line}</Text></Box>;
 
   const headingM = line.match(/^(#{1,3})\s+(.+)/);
   if (headingM)
-    return <Box key={key} marginTop={1} paddingLeft={4}><Text bold color={colors.primary}>{headingM[2]}</Text></Box>;
+    return <Box key={key} marginTop={1} paddingLeft={2}><Text bold color={colors.primary}>{headingM[2]}</Text></Box>;
 
   const bulletM = line.match(/^(\s*[-*•])\s+(.+)/);
   if (bulletM)
     return (
-      <Box key={key} flexDirection="row" gap={1} paddingLeft={6}>
+      <Box key={key} flexDirection="row" gap={1} paddingLeft={4}>
         <Text color={colors.dimSeparator}>{'•'}</Text>
         <Text>{bulletM[2]}</Text>
       </Box>
     );
 
-  if (/^🔴/.test(line)) return <Box key={key} paddingLeft={4}><Text bold color={colors.critical}>{line}</Text></Box>;
-  if (/^🟠/.test(line)) return <Box key={key} paddingLeft={4}><Text bold color={colors.error}>{line}</Text></Box>;
-  if (/^🟡/.test(line)) return <Box key={key} paddingLeft={4}><Text bold color={colors.warning}>{line}</Text></Box>;
-  if (/^🟢/.test(line)) return <Box key={key} paddingLeft={4}><Text bold color={colors.success}>{line}</Text></Box>;
+  if (/^🔴/.test(line)) return <Box key={key} paddingLeft={2}><Text bold color={colors.critical}>{line}</Text></Box>;
+  if (/^🟠/.test(line)) return <Box key={key} paddingLeft={2}><Text bold color={colors.error}>{line}</Text></Box>;
+  if (/^🟡/.test(line)) return <Box key={key} paddingLeft={2}><Text bold color={colors.warning}>{line}</Text></Box>;
+  if (/^🟢/.test(line)) return <Box key={key} paddingLeft={2}><Text bold color={colors.success}>{line}</Text></Box>;
   if (/^(Score|Grade|Security Score):/i.test(line))
-    return <Box key={key} paddingLeft={4}><Text bold color={colors.info}>{line}</Text></Box>;
+    return <Box key={key} paddingLeft={2}><Text bold color={colors.info}>{line}</Text></Box>;
 
-  return <Box key={key} paddingLeft={4}><Text>{line}</Text></Box>;
+  return <Box key={key} paddingLeft={2}><Text>{line}</Text></Box>;
 }
 
-export function BotMessage({ parts, model, duration }: Props) {
+export function BotMessage({ parts, model, duration, showThinking = true, showDetails = true }: Props) {
   const { colors } = useTheme();
   if (parts.length === 0) return null;
 
-  const groups = parts.reduce<MessagePart[][]>((acc, p) => {
-    const last = acc[acc.length - 1];
-    if (last && last[0].type === p.type) { last.push(p); } else { acc.push([p]); }
-    return acc;
-  }, []);
+  const filtered = parts.filter(p => {
+    if (!showThinking && p.type === 'reasoning') return false;
+    if (!showDetails && (p.type === 'tool-call' || p.type === 'tool-result')) return false;
+    return true;
+  });
 
   const shortModel = model
     ? model.replace('claude-', '').replace('gpt-4', 'gpt4').replace('-latest', '')
     : null;
 
+  if (filtered.length === 0) {
+    return (
+      <Box flexDirection="column" marginY={1}>
+        <Box paddingLeft={2}><Text bold color={colors.primary}>{'Sentinel'}</Text></Box>
+        <Box paddingLeft={2}><Text dimColor>{'[content filtered — use /thinking or /details to toggle]'}</Text></Box>
+      </Box>
+    );
+  }
+
+  const groups = filtered.reduce<MessagePart[][]>((acc, p) => {
+    const last = acc[acc.length - 1];
+    if (last && last[0].type === p.type) { last.push(p); } else { acc.push([p]); }
+    return acc;
+  }, []);
+
   return (
     <Box flexDirection="column" marginY={1}>
-      {/* Header */}
       <Box flexDirection="row" gap={1} paddingLeft={2} marginBottom={1}>
-        <Text bold color={colors.primary}>{'◆'}</Text>
         <Text bold color={colors.primary}>{'Sentinel'}</Text>
-        {shortModel ? <><Text dimColor>{'·'}</Text><Text dimColor>{shortModel}</Text></> : null}
-        {duration   ? <><Text dimColor>{'·'}</Text><Text dimColor>{`${(duration / 1000).toFixed(1)}s`}</Text></> : null}
+        {shortModel ? <Text dimColor>{shortModel}</Text> : null}
+        {duration ? <Text dimColor>{`${(duration / 1000).toFixed(1)}s`}</Text> : null}
       </Box>
 
       {groups.map((group, gi) => {

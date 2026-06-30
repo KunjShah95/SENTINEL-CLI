@@ -11,6 +11,8 @@ import { Blog } from './pages/Blog';
 import { Article } from './pages/Article';
 import { Contact } from './pages/Contact';
 import { Contact2 } from './pages/Contact2';
+import { ReviewPage } from './pages/ReviewPage';
+import { ReviewsList } from './pages/ReviewsList';
 import { Analytics } from "@vercel/analytics/react"
 
 
@@ -31,6 +33,8 @@ export default function App() {
           <Route path="/blog/article" element={<Article />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/contact/success" element={<Contact2 />} />
+          <Route path="/reviews" element={<ReviewsList />} />
+          <Route path="/review/:id" element={<ReviewPage />} />
         </Routes>
         <Footer />
         <Analytics />

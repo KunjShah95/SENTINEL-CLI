@@ -17,14 +17,14 @@
  * Mirrors packages/server/src/middleware/require-auth.ts from Nightcode.
  */
 
-import fs from "node:fs";
-import path from "node:path";
-import { createRequire } from "node:module";
+import fs from 'node:fs';
+import path from 'node:path';
+import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 
-const CONFIG_DIR = process.env.SENTINEL_HOME || path.join(process.env.HOME || process.env.USERPROFILE || ".", ".sentinel");
-const DEV_TOKENS_PATH = path.join(CONFIG_DIR, "dev-tokens.json");
+const CONFIG_DIR = process.env.SENTINEL_HOME || path.join(process.env.HOME || process.env.USERPROFILE || '.', '.sentinel');
+const DEV_TOKENS_PATH = path.join(CONFIG_DIR, 'dev-tokens.json');
 
 let devTokens = null;
 
@@ -32,7 +32,7 @@ function loadDevTokens() {
   if (devTokens !== null) return devTokens;
   try {
     if (fs.existsSync(DEV_TOKENS_PATH)) {
-      devTokens = JSON.parse(fs.readFileSync(DEV_TOKENS_PATH, "utf-8"));
+      devTokens = JSON.parse(fs.readFileSync(DEV_TOKENS_PATH, 'utf-8'));
     } else {
       devTokens = {};
     }
@@ -74,13 +74,13 @@ export function revokeDevToken(token) {
  * Authenticate a request. Returns { userId, mode: "clerk"|"dev" } or null.
  */
 export function authenticateRequest(request) {
-  const url = new URL(request.url || "http://localhost/");
-  const authHeader = request.headers.get("authorization") || "";
-  const bearer = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  const url = new URL(request.url || 'http://localhost/');
+  const authHeader = request.headers.get('authorization') || '';
+  const bearer = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
   const token =
     bearer ||
-    request.headers.get("x-sentinel-token") ||
-    (process.env.NODE_ENV !== "production" ? url.searchParams.get("token") : null);
+    request.headers.get('x-sentinel-token') ||
+    (process.env.NODE_ENV !== 'production' ? url.searchParams.get('token') : null);
 
   if (!token) return null;
 
@@ -88,7 +88,7 @@ export function authenticateRequest(request) {
   if (process.env.CLERK_SECRET_KEY && process.env.CLERK_PUBLISHABLE_KEY) {
     try {
       // eslint-disable-next-line global-require
-      require("@clerk/backend");
+      require('@clerk/backend');
       // Note: full Clerk validation requires async authenticateRequest,
       // which we don't block on. For the dev fallback we accept dev tokens.
     } catch {
@@ -99,7 +99,7 @@ export function authenticateRequest(request) {
   // 2. Dev tokens
   const tokens = loadDevTokens();
   if (tokens[token]) {
-    return { userId: tokens[token].userId, mode: "dev" };
+    return { userId: tokens[token].userId, mode: 'dev' };
   }
 
   return null;
@@ -112,10 +112,10 @@ export function requireAuth() {
   return async (c, next) => {
     const auth = authenticateRequest(c.req.raw);
     if (!auth) {
-      return c.json({ error: "Unauthorized. Run /login to continue." }, 401);
+      return c.json({ error: 'Unauthorized. Run /login to continue.' }, 401);
     }
-    c.set("userId", auth.userId);
-    c.set("authMode", auth.mode);
+    c.set('userId', auth.userId);
+    c.set('authMode', auth.mode);
     await next();
   };
 }
@@ -128,8 +128,8 @@ export function optionalAuth() {
   return async (c, next) => {
     const auth = authenticateRequest(c.req.raw);
     if (auth) {
-      c.set("userId", auth.userId);
-      c.set("authMode", auth.mode);
+      c.set('userId', auth.userId);
+      c.set('authMode', auth.mode);
     }
     await next();
   };

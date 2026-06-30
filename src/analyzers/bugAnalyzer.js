@@ -276,24 +276,6 @@ export class BugAnalyzer extends BaseAnalyzer {
     for (let lineNum = 0; lineNum < lines.length; lineNum++) {
       const line = lines[lineNum];
 
-      // Check for direct method calls on potentially null objects
-      if (/\w+\.\w+\(/.test(line) && !line.includes('if') && !line.includes('&&')) {
-        if (!/new\s+\w+/.test(line) && !line.includes('getElementById')) {
-          issues.push({
-            severity: 'medium',
-            type: 'bug',
-            title: 'Potential Null Pointer Dereference',
-            message: 'Method called on object that might be null',
-            file: filePath,
-            line: lineNum + 1,
-            column: line.search(/\w+\.\w+\(/),
-            snippet: this.getCodeSnippet(code, lineNum + 1).snippet,
-            suggestion: 'Add null check before method call',
-            tags: ['bug', 'null', 'dereference'],
-          });
-        }
-      }
-
       // Check for array access without null check
       if (/\[\s*\w+\s*\]/.test(line) && !line.includes('if')) {
         if (!/new\s+\w+/.test(line)) {

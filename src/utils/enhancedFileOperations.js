@@ -1,9 +1,9 @@
 /**
  * Enhanced File Operations API
- * 
+ *
  * Replaces regex-based parsing with proper diff-based editing,
  * AST-aware refactoring, and batch operations.
- * 
+ *
  * Inspired by LSP's TextDocumentEdit protocol and modern code editors.
  */
 
@@ -62,7 +62,7 @@ export class Range {
   static fromString(content, substring) {
     const lines = content.split('\n');
     const subIndex = content.indexOf(substring);
-    
+
     if (subIndex === -1) return null;
 
     let startLine = 0;
@@ -73,7 +73,7 @@ export class Range {
 
     for (let i = 0; i < lines.length; i++) {
       const lineLength = lines[i].length + 1; // +1 for newline
-      
+
       if (currentIndex <= subIndex && subIndex < currentIndex + lineLength) {
         startLine = i;
         startChar = subIndex - currentIndex;
@@ -115,7 +115,7 @@ export class FileEdit {
     }
 
     const lines = this.originalContent.split('\n');
-    
+
     // Sort edits in reverse order to preserve line numbers
     const sortedEdits = [...this.edits].sort((a, b) => {
       if (a.range.endLine !== b.range.endLine) {
@@ -160,7 +160,7 @@ export class FileEdit {
    */
   getDiff() {
     if (!this.modifiedContent) throw new Error('Edits not applied');
-    
+
     return createTwoFilesPatch(
       this.filePath,
       this.filePath,
@@ -219,7 +219,7 @@ export class EnhancedFileOperations {
     try {
       const content = await fsAsync.readFile(fullPath, options.encoding || 'utf8');
       const stats = await statAsync(fullPath);
-      
+
       return {
         success: true,
         content,
@@ -244,9 +244,9 @@ export class EnhancedFileOperations {
       const dir = path.dirname(fullPath);
       await fsAsync.mkdir(dir, { recursive: true });
       await fsAsync.writeFile(fullPath, content, options.encoding || 'utf8');
-      
+
       const stats = await statAsync(fullPath);
-      
+
       return {
         success: true,
         path: fullPath,
@@ -271,7 +271,7 @@ export class EnhancedFileOperations {
    */
   async editWithDiff(filePath, edits, options = {}) {
     const fullPath = this.resolvePath(filePath);
-    
+
     try {
       const { content } = await this.read(filePath);
       if (!content.success && !content.content) {
@@ -316,7 +316,7 @@ export class EnhancedFileOperations {
    */
   async replaceString(filePath, oldString, newString, options = {}) {
     const fullPath = this.resolvePath(filePath);
-    
+
     try {
       const { content } = await this.read(filePath);
       if (!content.success) {
@@ -366,10 +366,10 @@ export class EnhancedFileOperations {
    */
   async batchEdit(filePattern, edits, options = {}) {
     const results = [];
-    
+
     try {
       const files = await this.glob(filePattern);
-      
+
       for (const file of files.files) {
         const result = await this.editWithDiff(file, edits, options);
         results.push({
@@ -401,7 +401,7 @@ export class EnhancedFileOperations {
    */
   async batchEditMultiple(edits, options = {}) {
     const results = [];
-    
+
     for (const [filePath, fileEdits] of Object.entries(edits)) {
       const result = await this.editWithDiff(filePath, fileEdits, options);
       results.push({
@@ -424,7 +424,7 @@ export class EnhancedFileOperations {
 
   async chmod(filePath, mode) {
     const fullPath = this.resolvePath(filePath);
-    
+
     try {
       await chmodAsync(fullPath, mode);
       return {
@@ -444,7 +444,7 @@ export class EnhancedFileOperations {
   async createSymlink(target, linkPath, type = 'file') {
     const fullTarget = this.resolvePath(target);
     const fullLink = this.resolvePath(linkPath);
-    
+
     try {
       await symlinkAsync(fullTarget, fullLink, type);
       return {
@@ -463,11 +463,11 @@ export class EnhancedFileOperations {
 
   async readSymlink(linkPath) {
     const fullPath = this.resolvePath(linkPath);
-    
+
     try {
       const target = await readlinkAsync(fullPath);
       const realPath = await realpathAsync(fullPath);
-      
+
       return {
         success: true,
         link: fullPath,
@@ -508,7 +508,7 @@ export class EnhancedFileOperations {
   unwatch(filePath) {
     const fullPath = this.resolvePath(filePath);
     const watcher = this.watcherMap.get(fullPath);
-    
+
     if (watcher) {
       watcher.close();
       this.watcherMap.delete(fullPath);
@@ -613,13 +613,13 @@ export class EnhancedFileOperations {
   async copy(source, destination, options = {}) {
     const srcPath = this.resolvePath(source);
     const destPath = this.resolvePath(destination);
-    
+
     try {
       const dir = path.dirname(destPath);
       await fsAsync.mkdir(dir, { recursive: true });
-      
+
       await fsAsync.cp(srcPath, destPath, { recursive: true, force: options.overwrite });
-      
+
       return {
         success: true,
         source: srcPath,
@@ -636,12 +636,12 @@ export class EnhancedFileOperations {
   async move(source, destination) {
     const srcPath = this.resolvePath(source);
     const destPath = this.resolvePath(destination);
-    
+
     try {
       const dir = path.dirname(destPath);
       await fsAsync.mkdir(dir, { recursive: true });
       await fsAsync.rename(srcPath, destPath);
-      
+
       return {
         success: true,
         source: srcPath,
@@ -660,11 +660,11 @@ export class EnhancedFileOperations {
     try {
       const entries = await fsAsync.readdir(fullPath);
       const items = [];
-      
+
       for (const entry of entries) {
         const entryPath = path.join(fullPath, entry);
         const stats = await statAsync(entryPath);
-        
+
         items.push({
           name: entry,
           path: entryPath,

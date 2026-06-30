@@ -6,6 +6,8 @@
  */
 
 import { GitHubIntegration } from '../../../integrations/github.js';
+import { getKnowledgeBase } from '../../../shared/security/knowledge-base.js';
+
 
 // ─── Provider config ───────────────────────────────────────────────────────────
 
@@ -153,6 +155,7 @@ export async function enrichWithLspContext(files, cwd) {
 
 // ─── 4. runAiReview ─────────────────────────────────────────────────────────────
 
+const kb = getKnowledgeBase();
 export async function runAiReview(diff, files, lspContext = null) {
   const { buildReviewPrompt, parseReviewResponse } = await import('../../../tui/lib/security-reviewer.js');
 
@@ -343,10 +346,19 @@ export default async function reviewPullRequest(owner, repo, prNumber, options =
     console.warn(`[pr-review] Failed to post completion status: ${err.message}`);
   }
 
+  const severityCounts = {
+    critical: criticalCount,
+    high: highCount,
+    medium: allIssues.filter(i => i.severity === 'medium').length,
+    low: allIssues.filter(i => i.severity === 'low').length,
+    info: allIssues.filter(i => i.severity === 'info').length,
+  };
+
   return {
     issuesFound: allIssues.length,
     conclusion,
     duration,
     pr: `${owner}/${repo}#${prNumber}`,
+    severityCounts,
   };
 }

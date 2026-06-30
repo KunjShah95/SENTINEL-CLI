@@ -11,12 +11,12 @@ export class DatabaseTools {
   async detectDatabase() {
     const pkgPath = `${this.projectPath}/package.json`;
     const hasPkg = await this.files.exists(pkgPath);
-    
+
     if (hasPkg) {
       const pkg = await this.files.read(pkgPath);
       const json = JSON.parse(pkg.content);
       const deps = { ...json.dependencies, ...json.devDependencies };
-      
+
       if (deps.prisma) return { type: 'prisma', name: 'Prisma' };
       if (deps.typeorm) return { type: 'typeorm', name: 'TypeORM' };
       if (deps.sequelize) return { type: 'sequelize', name: 'Sequelize' };
@@ -29,11 +29,11 @@ export class DatabaseTools {
 
     const envPath = `${this.projectPath}/.env`;
     const hasEnv = await this.files.exists(envPath);
-    
+
     if (hasEnv) {
       const env = await this.files.read(envPath);
       const content = env.content;
-      
+
       if (content.includes('DATABASE_URL') && content.includes('postgres')) {
         return { type: 'postgresql', name: 'PostgreSQL' };
       }
@@ -50,11 +50,11 @@ export class DatabaseTools {
 
   async runMigrations(dbType, _direction = 'up') {
     const commands = {
-      prisma: `npx prisma migrate dev --name init`,
-      typeorm: `npx typeorm migration:run`,
-      sequelize: `npx sequelize-cli db:migrate`,
-      knex: `npx knex migrate:latest`,
-      default: `npm run migrate`
+      prisma: 'npx prisma migrate dev --name init',
+      typeorm: 'npx typeorm migration:run',
+      sequelize: 'npx sequelize-cli db:migrate',
+      knex: 'npx knex migrate:latest',
+      default: 'npm run migrate'
     };
 
     const cmd = commands[dbType] || commands.default;
@@ -76,11 +76,11 @@ export class DatabaseTools {
 
   async rollbackMigration(dbType) {
     const commands = {
-      prisma: `npx prisma migrate reset`,
-      typeorm: `npx typeorm migration:revert`,
-      sequelize: `npx sequelize-cli db:migrate:undo`,
-      knex: `npx knex migrate:rollback`,
-      default: `npm run migrate:rollback`
+      prisma: 'npx prisma migrate reset',
+      typeorm: 'npx typeorm migration:revert',
+      sequelize: 'npx sequelize-cli db:migrate:undo',
+      knex: 'npx knex migrate:rollback',
+      default: 'npm run migrate:rollback'
     };
 
     const cmd = commands[dbType] || commands.default;
@@ -89,11 +89,11 @@ export class DatabaseTools {
 
   async seedDatabase(dbType) {
     const commands = {
-      prisma: `npx prisma db seed`,
-      typeorm: `npx typeorm seeder:run`,
-      sequelize: `npx sequelize-cli db:seed:all`,
-      knex: `npx knex seed:run`,
-      default: `npm run seed`
+      prisma: 'npx prisma db seed',
+      typeorm: 'npx typeorm seeder:run',
+      sequelize: 'npx sequelize-cli db:seed:all',
+      knex: 'npx knex seed:run',
+      default: 'npm run seed'
     };
 
     const cmd = commands[dbType] || commands.default;
@@ -102,10 +102,10 @@ export class DatabaseTools {
 
   async resetDatabase(dbType) {
     const commands = {
-      prisma: `npx prisma migrate reset --force`,
-      typeorm: `npx typeorm schema:sync`,
-      sequelize: `npx sequelize-cli db:drop && npx sequelize-cli db:create`,
-      default: `echo "Manual reset required"`
+      prisma: 'npx prisma migrate reset --force',
+      typeorm: 'npx typeorm schema:sync',
+      sequelize: 'npx sequelize-cli db:drop && npx sequelize-cli db:create',
+      default: 'echo "Manual reset required"'
     };
 
     const cmd = commands[dbType] || commands.default;
@@ -114,10 +114,10 @@ export class DatabaseTools {
 
   async studio(dbType) {
     const commands = {
-      prisma: `npx prisma studio`,
-      typeorm: `echo "Use TypeORM Studio or TablePlus"`,
-      sequelize: `echo "Use TablePlus or MySQL Workbench"`,
-      default: `echo "No studio available"`
+      prisma: 'npx prisma studio',
+      typeorm: 'echo "Use TypeORM Studio or TablePlus"',
+      sequelize: 'echo "Use TablePlus or MySQL Workbench"',
+      default: 'echo "No studio available"'
     };
 
     const cmd = commands[dbType] || commands.default;
@@ -126,9 +126,9 @@ export class DatabaseTools {
 
   async generateSchema(dbType) {
     const commands = {
-      prisma: `npx prisma generate`,
-      typeorm: `npx typeorm schema:sync`,
-      default: `echo "Generate schema manually"`
+      prisma: 'npx prisma generate',
+      typeorm: 'npx typeorm schema:sync',
+      default: 'echo "Generate schema manually"'
     };
 
     const cmd = commands[dbType] || commands.default;

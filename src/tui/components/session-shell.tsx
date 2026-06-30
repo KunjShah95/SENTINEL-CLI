@@ -11,6 +11,7 @@ type Props = {
   onSubmit: (value: string) => void;
   onCommand?: (command: string) => void;
   onSlashCommand?: () => void;
+  onShellCommand?: (command: string) => void;
   inputDisabled?: boolean;
   loading?: boolean;
   mode?: Mode;
@@ -23,6 +24,8 @@ type Props = {
   compacting?: boolean;
   serverStatus?: 'connected' | 'local';
   costUsd?: number;
+  showThinking?: boolean;
+  showDetails?: boolean;
 };
 
 export function SessionShell({
@@ -30,6 +33,7 @@ export function SessionShell({
   onSubmit,
   onCommand,
   onSlashCommand,
+  onShellCommand,
   inputDisabled = false,
   loading = false,
   mode = 'BUILD',
@@ -42,36 +46,41 @@ export function SessionShell({
   compacting,
   serverStatus,
   costUsd,
+  showThinking = true,
+  showDetails = true,
 }: Props) {
   const { colors } = useTheme();
 
+  const modeColor =
+    mode === 'BUILD'  ? colors.success   :
+    mode === 'PLAN'   ? colors.planMode  :
+    mode === 'REVIEW' ? colors.critical  :
+    mode === 'SCAN'   ? colors.warning   : colors.error;
+
+  const shortModel = model
+    ? model.replace('claude-', '').replace('gpt-4', 'gpt4').replace('-latest', '')
+    : null;
+
   return (
     <Box flexDirection="column" flexGrow={1} width="100%">
-      {/* Thin header line */}
+      {/* Header */}
       <Box
         flexDirection="row"
         paddingX={2}
-        borderStyle="single"
-        borderColor={colors.dimSeparator}
+        paddingY={0}
+        alignItems="center"
         gap={2}
       >
-        <Text bold color={colors.primary}>{'◆ SENTINEL'}</Text>
-        <Text color={colors.dimSeparator}>{'│'}</Text>
-        {model ? <Text dimColor>{model.replace('claude-', '').replace('-latest', '')}</Text> : null}
-        <Text color={colors.dimSeparator}>{'│'}</Text>
-        <Text bold color={
-          mode === 'REVIEW' ? colors.critical :
-          mode === 'PLAN'   ? colors.planMode  :
-          mode === 'SCAN'   ? colors.warning   :
-          mode === 'FIX'    ? colors.error     : colors.success
-        }>{mode}</Text>
-        {statusText && (
-          <>
-            <Text color={colors.dimSeparator}>{'│'}</Text>
-            <Text dimColor>{statusText}</Text>
-          </>
-        )}
+        <Text color={colors.dimSeparator}>{'◈'}</Text>
+        {shortModel ? <Text dimColor>{shortModel}</Text> : null}
+        <Text bold color={modeColor}>{mode}</Text>
+        {compacting && <Text color={colors.warning}>{'⟳ compacting…'}</Text>}
+        {statusText && <Text dimColor>{statusText}</Text>}
+        {serverStatus === 'connected' && <Text color={colors.success}>{'⬤'}</Text>}
+        <Box flexGrow={1} />
       </Box>
+
+      <Box flexShrink={0}><Text color={colors.dimSeparator}>{'─'.repeat(80)}</Text></Box>
 
       {/* Message area */}
       <Box flexDirection="column" flexGrow={1} paddingX={1}>
@@ -91,6 +100,7 @@ export function SessionShell({
           onSubmit={onSubmit}
           onCommand={onCommand}
           onSlashCommand={onSlashCommand}
+          onShellCommand={onShellCommand}
           disabled={inputDisabled}
           mode={mode}
           onModeToggle={onModeToggle}
@@ -109,6 +119,8 @@ export function SessionShell({
           compacting={compacting}
           serverStatus={serverStatus}
           costUsd={costUsd}
+          showThinking={showThinking}
+          showDetails={showDetails}
         />
       </Box>
     </Box>

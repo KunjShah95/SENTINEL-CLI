@@ -42,7 +42,7 @@ class AutoFixGenerator {
         template: () => ({
           find: /\.innerHTML\s*=\s*([^;]+)/,
           replace: '.textContent = sanitize($1)',
-          import: "import { sanitize } from './utils';",
+          import: 'import { sanitize } from \'./utils\';',
         }),
         confidence: 0.85,
       },
@@ -63,7 +63,7 @@ class AutoFixGenerator {
         template: (match) => ({
           find: match[0],
           replace: match[0].replace(/console\.(log|warn|error)/, 'logger.$1'),
-          import: "import logger from './logger';",
+          import: 'import logger from \'./logger\';',
         }),
         confidence: 0.9,
       },
@@ -111,11 +111,11 @@ class AutoFixGenerator {
 
   canAutoFix(issue) {
     const supportedTypes = Object.keys(this.fixTemplates);
-    
+
     if (issue.type && supportedTypes.includes(issue.type)) {
       return true;
     }
-    
+
     if (issue.message) {
       for (const type of supportedTypes) {
         if (issue.message.toLowerCase().includes(type.replace(/-/g, ' '))) {
@@ -123,7 +123,7 @@ class AutoFixGenerator {
         }
       }
     }
-    
+
     if (issue.analyzer) {
       const analyzerSupport = {
         security: ['hardcoded-password', 'sql-injection', 'xss-vulnerability', 'eval-usage'],
@@ -131,11 +131,11 @@ class AutoFixGenerator {
         bugs: ['unused-variable', 'var-to-const'],
         performance: [],
       };
-      
+
       const supported = analyzerSupport[issue.analyzer] || [];
       return supported.some(s => issue.type === s);
     }
-    
+
     return false;
   }
 
@@ -145,7 +145,7 @@ class AutoFixGenerator {
     try {
       // Try template-based fix first
       const templateFix = await this.generateTemplateFix(issue);
-      
+
       if (templateFix && templateFix.confidence >= this.confidenceThreshold) {
         this.metrics.endTimer(timer);
         return templateFix;
@@ -169,7 +169,7 @@ class AutoFixGenerator {
 
   async generateTemplateFix(issue) {
     const template = this.fixTemplates[issue.type];
-    
+
     if (!template) {
       return null;
     }
@@ -271,7 +271,7 @@ class AutoFixGenerator {
     const multiStepFixes = {
       'sql-injection': {
         steps: [
-          { action: 'import', code: "import { query } from './db'" },
+          { action: 'import', code: 'import { query } from \'./db\'' },
           { action: 'replace', find: 'db.query', replace: 'query' },
         ],
         explanation: 'Replace string concatenation with parameterized query',
@@ -279,7 +279,7 @@ class AutoFixGenerator {
       },
       'xss-vulnerability': {
         steps: [
-          { action: 'import', code: "import { sanitize } from './utils'" },
+          { action: 'import', code: 'import { sanitize } from \'./utils\'' },
           { action: 'replace', find: '.innerHTML', replace: '.textContent = sanitize(' },
         ],
         explanation: 'Sanitize input and use textContent',
@@ -287,7 +287,7 @@ class AutoFixGenerator {
       },
       'hardcoded-password': {
         steps: [
-          { action: 'import', code: "import config from './config'" },
+          { action: 'import', code: 'import config from \'./config\'' },
           { action: 'replace', find: 'password =', replace: 'password = config.get(' },
         ],
         explanation: 'Load password from configuration',
@@ -319,14 +319,14 @@ class AutoFixGenerator {
       'insecure-random': {
         pattern: /Math\.random\s*\(\s*\)/g,
         replacement: 'crypto.getRandomValues(new Uint8Array(1))[0]',
-        imports: "import { randomBytes } from 'crypto'",
+        imports: 'import { randomBytes } from \'crypto\'',
         explanation: 'Use cryptographically secure random',
         confidence: 0.9,
       },
       'weak-crypto': {
         pattern: /md5|sha1/gi,
         replacement: 'sha256',
-        imports: "import { createHash } from 'crypto'",
+        imports: 'import { createHash } from \'crypto\'',
         explanation: 'Use stronger hashing algorithm',
         confidence: 0.85,
       },
@@ -387,17 +387,17 @@ class AutoFixGenerator {
       let response;
 
       switch (this.llmProvider) {
-        case 'openai':
-          response = await this.callOpenAI(prompt);
-          break;
-        case 'anthropic':
-          response = await this.callAnthropic(prompt);
-          break;
-        case 'groq':
-          response = await this.callGroq(prompt);
-          break;
-        default:
-          throw new Error(`Unknown LLM provider: ${this.llmProvider}`);
+      case 'openai':
+        response = await this.callOpenAI(prompt);
+        break;
+      case 'anthropic':
+        response = await this.callAnthropic(prompt);
+        break;
+      case 'groq':
+        response = await this.callGroq(prompt);
+        break;
+      default:
+        throw new Error(`Unknown LLM provider: ${this.llmProvider}`);
       }
 
       return this.parseLLMResponse(response, issue);
@@ -493,7 +493,7 @@ Provide the fix in this JSON format:
   parseLLMResponse(content, issue) {
     try {
       // Extract JSON from markdown code block if present
-      const jsonMatch = content.match(/```json\n?([\s\S]*?)\n?```/) || 
+      const jsonMatch = content.match(/```json\n?([\s\S]*?)\n?```/) ||
                         content.match(/```\n?([\s\S]*?)\n?```/) ||
                         [null, content];
 
@@ -602,7 +602,7 @@ Provide the fix in this JSON format:
 
     for (const issue of issues) {
       const fix = await this.generateFix(issue, options);
-      
+
       if (fix && fix.confidence >= (options.confidenceThreshold || this.confidenceThreshold)) {
         fixes.push({
           issue,

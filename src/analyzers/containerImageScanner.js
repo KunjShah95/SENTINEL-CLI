@@ -31,7 +31,7 @@ export class ContainerImageScanner extends BaseAnalyzer {
    */
   async detectScanTools() {
     const tools = {};
-    
+
     // Check for Trivy
     try {
       await exec('trivy version', { timeout: 5000 });
@@ -45,7 +45,7 @@ export class ContainerImageScanner extends BaseAnalyzer {
       console.log('⚠️ Trivy not available:', error.message);
       tools.trivy = { available: false, error: error.message };
     }
-    
+
     // Check for Grype
     try {
       await exec('grype version', { timeout: 5000 });
@@ -59,7 +59,7 @@ export class ContainerImageScanner extends BaseAnalyzer {
       console.log('⚠️ Grype not available:', error.message);
       tools.grype = { available: false, error: error.message };
     }
-    
+
     // Check for Snyk
     try {
       await exec('snyk version', { timeout: 5000 });
@@ -73,7 +73,7 @@ export class ContainerImageScanner extends BaseAnalyzer {
       console.log('⚠️ Snyk not available:', error.message);
       tools.snyk = { available: false, error: error.message };
     }
-    
+
     // Check for Docker CLI
     try {
       await exec('docker --version', { timeout: 5000 });
@@ -87,7 +87,7 @@ export class ContainerImageScanner extends BaseAnalyzer {
       console.log('⚠️ Docker CLI not available:', error.message);
       tools.docker = { available: false, error: error.message };
     }
-    
+
     this.scanTools = tools;
     return tools;
   }
@@ -146,19 +146,19 @@ export class ContainerImageScanner extends BaseAnalyzer {
    */
   async analyze(files, context = {}) {
     const issues = [];
-    
+
     // Filter for Docker-related files
-    const dockerFiles = files.filter(file => 
+    const dockerFiles = files.filter(file =>
       this.isDockerFile(file.path) ||
       this.isKubernetesFile(file.path) ||
       this.isContainerConfigFile(file.path)
     );
-    
+
     for (const file of dockerFiles) {
       const fileIssues = await this.analyzeFile(file, context);
       issues.push(...fileIssues);
     }
-    
+
     return issues;
   }
 
@@ -169,32 +169,32 @@ export class ContainerImageScanner extends BaseAnalyzer {
     const issues = [];
     const content = file.content;
     const filename = file.path;
-    
+
     try {
       // Dockerfile analysis
       if (filename.toLowerCase().includes('dockerfile')) {
         const dockerfileIssues = await this.analyzeDockerfile(content, filename);
         issues.push(...dockerfileIssues);
       }
-      
+
       // Kubernetes YAML analysis
       if (this.isKubernetesFile(filename, content)) {
         const k8sIssues = await this.analyzeKubernetesFile(content, filename);
         issues.push(...k8sIssues);
       }
-      
+
       // Docker Compose analysis
       if (filename.toLowerCase().includes('docker-compose') || filename.toLowerCase().includes('compose.yml')) {
         const composeIssues = await this.analyzeDockerCompose(content, filename);
         issues.push(...composeIssues);
       }
-      
+
       // Container config analysis
       if (this.isContainerConfigFile(filename, content)) {
         const configIssues = await this.analyzeContainerConfig(content, filename);
         issues.push(...configIssues);
       }
-      
+
       // Image reference analysis
       const imageRefs = this.extractImageReferences(content);
       for (const imageRef of imageRefs) {
@@ -204,7 +204,7 @@ export class ContainerImageScanner extends BaseAnalyzer {
     } catch (error) {
       console.warn(`Error analyzing ${filename}:`, error.message);
     }
-    
+
     return issues;
   }
 
@@ -254,7 +254,7 @@ export class ContainerImageScanner extends BaseAnalyzer {
       'LocalVolume', 'PersistentVolume', 'PersistentVolumeClaim',
       'VolumeSnapshot', 'HorizontalPodAutoscaler'
     ];
-    
+
     const contentLower = (content || '').toLowerCase();
     return k8sKeywords.some(keyword => contentLower.includes(keyword.toLowerCase()));
   }

@@ -73,16 +73,16 @@ export class TechnicalDebtTracker {
   async calculateDebt(analysisResults, options = {}) {
     const debtItems = [];
     const fileMetrics = new Map();
-    
+
     // Process all issues and calculate debt
     for (const result of analysisResults) {
       if (!result.issues) continue;
-      
+
       for (const issue of result.issues) {
         const debtItem = this.calculateIssueDebt(issue, options);
         if (debtItem) {
           debtItems.push(debtItem);
-          
+
           // Aggregate by file
           const file = issue.file;
           if (!fileMetrics.has(file)) {
@@ -93,7 +93,7 @@ export class TechnicalDebtTracker {
               maintainability: 100,
             });
           }
-          
+
           const metrics = fileMetrics.get(file);
           metrics.debt += debtItem.debtScore;
           metrics.issues.push(issue);
@@ -105,7 +105,7 @@ export class TechnicalDebtTracker {
 
     // Calculate summary statistics
     const summary = this.calculateDebtSummary(debtItems, fileMetrics);
-    
+
     // Update debt data
     this.debtData.lastUpdated = new Date().toISOString();
     this.debtData.summary = summary;
@@ -136,7 +136,7 @@ export class TechnicalDebtTracker {
     const complexityMultiplier = this.getComplexityMultiplier(issue);
     const maintainabilityCost = this.getMaintainabilityCost(issue);
     const timeMultiplier = options.timeMultiplier || 1;
-    
+
     const debtScore = Math.round(
       baseDebt * complexityMultiplier * maintainabilityCost * timeMultiplier
     );
@@ -173,7 +173,7 @@ export class TechnicalDebtTracker {
       low: 1,
       info: 0.5,
     };
-    
+
     return baseScores[severity] || 1;
   }
 
@@ -182,7 +182,7 @@ export class TechnicalDebtTracker {
    */
   getComplexityMultiplier(issue) {
     let multiplier = 1;
-    
+
     // Increase multiplier for certain issue types
     const highComplexityTypes = [
       'security',
@@ -190,17 +190,17 @@ export class TechnicalDebtTracker {
       'architecture',
       'concurrency',
     ];
-    
+
     if (highComplexityTypes.includes(issue.type)) {
       multiplier *= 2;
     }
-    
+
     // Consider analyzer complexity
     const complexAnalyzers = ['quality', 'performance', 'security'];
     if (complexAnalyzers.includes(issue.analyzer)) {
       multiplier *= 1.5;
     }
-    
+
     return multiplier;
   }
 
@@ -209,7 +209,7 @@ export class TechnicalDebtTracker {
    */
   getMaintainabilityCost(issue) {
     let cost = 1;
-    
+
     // Increase cost for code quality issues
     const maintainabilityIssues = [
       'complexity',
@@ -217,18 +217,18 @@ export class TechnicalDebtTracker {
       'naming',
       'formatting',
     ];
-    
+
     if (maintainabilityIssues.includes(issue.type)) {
       cost *= 1.8;
     }
-    
+
     // Consider file path complexity
     const filePath = issue.file;
     const pathSegments = filePath.split('/').length;
     if (pathSegments > 5) {
       cost *= 1.2; // Deep directory structure
     }
-    
+
     return cost;
   }
 
@@ -251,9 +251,9 @@ export class TechnicalDebtTracker {
       low: 1,
       info: 0.5,
     };
-    
+
     const weightedScore = debtScore * (severityWeight[severity] || 1);
-    
+
     if (weightedScore >= 20) return 'critical';
     if (weightedScore >= 10) return 'high';
     if (weightedScore >= 5) return 'medium';
@@ -266,10 +266,10 @@ export class TechnicalDebtTracker {
    */
   generateDebtTags(issue) {
     const tags = [];
-    
+
     // Add severity tag
     tags.push(issue.severity);
-    
+
     // Add type-specific tags
     if (issue.analyzer === 'security') {
       tags.push('security');
@@ -280,7 +280,7 @@ export class TechnicalDebtTracker {
     if (issue.analyzer === 'quality') {
       tags.push('maintainability');
     }
-    
+
     // Add location-based tags
     if (issue.file.includes('test')) {
       tags.push('test');
@@ -288,7 +288,7 @@ export class TechnicalDebtTracker {
     if (issue.file.includes('config')) {
       tags.push('configuration');
     }
-    
+
     return [...new Set(tags)];
   }
 
@@ -310,7 +310,7 @@ export class TechnicalDebtTracker {
       low: 'Address when convenient - code quality improvement',
       info: 'Consider during next refactor - minor improvement',
     };
-    
+
     const priority = this.calculateDebtPriority(debtScore, issue.severity);
     return recommendations[priority] || recommendations.medium;
   }
@@ -321,25 +321,25 @@ export class TechnicalDebtTracker {
   calculateDebtSummary(debtItems, fileMetrics) {
     const totalDebt = debtItems.reduce((sum, item) => sum + item.debtScore, 0);
     const totalIssues = debtItems.length;
-    
+
     // Categorize by severity
     const bySeverity = debtItems.reduce((acc, item) => {
       acc[item.severity] = (acc[item.severity] || 0) + 1;
       return acc;
     }, {});
-    
+
     // Categorize by priority
     const byPriority = debtItems.reduce((acc, item) => {
       acc[item.priority] = (acc[item.priority] || 0) + 1;
       return acc;
     }, {});
-    
+
     // Calculate debt ratios
     const avgDebtPerFile = fileMetrics.size > 0 ? totalDebt / fileMetrics.size : 0;
     const highInterestDebt = debtItems
       .filter(item => item.priority === 'critical' || item.priority === 'high')
       .reduce((sum, item) => sum + item.debtScore, 0);
-    
+
     return {
       totalDebt,
       totalIssues,
@@ -370,24 +370,24 @@ export class TechnicalDebtTracker {
     if (!this.debtData) {
       throw new Error('No debt data to save');
     }
-    
+
     try {
       // Add to history
       const snapshot = {
         timestamp: this.debtData.lastUpdated,
         summary: { ...this.debtData.summary },
       };
-      
+
       this.history.push(snapshot);
-      
+
       // Keep only last 90 days of history
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - 90);
-      
+
       this.history = this.history.filter(
         entry => new Date(entry.timestamp) > cutoffDate
       );
-      
+
       // Save both files
       await Promise.all([
         fs.writeFile(
@@ -401,7 +401,7 @@ export class TechnicalDebtTracker {
           'utf8'
         ),
       ]);
-      
+
       return {
         success: true,
         snapshotCount: this.history.length,
@@ -426,10 +426,10 @@ export class TechnicalDebtTracker {
         changePercent: 0,
       };
     }
-    
+
     const recent = this.history.slice(-5); // Last 5 snapshots
     const older = this.history.slice(-10, -5); // Previous 5 snapshots
-    
+
     if (older.length === 0) {
       return {
         trend: 'insufficient_data',
@@ -437,13 +437,13 @@ export class TechnicalDebtTracker {
         changePercent: 0,
       };
     }
-    
+
     const recentAvg = recent.reduce((sum, s) => sum + s.summary.totalDebt, 0) / recent.length;
     const olderAvg = older.reduce((sum, s) => sum + s.summary.totalDebt, 0) / older.length;
-    
+
     const change = recentAvg - olderAvg;
     const changePercent = olderAvg !== 0 ? (change / olderAvg) * 100 : 0;
-    
+
     let trend;
     if (Math.abs(changePercent) < 5) {
       trend = 'stable';
@@ -452,7 +452,7 @@ export class TechnicalDebtTracker {
     } else {
       trend = 'decreasing';
     }
-    
+
     return {
       trend,
       change: Math.round(change),
@@ -469,13 +469,13 @@ export class TechnicalDebtTracker {
     if (!this.debtData || !this.debtData.files) {
       return [];
     }
-    
+
     const recommendations = [];
-    
+
     // Sort files by debt ratio
     const sortedFiles = Object.entries(this.debtData.files)
       .sort(([, a], [, b]) => b.debtRatio - a.debtRatio);
-    
+
     // Recommend top 5 files to address
     for (const [file, metrics] of sortedFiles.slice(0, 5)) {
       const issues = metrics.issues
@@ -483,7 +483,7 @@ export class TechnicalDebtTracker {
           const severityOrder = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
           return severityOrder[a.severity] - severityOrder[b.severity];
         });
-      
+
       recommendations.push({
         file,
         priority: metrics.debtRatio > 5 ? 'high' : 'medium',
@@ -494,7 +494,7 @@ export class TechnicalDebtTracker {
         suggestion: this.generateFileRecommendation(file, metrics),
       });
     }
-    
+
     return recommendations;
   }
 
@@ -505,15 +505,15 @@ export class TechnicalDebtTracker {
     if (metrics.maintainabilityScore < 50) {
       return `Refactor ${file} - low maintainability score (${metrics.maintainabilityScore})`;
     }
-    
+
     if (metrics.debt > 50) {
       return `Address high debt in ${file} - ${metrics.debt} debt points`;
     }
-    
+
     if (metrics.issueCount > 10) {
       return `Focus on ${file} - ${metrics.issueCount} issues detected`;
     }
-    
+
     return `Review ${file} for potential improvements`;
   }
 
@@ -524,10 +524,10 @@ export class TechnicalDebtTracker {
     if (!this.debtData) {
       throw new Error('No debt data available');
     }
-    
+
     const trends = this.getDebtTrends();
     const recommendations = this.getPayoffRecommendations();
-    
+
     const report = {
       summary: this.debtData.summary,
       trends,
@@ -536,19 +536,19 @@ export class TechnicalDebtTracker {
       lastUpdated: this.debtData.lastUpdated,
       generatedAt: new Date().toISOString(),
     };
-    
+
     switch (format.toLowerCase()) {
-      case 'json':
-        return JSON.stringify(report, null, 2);
-      
-      case 'markdown':
-        return this.generateMarkdownReport(report);
-      
-      case 'html':
-        return this.generateHtmlReport(report);
-      
-      default:
-        return JSON.stringify(report, null, 2);
+    case 'json':
+      return JSON.stringify(report, null, 2);
+
+    case 'markdown':
+      return this.generateMarkdownReport(report);
+
+    case 'html':
+      return this.generateHtmlReport(report);
+
+    default:
+      return JSON.stringify(report, null, 2);
     }
   }
 
@@ -556,27 +556,27 @@ export class TechnicalDebtTracker {
    * Generate markdown report
    */
   generateMarkdownReport(report) {
-    let markdown = `# Technical Debt Report\n\n`;
+    let markdown = '# Technical Debt Report\n\n';
     markdown += `**Generated:** ${new Date(report.generatedAt).toLocaleString()}\n`;
     markdown += `**Last Updated:** ${new Date(report.lastUpdated).toLocaleString()}\n\n`;
-    
+
     // Summary
-    markdown += `## 📊 Summary\n\n`;
+    markdown += '## 📊 Summary\n\n';
     markdown += `- **Total Debt:** ${report.summary.totalDebt} points\n`;
     markdown += `- **Total Issues:** ${report.summary.totalIssues}\n`;
     markdown += `- **Average Debt/File:** ${report.summary.avgDebtPerFile}\n`;
     markdown += `- **Estimated Hours:** ${report.summary.estimatedHours}\n`;
     markdown += `- **Trend:** ${report.trends.trend} (${report.trends.changePercent}%)\n\n`;
-    
+
     // Severity breakdown
-    markdown += `## 🚨 Severity Breakdown\n\n`;
+    markdown += '## 🚨 Severity Breakdown\n\n';
     for (const [severity, count] of Object.entries(report.summary.bySeverity)) {
       markdown += `- **${severity.toUpperCase()}:** ${count}\n`;
     }
-    markdown += `\n`;
-    
+    markdown += '\n';
+
     // Recommendations
-    markdown += `## 💡 Recommendations\n\n`;
+    markdown += '## 💡 Recommendations\n\n';
     for (const rec of report.recommendations.slice(0, 3)) {
       markdown += `### ${rec.file}\n`;
       markdown += `- **Priority:** ${rec.priority}\n`;
@@ -584,7 +584,7 @@ export class TechnicalDebtTracker {
       markdown += `- **Issues:** ${rec.issueCount}\n`;
       markdown += `- **Suggestion:** ${rec.suggestion}\n\n`;
     }
-    
+
     return markdown;
   }
 
@@ -644,15 +644,15 @@ export class TechnicalDebtTracker {
    */
   async exportDebtData(format = 'json', outputPath) {
     const report = await this.generateDebtReport(format);
-    
+
     const defaultPath = path.join(
       this.debtDir,
       `technical-debt-export.${format}`
     );
     const finalPath = outputPath || defaultPath;
-    
+
     await fs.writeFile(finalPath, report, 'utf8');
-    
+
     return {
       success: true,
       outputPath: finalPath,
@@ -677,15 +677,15 @@ export class TechnicalDebtTracker {
       files: {},
       trends: [],
     };
-    
+
     this.history = [];
-    
+
     try {
       await Promise.all([
         fs.unlink(this.debtFile).catch(err => console.warn(`TechnicalDebtTracker: failed to remove ${this.debtFile}: ${err.message}`)),
         fs.unlink(this.historyFile).catch(err => console.warn(`TechnicalDebtTracker: failed to remove ${this.historyFile}: ${err.message}`)),
       ]);
-      
+
       return { success: true };
     } catch (error) {
       return { success: false, error: error.message };

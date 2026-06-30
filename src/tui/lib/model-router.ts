@@ -38,6 +38,7 @@ export type AvailableModels = {
   openrouter: string[];
   ollama: string[];
   lmstudio: string[];
+  "github-copilot": string[];
 };
 
 // ─── Routing table ────────────────────────────────────────────────────────────
@@ -61,57 +62,57 @@ type RoutingEntry = {
 
 const ROUTING_TABLE: Record<TaskType, RoutingEntry> = {
   'security-review': {
-    tier1: 'claude-opus-4-6',
-    tier2: 'deepseek-reasoner',
+    tier1: 'deepseek-reasoner',
+    tier2: 'llama-3.3-70b-versatile',
     tier3: 'grok-3',
-    reason: 'highest reasoning capability',
+    reason: 'strong reasoning for security analysis',
     maxTokens: 8192,
     temperature: 0.1,
   },
   'fix-code': {
-    tier1: 'claude-sonnet-4-6',
+    tier1: 'Qwen/Qwen2.5-Coder-32B-Instruct',
     tier2: 'codestral-latest',
-    tier3: 'Qwen/Qwen2.5-Coder-32B-Instruct',
-    reason: 'strong code generation',
+    tier3: 'llama-3.3-70b-versatile',
+    reason: 'open-source code generation',
     maxTokens: 8192,
     temperature: 0.2,
   },
   'plan': {
-    tier1: 'claude-opus-4-6',
-    tier2: 'deepseek-reasoner',
-    tier3: 'grok-3-mini',
+    tier1: 'deepseek-reasoner',
+    tier2: 'qwen-qwq-32b',
+    tier3: 'llama-3.3-70b-versatile',
     reason: 'deep reasoning for architecture',
     maxTokens: 4096,
     temperature: 0.3,
   },
   'ci-fix': {
-    tier1: 'claude-sonnet-4-6',
-    tier2: 'gpt-5.4',
-    tier3: 'llama-3.3-70b-versatile',
+    tier1: 'codestral-latest',
+    tier2: 'llama-3.3-70b-versatile',
+    tier3: 'deepseek-chat',
     reason: 'good model for test-failure analysis',
     maxTokens: 4096,
     temperature: 0.15,
   },
   'quick-scan': {
-    tier1: 'claude-haiku-4-5',
-    tier2: 'llama-3.1-8b-instant',
-    tier3: 'gemma2-9b-it',
+    tier1: 'llama-3.1-8b-instant',
+    tier2: 'gemma2-9b-it',
+    tier3: 'mistral-small-latest',
     reason: 'fast and cost-efficient for quick scans',
     maxTokens: 2048,
     temperature: 0.0,
   },
   'explain': {
-    tier1: 'claude-haiku-4-5',
+    tier1: 'llama-3.1-8b-instant',
     tier2: 'mistral-small-latest',
-    tier3: 'llama-3.1-8b-instant',
+    tier3: 'gemma2-9b-it',
     reason: 'any capable model for explanations',
     maxTokens: 2048,
     temperature: 0.4,
   },
   'summarize': {
-    tier1: 'claude-haiku-4-5',
-    tier2: 'gpt-4o-mini',
-    tier3: 'claude-haiku-4-5',
+    tier1: 'llama-3.1-8b-instant',
+    tier2: 'gemma2-9b-it',
+    tier3: 'mistral-small-latest',
     reason: 'lightweight model sufficient for summaries',
     maxTokens: 1024,
     temperature: 0.2,
@@ -129,7 +130,10 @@ function flattenAvailable(available?: Partial<AvailableModels>): Set<string> {
     ...(available.anthropic ?? []),
     ...(available.openai ?? []),
     ...(available.groq ?? []),
+    ...(available.mistral ?? []),
+    ...(available.deepseek ?? []),
     ...(available.ollama ?? []),
+    ...(available["github-copilot"] ?? []),
   ]);
 }
 

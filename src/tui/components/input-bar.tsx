@@ -5,10 +5,6 @@ import { useTheme } from '../providers/theme/index.js';
 
 type Mode = 'BUILD' | 'PLAN' | 'REVIEW' | 'SCAN' | 'FIX';
 
-const MODE_SYMBOL: Record<Mode, string> = {
-  BUILD: '⬡', PLAN: '◎', REVIEW: '⊕', SCAN: '◈', FIX: '⚙',
-};
-
 const MODE_COLOR_KEY: Record<Mode, string> = {
   BUILD: 'success', PLAN: 'planMode', REVIEW: 'critical', SCAN: 'warning', FIX: 'error',
 };
@@ -17,6 +13,7 @@ type Props = {
   onSubmit: (value: string) => void;
   onCommand?: (command: string) => void;
   onSlashCommand?: () => void;
+  onShellCommand?: (command: string) => void;
   disabled?: boolean;
   placeholder?: string;
   mode?: Mode;
@@ -36,8 +33,9 @@ export function InputBar({
   onSubmit,
   onCommand,
   onSlashCommand,
+  onShellCommand,
   disabled = false,
-  placeholder = 'Ask Sentinel anything, or /command...',
+  placeholder = 'Ask anything, or /command...',
   mode = 'BUILD',
   onModeToggle,
   onCommandPalette,
@@ -49,13 +47,21 @@ export function InputBar({
   const { colors } = useTheme();
 
   const activeColor = (colors as any)[MODE_COLOR_KEY[mode]] ?? colors.primary;
-  const modeSymbol  = MODE_SYMBOL[mode];
+  const isShell = value.startsWith('!');
 
   useEffect(() => {
     if (mentionToken === null) { setSuggestions([]); return; }
     let cancelled = false;
     (async () => {
       try {
+        const { getAgentSuggestions } = await import('../../shared/tools/agent-mentions.js');
+        const agentSuggestions = getAgentSuggestions(mentionToken);
+        if (agentSuggestions.length > 0 && !cancelled) {
+          const agentItems = agentSuggestions.map(a => `@${a.name}`);
+          setSuggestions(agentItems.slice(0, MAX_SUGGESTIONS));
+          setSelectedIndex(0);
+          return;
+        }
         const { executeLocalTool } = await import('../../shared/tools/index.js');
         const pattern = mentionToken.length > 0 ? `**/*${mentionToken}*` : '**/*';
         const result = await executeLocalTool('glob', { pattern });
@@ -98,6 +104,9 @@ export function InputBar({
     if (mentionToken !== null && suggestions.length > 0) { insertSelected(); return; }
     const trimmed = submitted.trim();
     if (!trimmed) return;
+    if (trimmed.startsWith('!')) {
+      if (onShellCommand) { onShellCommand(trimmed.slice(1)); return; }
+    }
     if (trimmed.startsWith('/')) {
       if (onSlashCommand) { onSlashCommand(); return; }
       if (onCommand)      { onCommand(trimmed); return; }
@@ -106,13 +115,12 @@ export function InputBar({
     setValue('');
     setMentionToken(null);
     setSuggestions([]);
-  }, [onSubmit, onCommand, onSlashCommand, mentionToken, suggestions, insertSelected]);
+  }, [onSubmit, onCommand, onSlashCommand, onShellCommand, mentionToken, suggestions, insertSelected]);
 
   const showSuggestions = mentionToken !== null && suggestions.length > 0;
 
   return (
     <Box flexDirection="column" width="100%">
-      {/* @mention file suggestions */}
       {showSuggestions ? (
         <Box
           flexDirection="column"
@@ -133,7 +141,6 @@ export function InputBar({
         </Box>
       ) : null}
 
-      {/* Main input */}
       <Box
         flexDirection="row"
         borderStyle="round"
@@ -142,12 +149,14 @@ export function InputBar({
         width="100%"
         alignItems="center"
       >
-        <Text bold color={activeColor}>{`${modeSymbol} `}</Text>
+        <Text bold color={isShell ? colors.warning : activeColor}>
+          {isShell ? '$' : mode.slice(0, 1)}
+        </Text>
         <TextInput
           value={value}
           onChange={handleChange}
           onSubmit={handleSubmit}
-          placeholder={disabled ? '  Processing...' : placeholder}
+          placeholder={disabled ? 'Processing...' : placeholder}
           focus={!disabled}
         />
       </Box>

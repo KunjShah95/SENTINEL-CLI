@@ -1,0 +1,58 @@
+﻿id: sql-injection-string-interpolation
+title: SQL Injection via Raw String Interpolation in Python
+severity: critical
+languages: [python]
+cwe: [CWE-89]
+tags: [injection, sql, database]
+description: |
+  Building SQL queries with f-strings, % formatting, or .format() using
+  user-supplied values opens the application to SQL injection. Python's
+  database adapters (psycopg2, sqlite3, mysql-connector, pymysql) all support
+  parameterized queries via placeholders, but developers sometimes bypass them
+  for convenience.
+
+  ORMs like SQLAlchemy and Django ORM are not immune — raw SQL methods
+  (text(), execute(), raw()) with interpolation are equally vulnerable.
+detection: |
+  Look for database execute() calls where the SQL string is constructed with:
+  - f"...{variable}..."
+  - "...%s ..." % vars
+  - "...{}...".format(vars)
+  - String concatenation with + between SQL keywords and user data
+  - SQLAlchemy text(f"...") with interpolation
+  - Django Model.objects.raw(f"...")
+
+  Parameterized queries using %s or ? placeholders with a separate arguments
+  tuple/list are safe — only flag when values are interpolated into the SQL
+  string itself.
+remediation: |
+  Always pass parameters as separate arguments to the execute() method. The
+  database driver handles escaping correctly for each database backend:
+
+  Instead of:
+    cursor.execute(f"SELECT * FROM users WHERE email = '{email}'")
+  Use:
+    cursor.execute("SELECT * FROM users WHERE email = %s", (email,))
+
+  For SQLAlchemy, use text() with bound parameters:
+    text("SELECT * FROM users WHERE email = :email").params(email=email)
+
+  For Django ORM, use parameterized raw() or avoid raw entirely by using the
+  queryset API: User.objects.filter(email=email)
+example:
+  vulnerable: |
+    import sqlite3
+    conn = sqlite3.connect("app.db")
+    username = request.form["username"]
+    query = f"SELECT * FROM users WHERE username = '{username}'"
+    conn.execute(query).fetchall()
+  fixed: |
+    import sqlite3
+    conn = sqlite3.connect("app.db")
+    username = request.form["username"]
+    conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchall()
+references:
+  - url: https://docs.python.org/3/library/sqlite3.html#sqlite3.Cursor.execute
+    title: sqlite3 execute documentation (parameter substitution)
+  - url: https://cwe.mitre.org/data/definitions/89.html
+    title: CWE-89: Improper Neutralization of Special Elements used in an SQL Command

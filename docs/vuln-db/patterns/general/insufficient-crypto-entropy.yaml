@@ -1,0 +1,65 @@
+﻿id: insufficient-crypto-entropy
+title: Insufficient Entropy in Cryptographic Operations
+severity: high
+languages: [general]
+cwe: [CWE-331, CWE-338]
+tags: [crypto, entropy, prng, security, tokens]
+description: |
+  Using non-cryptographic random number generators (PRNGs) or low-entropy
+  seeds for security-sensitive operations produces predictable outputs. An
+  attacker who can observe or guess the output of a weak RNG can:
+  - Predict session tokens and hijack user sessions
+  - Forge password reset tokens
+  - Predict API keys or CSRF tokens
+  - Subvert cryptographic key generation
+
+  Common weak sources include Math.random() (JS), random.randint() (Python),
+  java.util.Random (Java), and any generator seeded with time-based values
+  or small seed spaces.
+detection: |
+  Look for random value generation in security-sensitive contexts:
+  - Session ID or token generation
+  - Password reset links or tokens
+  - API key or secret generation
+  - CSRF token generation
+  - Cryptographic nonce or IV generation
+  - OAuth state parameters
+
+  Flag any of the above that uses:
+  - Math.random(), randrange(), randint(), random.choice() (stdlib random module)
+  - Seeded PRNGs where the seed is based on time, PID, or small input
+  - UUID version 1 (MAC address + timestamp) for security tokens
+  - Custom roll-your-own RNG implementations
+  - Weak seed patterns like new Random(42) or random.seed(1234)
+remediation: |
+  Use cryptographically secure random number generators (CSPRNGs):
+
+  JavaScript/Node.js:
+    const crypto = require('crypto');
+    const token = crypto.randomBytes(32).toString('hex');
+
+  Python:
+    import secrets
+    token = secrets.token_hex(32)
+
+  Java:
+    import java.security.SecureRandom;
+    SecureRandom sr = new SecureRandom();
+
+  For tokens, generate at least 128 bits (16 bytes) for session tokens and
+  256 bits (32 bytes) for API keys and password reset tokens.
+example:
+  vulnerable: |
+    // JavaScript — predictable Math.random() for session tokens
+    const sessionId = Math.random().toString(36).substring(2);
+    res.cookie('session', sessionId);
+  fixed: |
+    // JavaScript — cryptographically secure random bytes
+    import crypto from 'node:crypto';
+    const sessionId = crypto.randomBytes(32).toString('hex');
+    res.cookie('session', sessionId);
+references:
+  - url: https://cheatsheetseries.owasp.org/cheatsheets/Cryptographic_Storage_Cheat_Sheet.html
+    title: OWASP Cryptographic Storage Cheat Sheet
+  - url: https://cwe.mitre.org/data/definitions/331.html
+    title: CWE-331: Insufficient Entropy

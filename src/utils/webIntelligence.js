@@ -384,11 +384,11 @@ export class WebIntelligence {
 
   async fetch(url, options = {}) {
     const timeout = options.timeout || this.timeout;
-    
+
     return new Promise((resolve) => {
       const parsedUrl = new URL(url);
       const client = parsedUrl.protocol === 'https:' ? https : http;
-      
+
       const req = client.get(url, {
         headers: {
           'User-Agent': 'Sentinel-CLI/1.0',
@@ -417,7 +417,7 @@ export class WebIntelligence {
       });
 
       req.on('error', (e) => resolve({ success: false, url, error: e.message }));
-      
+
       req.setTimeout(timeout, () => {
         req.destroy();
         resolve({ success: false, url, error: 'Request timed out' });
@@ -446,7 +446,7 @@ export class WebIntelligence {
     if (!this.githubToken) {
       return { success: false, error: 'GITHUB_TOKEN not set' };
     }
-    
+
     return await this.fetch(`https://api.github.com/repos/${owner}/${repo}`, {
       headers: { Authorization: `token ${this.githubToken}` }
     });
@@ -457,10 +457,10 @@ export class WebIntelligence {
     if (options.state) params.set('state', options.state);
     if (options.labels) params.set('labels', options.labels);
     if (options.page) params.set('page', options.page.toString());
-    
+
     const queryString = params.toString();
     const url = `https://api.github.com/repos/${owner}/${repo}/issues${queryString ? '?' + queryString : ''}`;
-    
+
     return await this.fetch(url, {
       headers: this.githubToken ? { Authorization: `token ${this.githubToken}` } : {}
     });

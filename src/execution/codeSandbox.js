@@ -32,17 +32,17 @@ export class CodeExecutionSandbox {
    */
   async execute(code, language = 'javascript') {
     switch (this.options.method) {
-      case 'vm2':
-        return await this.executeVM2(code);
+    case 'vm2':
+      return await this.executeVM2(code);
 
-      case 'worker':
-        return await this.executeWorker(code);
+    case 'worker':
+      return await this.executeWorker(code);
 
-      case 'docker':
-        return await this.executeDocker(code, language);
+    case 'docker':
+      return await this.executeDocker(code, language);
 
-      default:
-        throw new Error(`Unknown execution method: ${this.options.method}`);
+    default:
+      throw new Error(`Unknown execution method: ${this.options.method}`);
     }
   }
 

@@ -14,24 +14,24 @@ export class EnvManager {
     const action = args[0] || 'list';
 
     switch (action) {
-      case 'list':
-      case 'ls':
-        return this.listEnvVars();
-      case 'set':
-        return this.setEnvVar(args[1], args[2]);
-      case 'get':
-        return this.getEnvVar(args[1]);
-      case 'remove':
-      case 'rm':
-        return this.removeEnvVar(args[1]);
-      case 'init':
-        return this.initEnvFile();
-      case 'template':
-        return this.generateTemplate();
-      case 'validate':
-        return this.validateEnvVars();
-      default:
-        this.showHelp();
+    case 'list':
+    case 'ls':
+      return this.listEnvVars();
+    case 'set':
+      return this.setEnvVar(args[1], args[2]);
+    case 'get':
+      return this.getEnvVar(args[1]);
+    case 'remove':
+    case 'rm':
+      return this.removeEnvVar(args[1]);
+    case 'init':
+      return this.initEnvFile();
+    case 'template':
+      return this.generateTemplate();
+    case 'validate':
+      return this.validateEnvVars();
+    default:
+      this.showHelp();
     }
   }
 
@@ -183,7 +183,7 @@ export class EnvManager {
     }
 
     try {
-      let content = await fs.readFile(this.envFile, 'utf8');
+      const content = await fs.readFile(this.envFile, 'utf8');
       const lines = content.split('\n').filter(l => !l.startsWith(`${key}=`));
 
       await fs.writeFile(this.envFile, lines.join('\n'), 'utf8');
@@ -217,7 +217,7 @@ export class EnvManager {
 `;
 
     await fs.writeFile(this.envFile, template, 'utf8');
-    console.log(chalk.green(`  ✓ Created .env.sentinel`));
+    console.log(chalk.green('  ✓ Created .env.sentinel'));
     console.log(chalk.gray('  Edit the file and add your API keys'));
   }
 

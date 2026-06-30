@@ -117,35 +117,35 @@ export class TestRunner {
     let args = [];
 
     switch (framework) {
-      case 'jest':
-        command = 'npx';
-        args = ['jest', '--json', '--outputFile', '.jest-results.json', ...options.args || []];
-        break;
-      case 'vitest':
-        command = 'npx';
-        args = ['vitest', '--json', '--outputFile', '.vitest-results.json', ...options.args || []];
-        break;
-      case 'mocha':
-        command = 'npx';
-        args = ['mocha', '--reporter', 'json', '--output', '.mocha-results.json', ...options.args || []];
-        break;
-      case 'pytest':
-        command = 'python';
-        args = ['-m', 'pytest', '--json', '--json-report', '--json-report-file=.pytest-results.json', ...options.args || []];
-        break;
-      case 'cargo':
-        command = 'cargo';
-        args = ['test', '--message-format', 'json', ...options.args || []];
-        break;
-      case 'go':
-        command = 'go';
-        args = ['test', '-json', ...options.args || []];
-        break;
-      default:
-        return {
-          success: false,
-          error: `Unsupported test framework: ${framework}`
-        };
+    case 'jest':
+      command = 'npx';
+      args = ['jest', '--json', '--outputFile', '.jest-results.json', ...options.args || []];
+      break;
+    case 'vitest':
+      command = 'npx';
+      args = ['vitest', '--json', '--outputFile', '.vitest-results.json', ...options.args || []];
+      break;
+    case 'mocha':
+      command = 'npx';
+      args = ['mocha', '--reporter', 'json', '--output', '.mocha-results.json', ...options.args || []];
+      break;
+    case 'pytest':
+      command = 'python';
+      args = ['-m', 'pytest', '--json', '--json-report', '--json-report-file=.pytest-results.json', ...options.args || []];
+      break;
+    case 'cargo':
+      command = 'cargo';
+      args = ['test', '--message-format', 'json', ...options.args || []];
+      break;
+    case 'go':
+      command = 'go';
+      args = ['test', '-json', ...options.args || []];
+      break;
+    default:
+      return {
+        success: false,
+        error: `Unsupported test framework: ${framework}`
+      };
     }
 
     try {
@@ -188,20 +188,20 @@ export class TestRunner {
   parseResults(output, framework) {
     try {
       switch (framework) {
-        case 'jest':
-          return this.parseJestResults(output);
-        case 'vitest':
-          return this.parseVitestResults(output);
-        case 'mocha':
-          return this.parseMochaResults(output);
-        case 'pytest':
-          return this.parsePytestResults(output);
-        case 'cargo':
-          return this.parseCargoResults(output);
-        case 'go':
-          return this.parseGoResults(output);
-        default:
-          return { success: true, output };
+      case 'jest':
+        return this.parseJestResults(output);
+      case 'vitest':
+        return this.parseVitestResults(output);
+      case 'mocha':
+        return this.parseMochaResults(output);
+      case 'pytest':
+        return this.parsePytestResults(output);
+      case 'cargo':
+        return this.parseCargoResults(output);
+      case 'go':
+        return this.parseGoResults(output);
+      default:
+        return { success: true, output };
       }
     } catch (error) {
       return {
@@ -516,7 +516,7 @@ export class TestRunner {
       fix = {
         type: 'assertion',
         description: 'Update assertion to match expected behavior',
-       建议: 'Review test expectations and update accordingly'
+        建议: 'Review test expectations and update accordingly'
       };
     } else if (message.includes('undefined') || message.includes('null')) {
       fix = {
@@ -571,16 +571,16 @@ export class TestRunner {
       let coverageFile;
 
       switch (framework) {
-        case 'jest':
-          command = 'npx jest --coverage --json';
-          coverageFile = 'coverage/coverage-final.json';
-          break;
-        case 'vitest':
-          command = 'npx vitest --coverage';
-          coverageFile = 'coverage/coverage-final.json';
-          break;
-        default:
-          return { success: false, error: `Coverage not supported for ${framework}` };
+      case 'jest':
+        command = 'npx jest --coverage --json';
+        coverageFile = 'coverage/coverage-final.json';
+        break;
+      case 'vitest':
+        command = 'npx vitest --coverage';
+        coverageFile = 'coverage/coverage-final.json';
+        break;
+      default:
+        return { success: false, error: `Coverage not supported for ${framework}` };
       }
 
       const { stdout } = await execAsync(command, {
@@ -611,14 +611,14 @@ export class TestRunner {
 
     let command;
     switch (framework) {
-      case 'jest':
-        command = 'npx jest --watch';
-        break;
-      case 'vitest':
-        command = 'npx vitest';
-        break;
-      default:
-        return { success: false, error: `Watch mode not supported for ${framework}` };
+    case 'jest':
+      command = 'npx jest --watch';
+      break;
+    case 'vitest':
+      command = 'npx vitest';
+      break;
+    default:
+      return { success: false, error: `Watch mode not supported for ${framework}` };
     }
 
     return {

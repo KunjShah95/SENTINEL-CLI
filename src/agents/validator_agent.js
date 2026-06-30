@@ -2,6 +2,9 @@
 // Uses syntax validation for JS/TS, Python, Go, and Rust
 
 import { execSync } from 'child_process';
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
 
 function validateJS(code) {
   const details = [];
@@ -16,7 +19,7 @@ function validateJS(code) {
 
 function validatePython(code, _filePath = null) {
   const details = [];
-  
+
   try {
     execSync(`python3 -m py_compile -c "${code.replace(/"/g, '\\"')}"`, { stdio: 'pipe' });
     details.push({ check: 'syntax', status: 'passed', language: 'python' });
@@ -29,41 +32,45 @@ function validatePython(code, _filePath = null) {
       details.push({ check: 'syntax', status: 'failed', note: msg, language: 'python' });
     }
   }
-  
+
   return details;
 }
 
 function validateGo(code, filePath = null) {
   const details = [];
-  
+
   try {
     if (filePath && fs.existsSync(filePath)) {
       execSync(`go vet ${filePath}`, { stdio: 'pipe' });
     } else {
-      execSync(`echo 'package main\nfunc main(){}' | go run /dev/stdin`, { input: code, stdio: ['pipe', 'pipe', 'pipe'] });
+      execSync('echo \'package main\nfunc main(){}\' | go run /dev/stdin', { input: code, stdio: ['pipe', 'pipe', 'pipe'] });
     }
     details.push({ check: 'syntax', status: 'passed', language: 'go' });
   } catch (e) {
     details.push({ check: 'syntax', status: 'failed', note: e.message, language: 'go' });
   }
-  
+
   return details;
 }
 
 function validateRust(code) {
   const details = [];
-  
+
+  let tempFile = null;
   try {
-    const tempFile = `/tmp/validate_rust_${Date.now()}.rs`;
+    tempFile = path.join(os.tmpdir(), `validate_rust_${Date.now()}.rs`);
     const wrappedCode = `fn main() { ${code} }`;
-    require('fs').writeFileSync(tempFile, wrappedCode);
+    fs.writeFileSync(tempFile, wrappedCode);
     execSync(`rustc --edition 2021 --crate-type lib -Z parse-only ${tempFile}`, { stdio: 'pipe' });
     details.push({ check: 'syntax', status: 'passed', language: 'rust' });
-    require('fs').unlinkSync(tempFile);
   } catch (e) {
     details.push({ check: 'syntax', status: 'failed', note: e.message, language: 'rust' });
+  } finally {
+    if (tempFile) {
+      try { fs.unlinkSync(tempFile); } catch { /* ignore */ }
+    }
   }
-  
+
   return details;
 }
 
@@ -82,12 +89,12 @@ function detectLanguage(code, filename) {
     };
     if (langMap[ext]) return langMap[ext];
   }
-  
+
   if (/^(import|export|const|let|var|function|class)\s/m.test(code)) return 'javascript';
   if (/^(def|class|import|from|if __name__)/m.test(code)) return 'python';
   if (/^package\s+\w+/m.test(code)) return 'go';
   if (/^(fn|let|mut|use|pub|mod)\s/m.test(code)) return 'rust';
-  
+
   return 'javascript';
 }
 
@@ -95,24 +102,24 @@ function validateFix(code, fixedCode, errors, options = {}) {
   const { filename = null } = options;
   const language = detectLanguage(code, filename);
   const details = [];
-  
+
   switch (language) {
-    case 'python':
-      details.push(...validatePython(fixedCode));
-      break;
-    case 'go':
-      details.push(...validateGo(fixedCode, filename));
-      break;
-    case 'rust':
-      details.push(...validateRust(fixedCode));
-      break;
-    default:
-      details.push(...validateJS(fixedCode));
+  case 'python':
+    details.push(...validatePython(fixedCode));
+    break;
+  case 'go':
+    details.push(...validateGo(fixedCode, filename));
+    break;
+  case 'rust':
+    details.push(...validateRust(fixedCode));
+    break;
+  default:
+    details.push(...validateJS(fixedCode));
   }
-  
+
   const failedChecks = details.filter(d => d.status === 'failed');
   const passes = failedChecks.length === 0;
-  
+
   return { passes, details, language };
 }
 

@@ -1,0 +1,227 @@
+{
+  "mode": "review",
+  "timestamp": "2026-06-16T02:14:18.692Z",
+  "files": [
+    "env.example",
+    "Dockerfile",
+    "__tests__/analyzerWorker.test.js",
+    "__tests__/errorHandler.test.js",
+    "bin/sentinel.js",
+    "docker-compose.yml",
+    "jest.config.js",
+    "package-lock.json",
+    "package.json",
+    "src/analyzers/baseAnalyzer.js",
+    "src/analyzers/bugAnalyzer.js",
+    "src/analyzers/qualityAnalyzer.js",
+    "src/config/configValidator.js",
+    "src/core/bot.js",
+    "src/core/processing/workers/analyzerWorker.js",
+    "src/output/sarifGenerator.js",
+    "src/server/api/app.js",
+    "src/server/api/lib/chat-stream.js",
+    "src/server/api/routes/chat.js",
+    "src/server/api/start.js",
+    "src/shared/index.js",
+    "src/shared/models/index.js",
+    "src/shared/tools/checkpoint.js",
+    "src/shared/tools/index.js",
+    "src/shared/tools/schemas.js",
+    "src/tui/components/input-bar.tsx",
+    "src/tui/components/messages/bot-message.tsx",
+    "src/tui/components/session-shell.tsx",
+    "src/tui/components/status-bar.tsx",
+    "src/tui/hooks/use-agent-chat.ts",
+    "src/tui/index.tsx",
+    "src/tui/layouts/root-layout.tsx",
+    "src/tui/lib/commands.ts",
+    "src/tui/lib/context-compactor.ts",
+    "src/tui/lib/model-router.ts",
+    "src/tui/lib/sast-runner.ts",
+    "src/tui/lib/security-reviewer.ts",
+    "src/tui/providers/prompt-config/index.tsx",
+    "src/tui/providers/theme/index.tsx",
+    "src/tui/screens/loop.tsx",
+    "src/tui/screens/review.tsx",
+    "src/tui/screens/session.tsx",
+    "src/utils/errorHandler.js",
+    ".sentinel/commands/",
+    ".sentinel/sessions/",
+    "CLAUDE.md",
+    "__tests__/configValidator.test.js",
+    "__tests__/context-compactor.test.js",
+    "__tests__/fileOperations.test.js",
+    "__tests__/linter.test.js",
+    "__tests__/position-resolver.test.js",
+    "__tests__/pr-bot-server.test.js",
+    "__tests__/review-pipeline.test.js",
+    "__tests__/rule-engine.test.js",
+    "__tests__/sarifGenerator.test.js",
+    "__tests__/sast-runner.test.js",
+    "__tests__/session-logger.test.js",
+    "__tests__/tool-registry.test.js",
+    "docs/DEPLOY_PR_BOT.md",
+    "scripts/coverage.mjs",
+    "server.err",
+    "src/agents/review-pipeline.js",
+    "src/agents/tool-registry.js",
+    "src/commands/rulesCommand.js",
+    "src/commands/sentinel-review.js",
+    "src/git/file-reader.js",
+    "src/github/",
+    "src/resolvers/",
+    "src/review/",
+    "src/rules/",
+    "src/server/api/routes/github-webhook.js",
+    "src/server/api/routes/session-viewer.js",
+    "src/server/database/session-logger.js",
+    "src/server/viewer.js",
+    "src/shared/models/discovery.js",
+    "src/shared/models/prefs.js",
+    "src/tui/components/dialogs/model-picker.tsx",
+    "src/tui/components/dialogs/provider-setup.tsx",
+    "src/tui/components/error-boundary.tsx",
+    "src/tui/lib/components/",
+    "src/tui/lib/custom-commands.ts",
+    "src/tui/lib/hooks/",
+    "src/tui/lib/index.js",
+    "src/tui/lib/init.ts",
+    "src/tui/lib/layouts/",
+    "src/tui/lib/lib/",
+    "src/tui/lib/providers/",
+    "src/tui/lib/screens/",
+    "src/tui/lib/theme.js"
+  ],
+  "totalIssues": 0,
+  "discarded": 0,
+  "comments": [],
+  "bundles": [
+    {
+      "id": "bundle_0",
+      "pattern": "component",
+      "files": [
+        "__tests__/analyzerWorker.test.js",
+        "src/core/processing/workers/analyzerWorker.js"
+      ],
+      "size": 2,
+      "slot": 1
+    },
+    {
+      "id": "bundle_1",
+      "pattern": "component",
+      "files": [
+        "__tests__/errorHandler.test.js",
+        "src/utils/errorHandler.js"
+      ],
+      "size": 2,
+      "slot": 2
+    },
+    {
+      "id": "bundle_2",
+      "pattern": "component",
+      "files": [
+        "src/config/configValidator.js",
+        "__tests__/configValidator.test.js"
+      ],
+      "size": 2,
+      "slot": 3
+    },
+    {
+      "id": "bundle_3",
+      "pattern": "component",
+      "files": [
+        "src/output/sarifGenerator.js",
+        "__tests__/sarifGenerator.test.js"
+      ],
+      "size": 2,
+      "slot": 4
+    },
+    {
+      "id": "bundle_4",
+      "pattern": "component",
+      "files": [
+        "src/shared/index.js",
+        "src/shared/models/index.js",
+        "src/shared/tools/index.js",
+        "src/tui/index.tsx",
+        "src/tui/providers/prompt-config/index.tsx"
+      ],
+      "size": 5,
+      "slot": 1
+    },
+    {
+      "id": "bundle_5",
+      "pattern": "component",
+      "files": [
+        "src/tui/lib/context-compactor.ts",
+        "__tests__/context-compactor.test.js"
+      ],
+      "size": 2,
+      "slot": 2
+    },
+    {
+      "id": "bundle_6",
+      "pattern": "component",
+      "files": [
+        "src/tui/lib/sast-runner.ts",
+        "__tests__/sast-runner.test.js"
+      ],
+      "size": 2,
+      "slot": 3
+    },
+    {
+      "id": "bundle_7",
+      "pattern": "component",
+      "files": [
+        "__tests__/review-pipeline.test.js",
+        "src/agents/review-pipeline.js"
+      ],
+      "size": 2,
+      "slot": 4
+    },
+    {
+      "id": "bundle_8",
+      "pattern": "component",
+      "files": [
+        "__tests__/session-logger.test.js",
+        "src/server/database/session-logger.js"
+      ],
+      "size": 2,
+      "slot": 1
+    },
+    {
+      "id": "bundle_9",
+      "pattern": "component",
+      "files": [
+        "__tests__/tool-registry.test.js",
+        "src/agents/tool-registry.js"
+      ],
+      "size": 2,
+      "slot": 2
+    },
+    {
+      "id": "bundle_10",
+      "pattern": "test-source",
+      "files": [
+        "src/tui/providers/theme/index.tsx",
+        "src/tui/lib/index.js"
+      ],
+      "size": 2,
+      "slot": 3
+    }
+  ],
+  "background": {
+    "text": "Main",
+    "sources": [
+      {
+        "type": "branch",
+        "text": "Main",
+        "priority": 3
+      }
+    ],
+    "hasContext": true,
+    "isEmpty": false
+  },
+  "_recordedAt": "2026-06-16T02:14:18.694Z",
+  "_id": "session_1781576058694"
+}

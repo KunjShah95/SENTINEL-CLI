@@ -15,24 +15,24 @@ console.log('👷 Background worker queue initialized');
 // Background worker to handle heavy processing out-of-band from the main Hono/Express loop
 export const worker = new Worker('sentinel-tools', async job => {
   console.log(`Processing job ${job.id}: ${job.name}`);
-  
+
   if (job.name === 'index_codebase') {
     const { projectPath } = job.data;
     const pipeline = new RAGPipeline();
     await pipeline.initialize();
-    
+
     // Perform heavy indexing
     const result = await pipeline.indexCodebase(projectPath);
     return result;
   }
-  
+
   if (job.name === 'ast_analysis') {
     const { code, language } = job.data;
     const agent = await getLanguageAgent(language);
     const analysis = await agent.analyze(code);
     return analysis;
   }
-  
+
   throw new Error(`Unknown job type: ${job.name}`);
 }, { connection });
 

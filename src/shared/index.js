@@ -7,7 +7,7 @@
  * work on both sides of the network.
  */
 
-export { Mode, modeSchema, isReadOnlyTool } from "./schemas/mode.js";
+export { Mode, modeSchema, isReadOnlyTool } from './schemas/mode.js';
 export {
   toolInputSchemas,
   readOnlyToolContracts,
@@ -24,7 +24,7 @@ export {
   MAX_MATCHES,
   MAX_OUTPUT,
   DEFAULT_TIMEOUT,
-} from "./tools/index.js";
+} from './tools/index.js';
 
 export {
   SUPPORTED_CHAT_MODELS,
@@ -38,11 +38,13 @@ export {
   calculateCreditsForUsage,
   USD_PER_CREDIT,
   SupportedProvider,
-} from "./models/index.js";
+  refreshModels,
+  invalidateModelCache,
+} from './models/index.js';
 
 export {
   createSessionSchema,
   submitSchema,
   newSessionStateSchema,
   ChatMessageMetadata,
-} from "./schemas/index.js";
+} from './schemas/index.js';

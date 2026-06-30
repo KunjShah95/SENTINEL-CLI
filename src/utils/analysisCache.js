@@ -97,7 +97,7 @@ export default class AnalysisCache {
         keysToRemove.push(key);
       }
     }
-    
+
     if (keysToRemove.length > 0) {
       for (const key of keysToRemove) {
         delete this.data.entries[key];

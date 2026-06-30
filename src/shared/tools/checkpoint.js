@@ -1,10 +1,11 @@
 /**
  * Agent Checkpoints — snapshot files before destructive tool calls
- * so the user can roll back with `/undo`.
+ * so the user can roll back with `/undo` or redo with `/redo`.
  *
- * Inspired by Cursor Composer 2.5's checkpointing. Stores lightweight
- * file copies in `.sentinel/checkpoints/<timestamp>/`.
- * Auto-prunes to keep only the 10 most recent checkpoints.
+ * Stores lightweight file copies in `.sentinel/checkpoints/<timestamp>/`.
+ * On `/undo`, checkpoints are moved to `.sentinel/redo/` so they can
+ * be reapplied with `/redo`. New work clears the redo stack.
+ * Auto-prunes both stacks to keep the 10 most recent entries.
  */
 
 import path from 'node:path';
@@ -12,10 +13,15 @@ import fs from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 
 const CHECKPOINT_DIR = '.sentinel/checkpoints';
+const REDO_DIR = '.sentinel/redo';
 const MAX_CHECKPOINTS = 10;
 
 function getCheckpointRoot() {
   return path.resolve(process.cwd(), CHECKPOINT_DIR);
+}
+
+function getRedoRoot() {
+  return path.resolve(process.cwd(), REDO_DIR);
 }
 
 /**
@@ -62,6 +68,9 @@ export async function createCheckpoint(filePaths) {
     'utf-8'
   );
 
+  // New work invalidates the redo stack
+  await clearRedoStack();
+
   // Auto-prune old checkpoints
   await pruneCheckpoints();
 
@@ -75,9 +84,9 @@ export async function createCheckpoint(filePaths) {
  */
 export async function restoreCheckpoint(id) {
   const root = getCheckpointRoot();
+  const redoRoot = getRedoRoot();
 
   if (!id) {
-    // Find latest
     const checkpoints = await listCheckpoints();
     if (checkpoints.length === 0) {
       throw new Error('No checkpoints available');
@@ -100,7 +109,6 @@ export async function restoreCheckpoint(id) {
     const target = path.resolve(process.cwd(), file.relative);
 
     if (file.existed) {
-      // Restore from checkpoint
       const src = path.join(checkpointDir, file.relative);
       if (existsSync(src)) {
         await fs.mkdir(path.dirname(target), { recursive: true });
@@ -108,20 +116,98 @@ export async function restoreCheckpoint(id) {
         restored.push(file.relative);
       }
     } else {
-      // File didn't exist before — delete it
       try {
         await fs.rm(target);
         deleted.push(file.relative);
-      } catch {
-        // File may already be gone
-      }
+      } catch { /* file may already be gone */ }
     }
   }
 
-  // Remove the used checkpoint
-  await fs.rm(checkpointDir, { recursive: true, force: true });
+  // Move the checkpoint to the redo stack instead of deleting
+  await fs.mkdir(redoRoot, { recursive: true });
+  const redoDest = path.join(redoRoot, id);
+  // If redoDest exists from a previous companion, remove it first
+  if (existsSync(redoDest)) {
+    await fs.rm(redoDest, { recursive: true, force: true });
+  }
+  await fs.rename(checkpointDir, redoDest);
 
   return { restored, deleted };
+}
+
+/**
+ * Redo the last undone checkpoint — moves it back from the redo stack
+ * and reapplies the file changes.
+ * @returns {{ restored: string[], deleted: string[] }}
+ */
+export async function redoCheckpoint() {
+  const redoRoot = getRedoRoot();
+  if (!existsSync(redoRoot)) {
+    throw new Error('Nothing to redo');
+  }
+
+  const entries = await fs.readdir(redoRoot, { withFileTypes: true });
+  const redoDirs = entries
+    .filter(e => e.isDirectory())
+    .sort()
+    .reverse();
+
+  if (redoDirs.length === 0) {
+    throw new Error('Nothing to redo');
+  }
+
+  const id = redoDirs[0].name;
+  const redoDir = path.join(redoRoot, id);
+  const manifestPath = path.join(redoDir, '_manifest.json');
+
+  if (!existsSync(manifestPath)) {
+    await fs.rm(redoDir, { recursive: true, force: true });
+    throw new Error('Redo checkpoint corrupted');
+  }
+
+  const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf-8'));
+  const restored = [];
+  const deleted = [];
+
+  for (const file of manifest.files) {
+    const target = path.resolve(process.cwd(), file.relative);
+
+    if (file.existed) {
+      const src = path.join(redoDir, file.relative);
+      if (existsSync(src)) {
+        await fs.mkdir(path.dirname(target), { recursive: true });
+        await fs.copyFile(src, target);
+        restored.push(file.relative);
+      }
+    } else {
+      try {
+        await fs.rm(target);
+        deleted.push(file.relative);
+      } catch { /* file may already be gone */ }
+    }
+  }
+
+  // Move back to checkpoint stack
+  const checkpointRoot = getCheckpointRoot();
+  await fs.mkdir(checkpointRoot, { recursive: true });
+  const cpDest = path.join(checkpointRoot, id);
+  if (existsSync(cpDest)) {
+    await fs.rm(cpDest, { recursive: true, force: true });
+  }
+  await fs.rename(redoDir, cpDest);
+
+  return { restored, deleted };
+}
+
+/**
+ * Clear the redo stack — called when new changes are made.
+ */
+export async function clearRedoStack() {
+  const redoRoot = getRedoRoot();
+  if (!existsSync(redoRoot)) return;
+  try {
+    await fs.rm(redoRoot, { recursive: true, force: true });
+  } catch { /* ignore cleanup failures */ }
 }
 
 /**

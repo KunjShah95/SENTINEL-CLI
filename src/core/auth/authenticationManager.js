@@ -21,7 +21,7 @@ class AuthenticationManager {
   // JWT Authentication
   async generateTokens(user) {
     const jwt = await import('jsonwebtoken');
-    
+
     const payload = {
       userId: user.id,
       email: user.email,
@@ -70,7 +70,7 @@ class AuthenticationManager {
     try {
       const jwt = await import('jsonwebtoken');
       const decoded = jwt.verify(refreshToken, this.jwtSecret);
-      
+
       if (decoded.type !== 'refresh') {
         throw new Error('Invalid token type');
       }
@@ -90,7 +90,7 @@ class AuthenticationManager {
   // User Management
   async createUser(userData) {
     const userId = `user_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
-    
+
     const user = {
       id: userId,
       email: userData.email,
@@ -105,7 +105,7 @@ class AuthenticationManager {
     };
 
     this.users.set(userId, user);
-    
+
     return this.sanitizeUser(user);
   }
 
@@ -113,14 +113,14 @@ class AuthenticationManager {
     // Check for lockout
     const lockKey = `login:${email}`;
     const failedAttempts = this.failedAttempts.get(lockKey) || 0;
-    
+
     if (failedAttempts >= this.maxFailedAttempts) {
       return { success: false, error: 'Account locked. Please try again later.' };
     }
 
     // Find user
     const user = Array.from(this.users.values()).find(u => u.email === email);
-    
+
     if (!user) {
       this.recordFailedAttempt(lockKey);
       return { success: false, error: 'Invalid credentials' };
@@ -132,7 +132,7 @@ class AuthenticationManager {
 
     // Verify password
     const isValid = await this.verifyPassword(password, user.passwordHash);
-    
+
     if (!isValid) {
       this.recordFailedAttempt(lockKey);
       return { success: false, error: 'Invalid credentials' };
@@ -146,7 +146,7 @@ class AuthenticationManager {
 
     // Generate tokens
     const tokens = await this.generateTokens(user);
-    
+
     return {
       success: true,
       user: this.sanitizeUser(user),
@@ -157,7 +157,7 @@ class AuthenticationManager {
   recordFailedAttempt(key) {
     const current = this.failedAttempts.get(key) || 0;
     this.failedAttempts.set(key, current + 1);
-    
+
     // Auto-clear after lockout duration
     setTimeout(() => {
       this.failedAttempts.delete(key);
@@ -187,7 +187,7 @@ class AuthenticationManager {
     }
 
     const state = crypto.randomBytes(32).toString('hex');
-    
+
     const params = new URLSearchParams({
       client_id: provider.clientId,
       redirect_uri: redirectUri,
@@ -222,7 +222,7 @@ class AuthenticationManager {
     });
 
     const tokens = await tokenResponse.json();
-    
+
     // Get user info
     const userInfoResponse = await fetch(provider.userInfoEndpoint, {
       headers: { Authorization: `Bearer ${tokens.access_token}` },
@@ -245,7 +245,7 @@ class AuthenticationManager {
 
     // Generate our tokens
     const authTokens = await this.generateTokens(user);
-    
+
     return {
       user: this.sanitizeUser(user),
       ...authTokens,
@@ -256,7 +256,7 @@ class AuthenticationManager {
   // SAML SSO
   async generateSAMLRequest(idpConfig) {
     const { default: saml } = await import('samlify');
-    
+
     const sp = saml.ServiceProvider({
       entityID: idpConfig.spEntityId,
       assertionConsumerService: [{
@@ -275,7 +275,7 @@ class AuthenticationManager {
     });
 
     const { id, context } = sp.createLoginRequest(idp, 'redirect');
-    
+
     return {
       requestId: id,
       samlRequest: context,
@@ -284,7 +284,7 @@ class AuthenticationManager {
 
   async handleSAMLResponse(samlResponse, idpConfig) {
     const { default: saml } = await import('samlify');
-    
+
     const sp = saml.ServiceProvider({
       entityID: idpConfig.spEntityId,
     });
@@ -312,7 +312,7 @@ class AuthenticationManager {
     }
 
     const tokens = await this.generateTokens(user);
-    
+
     return {
       user: this.sanitizeUser(user),
       ...tokens,
@@ -322,7 +322,7 @@ class AuthenticationManager {
   // MFA Support
   async setupMFA(userId) {
     const speakeasy = await import('speakeasy');
-    
+
     const secret = speakeasy.generateSecret({
       name: `Sentinel:${userId}`,
     });
@@ -341,7 +341,7 @@ class AuthenticationManager {
 
   async verifyMFA(userId, token) {
     const speakeasy = await import('speakeasy');
-    
+
     const user = this.users.get(userId);
     if (!user || !user.mfaSecret) {
       return false;

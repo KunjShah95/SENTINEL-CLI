@@ -402,7 +402,7 @@ class SessionStore {
     `;
 
     if (ruleId) {
-      query += ` AND rule_id = ?`;
+      query += ' AND rule_id = ?';
     }
 
     query += `

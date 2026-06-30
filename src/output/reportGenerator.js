@@ -29,26 +29,26 @@ export default class ReportGenerator {
     let output;
 
     switch (format) {
-      case 'console':
-        output = this.generateConsoleReport(report);
-        break;
-      case 'json':
-        output = JSON.stringify(report, null, 2);
-        break;
-      case 'junit':
-        output = this.generateJUnitReport(report);
-        break;
-      case 'html':
-        output = this.generateHtmlReport(report);
-        break;
-      case 'markdown':
-        output = this.generateMarkdownReport(report);
-        break;
-      case 'sarif':
-        output = this.generateSarifReport(report);
-        break;
-      default:
-        output = this.generateConsoleReport(report);
+    case 'console':
+      output = this.generateConsoleReport(report);
+      break;
+    case 'json':
+      output = JSON.stringify(report, null, 2);
+      break;
+    case 'junit':
+      output = this.generateJUnitReport(report);
+      break;
+    case 'html':
+      output = this.generateHtmlReport(report);
+      break;
+    case 'markdown':
+      output = this.generateMarkdownReport(report);
+      break;
+    case 'sarif':
+      output = this.generateSarifReport(report);
+      break;
+    default:
+      output = this.generateConsoleReport(report);
     }
 
     if (outputFile) {
@@ -60,15 +60,15 @@ export default class ReportGenerator {
 
   generateSarifReport(report) {
     const sarif = {
-      $schema: "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
-      version: "2.1.0",
+      $schema: 'https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json',
+      version: '2.1.0',
       runs: [
         {
           tool: {
             driver: {
-              name: "Sentinel CLI",
-              version: "1.8.0",
-              informationUri: "https://github.com/KunjShah95/Sentinel-CLI",
+              name: 'Sentinel CLI',
+              version: '1.8.0',
+              informationUri: 'https://github.com/KunjShah95/Sentinel-CLI',
               rules: this.extractRules(report.issues)
             }
           },
@@ -133,15 +133,15 @@ export default class ReportGenerator {
 
   mapSeverityToSarifLevel(severity) {
     switch (severity?.toLowerCase()) {
-      case 'critical':
-      case 'high':
-        return 'error';
-      case 'medium':
-        return 'warning';
-      case 'low':
-      case 'info':
-      default:
-        return 'note';
+    case 'critical':
+    case 'high':
+      return 'error';
+    case 'medium':
+      return 'warning';
+    case 'low':
+    case 'info':
+    default:
+      return 'note';
     }
   }
 

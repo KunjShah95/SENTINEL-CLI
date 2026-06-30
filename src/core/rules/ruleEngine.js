@@ -17,22 +17,22 @@ class RuleEngine {
       '>=': (a, b) => a >= b,
       '<': (a, b) => a < b,
       '<=': (a, b) => a <= b,
-      
+
       // Logical operators
       '&&': (a, b) => a && b,
       '||': (a, b) => a || b,
       '!': (a) => !a,
-      
+
       // String operators
       'contains': (a, b) => String(a).includes(b),
       'startsWith': (a, b) => String(a).startsWith(b),
       'endsWith': (a, b) => String(a).endsWith(b),
       'matches': (a, b) => new RegExp(b).test(String(a)),
-      
+
       // Array operators
       'in': (a, b) => Array.isArray(b) && b.includes(a),
       'includes': (a, b) => Array.isArray(a) && a.includes(b),
-      
+
       // Type operators
       'isType': (a, b) => typeof a === b,
       'isArray': (a) => Array.isArray(a),
@@ -56,7 +56,7 @@ class RuleEngine {
       'sum': (arr) => arr.reduce((a, b) => a + b, 0),
       'avg': (arr) => arr.reduce((a, b) => a + b, 0) / arr.length,
       'round': (a, decimals = 0) => Number(a.toFixed(decimals)),
-      
+
       // String functions
       'length': (a) => String(a).length,
       'uppercase': (a) => String(a).toUpperCase(),
@@ -66,7 +66,7 @@ class RuleEngine {
       'join': (arr, separator) => arr.join(separator),
       'replace': (a, search, replace) => String(a).replace(search, replace),
       'substring': (a, start, end) => String(a).substring(start, end),
-      
+
       // Array functions
       'count': (arr) => arr.length,
       'first': (arr) => arr[0],
@@ -77,21 +77,21 @@ class RuleEngine {
       'reverse': (arr) => [...arr].reverse(),
       'unique': (arr) => [...new Set(arr)],
       'flatten': (arr) => arr.flat(),
-      
+
       // Object functions
       'keys': (obj) => Object.keys(obj),
       'values': (obj) => Object.values(obj),
       'entries': (obj) => Object.entries(obj),
       'hasKey': (obj, key) => key in obj,
       'get': (obj, key, defaultValue) => obj[key] ?? defaultValue,
-      
+
       // Date functions
       'now': () => Date.now(),
       'date': () => new Date().toISOString(),
       'year': () => new Date().getFullYear(),
       'month': () => new Date().getMonth() + 1,
       'day': () => new Date().getDate(),
-      
+
       // Utility functions
       'if': (condition, trueValue, falseValue) => condition ? trueValue : falseValue,
       'coalesce': (...args) => args.find(arg => arg !== null && arg !== undefined),
@@ -110,10 +110,10 @@ class RuleEngine {
   parseRuleString(ruleString) {
     // Simple parser for string-based rules
     // Supports: field operator value, AND, OR, NOT
-    
+
     // Remove extra whitespace
     const clean = ruleString.trim().replace(/\s+/g, ' ');
-    
+
     // Try to parse as JSON first
     try {
       return JSON.parse(clean);
@@ -131,21 +131,21 @@ class RuleEngine {
         and: parts.map(p => this.parseExpression(p.trim())),
       };
     }
-    
+
     if (expr.includes(' OR ')) {
       const parts = expr.split(' OR ');
       return {
         or: parts.map(p => this.parseExpression(p.trim())),
       };
     }
-    
+
     // Handle NOT
     if (expr.startsWith('NOT ')) {
       return {
         not: this.parseExpression(expr.slice(4)),
       };
     }
-    
+
     // Handle comparison: field operator value
     const match = expr.match(/^(.+?)\s*(==|!=|>|<|>=|<=|contains|matches|in)\s*(.+)$/);
     if (match) {
@@ -156,7 +156,7 @@ class RuleEngine {
         value: this.parseValue(value.trim()),
       };
     }
-    
+
     // Simple field check (truthy)
     return {
       field: expr,
@@ -173,20 +173,20 @@ class RuleEngine {
     if (/^-?\d+\.\d+$/.test(value)) {
       return parseFloat(value);
     }
-    
+
     // Try to parse as boolean
     if (value === 'true') return true;
     if (value === 'false') return false;
-    
+
     // Try to parse as null
     if (value === 'null') return null;
-    
+
     // Remove quotes if present
     if ((value.startsWith('"') && value.endsWith('"')) ||
-        (value.startsWith("'") && value.endsWith("'"))) {
+        (value.startsWith('\'') && value.endsWith('\''))) {
       return value.slice(1, -1);
     }
-    
+
     return value;
   }
 
@@ -234,7 +234,7 @@ class RuleEngine {
   evaluateComparison(rule, data, context) {
     const fieldValue = this.getFieldValue(rule.field, data, context);
     const operator = this.operators[rule.operator];
-    
+
     if (!operator) {
       throw new Error(`Unknown operator: ${rule.operator}`);
     }
@@ -244,7 +244,7 @@ class RuleEngine {
 
   evaluateFunction(rule, data, context, depth) {
     const fn = this.functions[rule.fn];
-    
+
     if (!fn) {
       throw new Error(`Unknown function: ${rule.fn}`);
     }
@@ -325,10 +325,10 @@ class RuleEngine {
   validateRule(rule) {
     try {
       const parsed = this.parseRule(rule);
-      
+
       // Try to evaluate with empty data
       this.evaluate(parsed, {}, {}, 0);
-      
+
       return { valid: true };
     } catch (error) {
       return { valid: false, error: error.message };

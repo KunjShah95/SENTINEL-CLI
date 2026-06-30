@@ -28,7 +28,7 @@ async function main() {
   // Basic CLI parsing: first non-flag argument is code or path, rest are options
   const argv = process.argv.slice(2);
   let codeArg = null;
-  const options = { format: 'text', sarif: false, failOn: null };
+  const options = { format: 'text', sarif: false, failOn: null, loop: false, write: false, maxIter: 5 };
 
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -46,6 +46,19 @@ async function main() {
       i++;
       continue;
     }
+    if (a === '--loop') {
+      options.loop = true;
+      continue;
+    }
+    if (a === '--write') {
+      options.write = true;
+      continue;
+    }
+    if (a === '--max-iter' && argv[i + 1]) {
+      options.maxIter = parseInt(argv[i + 1], 10) || 5;
+      i++;
+      continue;
+    }
     // first non-flag is code/path
     if (!codeArg) codeArg = a;
   }
@@ -56,11 +69,49 @@ async function main() {
     return;
   }
 
+  let isFile = false;
+  try { isFile = fs.statSync(codeArg).isFile(); } catch { /* code string */ }
+
+  // Autonomous loop mode: scan -> fix -> validate -> re-scan proof -> iterate.
+  if (options.loop) {
+    const { runFixLoop } = await import('./autonomousFixLoop.js');
+    const report = await runFixLoop(code, {
+      filename: isFile ? codeArg : 'code.js',
+      maxIterations: options.maxIter,
+      failOn: options.failOn,
+      writeBack: options.write && isFile
+    });
+
+    console.log('# Autonomous Fix Loop');
+    console.log(`\nAuto-fixable targets: ${report.targetedCount} | Iterations: ${report.iterations}`);
+    console.log(`Resolved (proven gone): ${report.resolved.length}`);
+    report.resolved.forEach(e => console.log(`  ✓ ${e.type}: ${e.message}${e.line ? ` (line ${e.line})` : ''}`));
+    console.log(`Remaining (auto-fixable): ${report.remaining.length}`);
+    report.remaining.forEach(e => console.log(`  ✗ ${e.type}: ${e.message}${e.line ? ` (line ${e.line})` : ''}`));
+    if (report.regressionsIntroduced.length > 0) {
+      console.log(`Regressions blocked: ${report.regressionsIntroduced.length} (fix rolled back)`);
+    }
+    const unfixable = report.unfixableRemaining || [];
+    if (unfixable.length > 0) {
+      console.log(`\nNeeds human (not auto-fixable): ${unfixable.length}`);
+      unfixable.forEach(e => console.log(`  ⚠ ${e.severity} ${e.type}: ${e.message}${e.line ? ` (line ${e.line})` : ''}`));
+    }
+    console.log(`\nSyntax valid: ${report.syntaxValid ? 'YES' : 'NO'}`);
+    console.log(`PROVEN FIXED: ${report.proven ? 'YES' : 'NO'}`);
+    console.log(`CLEAN (nothing left at threshold): ${report.clean ? 'YES' : 'NO'}`);
+    if (report.wroteFile) console.log(`Wrote proven fix to ${report.filename}`);
+
+    // CI gate: fail if anything remains at the threshold — including findings a
+    // human must fix — not just auto-fixable ones.
+    if (options.failOn && !report.clean) process.exit(1);
+    return;
+  }
+
   // Step 1: Scan for errors
   const errors = await scannerModule.scanCode(code);
 
   // Step 2: Propose fixes
-  const fixRes = fixerModule.proposeFixes(code, errors);
+  const fixRes = await fixerModule.proposeFixes(code, errors);
 
   // Step 3: Validate fixes
   const validation = validatorModule.validateFix(code, fixRes.fixedCode, errors);

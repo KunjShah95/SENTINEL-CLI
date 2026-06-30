@@ -107,7 +107,56 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD node -e "console.log('Sentinel CLI v2.0.2 is healthy')" || exit 1
 
 # ============================================================
-# Stage 3: CI/CD Runner (optimized for GitHub Actions, GitLab CI)
+# Stage 3: GitHub PR Bot Server (Express webhook server)
+FROM node:20-alpine AS pr-bot
+
+LABEL maintainer="Sentinel Team"
+LABEL description="Sentinel GitHub PR Bot — auto-review on PR open/update"
+LABEL version="2.0.2"
+
+ENV NODE_ENV=production
+ENV SENTINEL_DOCKER=true
+
+WORKDIR /app
+
+# Install git for repo access during SAST analysis
+RUN apk add --no-cache git curl ca-certificates && \
+    rm -rf /var/cache/apk/*
+
+# Copy package files
+COPY package*.json ./
+
+# Install production dependencies only (includes express)
+RUN npm ci --only=production --ignore-scripts && \
+    npm cache clean --force
+
+# Copy source
+COPY --from=builder /app/src ./src
+COPY --from=builder /app/bin ./bin
+COPY --from=builder /app/mcp ./mcp
+COPY --from=builder /app/.sentinelrules.yaml ./
+
+# Expose webhook and health ports
+EXPOSE 3001
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD node -e "fetch('http://localhost:3001/health').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))" || exit 1
+
+# Create non-root user
+RUN addgroup -g 1001 -S sentinel && \
+    adduser -u 1001 -S sentinel -G sentinel && \
+    chown -R sentinel:sentinel /app
+
+USER sentinel
+
+ENV PATH="/app/node_modules/.bin:$PATH"
+
+ENTRYPOINT ["node", "src/github/prBotServer.js"]
+CMD []
+
+# ============================================================
+# Stage 4: CI/CD Runner (optimized for GitHub Actions, GitLab CI)
 FROM node:20-alpine AS ci
 
 LABEL maintainer="Sentinel Team"

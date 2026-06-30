@@ -40,10 +40,10 @@ export class IncrementalAnalyzer {
     try {
       const content = await fs.readFile(this.cacheFile, 'utf8');
       const data = JSON.parse(content);
-      
+
       // Convert to Map for faster lookups
       this.cache = new Map(Object.entries(data));
-      
+
       // Clean old entries if cache is too large
       if (this.cache.size > this.maxCacheSize) {
         await this.cleanOldEntries();
@@ -74,7 +74,7 @@ export class IncrementalAnalyzer {
     try {
       const cacheObj = Object.fromEntries(this.cache);
       const indexObj = Object.fromEntries(this.index);
-      
+
       await Promise.all([
         fs.writeFile(this.cacheFile, JSON.stringify(cacheObj, null, 2)),
         fs.writeFile(this.cacheIndexFile, JSON.stringify(indexObj, null, 2)),
@@ -97,11 +97,11 @@ export class IncrementalAnalyzer {
   async hasFileChanged(filePath, content) {
     const currentHash = this.generateFileHash(content);
     const cachedData = this.index.get(filePath);
-    
+
     if (!cachedData) {
       return true; // File not analyzed before
     }
-    
+
     return cachedData.hash !== currentHash;
   }
 
@@ -113,12 +113,12 @@ export class IncrementalAnalyzer {
     if (!cachedData) {
       return null;
     }
-    
+
     const analysis = this.cache.get(cachedData.cacheKey);
     if (!analysis) {
       return null;
     }
-    
+
     return {
       ...analysis,
       fromCache: true,
@@ -133,14 +133,14 @@ export class IncrementalAnalyzer {
     const hash = this.generateFileHash(content);
     const cacheKey = `${filePath}_${hash}`;
     const now = new Date().toISOString();
-    
+
     // Store in cache
     this.cache.set(cacheKey, {
       ...analysis,
       cachedAt: now,
       fileHash: hash,
     });
-    
+
     // Update index
     this.index.set(filePath, {
       hash,
@@ -149,7 +149,7 @@ export class IncrementalAnalyzer {
       fileSize: content.length,
       issuesCount: analysis.issues?.length || 0,
     });
-    
+
     // Clean up if needed
     if (this.cache.size > this.maxCacheSize) {
       await this.cleanOldEntries();
@@ -161,13 +161,13 @@ export class IncrementalAnalyzer {
    */
   async cleanOldEntries() {
     const entries = Array.from(this.index.entries());
-    
+
     // Sort by last analyzed time (oldest first)
     entries.sort((a, b) => new Date(a[1].analyzedAt) - new Date(b[1].analyzedAt));
-    
+
     // Remove oldest 25% of entries
     const toRemove = Math.floor(entries.length * 0.25);
-    
+
     for (let i = 0; i < toRemove; i++) {
       const [filePath, data] = entries[i];
       this.cache.delete(data.cacheKey);
@@ -181,10 +181,10 @@ export class IncrementalAnalyzer {
   async filterFilesToAnalyze(files) {
     const filesToAnalyze = [];
     const cachedResults = [];
-    
+
     for (const fileData of files) {
       const hasChanged = await this.hasFileChanged(fileData.path, fileData.content);
-      
+
       if (hasChanged) {
         filesToAnalyze.push(fileData);
       } else {
@@ -200,7 +200,7 @@ export class IncrementalAnalyzer {
         }
       }
     }
-    
+
     return {
       filesToAnalyze,
       cachedResults,
@@ -218,31 +218,31 @@ export class IncrementalAnalyzer {
     if (!message || typeof message !== 'object') {
       return false;
     }
-    
+
     // Validate session token
     if (message.sessionToken !== expectedSessionToken) {
       console.warn('Invalid session token in worker message');
       return false;
     }
-    
+
     // Validate worker ID
     if (message.workerId !== expectedWorkerId) {
       console.warn('Invalid worker ID in worker message');
       return false;
     }
-    
+
     // Check for error in message
     if (message.error) {
       console.warn(`Worker reported error: ${message.error}`);
       return false;
     }
-    
+
     // Validate data structure
     if (!message.data || !Array.isArray(message.data)) {
       console.warn('Invalid data structure in worker message');
       return false;
     }
-    
+
     return true;
   }
 
@@ -253,24 +253,24 @@ export class IncrementalAnalyzer {
     if (!isMainThread) {
       throw new Error('Parallel analysis must be run from main thread');
     }
-    
+
     if (files.length === 0) {
       return [];
     }
-    
+
     const { maxWorkers = this.maxWorkers, chunkSize = 1 } = options;
     const chunks = this.chunkArray(files, chunkSize);
-    
+
     // Generate a unique session token for this analysis batch
     const sessionToken = crypto.randomBytes(32).toString('hex');
-    
+
     // Create worker pool
     const workers = [];
     const promises = [];
-    
+
     for (let i = 0; i < Math.min(maxWorkers, chunks.length); i++) {
       const workerDataChunks = chunks.filter((_, index) => index % maxWorkers === i);
-      
+
       const worker = new Worker(__filename, {
         workerData: {
           analyzerFunction: analyzerFunction.toString(),
@@ -279,9 +279,9 @@ export class IncrementalAnalyzer {
           workerId: i,
         },
       });
-      
+
       workers.push(worker);
-      
+
       const promise = new Promise((resolve, reject) => {
         const messageHandler = (message) => {
           // Validate message origin and authenticity
@@ -289,13 +289,13 @@ export class IncrementalAnalyzer {
             reject(new Error('Invalid worker message: failed origin validation'));
             return;
           }
-          
+
           // Remove the listener after successful validation
           worker.off('message', messageHandler);
           clearTimeout(timeout); // Clear timeout when message is received
           resolve(message.data);
         };
-        
+
         worker.on('message', messageHandler);
         worker.on('error', (error) => {
           clearTimeout(timeout);
@@ -307,7 +307,7 @@ export class IncrementalAnalyzer {
             reject(new Error(`Worker stopped with exit code ${code}`));
           }
         });
-        
+
         // Set timeout to prevent hanging
         const timeout = setTimeout(() => {
           worker.off('message', messageHandler);
@@ -315,10 +315,10 @@ export class IncrementalAnalyzer {
           reject(new Error(`Worker ${i} timed out`));
         }, 300000); // 5 minutes timeout
       });
-      
+
       promises.push(promise);
     }
-    
+
     try {
       const results = await Promise.all(promises);
       return results.flat();
@@ -350,27 +350,27 @@ export class IncrementalAnalyzer {
    */
   async runIncrementalAnalysis(files, analyzers, options = {}) {
     const startTime = Date.now();
-    
+
     // Filter files that need analysis
     const filterResult = await this.filterFilesToAnalyze(files);
-    
-    console.log(`📊 Incremental Analysis:`);
+
+    console.log('📊 Incremental Analysis:');
     console.log(`  Total files: ${filterResult.totalFiles}`);
     console.log(`  From cache: ${filterResult.fromCache}`);
     console.log(`  Need analysis: ${filterResult.needAnalysis}`);
-    
+
     // Collect all results
     const allResults = [];
-    
+
     // Add cached results
     for (const cached of filterResult.cachedResults) {
       allResults.push(cached.cachedAnalysis);
     }
-    
+
     // Analyze files that need it
     if (filterResult.filesToAnalyze.length > 0) {
       let analysisResults;
-      
+
       if (options.parallel && filterResult.filesToAnalyze.length > 1) {
         // Parallel analysis
         analysisResults = await this.analyzeFilesInParallel(
@@ -385,25 +385,25 @@ export class IncrementalAnalyzer {
           analyzers
         );
       }
-      
+
       // Cache the new results
       for (let i = 0; i < filterResult.filesToAnalyze.length; i++) {
         const fileData = filterResult.filesToAnalyze[i];
         const result = analysisResults[i];
-        
+
         if (result && !result.fromCache) {
           await this.cacheAnalysis(fileData.path, fileData.content, result);
         }
-        
+
         allResults.push(result);
       }
     }
-    
+
     // Save cache
     await this.saveCache();
-    
+
     const duration = Date.now() - startTime;
-    
+
     return {
       results: allResults,
       summary: {
@@ -421,15 +421,15 @@ export class IncrementalAnalyzer {
    */
   async analyzeFilesSequentially(files, analyzers) {
     const results = [];
-    
+
     for (const fileData of files) {
       const fileResults = [];
-      
+
       for (const AnalyzerClass of analyzers) {
         try {
           const analyzer = new AnalyzerClass();
           const issues = await analyzer.analyzeFile(fileData.path, fileData.content);
-          
+
           fileResults.push({
             analyzer: analyzer.getName(),
             issues,
@@ -439,14 +439,14 @@ export class IncrementalAnalyzer {
           console.warn(`Analyzer ${AnalyzerClass.name} failed for ${fileData.path}: ${error.message}`);
         }
       }
-      
+
       results.push({
         file: fileData.path,
         analyzers: fileResults,
         totalIssues: fileResults.reduce((sum, r) => sum + (r.issues?.length || 0), 0),
       });
     }
-    
+
     return results;
   }
 
@@ -460,18 +460,18 @@ export class IncrementalAnalyzer {
       maxCacheSize: this.maxCacheSize,
       utilizationRate: `${((this.cache.size / this.maxCacheSize) * 100).toFixed(1)}%`,
     };
-    
+
     // Calculate cache age statistics
     if (this.index.size > 0) {
       const ages = Array.from(this.index.values()).map(entry => {
         return Date.now() - new Date(entry.analyzedAt).getTime();
       });
-      
+
       stats.oldestEntry = `${Math.max(...ages) / (1000 * 60 * 60)}h`;
       stats.newestEntry = `${Math.min(...ages) / (1000 * 60 * 60)}h`;
       stats.averageAge = `${(ages.reduce((a, b) => a + b, 0) / ages.length) / (1000 * 60 * 60)}h`;
     }
-    
+
     return stats;
   }
 
@@ -481,7 +481,7 @@ export class IncrementalAnalyzer {
   async clearCache() {
     this.cache.clear();
     this.index.clear();
-    
+
     try {
       await Promise.all([
         fs.unlink(this.cacheFile),
@@ -502,10 +502,10 @@ export class IncrementalAnalyzer {
       cache: Object.fromEntries(this.cache),
       index: Object.fromEntries(this.index),
     };
-    
+
     const path = outputPath || path.join(this.cacheDir, `cache-export-${Date.now()}.json`);
     await fs.writeFile(path, JSON.stringify(exportData, null, 2));
-    
+
     return path;
   }
 }
@@ -513,24 +513,24 @@ export class IncrementalAnalyzer {
 // Worker thread execution
 if (!isMainThread) {
   const { analyzerFunction: analyzerFuncStr, chunks, sessionToken, workerId } = workerData;
-  
+
   // Validate worker data
   if (!analyzerFuncStr || !chunks || !sessionToken || workerId === undefined) {
-    parentPort.postMessage({ 
+    parentPort.postMessage({
       error: 'Invalid worker data: missing required fields',
       sessionToken,
-      workerId 
+      workerId
     });
     process.exit(1);
   }
-  
+
   // Recreate the analyzer function
   const analyzerFunction = new Function('return ' + analyzerFuncStr)();
-  
+
   (async () => {
     try {
       const results = await analyzerFunction(chunks);
-      
+
       // Send validated message with session token and worker ID
       parentPort.postMessage({
         sessionToken,
@@ -539,7 +539,7 @@ if (!isMainThread) {
         timestamp: Date.now()
       });
     } catch (error) {
-      parentPort.postMessage({ 
+      parentPort.postMessage({
         error: error.message,
         sessionToken,
         workerId

@@ -89,7 +89,7 @@ export class SyntheticDataGenerator {
     const filtered = await this.filterByQuality(this.syntheticDataset);
 
     // Ensure diversity
-    console.log(`🎯 Ensuring diversity...`);
+    console.log('🎯 Ensuring diversity...');
     const diverse = this.ensureDiversity(filtered);
 
     console.log(`✅ Generated ${diverse.length} high-quality diverse samples`);

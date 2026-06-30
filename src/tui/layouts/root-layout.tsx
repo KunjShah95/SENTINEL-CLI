@@ -6,6 +6,7 @@ import { DialogProvider } from '../providers/dialog/index.js';
 import { PromptConfigProvider } from '../providers/prompt-config/index.js';
 import { ThemedRoot } from './themed-root.js';
 import { Outlet } from 'react-router';
+import { ErrorBoundary } from '../components/error-boundary.js';
 
 export function RootLayout() {
   return (
@@ -15,7 +16,9 @@ export function RootLayout() {
           <DialogProvider>
             <PromptConfigProvider>
               <ThemedRoot>
-                <Outlet />
+                <ErrorBoundary>
+                  <Outlet />
+                </ErrorBoundary>
               </ThemedRoot>
             </PromptConfigProvider>
           </DialogProvider>

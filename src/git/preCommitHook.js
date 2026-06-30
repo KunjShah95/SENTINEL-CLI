@@ -25,7 +25,7 @@ export class PreCommitHookManager {
 
     const hookContent = this.generateHookScript();
     await fs.writeFile(hookPath, hookContent, 'utf8');
-    
+
     // Make executable
     try {
       execSync(`chmod +x "${hookPath}"`, { stdio: 'ignore' });
@@ -75,7 +75,7 @@ exit 0
    */
   async uninstall() {
     const hookPath = path.join(process.cwd(), this.gitHooksPath, 'pre-commit');
-    
+
     try {
       await fs.unlink(hookPath);
       return { success: true };
@@ -89,7 +89,7 @@ exit 0
    */
   async isInstalled() {
     const hookPath = path.join(process.cwd(), this.gitHooksPath, 'pre-commit');
-    
+
     try {
       await fs.access(hookPath);
       const content = await fs.readFile(hookPath, 'utf8');
@@ -109,9 +109,9 @@ exit 0
         encoding: 'utf8',
         timeout: 5000,
       });
-      
+
       const files = staged.split('\n').filter(Boolean);
-      
+
       if (files.length === 0) {
         return {
           passed: true,

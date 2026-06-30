@@ -24,7 +24,7 @@ class AuditLogger {
     this.alertHooks = [];
     this.suppressionSpikeThreshold = options.suppressionSpikeThreshold || 50;
     this.suppressionWindowMinutes = options.suppressionWindowMinutes || 60;
-    
+
     this.startAutoFlush();
   }
 
@@ -87,7 +87,7 @@ class AuditLogger {
   }
 
   checkForAnomalies() {
-    const recentSuppressions = this.buffer.filter(entry => 
+    const recentSuppressions = this.buffer.filter(entry =>
       entry.action === 'issue_suppressed' &&
       entry.timestamp > Date.now() - (this.suppressionWindowMinutes * 60 * 1000)
     );
@@ -115,20 +115,20 @@ class AuditLogger {
 
   async log(event) {
     const auditEntry = this.createAuditEntry(event);
-    
+
     // Add to buffer
     this.buffer.push(auditEntry);
-    
+
     // Console output
     if (this.enableConsole) {
       this.logToConsole(auditEntry);
     }
-    
+
     // Flush if buffer is full
     if (this.buffer.length >= this.bufferSize) {
       await this.flush();
     }
-    
+
     return auditEntry.id;
   }
 
@@ -199,7 +199,7 @@ class AuditLogger {
 
   verifyChainIntegrity(entries) {
     let previousHash = null;
-    
+
     for (const entry of entries) {
       if (!entry.chain) {
         return { valid: false, brokenAt: entry.id, reason: 'Missing chain data' };
@@ -226,12 +226,12 @@ class AuditLogger {
 
   sanitizeData(data) {
     const sanitized = { ...data };
-    
+
     for (const field of this.sensitiveFields) {
       if (sanitized[field]) {
         sanitized[field] = '[REDACTED]';
       }
-      
+
       // Check nested objects
       for (const key of Object.keys(sanitized)) {
         if (typeof sanitized[key] === 'object' && sanitized[key] !== null) {
@@ -239,7 +239,7 @@ class AuditLogger {
         }
       }
     }
-    
+
     return sanitized;
   }
 
@@ -251,10 +251,10 @@ class AuditLogger {
       security: '\x1b[35m', // Magenta
       audit: '\x1b[32m',   // Green
     };
-    
+
     const reset = '\x1b[0m';
     const color = colors[entry.level] || colors.info;
-    
+
     console.log(
       `${color}[AUDIT]${reset} ${entry.timestamp} | ` +
       `${entry.category} | ${entry.action} | ` +
@@ -265,31 +265,31 @@ class AuditLogger {
 
   async flush() {
     if (this.buffer.length === 0) return;
-    
+
     const entries = [...this.buffer];
     this.buffer = [];
-    
+
     const promises = [];
-    
+
     if (this.enableFile) {
       promises.push(this.flushToFile(entries));
     }
-    
+
     if (this.enableWebhook && this.webhookUrl) {
       promises.push(this.flushToWebhook(entries));
     }
-    
+
     await Promise.allSettled(promises);
   }
 
   async flushToFile(entries) {
     try {
       await fs.mkdir(this.logDir, { recursive: true });
-      
+
       const date = new Date().toISOString().split('T')[0];
       const fileName = `audit-${date}.jsonl`;
       const filePath = path.join(this.logDir, fileName);
-      
+
       const lines = entries.map(e => JSON.stringify(e)).join('\n') + '\n';
       await fs.appendFile(filePath, lines);
     } catch (error) {
@@ -304,7 +304,7 @@ class AuditLogger {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ entries }),
       });
-      
+
       if (!response.ok) {
         throw new Error(`Webhook failed: ${response.statusText}`);
       }
@@ -317,7 +317,7 @@ class AuditLogger {
     setInterval(() => {
       this.flush();
     }, this.flushInterval);
-    
+
     // Flush on process exit
     process.on('beforeExit', () => {
       this.flush();
@@ -327,56 +327,56 @@ class AuditLogger {
   // Query audit logs
   async query(filters = {}) {
     const logs = await this.loadLogs(filters);
-    
+
     return logs.filter(entry => {
       if (filters.startDate && new Date(entry.timestamp) < new Date(filters.startDate)) {
         return false;
       }
-      
+
       if (filters.endDate && new Date(entry.timestamp) > new Date(filters.endDate)) {
         return false;
       }
-      
+
       if (filters.userId && entry.actor.id !== filters.userId) {
         return false;
       }
-      
+
       if (filters.tenantId && entry.tenant.id !== filters.tenantId) {
         return false;
       }
-      
+
       if (filters.category && entry.category !== filters.category) {
         return false;
       }
-      
+
       if (filters.action && entry.action !== filters.action) {
         return false;
       }
-      
+
       if (filters.level && entry.level !== filters.level) {
         return false;
       }
-      
+
       if (filters.success !== undefined && entry.result.success !== filters.success) {
         return false;
       }
-      
+
       return true;
     });
   }
 
   async loadLogs(_filters = {}) {
     const logs = [];
-    
+
     try {
       const files = await fs.readdir(this.logDir);
       const logFiles = files.filter(f => f.startsWith('audit-') && f.endsWith('.jsonl'));
-      
+
       for (const file of logFiles) {
         const filePath = path.join(this.logDir, file);
         const content = await fs.readFile(filePath, 'utf8');
         const lines = content.trim().split('\n');
-        
+
         for (const line of lines) {
           if (line) {
             try {
@@ -390,7 +390,7 @@ class AuditLogger {
     } catch (error) {
       // Directory might not exist
     }
-    
+
     return logs.sort((a, b) => b.unixTimestamp - a.unixTimestamp);
   }
 
@@ -399,12 +399,12 @@ class AuditLogger {
     try {
       const cutoff = Date.now() - (this.retentionDays * 24 * 60 * 60 * 1000);
       const files = await fs.readdir(this.logDir);
-      
+
       for (const file of files) {
         if (file.startsWith('audit-') && file.endsWith('.jsonl')) {
           const filePath = path.join(this.logDir, file);
           const stats = await fs.stat(filePath);
-          
+
           if (stats.mtime.getTime() < cutoff) {
             await fs.unlink(filePath);
             console.log(`Deleted old audit log: ${file}`);
@@ -441,19 +441,19 @@ class AuditLogger {
 
     for (const log of logs) {
       // Category counts
-      report.summary.byCategory[log.category] = 
+      report.summary.byCategory[log.category] =
         (report.summary.byCategory[log.category] || 0) + 1;
-      
+
       // Action counts
-      report.summary.byAction[log.action] = 
+      report.summary.byAction[log.action] =
         (report.summary.byAction[log.action] || 0) + 1;
-      
+
       // User counts
       if (log.actor.email) {
-        report.summary.byUser[log.actor.email] = 
+        report.summary.byUser[log.actor.email] =
           (report.summary.byUser[log.actor.email] || 0) + 1;
       }
-      
+
       // Result counts
       if (log.result.success) {
         report.summary.byResult.success++;
@@ -489,7 +489,7 @@ class AuditLogger {
       tenantId,
     });
 
-    const chainVerification = includeChainVerification 
+    const chainVerification = includeChainVerification
       ? this.verifyChainIntegrity(logs)
       : null;
 
@@ -506,17 +506,17 @@ class AuditLogger {
     };
 
     switch (framework.toUpperCase()) {
-      case 'SOC2':
-        evidenceBundle.evidence = this.generateSOC2Evidence(logs);
-        break;
-      case 'HIPAA':
-        evidenceBundle.evidence = this.generateHIPAACEvidence(logs);
-        break;
-      case 'GDPR':
-        evidenceBundle.evidence = this.generateGDPREvidence(logs);
-        break;
-      default:
-        evidenceBundle.evidence = this.generateSOC2Evidence(logs);
+    case 'SOC2':
+      evidenceBundle.evidence = this.generateSOC2Evidence(logs);
+      break;
+    case 'HIPAA':
+      evidenceBundle.evidence = this.generateHIPAACEvidence(logs);
+      break;
+    case 'GDPR':
+      evidenceBundle.evidence = this.generateGDPREvidence(logs);
+      break;
+    default:
+      evidenceBundle.evidence = this.generateSOC2Evidence(logs);
     }
 
     evidenceBundle.signature = this.signEvidenceBundle(evidenceBundle);
@@ -768,10 +768,10 @@ class AuditLogger {
       report.acceptanceRate = ((report.summary.fixesAccepted / totalCompleted) * 100).toFixed(2);
     }
 
-    const criticalLogs = logs.filter(l => 
+    const criticalLogs = logs.filter(l =>
       l.details?.severity === 'critical' && l.action === 'fix_accepted'
     );
-    
+
     if (criticalLogs.length > 0) {
       const times = criticalLogs.map(l => l.unixTimestamp).sort((a, b) => a - b);
       const avgTime = times.reduce((a, b) => a + b, 0) / times.length;

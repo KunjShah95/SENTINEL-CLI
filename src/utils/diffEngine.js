@@ -16,21 +16,21 @@ export class DiffEngine {
    */
   compare(oldContent, newContent, options = {}) {
     const method = options.method || 'lines';
-    
+
     let diff;
     switch (method) {
-      case 'chars':
-        diff = diffChars(oldContent, newContent);
-        break;
-      case 'words':
-        diff = diffWords(oldContent, newContent);
-        break;
-      case 'lines':
-      default:
-        diff = diffLines(oldContent, newContent);
-        break;
+    case 'chars':
+      diff = diffChars(oldContent, newContent);
+      break;
+    case 'words':
+      diff = diffWords(oldContent, newContent);
+      break;
+    case 'lines':
+    default:
+      diff = diffLines(oldContent, newContent);
+      break;
     }
-    
+
     return {
       changes: diff.map(part => ({
         value: part.value,
@@ -64,7 +64,7 @@ export class DiffEngine {
    */
   async preview(filePath, newContent, options = {}) {
     let oldContent;
-    
+
     try {
       oldContent = await fs.readFile(filePath, 'utf-8');
     } catch {
@@ -97,19 +97,19 @@ export class DiffEngine {
    */
   async apply(filePath, newContent, options = {}) {
     const { createBackup = true, backupDir = '.sentinel/backups' } = options;
-    
+
     let oldContent;
     let backupPath;
 
     try {
       oldContent = await fs.readFile(filePath, 'utf-8');
-      
+
       // Create backup
       if (createBackup) {
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
         const fileName = path.basename(filePath);
         backupPath = path.join(backupDir, `${fileName}.${timestamp}.bak`);
-        
+
         await fs.mkdir(backupDir, { recursive: true });
         await fs.writeFile(backupPath, oldContent, 'utf-8');
       }
@@ -139,7 +139,7 @@ export class DiffEngine {
    */
   async applyEdits(filePath, edits, options = {}) {
     const { createBackup = true } = options;
-    
+
     const content = await fs.readFile(filePath, 'utf-8');
     const lines = content.split('\n');
     const editsSorted = [...edits].sort((a, b) => b.line - a.line);
@@ -157,7 +157,7 @@ export class DiffEngine {
 
     for (const edit of editsSorted) {
       const { line, endLine, content: newContent } = edit;
-      
+
       if (endLine) {
         // Replace range
         lines.splice(line - 1, endLine - line + 1, newContent);
@@ -183,12 +183,12 @@ export class DiffEngine {
   generateSideBySide(oldContent, newContent, _options = {}) {
     const oldLines = oldContent.split('\n');
     const newLines = newContent.split('\n');
-    
+
     const comparison = this.compare(oldContent, newContent);
-    
+
     const left = [];
     const right = [];
-    
+
     let oldIdx = 0;
     let newIdx = 0;
 
@@ -230,7 +230,7 @@ export class DiffEngine {
   async revertFromBackup(backupPath, targetPath) {
     const backupContent = await fs.readFile(backupPath, 'utf-8');
     await fs.writeFile(targetPath, backupContent, 'utf-8');
-    
+
     return { success: true, revertedTo: backupPath };
   }
 }

@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { useNavigate } from 'react-router';
 import { useTheme } from '../providers/theme/index.js';
@@ -57,7 +57,8 @@ const LOOP_CONFIGS: LoopConfig[] = [
 
 function EventLog({ events, colors }: { events: LoopEvent[]; colors: Record<string, string> }) {
   if (events.length === 0) return null;
-  const visible = events.slice(-20);
+  const EVENT_WINDOW = 50;
+  const visible = events.slice(-EVENT_WINDOW);
 
   return (
     <Box flexDirection="column">
@@ -147,6 +148,7 @@ export function Loop() {
   const navigate = useNavigate();
   const { colors } = useTheme();
   const [selectedIdx, setSelectedIdx] = useState(0);
+  const startingRef = useRef(false);
 
   const {
     isRunning, loopType, currentState, currentStage, events, summary, iteration,
@@ -155,7 +157,9 @@ export function Loop() {
   } = useLoopEngine();
 
   const handleStart = useCallback(() => {
-    if (isRunning) return;
+    if (isRunning || startingRef.current) return;
+    startingRef.current = true;
+    setTimeout(() => { startingRef.current = false; }, 500);
     switch (LOOP_CONFIGS[selectedIdx].type) {
       case 'review': startReviewLoop(); break;
       case 'watch': startWatchLoop(); break;
@@ -180,8 +184,10 @@ export function Loop() {
   const activeConfig = LOOP_CONFIGS.find(c => c.type === loopType);
   const selectedConfig = LOOP_CONFIGS[selectedIdx];
 
-  // Latest AI messages (last 3) for the live output panel
-  const latestMessages = messages.slice(-3);
+  // Latest AI messages for the live output panel
+  const MESSAGE_WINDOW = 5;
+  const latestMessages = messages.slice(-MESSAGE_WINDOW);
+  const totalMessages = messages.length;
 
   return (
     <Box flexDirection="column" width="100%" padding={1}>
@@ -301,7 +307,10 @@ export function Loop() {
           {/* Live AI output */}
           {latestMessages.length > 0 && (
             <Box borderStyle="single" borderColor={colors.dimSeparator} paddingX={1} paddingY={0} flexDirection="column">
-              <Text bold color={colors.primary}>{'AI Output'}</Text>
+              <Box flexDirection="row" justifyContent="space-between">
+                <Text bold color={colors.primary}>{'AI Output'}</Text>
+                <Text dimColor>{totalMessages > MESSAGE_WINDOW ? `showing last ${MESSAGE_WINDOW} / ${totalMessages} messages` : `${totalMessages} messages`}</Text>
+              </Box>
               <Box flexDirection="column" marginTop={1}>
                 {latestMessages.map((msg: any) => (
                   msg.role === 'assistant'

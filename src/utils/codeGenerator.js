@@ -15,59 +15,59 @@ export class CodeGenerator {
     const { type, name, options = {} } = spec;
 
     switch (type) {
-      case 'react-component':
-        return this.generateReactComponent(name, options);
-      case 'vue-component':
-        return this.generateVueComponent(name, options);
-      case 'nextjs-page':
-        return this.generateNextJSPage(name, options);
-      case 'nextjs-api':
-        return this.generateNextJSAPI(name, options);
-      case 'express-route':
-        return this.generateExpressRoute(name, options);
-      case 'express-middleware':
-        return this.generateExpressMiddleware(name, options);
-      case 'graphql-resolver':
-        return this.generateGraphQLResolver(name, options);
-      case 'graphql-type':
-        return this.generateGraphQLType(name, options);
-      case 'django-view':
-        return this.generateDjangoView(name, options);
-      case 'django-model':
-        return this.generateDjangoModel(name, options);
-      case 'fastapi-endpoint':
-        return this.generateFastAPIEndpoint(name, options);
-      case 'rust-function':
-        return this.generateRustFunction(name, options);
-      case 'go-function':
-        return this.generateGoFunction(name, options);
-      case 'python-class':
-        return this.generatePythonClass(name, options);
-      case 'test-file':
-        return this.generateTestFile(name, options);
-      case 'hook':
-        return this.generateHook(name, options);
-      case 'context':
-        return this.generateContext(name, options);
-      case 'service':
-        return this.generateService(name, options);
-      case 'controller':
-        return this.generateController(name, options);
-      case 'repository':
-        return this.generateRepository(name, options);
-      default:
-        return this.generateGeneric(name, options);
+    case 'react-component':
+      return this.generateReactComponent(name, options);
+    case 'vue-component':
+      return this.generateVueComponent(name, options);
+    case 'nextjs-page':
+      return this.generateNextJSPage(name, options);
+    case 'nextjs-api':
+      return this.generateNextJSAPI(name, options);
+    case 'express-route':
+      return this.generateExpressRoute(name, options);
+    case 'express-middleware':
+      return this.generateExpressMiddleware(name, options);
+    case 'graphql-resolver':
+      return this.generateGraphQLResolver(name, options);
+    case 'graphql-type':
+      return this.generateGraphQLType(name, options);
+    case 'django-view':
+      return this.generateDjangoView(name, options);
+    case 'django-model':
+      return this.generateDjangoModel(name, options);
+    case 'fastapi-endpoint':
+      return this.generateFastAPIEndpoint(name, options);
+    case 'rust-function':
+      return this.generateRustFunction(name, options);
+    case 'go-function':
+      return this.generateGoFunction(name, options);
+    case 'python-class':
+      return this.generatePythonClass(name, options);
+    case 'test-file':
+      return this.generateTestFile(name, options);
+    case 'hook':
+      return this.generateHook(name, options);
+    case 'context':
+      return this.generateContext(name, options);
+    case 'service':
+      return this.generateService(name, options);
+    case 'controller':
+      return this.generateController(name, options);
+    case 'repository':
+      return this.generateRepository(name, options);
+    default:
+      return this.generateGeneric(name, options);
     }
   }
 
   // ==================== React ====================
-  
+
   generateReactComponent(name, { props = [], state = [], withHooks = false, withTests = false, typescript = true } = {}) {
     const propTypes = props.map(p => `${p.name}: PropTypes.${p.type || 'string'}${p.required ? '.isRequired' : ''}`).join(',\n  ');
     const propInterface = typescript ? props.map(p => `${p.name}${p.required ? '' : '?'}: ${p.type || 'string'}`).join(',\n  ') : '';
     const stateInit = state.map(s => `const [${s.name}, set${s.name.charAt(0).toUpperCase() + s.name.slice(1)}] = useState${s.initialValue ? `(${s.initialValue})` : '(null)'};`).join('\n  ');
-    const imports = withHooks ? "import { useState, useEffect } from 'react';" : "import React from 'react';";
-    
+    const imports = withHooks ? 'import { useState, useEffect } from \'react\';' : 'import React from \'react\';';
+
     let code = `${imports}
 import PropTypes from 'prop-types';
 
@@ -77,7 +77,7 @@ ${typescript ? `interface ${name}Props {
 
 ${typescript ? `const ${name}: React.FC<${name}Props> = ({ ${props.map(p => p.name).join(', ') || '_props'} }) => {` : `const ${name} = ({ ${props.map(p => p.name).join(', ') || '_props'} }) => {`}
   ${withHooks ? stateInit : '// State'}
-  ${withHooks ? "useEffect(() => {\n    // Effect logic\n  }, []);" : '// Effects'}
+  ${withHooks ? 'useEffect(() => {\n    // Effect logic\n  }, []);' : '// Effects'}
 
   return (
     <div className="${name.toLowerCase()}">
@@ -166,17 +166,17 @@ function ${name}Reducer(state, action) {
 }
 
 export function ${name}Provider({ children }) {
-  ${withReducer 
+  ${withReducer
     ? 'const [state, dispatch] = useReducer(${name}Reducer, initialState);'
-    : "const [state, setState] = useState(initialState);"
-  }
+    : 'const [state, setState] = useState(initialState);'
+}
 
   const value = {
     state,
-    ${withReducer 
-      ? 'dispatch'
-      : 'setState: (updates) => setState(prev => ({ ...prev, ...updates }))'
-    }
+    ${withReducer
+    ? 'dispatch'
+    : 'setState: (updates) => setState(prev => ({ ...prev, ...updates }))'
+}
   };
 
   return (
@@ -244,14 +244,14 @@ export default {
   generateNextJSPage(name, { appRouter = true, withAuth = false } = {}) {
     if (appRouter) {
       return `import { NextPage } from 'next';
-${withAuth ? "import { useSession } from 'next-auth/react';" : ''}
+${withAuth ? 'import { useSession } from \'next-auth/react\';' : ''}
 
 interface PageProps {
   // Props
 }
 
 const ${name}Page: NextPage<PageProps> = ({}) => {
-  ${withAuth ? "const { data: session } = useSession();" : ''}
+  ${withAuth ? 'const { data: session } = useSession();' : ''}
 
   return (
     <div className="container mx-auto p-4">
@@ -263,12 +263,12 @@ const ${name}Page: NextPage<PageProps> = ({}) => {
 export default ${name}Page;
 `;
     }
-    
+
     return `import Head from 'next/head';
-${withAuth ? "import { getSession } from 'next-auth/react';" : ''}
+${withAuth ? 'import { getSession } from \'next-auth/react\';' : ''}
 
 export async function getServerSideProps(context${withAuth ? ': any' : ''}) {
-  ${withAuth ? "const session = await getSession(context);\n  if (!session) {\n    return { redirect: { destination: '/auth/signin', permanent: false } };\n  }" : '// Server-side logic'}
+  ${withAuth ? 'const session = await getSession(context);\n  if (!session) {\n    return { redirect: { destination: \'/auth/signin\', permanent: false } };\n  }' : '// Server-side logic'}
   
   return {
     props: {
@@ -293,7 +293,7 @@ export default function ${name}({ props }) {
   }
 
   generateNextJSAPI(name, { method = 'GET', typescript = true } = {}) {
-    const handler = typescript 
+    const handler = typescript
       ? `export async function GET(request: NextRequest) {
   try {
     return NextResponse.json({ success: true });
@@ -310,7 +310,7 @@ export default function ${name}({ props }) {
 }`;
 
     return `import { NextResponse } from 'next/server';
-${typescript ? "import { NextRequest } from 'next/server';" : ''}
+${typescript ? 'import { NextRequest } from \'next/server\';' : ''}
 
 export async function ${method}(${typescript ? 'request: NextRequest' : 'request'}) {
   ${handler.replace('NextResponse', 'NextResponse')}
@@ -321,7 +321,7 @@ export async function ${method}(${typescript ? 'request: NextRequest' : 'request
   // ==================== Express ====================
 
   generateExpressRoute(name, { method = 'get', path = '/', controller = '', middlewares = [] } = {}) {
-    const middlewareImports = middlewares.length 
+    const middlewareImports = middlewares.length
       ? `const { ${middlewares.join(', ')} } = require('../middleware');`
       : '';
     const middlewareUse = middlewares.length
@@ -332,7 +332,7 @@ export async function ${method}(${typescript ? 'request: NextRequest' : 'request
 const router = express.Router();
 ${middlewareImports}
 
-${middlewareUse ? `router.${method}('${path}', ${middlewares.join(', ')}, ${controller || `(req, res) => {`});\n` : ''}
+${middlewareUse ? `router.${method}('${path}', ${middlewares.join(', ')}, ${controller || '(req, res) => {'});\n` : ''}
 router.${method}('${path}'${controller ? ', ' + controller : ''}, (req, res) => {
   res.json({ 
     success: true, 
@@ -349,7 +349,7 @@ module.exports = router;
     return `module.exports = function ${name}Middleware(options = {}) {
   return function (req, res, next) {
     // Middleware logic
-    ${options.includes('auth') ? "const token = req.headers.authorization;\n    if (!token) {\n      return res.status(401).json({ error: 'Unauthorized' });\n    }" : '// Process request'}
+    ${options.includes('auth') ? 'const token = req.headers.authorization;\n    if (!token) {\n      return res.status(401).json({ error: \'Unauthorized\' });\n    }' : '// Process request'}
     
     // Attach to request
     req.${name} = { /* data */ };
@@ -364,7 +364,7 @@ module.exports = router;
 
   generateGraphQLResolver(name, { typeName = 'Query', args = [] } = {}) {
     const argsStr = args.map(a => `${a.name}: ${a.type}`).join(', ');
-    
+
     return `const ${name}Resolver = {
   ${typeName}: {
     ${name}: async (parent, { ${argsStr || '_args'} }, context) => {
@@ -402,7 +402,7 @@ module.exports = ${name}Type;
 
   generateDjangoView(name, { method = 'get', model = '', template = '' } = {}) {
     const modelImport = model ? `from .models import ${model}` : '';
-    
+
     return `${modelImport}
 from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse
@@ -417,7 +417,7 @@ def ${name.toLowerCase()}_view(request${model ? `, ${model.toLowerCase()}_id` : 
     ${model ? `obj = get_object_or_404(${model}, pk=${model.toLowerCase()}_id)` : ''}
     
     if request.method == '${method.toUpperCase()}':
-        ${template ? `return render(request, '${template}', {'object': obj})` : `return JsonResponse({'data': {}})`}
+        ${template ? `return render(request, '${template}', {'object': obj})` : 'return JsonResponse({\'data\': {}})'}
 
     return JsonResponse({'error': 'Method not allowed'}, status=405)
 `;
@@ -432,7 +432,7 @@ def ${name.toLowerCase()}_view(request${model ? `, ${model.toLowerCase()}_id` : 
         boolean: 'models.BooleanField(default=False)',
         date: 'models.DateField(auto_now_add=True)',
         datetime: 'models.DateTimeField(auto_now=True)',
-        foreign: `models.ForeignKey('self', on_delete=models.CASCADE, null=True)`,
+        foreign: 'models.ForeignKey(\'self\', on_delete=models.CASCADE, null=True)',
         json: 'models.JSONField(default=dict)'
       };
       return `    ${f.name} = ${fieldTypes[f.type] || fieldTypes.string}${f.null ? ', null=True' : ''}${f.unique ? ', unique=True' : ''}`;
@@ -503,7 +503,7 @@ async def ${name}_endpoint(${responseModel ? `request: ${name}Request` : ''}):
 
   generateGoFunction(name, { args = [], returnType = 'error', packageName = 'main' } = {}) {
     const argStr = args.map(a => `${a.name} ${a.type}`).join(', ');
-    
+
     return `package ${packageName}
 
 func ${name}(${argStr}) ${returnType.includes('(') ? returnType : '(' + returnType + ')' } {
@@ -570,7 +570,7 @@ describe('${name}', () => {
   });
 });`;
       }
-      
+
       return `describe('${name}', () => {
   beforeEach(() => {
     // Setup
@@ -585,7 +585,7 @@ describe('${name}', () => {
   });
 });`;
     }
-    
+
     // Pytest
     return `import pytest
 from ${name.lowerCase().replace('test_', '')} import ${name}

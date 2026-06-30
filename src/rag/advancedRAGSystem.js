@@ -90,29 +90,29 @@ export class AdvancedRAGSystem {
     console.log(`🔍 Query: "${question}" [Strategy: ${strategy}]`);
 
     switch (strategy) {
-      case 'self-rag':
-        return await this.selfRAG(question, options);
+    case 'self-rag':
+      return await this.selfRAG(question, options);
 
-      case 'crag':
-        return await this.correctiveRAG(question, options);
+    case 'crag':
+      return await this.correctiveRAG(question, options);
 
-      case 'graph':
-        return await this.graphRAG(question, options);
+    case 'graph':
+      return await this.graphRAG(question, options);
 
-      case 'iterative':
-        return await this.iterativeRAG(question, options);
+    case 'iterative':
+      return await this.iterativeRAG(question, options);
 
-      case 'hyde':
-        return await this.hydeRAG(question, options);
+    case 'hyde':
+      return await this.hydeRAG(question, options);
 
-      case 'agentic':
-        return await this.agenticRAG(question, options);
+    case 'agentic':
+      return await this.agenticRAG(question, options);
 
-      case 'adaptive':
-        return await this.adaptiveRAG(question, options);
+    case 'adaptive':
+      return await this.adaptiveRAG(question, options);
 
-      default:
-        return await this.simpleRAG(question, options);
+    default:
+      return await this.simpleRAG(question, options);
     }
   }
 
@@ -284,7 +284,7 @@ export class AdvancedRAGSystem {
    */
   async iterativeRAG(question, _options = {}) {
     let currentQuestion = question;
-    let accumulatedContext = [];
+    const accumulatedContext = [];
     let answer = '';
     const iterations = [];
 
@@ -416,7 +416,7 @@ export class AdvancedRAGSystem {
     }
 
     console.log(`🎯 Adaptive RAG selected strategy: ${strategy}`);
-    console.log(`📊 Complexity analysis:`, complexity);
+    console.log('📊 Complexity analysis:', complexity);
 
     // Step 3: Execute selected strategy
     return await this.query(question, { ...options, strategy });
@@ -445,7 +445,7 @@ export class AdvancedRAGSystem {
 
     // Dense retrieval (vector similarity)
     const queryEmbedding = await this.embed(question + ' ' + previousContext);
-    let denseResults = await this.vectorDB.query('code', queryEmbedding, topK * 2);
+    const denseResults = await this.vectorDB.query('code', queryEmbedding, topK * 2);
 
     // Sparse retrieval (BM25-like keyword search)
     const sparseResults = await this.keywordSearch(question, topK);

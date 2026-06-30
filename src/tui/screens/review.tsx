@@ -8,7 +8,16 @@ import { UserMessage, BotMessage, ErrorMessage } from '../components/messages/in
 import { InputBar } from '../components/input-bar.js';
 import { getGitDiff, getChangedFiles, buildReviewPrompt } from '../lib/security-reviewer.js';
 
-type FocusPanel = 'files' | 'review';
+type FocusPanel = 'files' | 'cohorts' | 'review';
+
+type CohortInfo = {
+  name: string;
+  description: string;
+  files: string[];
+  fileCount: number;
+  insertions: number;
+  deletions: number;
+};
 
 function FileEntry({ file, selected, colors }: { file: string; selected: boolean; colors: Record<string, string> }) {
   const ext = file.split('.').pop() || '';
@@ -49,6 +58,8 @@ export function Review() {
   const [focusedPanel, setFocusedPanel] = useState<FocusPanel>('review');
   const [changedFiles, setChangedFiles] = useState<string[]>([]);
   const [selectedFileIdx, setSelectedFileIdx] = useState(0);
+  const [cohorts, setCohorts] = useState<CohortInfo[]>([]);
+  const [selectedCohortIdx, setSelectedCohortIdx] = useState(0);
   const [reviewStarted, setReviewStarted] = useState(false);
   const [criticalCount, setCriticalCount] = useState(0);
   const [highCount, setHighCount] = useState(0);
@@ -57,11 +68,33 @@ export function Review() {
   const reviewTriggeredRef = useRef(false);
 
   const { messages, loading, mode, toggleMode, submit, status, model } = useAgentChat({ initialMode: 'REVIEW' });
+  const submitRef = useRef(submit);
+  submitRef.current = submit;
   const isLoading = loading || status === 'streaming';
 
   useEffect(() => {
     const files = getChangedFiles();
     setChangedFiles(files.length > 0 ? files : ['(no changes detected)']);
+    // Classify files into cohorts for navigation
+    const cohortMap: Record<string, CohortInfo> = {
+      'Foundation': { name: 'Foundation', description: 'Models, types, configs', files: [], fileCount: 0, insertions: 0, deletions: 0 },
+      'API': { name: 'API', description: 'Routes, controllers', files: [], fileCount: 0, insertions: 0, deletions: 0 },
+      'UI': { name: 'UI', description: 'Components, views', files: [], fileCount: 0, insertions: 0, deletions: 0 },
+      'Tests': { name: 'Tests', description: 'Test files', files: [], fileCount: 0, insertions: 0, deletions: 0 },
+      'Config': { name: 'Config', description: 'Config, CI/CD', files: [], fileCount: 0, insertions: 0, deletions: 0 },
+      'Other': { name: 'Other', description: 'Other changes', files: [], fileCount: 0, insertions: 0, deletions: 0 },
+    };
+    for (const file of files) {
+      const p = file.toLowerCase();
+      if (/(test|spec|__tests__)/.test(p)) cohortMap['Tests'].files.push(file);
+      else if (/(route|controller|api|handler|middleware)/.test(p)) cohortMap['API'].files.push(file);
+      else if (/(component|view|page|screen|\.tsx|\.jsx|\.vue)/.test(p)) cohortMap['UI'].files.push(file);
+      else if (/(config|\.env|\.yaml|\.yml|dockerfile|ci)/.test(p)) cohortMap['Config'].files.push(file);
+      else if (/(model|schema|type|interface|entity|migration)/.test(p)) cohortMap['Foundation'].files.push(file);
+      else cohortMap['Other'].files.push(file);
+    }
+    const activeCohorts = Object.values(cohortMap).filter(c => c.files.length > 0).map(c => ({ ...c, fileCount: c.files.length }));
+    setCohorts(activeCohorts);
   }, []);
 
   useEffect(() => {
@@ -73,8 +106,8 @@ export function Review() {
     setChangedFiles(files.length > 0 ? files : ['(no staged changes)']);
     const prompt = buildReviewPrompt(diff, { files, focus: 'all' });
     setReviewStarted(true);
-    submit(prompt);
-  }, [submit]);
+    submitRef.current(prompt);
+  }, []);
 
   useEffect(() => {
     const lastAssistant = [...messages].reverse().find(m => m.role === 'assistant');
@@ -96,8 +129,8 @@ export function Review() {
     const diff = getGitDiff();
     if (!diff) return;
     setChangedFiles(files.length > 0 ? files : ['(no staged changes)']);
-    submit(buildReviewPrompt(diff, { files, focus: 'all' }));
-  }, [submit]);
+    submitRef.current(buildReviewPrompt(diff, { files, focus: 'all' }));
+  }, []);
 
   const runFileReview = useCallback((file: string) => {
     if (file === '(no changes detected)' || file === '(no staged changes)') return;
@@ -108,12 +141,25 @@ export function Review() {
 
   useInput((input, key) => {
     if (input === 'q' && !key.ctrl && !key.shift) { navigate('/'); return; }
-    if (key.tab) { setFocusedPanel(p => p === 'files' ? 'review' : 'files'); return; }
+    if (key.tab) { setFocusedPanel(p => p === 'files' ? 'cohorts' : p === 'cohorts' ? 'review' : 'files'); return; }
     if (key.ctrl && input === 'r') { runReview(); return; }
     if (focusedPanel === 'files') {
       if (key.upArrow) { setSelectedFileIdx(i => Math.max(0, i - 1)); return; }
       if (key.downArrow) { setSelectedFileIdx(i => Math.min(changedFiles.length - 1, i + 1)); return; }
       if (key.return) { const file = changedFiles[selectedFileIdx]; if (file) runFileReview(file); return; }
+    }
+    if (focusedPanel === 'cohorts') {
+      if (key.upArrow) { setSelectedCohortIdx(i => Math.max(0, i - 1)); return; }
+      if (key.downArrow) { setSelectedCohortIdx(i => Math.min(cohorts.length - 1, i + 1)); return; }
+      if (key.return) {
+        const cohort = cohorts[selectedCohortIdx];
+        if (cohort && cohort.files.length > 0) {
+          setChangedFiles(cohort.files);
+          setSelectedFileIdx(0);
+          setFocusedPanel('files');
+        }
+        return;
+      }
     }
   });
 
@@ -130,6 +176,37 @@ export function Review() {
 
       {/* Main content */}
       <Box flexDirection="row" flexGrow={1}>
+        {/* Cohorts panel */}
+        {cohorts.length > 0 && (
+          <Box
+            flexDirection="column"
+            width={24}
+            borderStyle="single"
+            borderColor={focusedPanel === 'cohorts' ? colors.primary : colors.dimSeparator}
+            flexShrink={0}
+          >
+            <Box paddingX={1} borderStyle="single" borderColor={colors.dimSeparator}>
+              <Text bold color={colors.primary}>{'Cohorts'}</Text>
+            </Box>
+            <Box flexDirection="column" flexGrow={1} paddingY={1}>
+              {cohorts.map((cohort, idx) => (
+                <Box key={cohort.name} flexDirection="row" paddingX={1}>
+                  <Text color={idx === selectedCohortIdx && focusedPanel === 'cohorts' ? colors.primary : colors.dimSeparator}>
+                    {idx === selectedCohortIdx && focusedPanel === 'cohorts' ? '▶ ' : '  '}
+                  </Text>
+                  <Text bold={idx === selectedCohortIdx && focusedPanel === 'cohorts'} color={colors.primary}>
+                    {cohort.name}
+                  </Text>
+                  <Text dimColor>{` (${cohort.fileCount})`}</Text>
+                </Box>
+              ))}
+            </Box>
+            <Box borderStyle="single" borderColor={colors.dimSeparator} paddingX={1}>
+              <Text dimColor>{'↑↓ navigate  Enter select'}</Text>
+            </Box>
+          </Box>
+        )}
+
         {/* Files panel */}
         <Box
           flexDirection="column"

@@ -5,7 +5,7 @@ import { execSync } from 'child_process';
 
 export async function analyzePython(code, filePath = null) {
   const issues = [];
-  
+
   // Comprehensive heuristic checks
   const checks = [
     { type: 'SecurityRisk', message: 'Usage of eval()', re: /eval\s*\(/, severity: 'critical' },
@@ -23,7 +23,7 @@ export async function analyzePython(code, filePath = null) {
     { type: 'BestPractice', message: 'Using == for None comparison', re: /==\s*None/, severity: 'low' },
     { type: 'Performance', message: 'Using + for string concatenation in loop', re: /for\s+\w+\s+in\s+.*:\s*\n\s*\w+\s*\+=/, severity: 'medium' },
   ];
-  
+
   const lines = code.split('\n');
   for (const c of checks) {
     const matches = code.matchAll(new RegExp(c.re, 'g'));
@@ -32,7 +32,7 @@ export async function analyzePython(code, filePath = null) {
       issues.push({ type: c.type, message: c.message, file: filePath, line: lineNum, snippet: lines[lineNum - 1]?.trim(), severity: c.severity });
     }
   }
-  
+
   return issues;
 }
 

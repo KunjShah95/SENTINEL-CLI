@@ -224,6 +224,25 @@ export function parseReviewResponse(text: string, files: string[] = []): ParsedR
   };
 }
 
+/**
+ * Get vulnerability database context for enriching review prompts.
+ * Uses the VulnerabilityDatabase to find relevant security patterns.
+ */
+export async function getVulnerabilityContext(
+  files: string[] = [],
+  languages: string[] = []
+): Promise<string> {
+  try {
+    const { VulnerabilityDatabase } = await import('../../security/vulnerability-db/index.js');
+    const vdb = new VulnerabilityDatabase();
+    await vdb.initialize();
+    const context = await vdb.getReviewContext({ files, languages });
+    return context;
+  } catch {
+    return '';
+  }
+}
+
 // Get severity color key for theme
 export function getSeverityColorKey(sev: ReviewSeverity): keyof ThemeColors {
   switch (sev) {

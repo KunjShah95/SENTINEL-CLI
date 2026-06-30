@@ -7,13 +7,13 @@
  * contracts line up.
  */
 
-import { Mode, isMode } from "./mode.js";
+import { Mode, isMode } from './mode.js';
 
 function makeValidator(check) {
   const v = (input) => {
     const result = check(input);
     if (!result.ok) {
-      const err = new Error(result.error || "Invalid value");
+      const err = new Error(result.error || 'Invalid value');
       err.issues = result.issues || [{ message: result.error }];
       throw err;
     }
@@ -50,7 +50,7 @@ function chain(baseValidator) {
       makeValidator((v) => {
         if (v === undefined) return { ok: true };
         baseValidator(v);
-        const len = typeof v === "string" ? v.length : Array.isArray(v) ? v.length : 0;
+        const len = typeof v === 'string' ? v.length : Array.isArray(v) ? v.length : 0;
         if (len < n) {
           return { ok: false, error: message || `Must be at least ${n} (got ${len})` };
         }
@@ -79,7 +79,7 @@ function chain(baseValidator) {
 function string() {
   return chain(
     makeValidator((v) => {
-      if (typeof v !== "string") return { ok: false, error: "Must be a string" };
+      if (typeof v !== 'string') return { ok: false, error: 'Must be a string' };
       return { ok: true };
     })
   );
@@ -88,8 +88,8 @@ function string() {
 function number() {
   return chain(
     makeValidator((v) => {
-      if (typeof v !== "number" || !Number.isFinite(v)) {
-        return { ok: false, error: "Must be a number" };
+      if (typeof v !== 'number' || !Number.isFinite(v)) {
+        return { ok: false, error: 'Must be a number' };
       }
       return { ok: true };
     })
@@ -99,7 +99,7 @@ function number() {
 function integer() {
   return chain(
     makeValidator((v) => {
-      if (!Number.isInteger(v)) return { ok: false, error: "Must be an integer" };
+      if (!Number.isInteger(v)) return { ok: false, error: 'Must be an integer' };
       return { ok: true };
     })
   );
@@ -108,7 +108,7 @@ function integer() {
 function array(item) {
   return chain(
     makeValidator((v) => {
-      if (!Array.isArray(v)) return { ok: false, error: "Must be an array" };
+      if (!Array.isArray(v)) return { ok: false, error: 'Must be an array' };
       for (let i = 0; i < v.length; i++) {
         try {
           item(v[i]);
@@ -124,8 +124,8 @@ function array(item) {
 function object(shape) {
   return chain(
     makeValidator((v) => {
-      if (typeof v !== "object" || v === null || Array.isArray(v)) {
-        return { ok: false, error: "Must be an object" };
+      if (typeof v !== 'object' || v === null || Array.isArray(v)) {
+        return { ok: false, error: 'Must be an object' };
       }
       for (const key of Object.keys(shape)) {
         try {
@@ -143,7 +143,7 @@ function enumValues(values) {
   return chain(
     makeValidator((v) => {
       if (!Array.isArray(values) || !values.includes(v)) {
-        return { ok: false, error: `Must be one of: ${values.join(", ")}` };
+        return { ok: false, error: `Must be one of: ${values.join(', ')}` };
       }
       return { ok: true };
     })
@@ -163,14 +163,14 @@ const { z: zz } = { z };
 export { zz as zod };
 
 export const createSessionSchema = z.object({
-  title: z.string().refine((v) => typeof v === "string" && v.length > 0, "title is required"),
+  title: z.string().refine((v) => typeof v === 'string' && v.length > 0, 'title is required'),
 });
 
-export const modeValidator = z.enum([Mode.BUILD, Mode.PLAN], "mode must be BUILD or PLAN");
+export const modeValidator = z.enum([Mode.BUILD, Mode.PLAN], 'mode must be BUILD or PLAN');
 
 export const submitSchema = z.object({
   id: z.string(),
-  messages: z.array(z.object({}), "messages must be an array").refine((arr) => arr.length > 0, "messages must not be empty"),
+  messages: z.array(z.object({}), 'messages must be an array').refine((arr) => arr.length > 0, 'messages must not be empty'),
   mode: modeValidator,
   model: z.string(),
 });

@@ -1,0 +1,72 @@
+{
+  "patterns": [
+    {
+      "id": "SEC-001",
+      "category": "Injection",
+      "title": "SQL Injection",
+      "type": "OWASP-03",
+      "description": "Unsanitized user input passed directly into a database query",
+      "symptoms": ["concatenated strings in query", "lack of parameterized queries", "raw string interpolation in SQL"],
+      "examples": [
+        "db.query(`SELECT * FROM users WHERE id = ${userId}`)",
+        "connection.execute('SELECT * FROM table WHERE x = ' + input)"
+      ],
+      "remediation": "Use parameterized queries or an ORM with safe defaults.",
+      "severity": "Critical"
+    },
+    {
+      "id": "SEC-002",
+      "category": "Broken Access Control",
+      "title": "Insecure Direct Object Reference (IDOR)",
+      "type": "OWASP-01",
+      "description": "Exposing internal object identifiers allows unauthorized access to other users' data",
+      "symptoms": ["using IDs directly from request params without auth checks", "fetching records by ID without checking ownership"],
+      "examples": [
+        "const user = await db.users.findUnique({ where: { id: req.params.id } })"
+      ],
+      "remediation": "Always verify that the authenticated user has permission to access the requested resource.",
+      "severity": "High"
+    },
+    {
+      "id": "SEC-003",
+      "category": "Cryptographic Failures",
+      "title": "Hardcoded Secrets",
+      "type": "CWE-798",
+      "description": "API keys, passwords, or secrets stored in plain text in source code",
+      "symptoms": ["strings like 'sk-ant-', 'AIza', 'SECRET_KEY' in source", "hardcoded passwords"],
+      "examples": [
+        "const API_KEY = 'sk-1234567890';",
+        "const secret = 'my-super-secret-password';"
+      ],
+      "remediation": "Move secrets to environment variables or a secure vault (Azure Key Vault, AWS Secrets Manager).",
+      "severity": "Critical"
+    },
+    {
+      "id": "SEC-004",
+      "category": "Cross-Site Scripting (XSS)",
+      "title": "Unsanitized HTML Injection",
+      "type": "OWASP-03",
+      "description": "Allowing untrusted input to be rendered as HTML in the browser",
+      "symptoms": ["dangerouslySetInnerHTML", "innerHTML", "document.write()"],
+      "examples": [
+        "element.innerHTML = userProvidedString;",
+        "<div dangerouslySetInnerHTML={{ __html: userInput }} />"
+      ],
+      "remediation": "Sanitize user input using a library like DOMPurify or use secure alternatives like textContent.",
+      "severity": "High"
+    },
+    {
+      "id": "SEC-005",
+      "category": "Authentication",
+      "title": "Weak Password Hashing",
+      "type": "CWE-916",
+      "description": "Using obsolete or weak hashing algorithms for passwords",
+      "symptoms": ["md5", "sha1", "plain text passwords"],
+      "examples": [
+        "const hash = crypto.createHash('md5').update(pwd).digest('hex')"
+      ],
+      "remediation": "Use argon2 or bcrypt with a strong salt.",
+      "severity": "High"
+    }
+  ]
+}

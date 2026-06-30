@@ -1,11 +1,4 @@
 #!/usr/bin/env node
-/**
- * Quick smoke-test for the Sentinel MCP server.
- * Sends a few JSON-RPC messages over stdio and checks the responses.
- *
- * Run with: node test-mcp.js
- */
-
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -23,14 +16,12 @@ const results = [];
 server.stdout.on("data", (chunk) => {
   buffer += chunk.toString();
   const lines = buffer.split("\n");
-  buffer = lines.pop(); // keep incomplete line
+  buffer = lines.pop();
   for (const line of lines) {
     if (line.trim()) {
       try {
         results.push(JSON.parse(line));
-      } catch {
-        // not JSON, ignore
-      }
+      } catch { }
     }
   }
 });
@@ -41,7 +32,6 @@ function send(msg) {
   server.stdin.write(JSON.stringify(msg) + "\n");
 }
 
-// 1. Initialize
 send({
   jsonrpc: "2.0",
   id: 1,
@@ -53,34 +43,37 @@ send({
   },
 });
 
-// 2. List tools
 setTimeout(() => {
   send({ jsonrpc: "2.0", id: 2, method: "tools/list", params: {} });
 }, 200);
 
-// 3. Call sentinel_review_code on a snippet with an obvious SQL injection
 setTimeout(() => {
   send({
     jsonrpc: "2.0",
     id: 3,
     method: "tools/call",
     params: {
-      name: "sentinel_review_code",
-      arguments: {
-        code: `
-async function getUser(id) {
-  const query = "SELECT * FROM users WHERE id = " + id;
-  return db.execute(query);
-}
-const password = "admin123";
-        `.trim(),
-        language: "javascript",
-      },
+      name: "sentinel_health",
+      arguments: {},
     },
   });
 }, 400);
 
-// 4. Print results and exit
+setTimeout(() => {
+  send({
+    jsonrpc: "2.0",
+    id: 4,
+    method: "tools/call",
+    params: {
+      name: "sentinel_review_diff",
+      arguments: {
+        diff: `diff --git a/test.js b/test.js\nindex 0000000..0000000 100644\n--- a/test.js\n+++ b/test.js\n@@ -1,3 +1,3 @@\n function getUser(id) {\n-  return "Hello " + name;\n+  return "Hello " + name;\n }`,
+        files: ["test.js"],
+      },
+    },
+  });
+}, 600);
+
 setTimeout(() => {
   console.log("\n=== MCP Server Test Results ===\n");
   for (const r of results) {
@@ -93,9 +86,17 @@ setTimeout(() => {
       tools.forEach((t) => console.log(`  - ${t.name}`));
     }
     if (r.id === 3) {
-      console.log("\n✓ Code review response:");
-      const text = r.result?.content?.[0]?.text ?? JSON.stringify(r.result);
-      console.log(text.split("\n").map((l) => "  " + l).join("\n"));
+      const text = r.result?.content?.[0]?.text ?? JSON.stringify(r.error);
+      const parsed = JSON.parse(text);
+      console.log(`✓ sentinel_health: status=${parsed.status}, providers=${parsed.availableCount}`);
+    }
+    if (r.id === 4) {
+      if (r.error) {
+        console.log(`✗ sentinel_review_diff error: ${r.error.message}`);
+      } else {
+        const text = r.result?.content?.[0]?.text ?? '';
+        console.log(`✓ sentinel_review_diff returned ${text.length} chars`);
+      }
     }
   }
   server.kill();

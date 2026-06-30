@@ -1,10 +1,10 @@
 /**
  * ANOMALY DETECTION ENGINE
- * 
- * Inspired by DeepMind's research on anomaly detection and Andrew Ng's 
+ *
+ * Inspired by DeepMind's research on anomaly detection and Andrew Ng's
  * practical ML applications. Uses statistical and ML methods to detect
  * unusual patterns in code and security findings.
- * 
+ *
  * Key Features:
  * - Isolation Forest for outlier detection
  * - Statistical anomaly detection
@@ -118,21 +118,21 @@ export class AnomalyDetectionEngine extends EventEmitter {
    */
   async train(data) {
     const startTime = Date.now();
-    
+
     // Convert data to feature vectors
     const featureVectors = data.map(item => this._extractFeatures(item));
-    
+
     // Train Isolation Forest
     this._trainIsolationForest(featureVectors);
-    
+
     // Calculate statistical properties
     this._calculateStatistics(featureVectors);
-    
+
     // Build profiles
     this._buildProfiles(data);
-    
+
     const trainingTime = Date.now() - startTime;
-    
+
     this.emit('model:trained', {
       trainingTime,
       dataSize: data.length,
@@ -151,23 +151,23 @@ export class AnomalyDetectionEngine extends EventEmitter {
    */
   _extractFeatures(item) {
     const features = [];
-    
+
     // Numerical features
     features.push(item.confidence || 0.5);
     features.push(item.severityScore || 0.5);
     features.push(item.fileComplexity || 0);
     features.push(item.ruleFrequency || 0);
     features.push(item.userActivity || 0);
-    
+
     // Categorical features (encoded)
     features.push(this._encodeSeverity(item.severity));
     features.push(this._encodeCategory(item.category));
     features.push(this._encodeLanguage(item.language));
-    
+
     // Contextual features
     features.push(item.timeOfDay || 12);
     features.push(item.dayOfWeek || 1);
-    
+
     return features;
   }
 
@@ -183,12 +183,12 @@ export class AnomalyDetectionEngine extends EventEmitter {
    * Encode category to numerical
    */
   _encodeCategory(category) {
-    const map = { 
-      security: 1, 
-      performance: 0.8, 
-      reliability: 0.6, 
-      maintainability: 0.4, 
-      accessibility: 0.2 
+    const map = {
+      security: 1,
+      performance: 0.8,
+      reliability: 0.6,
+      maintainability: 0.4,
+      accessibility: 0.2
     };
     return map[category] || 0.5;
   }
@@ -216,21 +216,21 @@ export class AnomalyDetectionEngine extends EventEmitter {
   _trainIsolationForest(data) {
     const { nEstimators, maxSamples } = this.options;
     const sampleSize = Math.min(maxSamples, data.length);
-    
+
     this.models.isolationForest.trees = [];
-    
+
     for (let i = 0; i < nEstimators; i++) {
       // Random subsample
       const sample = [];
       for (let j = 0; j < sampleSize; j++) {
         sample.push(data[Math.floor(Math.random() * data.length)]);
       }
-      
+
       // Build a random tree
       const tree = this._buildRandomTree(sample, 0, Math.ceil(Math.log2(sampleSize)));
       this.models.isolationForest.trees.push(tree);
     }
-    
+
     this.models.isolationForest.trained = true;
   }
 
@@ -245,10 +245,10 @@ export class AnomalyDetectionEngine extends EventEmitter {
     // Random split
     const featureIndex = Math.floor(Math.random() * data[0].length);
     const splitValue = Math.random();
-    
+
     const left = data.filter(d => d[featureIndex] < splitValue);
     const right = data.filter(d => d[featureIndex] >= splitValue);
-    
+
     return {
       type: 'node',
       featureIndex,
@@ -265,7 +265,7 @@ export class AnomalyDetectionEngine extends EventEmitter {
     if (tree.type === 'leaf') {
       return depth + this._c(tree.size);
     }
-    
+
     if (sample[tree.featureIndex] < tree.splitValue) {
       return this._pathLength(sample, tree.left, depth + 1);
     } else {
@@ -286,18 +286,18 @@ export class AnomalyDetectionEngine extends EventEmitter {
    */
   _calculateStatistics(data) {
     const numFeatures = data[0]?.length || 0;
-    
+
     for (let i = 0; i < numFeatures; i++) {
       const values = data.map(d => d[i]).filter(v => v !== undefined);
-      
+
       // Mean
       this.models.statistical.mean[i] = values.reduce((a, b) => a + b, 0) / values.length;
-      
+
       // Standard deviation
       const mean = this.models.statistical.mean[i];
       const variance = values.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / values.length;
       this.models.statistical.std[i] = Math.sqrt(variance);
-      
+
       // Quartiles
       const sorted = [...values].sort((a, b) => a - b);
       this.models.statistical.quartiles[i] = {
@@ -316,7 +316,7 @@ export class AnomalyDetectionEngine extends EventEmitter {
     const groupedByUser = {};
     const groupedByFile = {};
     const groupedByRule = {};
-    
+
     for (const item of data) {
       if (item.userId) {
         if (!groupedByUser[item.userId]) {
@@ -324,14 +324,14 @@ export class AnomalyDetectionEngine extends EventEmitter {
         }
         groupedByUser[item.userId].push(item);
       }
-      
+
       if (item.filePath) {
         if (!groupedByFile[item.filePath]) {
           groupedByFile[item.filePath] = [];
         }
         groupedByFile[item.filePath].push(item);
       }
-      
+
       if (item.ruleId) {
         if (!groupedByRule[item.ruleId]) {
           groupedByRule[item.ruleId] = [];
@@ -339,16 +339,16 @@ export class AnomalyDetectionEngine extends EventEmitter {
         groupedByRule[item.ruleId].push(item);
       }
     }
-    
+
     // Store profiles
     for (const [userId, items] of Object.entries(groupedByUser)) {
       this.models.profile.userProfiles.set(userId, this._createProfile(items));
     }
-    
+
     for (const [filePath, items] of Object.entries(groupedByFile)) {
       this.models.profile.fileProfiles.set(filePath, this._createProfile(items));
     }
-    
+
     for (const [ruleId, items] of Object.entries(groupedByRule)) {
       this.models.profile.ruleProfiles.set(ruleId, this._createProfile(items));
     }
@@ -388,15 +388,15 @@ export class AnomalyDetectionEngine extends EventEmitter {
     }
 
     const results = [];
-    
+
     for (const item of data) {
       const features = this._extractFeatures(item);
-      
+
       // Run all detection methods
       const isolationScore = this._detectIsolationForest(features);
       const statisticalScore = this._detectStatistical(features);
       const profileScore = this._detectProfile(item);
-      
+
       // Combine scores
       const anomalyScore = (
         isolationScore * 0.4 +
@@ -420,21 +420,21 @@ export class AnomalyDetectionEngine extends EventEmitter {
           },
           timestamp: Date.now()
         };
-        
+
         results.push(anomaly);
-        
+
         // Store in history
         this._addToHistory(anomaly);
-        
+
         // Emit alert if enabled
         if (this.options.alertOnAnomaly) {
           this._checkAlertRules(anomaly);
         }
       }
     }
-    
+
     this.emit('anomalies:detected', { count: results.length, anomalies: results });
-    
+
     return results;
   }
 
@@ -445,13 +445,13 @@ export class AnomalyDetectionEngine extends EventEmitter {
     const pathLengths = this.models.isolationForest.trees.map(
       tree => this._pathLength(features, tree)
     );
-    
+
     const avgPathLength = pathLengths.reduce((a, b) => a + b, 0) / pathLengths.length;
-    
+
     // Calculate anomaly score
     const c = this._c(this.options.maxSamples);
     const score = Math.pow(2, -avgPathLength / c);
-    
+
     return score;
   }
 
@@ -460,20 +460,20 @@ export class AnomalyDetectionEngine extends EventEmitter {
    */
   _detectStatistical(features) {
     let maxScore = 0;
-    
+
     for (let i = 0; i < features.length; i++) {
       const value = features[i];
       const mean = this.models.statistical.mean[i] || 0;
       const std = this.models.statistical.std[i] || 1;
-      
+
       // Z-score
       const zScore = Math.abs((value - mean) / std);
-      
+
       // Convert to 0-1 score (higher = more anomalous)
       const score = Math.min(1, zScore / 3);
       maxScore = Math.max(maxScore, score);
     }
-    
+
     return maxScore;
   }
 
@@ -482,7 +482,7 @@ export class AnomalyDetectionEngine extends EventEmitter {
    */
   _detectProfile(item) {
     let maxScore = 0;
-    
+
     // Check user profile
     if (item.userId) {
       const profile = this.models.profile.userProfiles.get(item.userId);
@@ -491,7 +491,7 @@ export class AnomalyDetectionEngine extends EventEmitter {
         maxScore = Math.max(maxScore, deviation * 2);
       }
     }
-    
+
     // Check file profile
     if (item.filePath) {
       const profile = this.models.profile.fileProfiles.get(item.filePath);
@@ -499,7 +499,7 @@ export class AnomalyDetectionEngine extends EventEmitter {
         maxScore = Math.max(maxScore, 1 / (profile.count + 1));
       }
     }
-    
+
     // Check rule profile
     if (item.ruleId) {
       const profile = this.models.profile.ruleProfiles.get(item.ruleId);
@@ -507,7 +507,7 @@ export class AnomalyDetectionEngine extends EventEmitter {
         maxScore = Math.max(maxScore, 1 / (profile.count + 1));
       }
     }
-    
+
     return Math.min(1, maxScore);
   }
 
@@ -537,7 +537,7 @@ export class AnomalyDetectionEngine extends EventEmitter {
    */
   _addToHistory(anomaly) {
     this.anomalyHistory.push(anomaly);
-    
+
     if (this.anomalyHistory.length > this.maxHistorySize) {
       this.anomalyHistory = this.anomalyHistory.slice(-this.maxHistorySize);
     }
@@ -578,7 +578,7 @@ export class AnomalyDetectionEngine extends EventEmitter {
       id: `rule-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       createdAt: Date.now()
     });
-    
+
     this.emit('alert_rule:added', rule);
   }
 
@@ -587,14 +587,14 @@ export class AnomalyDetectionEngine extends EventEmitter {
    */
   getStatistics() {
     const recent = this.anomalyHistory.slice(-1000);
-    
+
     return {
       totalAnomalies: this.anomalyHistory.length,
       recentAnomalies: recent.length,
       bySeverity: this._countBySeverity(recent),
       byType: this._countByType(recent),
-      avgScore: recent.length > 0 
-        ? recent.reduce((sum, a) => sum + a.anomalyScore, 0) / recent.length 
+      avgScore: recent.length > 0
+        ? recent.reduce((sum, a) => sum + a.anomalyScore, 0) / recent.length
         : 0,
       trend: this._calculateTrend(recent)
     };
@@ -627,14 +627,14 @@ export class AnomalyDetectionEngine extends EventEmitter {
    */
   _calculateTrend(anomalies) {
     if (anomalies.length < 2) return 'stable';
-    
+
     const half = Math.floor(anomalies.length / 2);
     const firstHalf = anomalies.slice(0, half);
     const secondHalf = anomalies.slice(half);
-    
+
     const firstAvg = firstHalf.reduce((sum, a) => sum + a.anomalyScore, 0) / firstHalf.length;
     const secondAvg = secondHalf.reduce((sum, a) => sum + a.anomalyScore, 0) / secondHalf.length;
-    
+
     if (secondAvg > firstAvg * 1.1) return 'increasing';
     if (secondAvg < firstAvg * 0.9) return 'decreasing';
     return 'stable';

@@ -9,6 +9,7 @@
  */
 
 import { getLLMOrchestrator } from '../llm/llmOrchestrator.js';
+import { LinkedIssueContext } from '../context/linkedIssueContext.js';
 
 export class TaskPlannerAgent {
   constructor(options = {}) {
@@ -18,6 +19,28 @@ export class TaskPlannerAgent {
     this.reasoningThreshold = options.reasoningThreshold || 0.8;
     this.tasks = new Map();
     this.executionHistory = [];
+    this.issueContext = options.issueContext || new LinkedIssueContext(options);
+  }
+
+  /**
+   * Plan from an issue URL — fetches issue details and generates
+   * a codebase-aware implementation plan.
+   */
+  async planFromIssue(issueUrl, repoContext = {}) {
+    const { IssuePlanner } = await import('../planning/issuePlanner.js');
+    const planner = new IssuePlanner({
+      llmClient: this.orchestrator,
+      issueContext: this.issueContext,
+      githubToken: repoContext.githubToken,
+      gitlabToken: repoContext.gitlabToken,
+    });
+
+    const result = await planner.planFromIssue(issueUrl, repoContext);
+    return {
+      success: true,
+      issue: result.issue,
+      plan: result.plan,
+    };
   }
 
   /**
@@ -25,6 +48,18 @@ export class TaskPlannerAgent {
    * Uses ReAct (Reasoning + Acting) pattern
    */
   async decomposeTasks(goal, context = {}) {
+    // Enrich context with linked issue details if available
+    if (context.prTitle || context.prBody) {
+      const issueContext = await this.issueContext.getContextFromPR(
+        context.prTitle || '',
+        context.prBody || '',
+        context
+      );
+      if (issueContext.summary) {
+        context.linkedIssues = issueContext.summary;
+      }
+    }
+
     const reasoning = await this.reasonAboutTask(goal, context);
 
     if (!reasoning.success) {

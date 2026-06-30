@@ -9,13 +9,13 @@
  * server without any TypeScript build step.
  */
 
-import fs from "node:fs";
-import path from "node:path";
-import { URL } from "node:url";
+import fs from 'node:fs';
+import path from 'node:path';
+import { URL } from 'node:url';
 
 const CONFIG_DIR =
-  process.env.SENTINEL_HOME || path.join(process.env.HOME || process.env.USERPROFILE || ".", ".sentinel");
-const AUTH_FILE = path.join(CONFIG_DIR, "auth.json");
+  process.env.SENTINEL_HOME || path.join(process.env.HOME || process.env.USERPROFILE || '.', '.sentinel');
+const AUTH_FILE = path.join(CONFIG_DIR, 'auth.json');
 
 let cachedAuth = null;
 
@@ -23,8 +23,8 @@ export function getAuth() {
   if (cachedAuth) return cachedAuth;
   try {
     if (!fs.existsSync(AUTH_FILE)) return null;
-    const parsed = JSON.parse(fs.readFileSync(AUTH_FILE, "utf-8"));
-    if (typeof parsed?.token === "string") {
+    const parsed = JSON.parse(fs.readFileSync(AUTH_FILE, 'utf-8'));
+    if (typeof parsed?.token === 'string') {
       cachedAuth = { token: parsed.token, userId: parsed.userId };
       return cachedAuth;
     }
@@ -59,7 +59,7 @@ export function clearAuth() {
 async function authedFetch(url, init = {}) {
   const auth = getAuth();
   const headers = new Headers(init.headers || {});
-  if (auth?.token) headers.set("Authorization", `Bearer ${auth.token}`);
+  if (auth?.token) headers.set('Authorization', `Bearer ${auth.token}`);
   const res = await fetch(url, { ...init, headers });
   if (res.status === 401) {
     clearAuth();
@@ -74,7 +74,7 @@ async function authedFetch(url, init = {}) {
 export async function getErrorMessage(response) {
   try {
     const data = await response.clone().json();
-    if (data && typeof data.error === "string") return data.error;
+    if (data && typeof data.error === 'string') return data.error;
   } catch {
     // ignore
   }
@@ -93,11 +93,11 @@ async function sleep(ms) {
  * backoff. Other errors are thrown immediately.
  */
 export async function api(method, path, body) {
-  const base = process.env.SENTINEL_API_URL || process.env.API_URL || "http://localhost:3000";
+  const base = process.env.SENTINEL_API_URL || process.env.API_URL || 'http://localhost:3000';
   const url = new URL(path, base).toString();
   const init = { method };
   if (body !== undefined) {
-    init.headers = { "Content-Type": "application/json" };
+    init.headers = { 'Content-Type': 'application/json' };
     init.body = JSON.stringify(body);
   }
 
@@ -132,7 +132,7 @@ export async function api(method, path, body) {
  * Stream a POST endpoint as raw SSE. Returns an async iterator.
  */
 export async function streamSse(path, body) {
-  const res = await api("POST", path, body);
+  const res = await api('POST', path, body);
   if (!res.ok) {
     const message = await getErrorMessage(res);
     const err = new Error(message);
@@ -141,7 +141,7 @@ export async function streamSse(path, body) {
   }
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
-  let buf = "";
+  let buf = '';
   return (async function* () {
     try {
       for (;;) {
@@ -149,7 +149,7 @@ export async function streamSse(path, body) {
         if (done) break;
         buf += decoder.decode(value, { stream: true });
         let idx;
-        while ((idx = buf.indexOf("\n\n")) !== -1) {
+        while ((idx = buf.indexOf('\n\n')) !== -1) {
           const raw = buf.slice(0, idx);
           buf = buf.slice(idx + 2);
           const event = parseSseFrame(raw);
@@ -171,14 +171,14 @@ export async function streamSse(path, body) {
 }
 
 function parseSseFrame(raw) {
-  let event = "message";
+  let event = 'message';
   const dataLines = [];
-  for (const line of raw.split("\n")) {
-    if (line.startsWith("event: ")) event = line.slice(7).trim();
-    else if (line.startsWith("data: ")) dataLines.push(line.slice(6));
+  for (const line of raw.split('\n')) {
+    if (line.startsWith('event: ')) event = line.slice(7).trim();
+    else if (line.startsWith('data: ')) dataLines.push(line.slice(6));
   }
   if (dataLines.length === 0) return null;
-  const dataStr = dataLines.join("\n");
+  const dataStr = dataLines.join('\n');
   let data;
   try {
     data = JSON.parse(dataStr);
@@ -192,20 +192,20 @@ function parseSseFrame(raw) {
  * Convenience wrappers.
  */
 export const Sessions = {
-  list: () => api("GET", "/sessions"),
-  get: (id) => api("GET", `/sessions/${id}`),
-  create: (body) => api("POST", "/sessions", body),
-  delete: (id) => api("DELETE", `/sessions/${id}`),
+  list: () => api('GET', '/sessions'),
+  get: (id) => api('GET', `/sessions/${id}`),
+  create: (body) => api('POST', '/sessions', body),
+  delete: (id) => api('DELETE', `/sessions/${id}`),
 };
 
 export const Billing = {
-  checkout: () => api("POST", "/billing/checkout"),
-  portal: () => api("POST", "/billing/portal"),
+  checkout: () => api('POST', '/billing/checkout'),
+  portal: () => api('POST', '/billing/portal'),
 };
 
 export const Auth = {
-  devLogin: (userId) => api("POST", "/auth/dev-login", { userId }),
-  devLogout: (token) => api("POST", "/auth/dev-logout", { token }),
+  devLogin: (userId) => api('POST', '/auth/dev-login', { userId }),
+  devLogout: (token) => api('POST', '/auth/dev-logout', { token }),
 };
 
 export { authedFetch as fetch };

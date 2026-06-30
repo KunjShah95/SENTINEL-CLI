@@ -31,6 +31,7 @@ const sentinelCmds: Record<string, string[]> = {
   'best-practices': ['best-practices'],
   'multi-file': ['multi-file'],
   config: ['config'],
+  connect: ['connect'],
   cache: ['cache'],
   validate: ['validate'],
   parallel: ['parallel'],
@@ -423,6 +424,42 @@ export const COMMAND_HANDLERS: Record<string, CommandHandler> = {
       return out;
     },
   },
+  connect: {
+    description: 'Connect your existing AI subscriptions (Copilot, ChatGPT, Claude)',
+    handler: async () => {
+      const lines = [
+        'Connect your existing subscriptions to use them in Sentinel:',
+        '',
+        '── GitHub Copilot ──────────────────────────────────────────',
+        '  Set env: GITHUB_TOKEN=<your-github-token>',
+        '  Or set:  GITHUB_COPILOT_TOKEN=<your-copilot-token>',
+        '  Models:  /model copilot/gpt-4o, /model copilot/claude-sonnet',
+        '  Get token: https://github.com/settings/tokens',
+        '',
+        '── ChatGPT (OpenAI) ────────────────────────────────────────',
+        '  ChatGPT Plus/Pro users get API credits included.',
+        '  Set env: OPENAI_API_KEY=sk-...',
+        '  Or use:  /auth set openai <your-key>',
+        '  Get key: https://platform.openai.com/api-keys',
+        '',
+        '── Claude (Anthropic) ──────────────────────────────────────',
+        '  Claude Pro/Max/Team users get API credits included.',
+        '  Set env: ANTHROPIC_API_KEY=sk-ant-...',
+        '  Or use:  /auth set anthropic <your-key>',
+        '  Get key: https://console.anthropic.com/settings/keys',
+        '',
+        '── Free open-source (default) ─────────────────────────────',
+        '  Groq:   Free Llama 3 / Gemma / Qwen models (set GROQ_API_KEY)',
+        '  Ollama: Fully local, no key needed (install Ollama first)',
+        '  LM Studio: Local OpenAI-compatible server',
+        '',
+        'Default model is llama-3.1-8b-instant (Groq free tier).',
+        'Run /models to see all available providers.',
+        'Run /auth to check your current API key status.',
+      ];
+      return lines.join('\n');
+    },
+  },
   models: {
     description: 'Show configured AI providers and installed Ollama models',
     handler: async () => {
@@ -481,7 +518,7 @@ export const COMMAND_HANDLERS: Record<string, CommandHandler> = {
       const model = match[1];
       const prompt = match[2];
       try {
-        const host = 'http://localhost:11434';
+        const host = process.env.OLLAMA_HOST || 'http://localhost:11434';
         const res = await fetch(`${host}/api/chat`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

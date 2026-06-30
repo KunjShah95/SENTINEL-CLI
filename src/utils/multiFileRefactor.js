@@ -352,23 +352,23 @@ export class MultiFileRefactor {
     let template = '';
 
     switch (type) {
-      case 'component':
-        template = this.generateReactComponent(name, properties);
-        break;
-      case 'route':
-        template = this.generateExpressRoute(name, properties);
-        break;
-      case 'model':
-        template = this.generateModel(name, properties);
-        break;
-      case 'function':
-        template = this.generateFunction(name, properties);
-        break;
-      case 'test':
-        template = this.generateTest(name, properties);
-        break;
-      default:
-        template = `// Generated code for ${type}: ${name}\n`;
+    case 'component':
+      template = this.generateReactComponent(name, properties);
+      break;
+    case 'route':
+      template = this.generateExpressRoute(name, properties);
+      break;
+    case 'model':
+      template = this.generateModel(name, properties);
+      break;
+    case 'function':
+      template = this.generateFunction(name, properties);
+      break;
+    case 'test':
+      template = this.generateTest(name, properties);
+      break;
+    default:
+      template = `// Generated code for ${type}: ${name}\n`;
     }
 
     return { success: true, code: template, spec };

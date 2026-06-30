@@ -52,7 +52,7 @@ export class MultiAgentOrchestrator {
    * ORCHESTRATE - Main entry point
    */
   async orchestrate(question, vectorDB, options = {}) {
-    console.log(`🤖 Orchestrating agents for query...`);
+    console.log('🤖 Orchestrating agents for query...');
 
     // Step 1: Analyze question and select agents
     const selectedAgents = await this.selectAgents(question);

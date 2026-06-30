@@ -197,13 +197,13 @@ export class VueAnalyzer extends BaseAnalyzer {
   }
 
   shouldAnalyzeFile(filePath) {
-    return filePath.endsWith('.vue') || 
+    return filePath.endsWith('.vue') ||
            (filePath.endsWith('.js') && filePath.includes('vue'));
   }
 
   async analyze(files, context) {
     this.issues = [];
-    
+
     for (const file of files) {
       if (this.shouldAnalyzeFile(file.path)) {
         try {

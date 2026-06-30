@@ -3,10 +3,10 @@
  * operations the Hono routes need.
  */
 
-import { randomUUID } from "node:crypto";
-import { getDatabase } from "./adapter.js";
+import { randomUUID } from 'node:crypto';
+import { getDatabase } from './adapter.js';
 
-export async function createSession({ userId, title, mode = "BUILD", model, projectPath }) {
+export async function createSession({ userId, title, mode = 'BUILD', model, projectPath }) {
   const db = await getDatabase();
   const now = new Date();
   return await db.createSession({
@@ -14,10 +14,10 @@ export async function createSession({ userId, title, mode = "BUILD", model, proj
     userId,
     title,
     mode,
-    model: model || "claude-sonnet-4-6",
+    model: model || 'claude-sonnet-4-6',
     projectPath: projectPath || null,
     messages: [],
-    status: "active",
+    status: 'active',
     createdAt: now,
     updatedAt: now,
   });
@@ -57,7 +57,7 @@ export async function deleteSession({ id, userId }) {
 
 export async function recordCredit({ userId, sessionId, credits, provider, model }) {
   const db = await getDatabase();
-  if (typeof db.recordCreditEvent === "function") {
+  if (typeof db.recordCreditEvent === 'function') {
     return await db.recordCreditEvent({
       id: randomUUID(),
       userId,
@@ -73,7 +73,7 @@ export async function recordCredit({ userId, sessionId, credits, provider, model
 
 export async function getUsedCredits({ userId }) {
   const db = await getDatabase();
-  if (typeof db.getUsedCredits === "function") {
+  if (typeof db.getUsedCredits === 'function') {
     return await db.getUsedCredits(userId);
   }
   return 0;

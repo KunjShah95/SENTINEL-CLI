@@ -13,17 +13,17 @@
  * Mirrors packages/database from Nightcode.
  */
 
-import path from "node:path";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { createRequire } from "node:module";
+import path from 'node:path';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 
 let _adapter = null;
 
 const DEFAULT_DB_DIR = path.join(
-  process.env.SENTINEL_HOME || path.join(process.env.HOME || process.env.USERPROFILE || ".", ".sentinel"),
-  "db"
+  process.env.SENTINEL_HOME || path.join(process.env.HOME || process.env.USERPROFILE || '.', '.sentinel'),
+  'db'
 );
 
 /**
@@ -51,7 +51,7 @@ class JsonAdapter {
 
   _read() {
     try {
-      const raw = readFileSync(this.filePath, "utf-8");
+      const raw = readFileSync(this.filePath, 'utf-8');
       return JSON.parse(raw);
     } catch {
       return { sessions: [] };
@@ -103,17 +103,17 @@ class JsonAdapter {
   }
 
   backend() {
-    return "json";
+    return 'json';
   }
 }
 
 class SqliteAdapter {
   constructor(dbPath) {
     // Lazy require so we don't fail if better-sqlite3 isn't installed.
-    const Database = require("better-sqlite3");
+    const Database = require('better-sqlite3');
     mkdirSync(path.dirname(dbPath), { recursive: true });
     this.db = new Database(dbPath);
-    this.db.pragma("journal_mode = WAL");
+    this.db.pragma('journal_mode = WAL');
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS sessions (
         id TEXT PRIMARY KEY,
@@ -144,8 +144,8 @@ class SqliteAdapter {
       INSERT INTO sessions (id, user_id, title, mode, model, project_path, messages, status, created_at, updated_at)
       VALUES (@id, @userId, @title, @mode, @model, @projectPath, @messages, @status, @createdAt, @updatedAt)
     `);
-    this._find = this.db.prepare(`SELECT * FROM sessions WHERE id = ? AND user_id = ?`);
-    this._findAny = this.db.prepare(`SELECT * FROM sessions WHERE id = ?`);
+    this._find = this.db.prepare('SELECT * FROM sessions WHERE id = ? AND user_id = ?');
+    this._findAny = this.db.prepare('SELECT * FROM sessions WHERE id = ?');
     this._list = this.db.prepare(`
       SELECT id, title, created_at as createdAt, mode, model, status
       FROM sessions WHERE user_id = ? ORDER BY created_at DESC
@@ -157,7 +157,7 @@ class SqliteAdapter {
       UPDATE sessions SET title = COALESCE(?, title), status = COALESCE(?, status), updated_at = ?
       WHERE id = ? AND user_id = ?
     `);
-    this._delete = this.db.prepare(`DELETE FROM sessions WHERE id = ? AND user_id = ?`);
+    this._delete = this.db.prepare('DELETE FROM sessions WHERE id = ? AND user_id = ?');
 
     this._insertCreditEvent = this.db.prepare(`
       INSERT INTO credit_events (id, user_id, session_id, credits, provider, model, created_at)
@@ -177,9 +177,9 @@ class SqliteAdapter {
       model: s.model,
       projectPath: s.projectPath || null,
       messages: JSON.stringify(s.messages || []),
-      status: s.status || "active",
-      createdAt: typeof s.createdAt === "string" ? s.createdAt : s.createdAt.toISOString(),
-      updatedAt: typeof s.updatedAt === "string" ? s.updatedAt : s.updatedAt.toISOString(),
+      status: s.status || 'active',
+      createdAt: typeof s.createdAt === 'string' ? s.createdAt : s.createdAt.toISOString(),
+      updatedAt: typeof s.updatedAt === 'string' ? s.updatedAt : s.updatedAt.toISOString(),
     };
   }
 
@@ -192,7 +192,7 @@ class SqliteAdapter {
       mode: row.mode,
       model: row.model,
       projectPath: row.project_path,
-      messages: JSON.parse(row.messages || "[]"),
+      messages: JSON.parse(row.messages || '[]'),
       status: row.status,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
@@ -257,11 +257,11 @@ class SqliteAdapter {
   }
 
   async ping() {
-    return this.db.prepare("SELECT 1 AS ok").get().ok === 1;
+    return this.db.prepare('SELECT 1 AS ok').get().ok === 1;
   }
 
   backend() {
-    return "sqlite";
+    return 'sqlite';
   }
 
   close() {
@@ -279,9 +279,9 @@ class PrismaAdapter {
     let PrismaClient;
     try {
       // eslint-disable-next-line global-require
-      ({ PrismaClient } = require("@prisma/client"));
+      ({ PrismaClient } = require('@prisma/client'));
     } catch (e) {
-      throw new Error("@prisma/client not installed");
+      throw new Error('@prisma/client not installed');
     }
     this.prisma = new PrismaClient();
   }
@@ -297,7 +297,7 @@ class PrismaAdapter {
   async findSessions(userId) {
     return await this.prisma.session.findMany({
       where: { userId },
-      orderBy: { createdAt: "desc" },
+      orderBy: { createdAt: 'desc' },
       select: { id: true, title: true, createdAt: true, mode: true, model: true, status: true },
     });
   }
@@ -321,7 +321,7 @@ class PrismaAdapter {
   }
 
   backend() {
-    return "prisma";
+    return 'prisma';
   }
 }
 
@@ -331,14 +331,14 @@ class PrismaAdapter {
 async function detectAdapter() {
   if (process.env.SENTINEL_DB_BACKEND) {
     const choice = process.env.SENTINEL_DB_BACKEND.toLowerCase();
-    if (choice === "prisma" || choice === "postgres") {
+    if (choice === 'prisma' || choice === 'postgres') {
       return new PrismaAdapter();
     }
-    if (choice === "sqlite") {
-      return new SqliteAdapter(path.join(DEFAULT_DB_DIR, "sentinel.db"));
+    if (choice === 'sqlite') {
+      return new SqliteAdapter(path.join(DEFAULT_DB_DIR, 'sentinel.db'));
     }
-    if (choice === "json") {
-      return new JsonAdapter(path.join(DEFAULT_DB_DIR, "sentinel.json"));
+    if (choice === 'json') {
+      return new JsonAdapter(path.join(DEFAULT_DB_DIR, 'sentinel.json'));
     }
   }
 
@@ -352,10 +352,10 @@ async function detectAdapter() {
 
   try {
     // eslint-disable-next-line global-require
-    require.resolve("better-sqlite3");
-    return new SqliteAdapter(path.join(DEFAULT_DB_DIR, "sentinel.db"));
+    require.resolve('better-sqlite3');
+    return new SqliteAdapter(path.join(DEFAULT_DB_DIR, 'sentinel.db'));
   } catch {
-    return new JsonAdapter(path.join(DEFAULT_DB_DIR, "sentinel.json"));
+    return new JsonAdapter(path.join(DEFAULT_DB_DIR, 'sentinel.json'));
   }
 }
 
@@ -379,7 +379,7 @@ export function setDatabase(adapter) {
  * Reset the adapter (for tests).
  */
 export function resetDatabase() {
-  if (_adapter && typeof _adapter.close === "function") {
+  if (_adapter && typeof _adapter.close === 'function') {
     try {
       _adapter.close();
     } catch {

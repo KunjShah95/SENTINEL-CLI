@@ -354,23 +354,23 @@ export class BaselineManager {
     let extension;
 
     switch (format.toLowerCase()) {
-      case 'json':
-        content = JSON.stringify(baseline, null, 2);
-        extension = '.json';
-        break;
+    case 'json':
+      content = JSON.stringify(baseline, null, 2);
+      extension = '.json';
+      break;
 
-      case 'csv':
-        content = this.exportToCSV(baseline.issues);
-        extension = '.csv';
-        break;
+    case 'csv':
+      content = this.exportToCSV(baseline.issues);
+      extension = '.csv';
+      break;
 
-      case 'markdown':
-        content = this.exportToMarkdown(baseline);
-        extension = '.md';
-        break;
+    case 'markdown':
+      content = this.exportToMarkdown(baseline);
+      extension = '.md';
+      break;
 
-      default:
-        throw new Error(`Unsupported export format: ${format}`);
+    default:
+      throw new Error(`Unsupported export format: ${format}`);
     }
 
     const defaultPath = path.join(this.configDir, `baseline-export${extension}`);
@@ -409,7 +409,7 @@ export class BaselineManager {
    * Export baseline to Markdown format
    */
   exportToMarkdown(baseline) {
-    let markdown = `# Sentinel Baseline Report\n\n`;
+    let markdown = '# Sentinel Baseline Report\n\n';
     markdown += `**Created:** ${new Date(baseline.created).toLocaleString()}\n`;
     markdown += `**Total Issues:** ${baseline.issues.length}\n\n`;
 

@@ -11,14 +11,14 @@
 export class EmbeddingProvider {
   static async create(provider = 'openai', options = {}) {
     switch (provider.toLowerCase()) {
-      case 'openai':
-        return new OpenAIEmbeddingProvider(options);
-      case 'local':
-        return new LocalEmbeddingProvider(options);
-      case 'tfidf':
-        return new TFIDFEmbeddingProvider(options);
-      default:
-        return new OpenAIEmbeddingProvider(options);
+    case 'openai':
+      return new OpenAIEmbeddingProvider(options);
+    case 'local':
+      return new LocalEmbeddingProvider(options);
+    case 'tfidf':
+      return new TFIDFEmbeddingProvider(options);
+    default:
+      return new OpenAIEmbeddingProvider(options);
     }
   }
 }

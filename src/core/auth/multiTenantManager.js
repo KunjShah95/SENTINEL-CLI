@@ -16,7 +16,7 @@ class MultiTenantManager {
   async createTenant(tenantData) {
     const tenantId = this.generateTenantId();
     const apiKey = this.generateApiKey();
-    
+
     const tenant = {
       id: tenantId,
       name: tenantData.name,
@@ -42,7 +42,7 @@ class MultiTenantManager {
     }
 
     this.tenants.set(tenantId, tenant);
-    
+
     return {
       tenant: this.sanitizeTenant(tenant),
       apiKey, // Return unencrypted key only once
@@ -57,10 +57,10 @@ class MultiTenantManager {
 
   getTenantByApiKey(apiKey) {
     for (const tenant of this.tenants.values()) {
-      const storedKey = this.encryptionKey 
+      const storedKey = this.encryptionKey
         ? this.decrypt(tenant.apiKey)
         : tenant.apiKey;
-      
+
       if (storedKey === apiKey) {
         return this.sanitizeTenant(tenant);
       }
@@ -73,7 +73,7 @@ class MultiTenantManager {
     if (!tenant) return null;
 
     const allowedUpdates = ['name', 'plan', 'quota', 'settings', 'features', 'status'];
-    
+
     for (const key of allowedUpdates) {
       if (updates[key] !== undefined) {
         tenant[key] = updates[key];
@@ -96,37 +96,37 @@ class MultiTenantManager {
     this.resetMonthlyUsageIfNeeded(tenant);
 
     switch (operation) {
-      case 'analysis':
-        if (tenant.usage.analysesThisMonth >= tenant.quota.maxAnalysesPerMonth) {
-          return {
-            allowed: false,
-            reason: `Monthly analysis quota exceeded (${tenant.quota.maxAnalysesPerMonth})`,
-          };
-        }
-        break;
-
-      case 'storage':
-        if (tenant.usage.storageUsedMB >= tenant.quota.maxStorageMB) {
-          return {
-            allowed: false,
-            reason: `Storage quota exceeded (${tenant.quota.maxStorageMB}MB)`,
-          };
-        }
-        break;
-
-      case 'project': {
-        const projectCount = this.getProjectCount(tenantId);
-        if (projectCount >= tenant.quota.maxProjects) {
-          return {
-            allowed: false,
-            reason: `Project quota exceeded (${tenant.quota.maxProjects})`,
-          };
-        }
-        break;
+    case 'analysis':
+      if (tenant.usage.analysesThisMonth >= tenant.quota.maxAnalysesPerMonth) {
+        return {
+          allowed: false,
+          reason: `Monthly analysis quota exceeded (${tenant.quota.maxAnalysesPerMonth})`,
+        };
       }
+      break;
 
-      default:
-        return { allowed: true };
+    case 'storage':
+      if (tenant.usage.storageUsedMB >= tenant.quota.maxStorageMB) {
+        return {
+          allowed: false,
+          reason: `Storage quota exceeded (${tenant.quota.maxStorageMB}MB)`,
+        };
+      }
+      break;
+
+    case 'project': {
+      const projectCount = this.getProjectCount(tenantId);
+      if (projectCount >= tenant.quota.maxProjects) {
+        return {
+          allowed: false,
+          reason: `Project quota exceeded (${tenant.quota.maxProjects})`,
+        };
+      }
+      break;
+    }
+
+    default:
+      return { allowed: true };
     }
 
     return { allowed: true };
@@ -139,12 +139,12 @@ class MultiTenantManager {
     this.resetMonthlyUsageIfNeeded(tenant);
 
     switch (operation) {
-      case 'analysis':
-        tenant.usage.analysesThisMonth += amount;
-        break;
-      case 'storage':
-        tenant.usage.storageUsedMB += amount;
-        break;
+    case 'analysis':
+      tenant.usage.analysesThisMonth += amount;
+      break;
+    case 'storage':
+      tenant.usage.storageUsedMB += amount;
+      break;
     }
 
     return true;
@@ -153,7 +153,7 @@ class MultiTenantManager {
   resetMonthlyUsageIfNeeded(tenant) {
     const now = Date.now();
     const oneMonth = 30 * 24 * 60 * 60 * 1000;
-    
+
     if (now - tenant.usage.lastReset > oneMonth) {
       tenant.usage.analysesThisMonth = 0;
       tenant.usage.lastReset = now;
@@ -188,31 +188,31 @@ class MultiTenantManager {
 
   encrypt(text) {
     if (!this.encryptionKey) return text;
-    
+
     const iv = crypto.randomBytes(16);
     const cipher = crypto.createCipher('aes-256-gcm', this.encryptionKey);
     let encrypted = cipher.update(text, 'utf8', 'hex');
     encrypted += cipher.final('hex');
     const authTag = cipher.getAuthTag();
-    
+
     return `${iv.toString('hex')}:${authTag.toString('hex')}:${encrypted}`;
   }
 
   decrypt(encryptedData) {
     if (!this.encryptionKey) return encryptedData;
-    
+
     const [ivHex, authTagHex, encrypted] = encryptedData.split(':');
     // eslint-disable-next-line no-unused-vars
     const iv = Buffer.from(ivHex, 'hex');
     const authTag = Buffer.from(authTagHex, 'hex');
-    
+
     // Note: In a complete implementation, iv would be passed to createDecipheriv
     const decipher = crypto.createDecipher('aes-256-gcm', this.encryptionKey);
     decipher.setAuthTag(authTag);
-    
+
     let decrypted = decipher.update(encrypted, 'hex', 'utf8');
     decrypted += decipher.final('utf8');
-    
+
     return decrypted;
   }
 
@@ -222,7 +222,7 @@ class MultiTenantManager {
 
   getTenantStats() {
     const tenants = this.getAllTenants();
-    
+
     return {
       total: tenants.length,
       byPlan: tenants.reduce((acc, t) => {
@@ -242,9 +242,9 @@ class MultiTenantManager {
 
   async validateTenantContext(context) {
     const { tenantId, apiKey } = context;
-    
+
     let tenant = null;
-    
+
     if (apiKey) {
       tenant = this.getTenantByApiKey(apiKey);
     } else if (tenantId) {

@@ -11,9 +11,9 @@
  * always passes.
  */
 
-import { getUsedCredits } from "../../database/index.js";
-import { recordCredit } from "../../database/sessions.js";
-import { createRequire } from "node:module";
+import { getUsedCredits } from '../../database/index.js';
+import { recordCredit } from '../../database/sessions.js';
+import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 
@@ -27,10 +27,10 @@ function getClient() {
   }
   try {
     // eslint-disable-next-line global-require
-    const { Polar } = require("@polar-sh/sdk");
+    const { Polar } = require('@polar-sh/sdk');
     polarClient = new Polar({
       accessToken: process.env.POLAR_ACCESS_TOKEN,
-      server: process.env.POLAR_SERVER === "production" ? "production" : "sandbox",
+      server: process.env.POLAR_SERVER === 'production' ? 'production' : 'sandbox',
     });
     return polarClient;
   } catch {
@@ -50,12 +50,12 @@ export async function createCheckoutUrl({ customerExternalId, requestUrl }) {
   if (!client) {
     return `${requestUrl}/billing/success?dev=1`;
   }
-  const productId = requireEnv("POLAR_PRODUCT_ID");
+  const productId = requireEnv('POLAR_PRODUCT_ID');
   const result = await client.checkouts.create({
     products: [productId],
-    successUrl: new URL("/billing/success", requestUrl).toString(),
+    successUrl: new URL('/billing/success', requestUrl).toString(),
     externalCustomerId: customerExternalId,
-    metadata: { source: "sentinel-cli" },
+    metadata: { source: 'sentinel-cli' },
   });
   return result.url;
 }
@@ -67,7 +67,7 @@ export async function createCustomerPortalUrl({ externalCustomerId, requestUrl }
   }
   const result = await client.customerSessions.create({
     externalCustomerId,
-    returnUrl: new URL("/billing/success", requestUrl).toString(),
+    returnUrl: new URL('/billing/success', requestUrl).toString(),
   });
   return result.customerPortalUrl;
 }
@@ -80,13 +80,13 @@ export async function getAvailableCreditsBalance(customerExternalId) {
     const used = await getUsedCredits({ userId: customerExternalId });
     return Math.max(0, allocation - used);
   }
-  const meterId = requireEnv("POLAR_CREDITS_METER_ID");
+  const meterId = requireEnv('POLAR_CREDITS_METER_ID');
   try {
     const state = await client.customers.getStateExternal({ externalId: customerExternalId });
     const meters = state.activeMeters || [];
     const matching = meters.filter((m) => m.meterId === meterId);
     if (matching.length > 1) {
-      throw new Error("Expected exactly one matching Polar credits meter");
+      throw new Error('Expected exactly one matching Polar credits meter');
     }
     return matching[0]?.balance ?? 0;
   } catch (e) {
@@ -112,7 +112,7 @@ export async function ingestAiUsage({ externalCustomerId, eventId, credits, prov
   await client.events.ingest({
     events: [
       {
-        name: "sentinel_usage",
+        name: 'sentinel_usage',
         externalId: eventId,
         externalCustomerId,
         metadata: { credits },

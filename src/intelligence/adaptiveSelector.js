@@ -33,7 +33,7 @@ export class AdaptiveStrategySelector {
    * Main entry point - analyzes question and selects optimal strategy
    */
   async selectStrategy(question, context = {}) {
-    console.log(`🎯 Analyzing question for strategy selection...`);
+    console.log('🎯 Analyzing question for strategy selection...');
 
     // Step 1: Extract features from question
     const features = await this.extractFeatures(question, context);
@@ -54,7 +54,7 @@ export class AdaptiveStrategySelector {
     const selected = costOptimized[0];
 
     console.log(`✅ Selected strategy: ${selected.strategy} (confidence: ${selected.confidence.toFixed(2)})`);
-    console.log(`📊 Analysis:`, {
+    console.log('📊 Analysis:', {
       complexity: complexity.overall,
       features: this.summarizeFeatures(features),
       alternatives: costOptimized.slice(1, 3).map(c => ({

@@ -92,14 +92,14 @@ export class ContextAwareSuppression {
       const suppressionsPath = join(projectPath, this.suppressionsFile);
       const content = await fs.readFile(suppressionsPath, 'utf-8');
       const data = JSON.parse(content);
-      
+
       this.teamSuppressions = new Map(
         (data.suppressions || []).map(s => [
           `${s.file}:${s.line}:${s.ruleId}`,
           { ...s, teamAcknowledged: true }
         ])
       );
-      
+
       return {
         loaded: true,
         count: this.teamSuppressions.size,
@@ -113,7 +113,7 @@ export class ContextAwareSuppression {
   analyzeFileContext(filePath, content) {
     const fileName = filePath.split(/[/\\]/).pop();
     const directory = filePath.substring(0, filePath.length - fileName.length);
-    
+
     const context = {
       filePath,
       fileName,
@@ -142,14 +142,14 @@ export class ContextAwareSuppression {
 
   detectFrameworks(content) {
     const detected = [];
-    
+
     for (const [framework, patterns] of Object.entries(FRAMEWORK_PATTERNS)) {
       const matches = patterns.filter(pattern => pattern.test(content));
       if (matches.length >= 2) {
         detected.push(framework);
       }
     }
-    
+
     return detected;
   }
 
@@ -163,29 +163,29 @@ export class ContextAwareSuppression {
       /scaffold/i,
       /tutorial/i,
     ];
-    
-    const hasExampleIndicator = exampleIndicators.some(p => 
+
+    const hasExampleIndicator = exampleIndicators.some(p =>
       p.test(filePath) || p.test(content.substring(0, 500))
     );
-    
+
     if (hasExampleIndicator) return true;
-    
+
     const commentPatterns = [
       /\/\/\s*example/i,
       /\/\*\s*example/i,
       /#\s*example/i,
     ];
-    
+
     return commentPatterns.some(p => p.test(content));
   }
 
   isDocumentation(filePath) {
     const docExtensions = ['.md', '.txt', '.rst', '.adoc'];
     const docFileNames = ['readme', 'changelog', 'contributing', 'license', 'todo'];
-    
+
     const ext = filePath.split('.').pop();
     if (docExtensions.includes(`.${ext}`)) return true;
-    
+
     const fileName = filePath.split(/[/\\]/).pop().toLowerCase();
     return docFileNames.some(name => fileName.includes(name));
   }
@@ -257,11 +257,11 @@ export class ContextAwareSuppression {
     const issueType = (issue.type || '').toLowerCase();
     const issueRule = (issue.ruleId || '').toLowerCase();
 
-    const isTestUnsafe = testRelatedRules.some(r => 
+    const isTestUnsafe = testRelatedRules.some(r =>
       issueType.includes(r) || issueRule.includes(r)
     );
 
-    const isTestSafe = testSafeRules.some(r => 
+    const isTestSafe = testSafeRules.some(r =>
       issueType.includes(r) || issueRule.includes(r)
     );
 
@@ -288,7 +288,7 @@ export class ContextAwareSuppression {
 
   suppressIssue(issue, reason, suppressedBy = 'team') {
     const key = `${issue.file}:${issue.line}:${issue.ruleId}`;
-    
+
     this.teamSuppressions.set(key, {
       file: issue.file,
       line: issue.line,
@@ -311,7 +311,7 @@ export class ContextAwareSuppression {
 
     for (const issue of issues) {
       const cacheKey = issue.file;
-      
+
       let context = this.fileContextCache.get(cacheKey);
       if (!context) {
         context = this.analyzeFileContext(issue.file, issue.code || '');
@@ -328,7 +328,7 @@ export class ContextAwareSuppression {
         continue;
       }
 
-      const { shouldSuppress, reason, context: issueContext } = 
+      const { shouldSuppress, reason, context: issueContext } =
         this.shouldSuppressBasedOnContext(issue, context);
 
       if (shouldSuppress) {
@@ -341,7 +341,7 @@ export class ContextAwareSuppression {
       } else {
         filtered.push({
           ...issue,
-          contextAnalysis: context.isLikelyFalsePositive ? 
+          contextAnalysis: context.isLikelyFalsePositive ?
             { likelyFalsePositive: true } : null
         });
       }
@@ -354,7 +354,7 @@ export class ContextAwareSuppression {
         total: issues.length,
         active: filtered.length,
         suppressed: suppressed.length,
-        suppressionRate: issues.length > 0 ? 
+        suppressionRate: issues.length > 0 ?
           (suppressed.length / issues.length * 100).toFixed(1) : 0,
         byReason: this.groupByReason(suppressed)
       }
@@ -371,7 +371,7 @@ export class ContextAwareSuppression {
 
   async exportTeamSuppressions(outputPath) {
     const suppressions = Array.from(this.teamSuppressions.values());
-    
+
     const exportData = {
       version: '1.0',
       exportedAt: new Date().toISOString(),

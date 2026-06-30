@@ -12,7 +12,7 @@ import chalk from 'chalk';
 export class FileWatcher extends EventEmitter {
   constructor(config = {}) {
     super();
-    
+
     this.config = {
       // Watch configuration
       debounceMs: 1000,        // Debounce time for file changes
@@ -29,7 +29,7 @@ export class FileWatcher extends EventEmitter {
         'coverage/**',
         '.nyc_output/**'
       ],
-      
+
       // File type filters
       watchExtensions: [
         '.js', '.ts', '.jsx', '.tsx',
@@ -39,15 +39,15 @@ export class FileWatcher extends EventEmitter {
         '.yml', '.yaml', '.json', '.xml',
         '.sql', '.sh', '.bash', '.zsh'
       ],
-      
+
       // Performance settings
       batchSize: 50,           // Process changes in batches
       checkInterval: 5000,     // Periodic full scan interval (ms)
       enablePeriodicScan: true,
-      
+
       ...config
     };
-    
+
     this.watchedFiles = new Map();
     this.watchedDirectories = new Set();
     this.changeQueue = new Set();
@@ -67,25 +67,25 @@ export class FileWatcher extends EventEmitter {
   async startWatching(targetPaths = ['.']) {
     console.log(chalk.cyan('👀 Starting Sentinel file watcher...'));
     this.startTime = Date.now();
-    
+
     try {
       // Resolve and normalize target paths
       const resolvedPaths = targetPaths.map(p => path.resolve(p));
-      
+
       // Scan and add files to watch
       await this.scanAndWatchPaths(resolvedPaths);
-      
+
       // Start periodic scanning if enabled
       if (this.config.enablePeriodicScan) {
         this.startPeriodicScan();
       }
-      
+
       console.log(chalk.green(`✅ Watching ${this.stats.filesWatched} files`));
       console.log(chalk.gray('Press Ctrl+C to stop watching\n'));
-      
+
       // Start change processing loop
       this.processChangeQueue();
-      
+
       return {
         success: true,
         filesWatched: this.stats.filesWatched,
@@ -104,7 +104,7 @@ export class FileWatcher extends EventEmitter {
     for (const targetPath of paths) {
       try {
         const stats = await fs.promises.stat(targetPath);
-        
+
         if (stats.isDirectory()) {
           await this.watchDirectory(targetPath);
         } else if (stats.isFile()) {
@@ -122,38 +122,38 @@ export class FileWatcher extends EventEmitter {
   async watchDirectory(dirPath) {
     try {
       const entries = await fs.promises.readdir(dirPath, { withFileTypes: true });
-      
+
       for (const entry of entries) {
         // Validate entry name to prevent path traversal
         if (entry.name.includes('..') || entry.name.includes('/') || entry.name.includes('\\')) {
           continue;
         }
-        
+
         const fullPath = path.join(dirPath, entry.name);
         const relativePath = path.relative(process.cwd(), fullPath);
-        
+
         // Check ignore patterns
         if (this.shouldIgnore(relativePath)) {
           continue;
         }
-        
+
         // Check file extension
         if (entry.isFile() && !this.shouldWatchFile(relativePath)) {
           continue;
         }
-        
+
         // Watch directory
         if (entry.isDirectory()) {
           this.watchedDirectories.add(fullPath);
           await this.watchDirectory(fullPath);
         }
-        
+
         // Watch file
         if (entry.isFile()) {
           await this.watchFile(fullPath);
         }
       }
-      
+
       // Setup directory watcher
       this.setupDirectoryWatcher(dirPath);
     } catch (error) {
@@ -170,7 +170,7 @@ export class FileWatcher extends EventEmitter {
         console.warn(chalk.yellow(`⚠️ Maximum files watched (${this.config.maxFiles})`));
         return;
       }
-      
+
       const stats = await fs.promises.stat(filePath);
       const fileInfo = {
         path: filePath,
@@ -178,13 +178,13 @@ export class FileWatcher extends EventEmitter {
         mtime: stats.mtime,
         watchedAt: Date.now()
       };
-      
+
       this.watchedFiles.set(filePath, fileInfo);
       this.stats.filesWatched++;
-      
+
       // Setup file watcher
       this.setupFileWatcher(filePath);
-      
+
     } catch (error) {
       console.warn(chalk.yellow(`⚠️ Cannot watch file ${filePath}: ${error.message}`));
     }
@@ -201,16 +201,16 @@ export class FileWatcher extends EventEmitter {
       }, (eventType, _filename) => {
         this.handleFileChange(filePath, eventType);
       });
-      
+
       // Handle watcher errors
       watcher.on('error', (error) => {
         console.warn(chalk.yellow(`⚠️ Watcher error for ${filePath}: ${error.message}`));
         this.stats.errors++;
       });
-      
+
       // Store watcher reference
       this.watchedFiles.get(filePath).watcher = watcher;
-      
+
     } catch (error) {
       console.warn(chalk.yellow(`⚠️ Cannot setup watcher for ${filePath}: ${error.message}`));
     }
@@ -230,27 +230,27 @@ export class FileWatcher extends EventEmitter {
           if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
             return;
           }
-          
+
           const fullPath = path.resolve(dirPath, filename);
-          
+
           // Validate path is within expected directory
           if (!fullPath.startsWith(path.resolve(dirPath))) {
             return;
           }
-          
+
           const relativePath = path.relative(process.cwd(), fullPath);
-          
+
           // Only process if it's a file we should watch
           if (this.shouldWatchFile(relativePath) && !this.shouldIgnore(relativePath)) {
             this.handleFileChange(fullPath, eventType);
           }
         }
       });
-      
+
       watcher.on('error', (error) => {
         console.warn(chalk.yellow(`⚠️ Directory watcher error for ${dirPath}: ${error.message}`));
       });
-      
+
     } catch (error) {
       console.warn(chalk.yellow(`⚠️ Cannot setup directory watcher for ${dirPath}: ${error.message}`));
     }
@@ -261,18 +261,18 @@ export class FileWatcher extends EventEmitter {
    */
   handleFileChange(filePath, eventType) {
     const now = Date.now();
-    
+
     // Add to change queue with debouncing
     this.changeQueue.add(filePath);
     this.stats.changesDetected++;
-    
+
     // Emit change event
     this.emit('fileChanged', {
       file: filePath,
       type: eventType,
       timestamp: now
     });
-    
+
     // Log significant changes
     if (eventType === 'rename' || eventType === 'delete') {
       console.log(chalk.yellow(`📁 ${eventType}: ${path.relative(process.cwd(), filePath)}`));
@@ -286,36 +286,36 @@ export class FileWatcher extends EventEmitter {
     if (this.isProcessing || this.changeQueue.size === 0) {
       return;
     }
-    
+
     this.isProcessing = true;
-    
+
     setTimeout(async () => {
       try {
         const changes = Array.from(this.changeQueue);
         this.changeQueue.clear();
-        
+
         if (changes.length === 0) {
           this.isProcessing = false;
           return;
         }
-        
+
         // Process changes in batches
         for (let i = 0; i < changes.length; i += this.config.batchSize) {
           const batch = changes.slice(i, i + this.config.batchSize);
           await this.processBatch(batch);
-          
+
           // Small delay between batches to avoid overwhelming the system
           if (i + this.config.batchSize < changes.length) {
             await new Promise(resolve => setTimeout(resolve, 100));
           }
         }
-        
+
       } catch (error) {
         console.error(chalk.red('Error processing change queue:'), error.message);
         this.stats.errors++;
       } finally {
         this.isProcessing = false;
-        
+
         // Continue processing if more changes queued
         if (this.changeQueue.size > 0) {
           setImmediate(() => this.processChangeQueue());
@@ -329,21 +329,21 @@ export class FileWatcher extends EventEmitter {
    */
   async processBatch(filePaths) {
     const validFiles = [];
-    
+
     // Validate and check file changes
     for (const filePath of filePaths) {
       try {
         // Check if file still exists
         const stats = await fs.promises.stat(filePath);
         const currentFileInfo = this.watchedFiles.get(filePath);
-        
+
         // Add to analysis queue if file changed or is new
-        if (!currentFileInfo || 
-            stats.size !== currentFileInfo.size || 
+        if (!currentFileInfo ||
+            stats.size !== currentFileInfo.size ||
             stats.mtime.getTime() !== currentFileInfo.mtime.getTime()) {
-          
+
           validFiles.push(filePath);
-          
+
           // Update file info
           this.watchedFiles.set(filePath, {
             size: stats.size,
@@ -359,7 +359,7 @@ export class FileWatcher extends EventEmitter {
         }
       }
     }
-    
+
     // Emit batch processed event if files changed
     if (validFiles.length > 0) {
       this.emit('batchProcessed', {
@@ -388,16 +388,16 @@ export class FileWatcher extends EventEmitter {
    */
   async performPeriodicScan() {
     const changedFiles = [];
-    
+
     // Check all watched files for changes
     for (const [filePath, fileInfo] of this.watchedFiles.entries()) {
       try {
         const stats = await fs.promises.stat(filePath);
-        
-        if (stats.size !== fileInfo.size || 
+
+        if (stats.size !== fileInfo.size ||
             stats.mtime.getTime() !== fileInfo.mtime.getTime()) {
           changedFiles.push(filePath);
-          
+
           // Update file info
           this.watchedFiles.set(filePath, {
             ...fileInfo,
@@ -412,7 +412,7 @@ export class FileWatcher extends EventEmitter {
         }
       }
     }
-    
+
     if (changedFiles.length > 0) {
       console.log(chalk.cyan(`🔄 Periodic scan: ${changedFiles.length} files changed`));
       this.emit('periodicScanComplete', {
@@ -427,7 +427,7 @@ export class FileWatcher extends EventEmitter {
    */
   shouldIgnore(filePath) {
     const normalizedPath = filePath.replace(/\\/g, '/');
-    
+
     return this.config.ignorePatterns.some(pattern => {
       if (pattern.endsWith('/**')) {
         return normalizedPath.startsWith(pattern.slice(0, -3));
@@ -449,33 +449,33 @@ export class FileWatcher extends EventEmitter {
    */
   stopWatching() {
     console.log(chalk.yellow('\n🛑 Stopping file watcher...'));
-    
+
     // Close all watchers
     for (const fileInfo of this.watchedFiles.values()) {
       if (fileInfo.watcher) {
         fileInfo.watcher.close();
       }
     }
-    
+
     // Clear data
     this.watchedFiles.clear();
     this.watchedDirectories.clear();
     this.changeQueue.clear();
-    
+
     // Calculate runtime
     const runtime = this.startTime ? Date.now() - this.startTime : 0;
-    
+
     console.log(chalk.green('✅ File watcher stopped'));
-    console.log(chalk.gray(`📊 Session stats:`));
+    console.log(chalk.gray('📊 Session stats:'));
     console.log(chalk.gray(`  Files watched: ${this.stats.filesWatched}`));
     console.log(chalk.gray(`  Changes detected: ${this.stats.changesDetected}`));
     console.log(chalk.gray(`  Analyses run: ${this.stats.analysesRun}`));
     console.log(chalk.gray(`  Runtime: ${Math.round(runtime / 1000)}s`));
-    
+
     if (this.stats.errors > 0) {
       console.log(chalk.yellow(`  Errors: ${this.stats.errors}`));
     }
-    
+
     return this.stats;
   }
 
@@ -497,7 +497,7 @@ export class FileWatcher extends EventEmitter {
    */
   async addFilesToWatch(filePaths) {
     const addedFiles = [];
-    
+
     for (const filePath of filePaths) {
       try {
         const stats = await fs.promises.stat(filePath);
@@ -509,12 +509,12 @@ export class FileWatcher extends EventEmitter {
         console.warn(chalk.yellow(`⚠️ Cannot add ${filePath}: ${error.message}`));
       }
     }
-    
+
     if (addedFiles.length > 0) {
       console.log(chalk.green(`➕ Added ${addedFiles.length} files to watch`));
       this.emit('filesAdded', { files: addedFiles });
     }
-    
+
     return addedFiles;
   }
 
@@ -523,7 +523,7 @@ export class FileWatcher extends EventEmitter {
    */
   removeFilesFromWatch(filePaths) {
     const removedFiles = [];
-    
+
     for (const filePath of filePaths) {
       const fileInfo = this.watchedFiles.get(filePath);
       if (fileInfo) {
@@ -534,12 +534,12 @@ export class FileWatcher extends EventEmitter {
         removedFiles.push(filePath);
       }
     }
-    
+
     if (removedFiles.length > 0) {
       console.log(chalk.yellow(`➖ Removed ${removedFiles.length} files from watch`));
       this.emit('filesRemoved', { files: removedFiles });
     }
-    
+
     return removedFiles;
   }
 }

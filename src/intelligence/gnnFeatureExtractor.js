@@ -469,23 +469,23 @@ export class GNNFeatureExtractor {
 
     // Extract relevant properties based on node type
     switch (node.type) {
-      case 'FunctionDeclaration':
-        props.async = node.async;
-        props.generator = node.generator;
-        props.params = node.params.length;
-        break;
+    case 'FunctionDeclaration':
+      props.async = node.async;
+      props.generator = node.generator;
+      props.params = node.params.length;
+      break;
 
-      case 'VariableDeclaration':
-        props.kind = node.kind; // const, let, var
-        break;
+    case 'VariableDeclaration':
+      props.kind = node.kind; // const, let, var
+      break;
 
-      case 'Identifier':
-        props.name = node.name;
-        break;
+    case 'Identifier':
+      props.name = node.name;
+      break;
 
-      case 'Literal':
-        props.value = node.value;
-        break;
+    case 'Literal':
+      props.value = node.value;
+      break;
     }
 
     return props;
@@ -595,17 +595,17 @@ export class GNNFeatureExtractor {
    */
   formatGraph(graph, format) {
     switch (format) {
-      case 'pytorch-geometric':
-        return this.toPyTorchGeometric(graph);
+    case 'pytorch-geometric':
+      return this.toPyTorchGeometric(graph);
 
-      case 'dgl':
-        return this.toDGL(graph);
+    case 'dgl':
+      return this.toDGL(graph);
 
-      case 'networkx':
-        return this.toNetworkX(graph);
+    case 'networkx':
+      return this.toNetworkX(graph);
 
-      default:
-        return graph; // Return raw format
+    default:
+      return graph; // Return raw format
     }
   }
 

@@ -23,23 +23,23 @@ export class IaCAnalyzer extends BaseAnalyzer {
     const ext = filePath.split('.').pop()?.toLowerCase();
 
     switch (ext) {
-      case 'tf':
-        issues.push(...this.analyzeTerraform(filePath, content));
-        break;
-      case 'yaml':
-      case 'yml':
-        if (filePath.includes('k8s') || filePath.includes('kubernetes') || content.includes('apiVersion:')) {
-          issues.push(...this.analyzeKubernetes(filePath, content));
-        }
-        break;
-      case 'dockerfile':
-        issues.push(...this.analyzeDockerfile(filePath, content));
-        break;
-      case 'json':
-        if (filePath.includes('terraform') || filePath.includes('.tfstate')) {
-          issues.push(...this.analyzeTerraformJson(filePath, content));
-        }
-        break;
+    case 'tf':
+      issues.push(...this.analyzeTerraform(filePath, content));
+      break;
+    case 'yaml':
+    case 'yml':
+      if (filePath.includes('k8s') || filePath.includes('kubernetes') || content.includes('apiVersion:')) {
+        issues.push(...this.analyzeKubernetes(filePath, content));
+      }
+      break;
+    case 'dockerfile':
+      issues.push(...this.analyzeDockerfile(filePath, content));
+      break;
+    case 'json':
+      if (filePath.includes('terraform') || filePath.includes('.tfstate')) {
+        issues.push(...this.analyzeTerraformJson(filePath, content));
+      }
+      break;
     }
 
     return issues;
@@ -455,7 +455,7 @@ export class IaCAnalyzer extends BaseAnalyzer {
 
     try {
       const data = JSON.parse(content);
-      
+
       // Check for plaintext secrets in state
       const checkObject = (obj, path = '') => {
         for (const [key, value] of Object.entries(obj || {})) {
@@ -478,7 +478,7 @@ export class IaCAnalyzer extends BaseAnalyzer {
           }
         }
       };
-      
+
       checkObject(data);
     } catch (e) {
       // Not valid JSON, skip

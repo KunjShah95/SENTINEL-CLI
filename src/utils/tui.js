@@ -29,7 +29,7 @@ export class InteractiveTUI {
     this.clearScreen();
     this.printHeader();
     this.printSummary();
-    
+
     console.log('\n' + chalk.gray('─'.repeat(50)));
     console.log(chalk.bold.cyan('  [N] Next Issue    [P] Previous Issue'));
     console.log(chalk.bold.cyan('  [F] Filter         [S] Sort'));
@@ -38,37 +38,37 @@ export class InteractiveTUI {
     console.log(chalk.gray('─'.repeat(50)));
 
     const answer = await this.prompt('\n> ');
-    
+
     switch (answer.toLowerCase()) {
-      case 'n':
-        this.nextIssue();
-        break;
-      case 'p':
-        this.prevIssue();
-        break;
-      case 'f':
-        await this.filterMenu();
-        break;
-      case 's':
-        await this.sortMenu();
-        break;
-      case 'v':
-        await this.viewDetails();
-        break;
-      case 'j':
-        await this.jumpToLine();
-        break;
-      case 'e':
-        await this.exportMenu();
-        break;
-      case 'q':
-        this.quit();
-        return;
-      default:
-        console.log(chalk.yellow('Invalid option'));
-        await this.sleep(1000);
+    case 'n':
+      this.nextIssue();
+      break;
+    case 'p':
+      this.prevIssue();
+      break;
+    case 'f':
+      await this.filterMenu();
+      break;
+    case 's':
+      await this.sortMenu();
+      break;
+    case 'v':
+      await this.viewDetails();
+      break;
+    case 'j':
+      await this.jumpToLine();
+      break;
+    case 'e':
+      await this.exportMenu();
+      break;
+    case 'q':
+      this.quit();
+      return;
+    default:
+      console.log(chalk.yellow('Invalid option'));
+      await this.sleep(1000);
     }
-    
+
     await this.mainMenu();
   }
 
@@ -87,7 +87,7 @@ export class InteractiveTUI {
   printSummary() {
     const filtered = this.getFilteredIssues();
     const bySeverity = this.countBySeverity(filtered);
-    
+
     console.log(chalk.white('Summary:'));
     console.log(`  ${chalk.red('●')} Critical: ${chalk.red(bySeverity.critical)}`);
     console.log(`  ${chalk.yellow('●')} High:     ${chalk.yellow(bySeverity.high)}`);
@@ -95,11 +95,11 @@ export class InteractiveTUI {
     console.log(`  ${chalk.gray('●')} Low:      ${chalk.gray(bySeverity.low)}`);
     console.log(`  ${chalk.gray('●')} Info:     ${chalk.gray(bySeverity.info)}`);
     console.log(`  ${chalk.bold.white('Total:     ' + filtered.length)}`);
-    
+
     if (this.filter) {
       console.log(chalk.cyan(`\nFilter: ${this.filter}`));
     }
-    
+
     this.printCurrentIssue();
   }
 
@@ -113,7 +113,7 @@ export class InteractiveTUI {
     const issue = filtered[this.currentIndex];
     console.log(chalk.gray('\n─'.repeat(50)));
     console.log(chalk.bold.white(`Issue ${this.currentIndex + 1} of ${filtered.length}`));
-    
+
     const severityColors = {
       critical: chalk.red,
       high: chalk.yellow,
@@ -121,11 +121,11 @@ export class InteractiveTUI {
       low: chalk.gray,
       info: chalk.gray,
     };
-    
+
     const color = severityColors[issue.severity] || chalk.white;
     console.log(color(`[${issue.severity.toUpperCase()}] `) + chalk.bold.white(issue.title || issue.message));
     console.log(chalk.gray(`File: ${issue.file}:${issue.line}`));
-    
+
     if (issue.snippet) {
       console.log(chalk.gray('\nCode:'));
       console.log(chalk.gray(issue.snippet));
@@ -141,7 +141,7 @@ export class InteractiveTUI {
 
   getFilteredIssues() {
     let filtered = [...this.issues];
-    
+
     if (this.filter) {
       filtered = filtered.filter(issue => {
         const filter = this.filter.toLowerCase();
@@ -188,22 +188,22 @@ export class InteractiveTUI {
     console.log('  [s] Security issues only');
     console.log('  [b] By file pattern');
     console.log('  [a] Clear filter');
-    
+
     const answer = await this.prompt('\n> ');
-    
+
     switch (answer.toLowerCase()) {
-      case 'c': this.filter = 'critical'; break;
-      case 'h': this.filter = 'high'; break;
-      case 'm': this.filter = 'medium'; break;
-      case 's': this.filter = 'security'; break;
-      case 'b': {
-        const pattern = await this.prompt('Enter file pattern: ');
-        this.filter = pattern;
-        break;
-      }
-      case 'a': this.filter = null; break;
+    case 'c': this.filter = 'critical'; break;
+    case 'h': this.filter = 'high'; break;
+    case 'm': this.filter = 'medium'; break;
+    case 's': this.filter = 'security'; break;
+    case 'b': {
+      const pattern = await this.prompt('Enter file pattern: ');
+      this.filter = pattern;
+      break;
     }
-    
+    case 'a': this.filter = null; break;
+    }
+
     this.currentIndex = 0;
   }
 
@@ -212,22 +212,22 @@ export class InteractiveTUI {
     console.log('  [s] By severity');
     console.log('  [f] By file');
     console.log('  [l] By line number');
-    
+
     const answer = await this.prompt('\n> ');
-    
+
     switch (answer.toLowerCase()) {
-      case 's': this.sortBy = 'severity'; break;
-      case 'f': this.sortBy = 'file'; break;
-      case 'l': this.sortBy = 'line'; break;
+    case 's': this.sortBy = 'severity'; break;
+    case 'f': this.sortBy = 'file'; break;
+    case 'l': this.sortBy = 'line'; break;
     }
-    
+
     this.currentIndex = 0;
   }
 
   async viewDetails() {
     const filtered = this.getFilteredIssues();
     const issue = filtered[this.currentIndex];
-    
+
     console.log(chalk.cyan('\n--- Full Details ---'));
     console.log(chalk.bold('Type:') + ' ' + (issue.type || 'N/A'));
     console.log(chalk.bold('Analyzer:') + ' ' + (issue.analyzer || 'N/A'));
@@ -236,12 +236,12 @@ export class InteractiveTUI {
     console.log(chalk.bold('Suggestion:') + ' ' + (issue.suggestion || 'N/A'));
     console.log(chalk.bold('Tags:') + ' ' + (issue.tags?.join(', ') || 'N/A'));
     console.log(chalk.bold('Confidence:') + ' ' + ((issue.confidence * 100)?.toFixed(0) + '%' || 'N/A'));
-    
+
     if (issue.suggestion) {
       console.log(chalk.green('\nSuggestion:'));
       console.log(issue.suggestion);
     }
-    
+
     await this.prompt('\nPress Enter to continue...');
   }
 
@@ -249,7 +249,7 @@ export class InteractiveTUI {
     const filtered = this.getFilteredIssues();
     const num = await this.prompt(`Enter issue number (1-${filtered.length}): `);
     const index = parseInt(num) - 1;
-    
+
     if (index >= 0 && index < filtered.length) {
       this.currentIndex = index;
     } else {
@@ -263,7 +263,7 @@ export class InteractiveTUI {
     console.log('  [j] JSON');
     console.log('  [c] CSV');
     console.log('  [m] Markdown');
-    
+
     const answer = await this.prompt('\n> ');
     console.log(chalk.green(`\nExported to sentinel-export.${answer === 'j' ? 'json' : answer === 'c' ? 'csv' : 'md'}`));
     await this.sleep(1500);
@@ -290,7 +290,7 @@ export class InteractiveTUI {
  */
 export function displayIssuesTUI(issues, options = {}) {
   const tui = new InteractiveTUI(issues);
-  
+
   if (options.interactive) {
     tui.start();
   } else {

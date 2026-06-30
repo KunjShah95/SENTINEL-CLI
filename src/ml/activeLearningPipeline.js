@@ -1,9 +1,9 @@
 /**
  * ACTIVE LEARNING PIPELINE
- * 
+ *
  * Inspired by Andrew Ng's work on data-centric AI and active learning.
  * This system intelligently selects the most valuable samples for labeling.
- * 
+ *
  * Key Features:
  * - Uncertainty sampling
  * - Query-by-Committee
@@ -56,10 +56,10 @@ export class ActiveLearningPipeline extends EventEmitter {
     this.unlabeledData = [];
     this.labeledData = [];
     this.queryHistory = [];
-    
+
     // Committee models for QBC
     this.committeeModels = [];
-    
+
     // Statistics
     this.statistics = {
       totalQueries: 0,
@@ -135,31 +135,31 @@ export class ActiveLearningPipeline extends EventEmitter {
    */
   async selectSamples(count = null) {
     const batchSize = count || this.options.batchSize;
-    
+
     if (this.unlabeledData.length === 0) {
       return [];
     }
 
     let selectedSamples;
-    
+
     switch (this.options.strategy) {
-      case SamplingStrategy.UNCERTAINTY:
-        selectedSamples = await this._uncertaintySampling(batchSize);
-        break;
-      case SamplingStrategy.MARGIN:
-        selectedSamples = await this._marginSampling(batchSize);
-        break;
-      case SamplingStrategy.ENTROPY:
-        selectedSamples = await this._entropySampling(batchSize);
-        break;
-      case SamplingStrategy.QUERY_BY_COMMITTEE:
-        selectedSamples = await this._queryByCommittee(batchSize);
-        break;
-      case SamplingStrategy.DIVERSITY:
-        selectedSamples = await this._diversitySampling(batchSize);
-        break;
-      default:
-        selectedSamples = await this._uncertaintySampling(batchSize);
+    case SamplingStrategy.UNCERTAINTY:
+      selectedSamples = await this._uncertaintySampling(batchSize);
+      break;
+    case SamplingStrategy.MARGIN:
+      selectedSamples = await this._marginSampling(batchSize);
+      break;
+    case SamplingStrategy.ENTROPY:
+      selectedSamples = await this._entropySampling(batchSize);
+      break;
+    case SamplingStrategy.QUERY_BY_COMMITTEE:
+      selectedSamples = await this._queryByCommittee(batchSize);
+      break;
+    case SamplingStrategy.DIVERSITY:
+      selectedSamples = await this._diversitySampling(batchSize);
+      break;
+    default:
+      selectedSamples = await this._uncertaintySampling(batchSize);
     }
 
     // Mark samples as queried
@@ -252,17 +252,17 @@ export class ActiveLearningPipeline extends EventEmitter {
     const samplesWithDisagreement = this.unlabeledData
       .filter(s => !s.queried)
       .map(sample => {
-        const predictions = this.committeeModels.map(model => 
+        const predictions = this.committeeModels.map(model =>
           model.predict(sample)
         );
-        
+
         // Calculate disagreement
         const votes = {};
         for (const pred of predictions) {
           const label = pred.label || 'unknown';
           votes[label] = (votes[label] || 0) + 1;
         }
-        
+
         const disagreement = 1 - (Math.max(...Object.values(votes)) / predictions.length);
         return { ...sample, disagreement };
       })
@@ -278,9 +278,9 @@ export class ActiveLearningPipeline extends EventEmitter {
     // Simple diversity: select samples that are farthest from each other
     const selected = [];
     const remaining = this.unlabeledData.filter(s => !s.queried);
-    
+
     if (remaining.length === 0) return [];
-    
+
     // Start with most uncertain
     const first = await this._uncertaintySampling(1);
     if (first.length > 0) {
@@ -298,7 +298,7 @@ export class ActiveLearningPipeline extends EventEmitter {
         const minDistance = Math.min(
           ...selected.map(s => this._distance(s, candidate))
         );
-        
+
         if (minDistance > bestMinDistance) {
           bestMinDistance = minDistance;
           bestCandidate = candidate;
@@ -324,16 +324,16 @@ export class ActiveLearningPipeline extends EventEmitter {
     // Simple Hamming-like distance for demonstration
     const features1 = sample1.features || {};
     const features2 = sample2.features || {};
-    
+
     let distance = 0;
     const allKeys = new Set([...Object.keys(features1), ...Object.keys(features2)]);
-    
+
     for (const key of allKeys) {
       const v1 = features1[key] || 0;
       const v2 = features2[key] || 0;
       distance += Math.abs(v1 - v2);
     }
-    
+
     return distance;
   }
 
@@ -343,33 +343,33 @@ export class ActiveLearningPipeline extends EventEmitter {
   async addLabeledSample(sample, label) {
     // Find in unlabeled and move to labeled
     const idx = this.unlabeledData.findIndex(s => s.id === sample.id);
-    
+
     const labeledSample = {
       ...sample,
       label,
       labeledAt: Date.now()
     };
-    
+
     if (idx !== -1) {
       this.unlabeledData.splice(idx, 1);
     }
-    
+
     this.labeledData.push(labeledSample);
-    
+
     // Update label distribution
-    this.statistics.labelDistribution[label] = 
+    this.statistics.labelDistribution[label] =
       (this.statistics.labelDistribution[label] || 0) + 1;
-    
+
     // Update ratios
-    this.performanceMetrics.labeledRatio = 
+    this.performanceMetrics.labeledRatio =
       this.labeledData.length / (this.labeledData.length + this.unlabeledData.length);
     this.performanceMetrics.unlabeledRatio = 1 - this.performanceMetrics.labeledRatio;
-    
+
     // Re-evaluate performance
     await this._evaluatePerformance();
-    
+
     this.emit('sample:labeled', { sample: labeledSample, label });
-    
+
     return labeledSample;
   }
 
@@ -380,7 +380,7 @@ export class ActiveLearningPipeline extends EventEmitter {
     for (const { sample, label } of labeledSamples) {
       await this.addLabeledSample(sample, label);
     }
-    
+
     this.emit('batch:labeled', { count: labeledSamples.length });
   }
 
@@ -401,9 +401,9 @@ export class ActiveLearningPipeline extends EventEmitter {
         correct++;
       }
     }
-    
+
     this.performanceMetrics.currentAccuracy = correct / this.labeledData.length;
-    
+
     // Track improvement
     if (this.statistics.totalQueries > 0) {
       this.statistics.improvementHistory.push({
@@ -419,26 +419,26 @@ export class ActiveLearningPipeline extends EventEmitter {
    */
   getLabelingSuggestions(count = null) {
     const batchSize = count || this.options.batchSize;
-    
+
     // Get samples that need labeling
     const suggestions = this.unlabeledData
       .filter(s => !s.queried)
       .slice(0, batchSize)
       .map(sample => {
         // Calculate various metrics
-        const uncertainty = sample.prediction?.confidence 
-          ? 1 - Math.abs(sample.prediction.confidence - 0.5) * 2 
+        const uncertainty = sample.prediction?.confidence
+          ? 1 - Math.abs(sample.prediction.confidence - 0.5) * 2
           : 1;
-        
+
         // Determine suggestion type
         let suggestionType = QueryType.MANUAL;
         let suggestedLabel = null;
-        
+
         if (sample.prediction?.confidence > 0.9) {
           suggestionType = QueryType.SEMI_AUTOMATIC;
           suggestedLabel = sample.prediction.label;
         }
-        
+
         return {
           id: sample.id,
           sample,
@@ -450,7 +450,7 @@ export class ActiveLearningPipeline extends EventEmitter {
         };
       })
       .sort((a, b) => b.uncertainty - a.uncertainty);
-    
+
     return suggestions;
   }
 
@@ -527,8 +527,8 @@ export class ActiveLearningPipeline extends EventEmitter {
       ...this.statistics,
       labeledDistribution: this.statistics.labelDistribution,
       totalDataSize: this.labeledData.length + this.unlabeledData.length,
-      labelEfficiency: this.labeledData.length > 0 
-        ? this.performanceMetrics.currentAccuracy / this.labeledData.length 
+      labelEfficiency: this.labeledData.length > 0
+        ? this.performanceMetrics.currentAccuracy / this.labeledData.length
         : 0
     };
   }

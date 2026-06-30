@@ -23,19 +23,19 @@ export class EmbeddingProvider {
 
   async initialize() {
     switch (this.options.provider) {
-      case 'openai':
-        await this.initializeOpenAI();
-        break;
-      case 'huggingface':
-        await this.initializeHuggingFace();
-        break;
-      case 'local':
-        await this.initializeLocal();
-        break;
-      case 'tfidf':
-      default:
-        this.initializeTFIDF();
-        break;
+    case 'openai':
+      await this.initializeOpenAI();
+      break;
+    case 'huggingface':
+      await this.initializeHuggingFace();
+      break;
+    case 'local':
+      await this.initializeLocal();
+      break;
+    case 'tfidf':
+    default:
+      this.initializeTFIDF();
+      break;
     }
     this.initialized = true;
   }
@@ -87,15 +87,15 @@ export class EmbeddingProvider {
     }
 
     switch (this.options.provider) {
-      case 'openai':
-        return await this.getOpenAIEmbedding(text);
-      case 'huggingface':
-        return await this.getHuggingFaceEmbedding(text);
-      case 'local':
-        return await this.getLocalEmbedding(text);
-      case 'tfidf':
-      default:
-        return this.getTFIDFEmbedding(text);
+    case 'openai':
+      return await this.getOpenAIEmbedding(text);
+    case 'huggingface':
+      return await this.getHuggingFaceEmbedding(text);
+    case 'local':
+      return await this.getLocalEmbedding(text);
+    case 'tfidf':
+    default:
+      return this.getTFIDFEmbedding(text);
     }
   }
 

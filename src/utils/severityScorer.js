@@ -15,7 +15,7 @@ export class SeverityScorer {
         low: 1.0,
         info: 0.0
       },
-      
+
       // Contextual multipliers
       contextMultipliers: {
         // File type risk
@@ -23,7 +23,7 @@ export class SeverityScorer {
         authenticationFiles: 1.5, // auth, jwt, oauth files
         databaseFiles: 1.3,    // database connection/config files
         apiFiles: 1.1,         // API endpoint files
-        
+
         // Vulnerability type risk
         sqlInjection: 1.4,
         xss: 1.2,
@@ -33,14 +33,14 @@ export class SeverityScorer {
         authorization: 1.3,
         cryptography: 1.2,
         secrets: 1.6, // Secrets exposure is very high risk
-        
+
         // Exploitability factors
         remoteExploitable: 1.3,
         requiresUserInteraction: 0.8,
         networkAccessible: 1.2,
         noAuthenticationRequired: 1.1
       },
-      
+
       // Business impact factors
       businessImpact: {
         paymentProcessing: 1.5,
@@ -49,7 +49,7 @@ export class SeverityScorer {
         administrativeFunctions: 1.3,
         dataExport: 1.2
       },
-      
+
       // Remediation complexity
       remediationComplexity: {
         simple: 0.9,      // Easy to fix
@@ -57,10 +57,10 @@ export class SeverityScorer {
         complex: 1.1,     // Hard to fix
         architectural: 1.3 // Requires architecture changes
       },
-      
+
       ...config
     };
-    
+
     this.severityWeights = {
       critical: 10,
       high: 8,
@@ -80,16 +80,16 @@ export class SeverityScorer {
     const exploitabilityScore = this.calculateExploitabilityScore(issue);
     const businessImpactScore = this.calculateBusinessImpactScore(issue);
     const remediationScore = this.calculateRemediationScore(issue);
-    
+
     // Weighted combination of factors
-    const finalScore = Math.min(100, Math.max(0, 
+    const finalScore = Math.min(100, Math.max(0,
       (baseScore * 0.4) +
       (contextualScore * 0.2) +
       (exploitabilityScore * 0.2) +
       (businessImpactScore * 0.1) +
       (remediationScore * 0.1)
     ));
-    
+
     return {
       score: Math.round(finalScore),
       breakdown: {
@@ -116,32 +116,32 @@ export class SeverityScorer {
    */
   calculateContextualRisk(issue) {
     let multiplier = 1.0;
-    
+
     // File type analysis
     const filePath = issue.file?.toLowerCase() || '';
-    
+
     if (this.isConfigFile(filePath)) {
       multiplier *= this.config.contextMultipliers.configFiles;
     }
-    
+
     if (this.isAuthenticationFile(filePath)) {
       multiplier *= this.config.contextMultipliers.authenticationFiles;
     }
-    
+
     if (this.isDatabaseFile(filePath)) {
       multiplier *= this.config.contextMultipliers.databaseFiles;
     }
-    
+
     if (this.isAPIFile(filePath)) {
       multiplier *= this.config.contextMultipliers.apiFiles;
     }
-    
+
     // Vulnerability type analysis
     const vulnerabilityType = this.categorizeVulnerability(issue);
     if (this.config.contextMultipliers[vulnerabilityType]) {
       multiplier *= this.config.contextMultipliers[vulnerabilityType];
     }
-    
+
     return Math.min(100, this.getBaseScore(issue.severity) * multiplier);
   }
 
@@ -149,28 +149,28 @@ export class SeverityScorer {
    * Calculate exploitability score based on vulnerability characteristics
    */
   calculateExploitabilityScore(issue) {
-    let score = this.getBaseScore(issue.severity);
+    const score = this.getBaseScore(issue.severity);
     let multiplier = 1.0;
-    
+
     const message = issue.message?.toLowerCase() || '';
     const title = issue.title?.toLowerCase() || '';
     const combined = `${title} ${message}`;
-    
+
     // Check for remote exploitability indicators
     if (this.containsAny(combined, ['remote', 'network', 'http', 'https', 'api'])) {
       multiplier *= this.config.contextMultipliers.remoteExploitable;
     }
-    
+
     // Check if authentication is required
     if (this.containsAny(combined, ['no auth', 'without authentication', 'anonymous'])) {
       multiplier *= this.config.contextMultipliers.noAuthenticationRequired;
     }
-    
+
     // Check if user interaction is required (reduces risk)
     if (this.containsAny(combined, ['user interaction', 'social engineering', 'click'])) {
       multiplier *= this.config.contextMultipliers.requiresUserInteraction;
     }
-    
+
     return Math.min(100, score * multiplier);
   }
 
@@ -178,34 +178,34 @@ export class SeverityScorer {
    * Calculate business impact score
    */
   calculateBusinessImpactScore(issue) {
-    let score = this.getBaseScore(issue.severity);
+    const score = this.getBaseScore(issue.severity);
     let multiplier = 1.0;
-    
+
     const message = issue.message?.toLowerCase() || '';
     const title = issue.title?.toLowerCase() || '';
     const combined = `${title} ${message}`;
-    
+
     // Check for high-impact keywords
     if (this.containsAny(combined, ['payment', 'credit card', 'billing', 'transaction'])) {
       multiplier *= this.config.businessImpact.paymentProcessing;
     }
-    
+
     if (this.containsAny(combined, ['user data', 'personal', 'pii', 'privacy', 'gdpr'])) {
       multiplier *= this.config.businessImpact.userData;
     }
-    
+
     if (this.containsAny(combined, ['auth', 'login', 'password', 'session'])) {
       multiplier *= this.config.businessImpact.authentication;
     }
-    
+
     if (this.containsAny(combined, ['admin', 'administrator', 'root', 'privilege'])) {
       multiplier *= this.config.businessImpact.administrativeFunctions;
     }
-    
+
     if (this.containsAny(combined, ['export', 'download', 'backup', 'dump'])) {
       multiplier *= this.config.businessImpact.dataExport;
     }
-    
+
     return Math.min(100, score * multiplier);
   }
 
@@ -213,11 +213,11 @@ export class SeverityScorer {
    * Calculate remediation complexity score
    */
   calculateRemediationScore(issue) {
-    let score = this.getBaseScore(issue.severity);
+    const score = this.getBaseScore(issue.severity);
     let multiplier = 1.0;
-    
+
     const suggestion = issue.suggestion?.toLowerCase() || '';
-    
+
     // Analyze remediation complexity from suggestions
     if (this.containsAny(suggestion, ['simple', 'easily', 'just', 'remove'])) {
       multiplier *= this.config.remediationComplexity.simple;
@@ -226,7 +226,7 @@ export class SeverityScorer {
     } else if (this.containsAny(suggestion, ['complex', 'difficult', 'significant'])) {
       multiplier *= this.config.remediationComplexity.complex;
     }
-    
+
     return Math.min(100, score * multiplier);
   }
 
@@ -235,23 +235,23 @@ export class SeverityScorer {
    */
   calculateConfidence(issue) {
     let confidence = 0.7; // Base confidence
-    
+
     // Higher confidence for specific vulnerability patterns
     const title = issue.title?.toLowerCase() || '';
     const message = issue.message?.toLowerCase() || '';
-    
+
     if (this.containsAny(`${title} ${message}`, ['cve', 'cvss', 'known vulnerability'])) {
       confidence += 0.2;
     }
-    
+
     if (issue.tags && issue.tags.length > 0) {
       confidence += 0.1;
     }
-    
+
     if (issue.snippet) {
       confidence += 0.1;
     }
-    
+
     return Math.min(1.0, confidence);
   }
 
@@ -271,7 +271,7 @@ export class SeverityScorer {
    */
   categorizeVulnerability(issue) {
     const text = `${issue.title} ${issue.message}`.toLowerCase();
-    
+
     if (this.containsAny(text, ['sql', 'injection', 'query'])) return 'sqlInjection';
     if (this.containsAny(text, ['xss', 'cross-site', 'scripting'])) return 'xss';
     if (this.containsAny(text, ['csrf', 'cross-site request'])) return 'csrf';
@@ -280,7 +280,7 @@ export class SeverityScorer {
     if (this.containsAny(text, ['permission', 'authorization', 'access control'])) return 'authorization';
     if (this.containsAny(text, ['crypto', 'hash', 'encryption', 'md5', 'sha1'])) return 'cryptography';
     if (this.containsAny(text, ['secret', 'key', 'token', 'credential'])) return 'secrets';
-    
+
     return 'general';
   }
 
@@ -336,7 +336,7 @@ export class SeverityScorer {
    */
   generatePriorityReport(issues) {
     const prioritizedIssues = this.prioritizeIssues(issues);
-    
+
     const report = {
       summary: {
         totalIssues: issues.length,
@@ -354,10 +354,10 @@ export class SeverityScorer {
       },
       recommendations: this.generateRecommendations(prioritizedIssues)
     };
-    
+
     for (const issue of prioritizedIssues) {
       report.summary.totalScore += issue.riskScore.score;
-      
+
       if (issue.riskScore.score >= 80) {
         report.summary.criticalCount++;
         report.summary.highPriorityCount++;
@@ -373,10 +373,10 @@ export class SeverityScorer {
         report.priorities['P4 - Informational'].push(issue);
       }
     }
-    
-    report.summary.averageScore = issues.length > 0 ? 
+
+    report.summary.averageScore = issues.length > 0 ?
       Math.round(report.summary.totalScore / issues.length) : 0;
-    
+
     return report;
   }
 
@@ -385,10 +385,10 @@ export class SeverityScorer {
    */
   generateRecommendations(prioritizedIssues) {
     const recommendations = [];
-    
+
     // Top 3 highest priority issues
     const topIssues = prioritizedIssues.slice(0, 3);
-    
+
     for (let i = 0; i < topIssues.length; i++) {
       const issue = topIssues[i];
       recommendations.push({
@@ -403,7 +403,7 @@ export class SeverityScorer {
         businessImpact: this.assessBusinessImpact(issue)
       });
     }
-    
+
     return recommendations;
   }
 
@@ -412,7 +412,7 @@ export class SeverityScorer {
    */
   generateIssueRecommendation(issue) {
     const baseRecommendation = issue.suggestion || 'Review and remediate this issue';
-    
+
     if (issue.riskScore.score >= 80) {
       return `URGENT: ${baseRecommendation} - This issue poses critical risk to your application.`;
     } else if (issue.riskScore.score >= 65) {
@@ -429,7 +429,7 @@ export class SeverityScorer {
    */
   estimateRemediationEffort(issue) {
     const suggestion = issue.suggestion?.toLowerCase() || '';
-    
+
     if (this.containsAny(suggestion, ['simple', 'easily', 'remove', 'delete'])) {
       return '1-2 hours';
     } else if (this.containsAny(suggestion, ['refactor', 'redesign', 'architecture'])) {

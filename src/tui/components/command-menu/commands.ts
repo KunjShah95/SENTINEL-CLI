@@ -74,6 +74,12 @@ export const COMMANDS: Command[] = [
     category: 'scan',
   },
   {
+    name: 'fix',
+    description: 'Autonomous fix loop: scan→fix→re-scan proof (e.g. /fix src/ --write)',
+    value: '/fix',
+    category: 'actions',
+  },
+  {
     name: 'help',
     description: 'Show help and available commands',
     value: '/help',

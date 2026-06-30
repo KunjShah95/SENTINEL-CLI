@@ -312,10 +312,10 @@ export default new {{Name}}Service();`
     try {
       const dir = path.dirname(fullPath);
       await this.ensureDir(dir);
-      
+
       await writeFileAsync(fullPath, content, options.encoding || 'utf8');
       const stats = await statAsync(fullPath);
-      
+
       return {
         success: true,
         path: fullPath,
@@ -334,7 +334,7 @@ export default new {{Name}}Service();`
 
   async edit(filePath, changes) {
     const fullPath = this.resolvePath(filePath);
-    
+
     try {
       const original = await readFileAsync(fullPath, 'utf8');
       let modified = original;
@@ -369,9 +369,9 @@ export default new {{Name}}Service();`
       }
 
       await writeFileAsync(fullPath, modified, 'utf8');
-      
+
       const diff = diffLines(original, modified);
-      
+
       return {
         success: true,
         path: fullPath,
@@ -415,14 +415,14 @@ export default new {{Name}}Service();`
   async copy(source, destination) {
     const srcPath = this.resolvePath(source);
     const destPath = this.resolvePath(destination);
-    
+
     try {
       const dir = path.dirname(destPath);
       await this.ensureDir(dir);
-      
+
       await copyFileAsync(srcPath, destPath);
       const stats = await statAsync(destPath);
-      
+
       return {
         success: true,
         source: srcPath,
@@ -482,10 +482,10 @@ export default new {{Name}}Service();`
   }
 
   async glob(pattern, options = {}) {
-    const fullPattern = path.isAbsolute(pattern) 
-      ? pattern 
+    const fullPattern = path.isAbsolute(pattern)
+      ? pattern
       : path.join(this.basePath, pattern);
-    
+
     try {
       const files = await globAsync(fullPattern, {
         cwd: this.basePath,
@@ -494,7 +494,7 @@ export default new {{Name}}Service();`
         dot: options.dot || false,
         deep: options.deep !== undefined ? options.deep : -1
       });
-      
+
       return {
         success: true,
         pattern,
@@ -516,11 +516,11 @@ export default new {{Name}}Service();`
     try {
       const entries = await readdirAsync(fullPath);
       const items = [];
-      
+
       for (const entry of entries) {
         const entryPath = path.join(fullPath, entry);
         const stats = await statAsync(entryPath);
-        
+
         items.push({
           name: entry,
           path: entryPath,
@@ -531,7 +531,7 @@ export default new {{Name}}Service();`
           modified: stats.mtime
         });
       }
-      
+
       if (options.sort !== false) {
         items.sort((a, b) => {
           if (a.isDirectory !== b.isDirectory) {
@@ -540,7 +540,7 @@ export default new {{Name}}Service();`
           return a.name.localeCompare(b.name);
         });
       }
-      
+
       return {
         success: true,
         path: fullPath,
@@ -560,10 +560,10 @@ export default new {{Name}}Service();`
   async tree(dirPath = '.', options = {}) {
     const maxDepth = options.depth || 3;
     const result = [];
-    
+
     const traverse = async (dir, depth = 0) => {
       if (depth > maxDepth) return;
-      
+
       const items = await this.list(dir, { sort: true });
       for (const item of items.items) {
         result.push({
@@ -572,15 +572,15 @@ export default new {{Name}}Service();`
           size: item.size,
           depth
         });
-        
+
         if (item.isDirectory && depth < maxDepth) {
           await traverse(item.path, depth + 1);
         }
       }
     };
-    
+
     await traverse(dirPath);
-    
+
     return {
       success: true,
       path: this.resolvePath(dirPath),

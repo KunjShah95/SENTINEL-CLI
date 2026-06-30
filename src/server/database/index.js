@@ -5,7 +5,7 @@
  *   import { getDatabase, createSession } from "@sentinel/database";
  */
 
-export { getDatabase, setDatabase, resetDatabase, JsonAdapter, SqliteAdapter, PrismaAdapter } from "./adapter.js";
+export { getDatabase, setDatabase, resetDatabase, JsonAdapter, SqliteAdapter, PrismaAdapter } from './adapter.js';
 export {
   createSession,
   getSession,
@@ -15,4 +15,4 @@ export {
   deleteSession,
   recordCredit,
   getUsedCredits,
-} from "./sessions.js";
+} from './sessions.js';

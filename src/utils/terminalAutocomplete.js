@@ -27,38 +27,38 @@ export class TerminalAutocomplete {
       { name: 'auth', description: 'Configure API keys', category: 'main' },
       { name: 'config', description: 'Manage configuration', category: 'main' },
       { name: 'init', description: 'Initialize Sentinel in project', category: 'main' },
-      
+
       // Analysis commands
       { name: 'analyze:security', description: 'Security analysis', category: 'analysis' },
       { name: 'analyze:quality', description: 'Code quality analysis', category: 'analysis' },
       { name: 'analyze:deps', description: 'Dependency analysis', category: 'analysis' },
       { name: 'analyze:secrets', description: 'Secret detection', category: 'analysis' },
-      
+
       // Git commands
       { name: 'git:hooks', description: 'Manage git hooks', category: 'git' },
       { name: 'git:pre-commit', description: 'Run pre-commit checks', category: 'git' },
       { name: 'git:post-commit', description: 'Run post-commit checks', category: 'git' },
-      
+
       // Tool commands
       { name: 'exec', description: 'Execute shell command', category: 'tool' },
       { name: 'run', description: 'Run npm script', category: 'tool' },
       { name: 'test', description: 'Run tests', category: 'tool' },
       { name: 'lint', description: 'Run linter', category: 'tool' },
       { name: 'build', description: 'Build project', category: 'tool' },
-      
+
       // File commands
       { name: 'file:read', description: 'Read file contents', category: 'file' },
       { name: 'file:write', description: 'Write to file', category: 'file' },
       { name: 'file:edit', description: 'Edit file', category: 'file' },
       { name: 'file:glob', description: 'Find files by pattern', category: 'file' },
       { name: 'file:grep', description: 'Search in files', category: 'file' },
-      
+
       // AI commands
       { name: 'ai:ask', description: 'Ask AI a question', category: 'ai' },
       { name: 'ai:explain', description: 'Explain code', category: 'ai' },
       { name: 'ai:generate', description: 'Generate code', category: 'ai' },
       { name: 'ai:refactor', description: 'Refactor code', category: 'ai' },
-      
+
       // Utility commands
       { name: 'help', description: 'Show help', category: 'utility' },
       { name: 'version', description: 'Show version', category: 'utility' },
@@ -131,7 +131,7 @@ export class TerminalAutocomplete {
     };
 
     const commandOptions = options[command] || ['--help', '--verbose', '--json'];
-    
+
     return commandOptions
       .filter(o => o.startsWith(prefix))
       .map(o => ({
@@ -184,14 +184,14 @@ export class TerminalAutocomplete {
   async getFileCompletions(prefix) {
     const cacheKey = `files:${prefix}`;
     const cached = this.cache.get(cacheKey);
-    
+
     if (cached && Date.now() - cached.timestamp < this.cacheTimeout) {
       return cached.results;
     }
 
     try {
       const isDir = prefix.endsWith('/') || prefix === '';
-      const searchPattern = isDir 
+      const searchPattern = isDir
         ? `${prefix}*`
         : `${prefix}*`;
 
@@ -264,8 +264,8 @@ export class TerminalAutocomplete {
         '_sentinel_completions() {',
         '  local cur prev opts',
         '  COMPREPLY=()',
-        "  cur=\"${COMP_WORDS[COMP_CWORD]}\"",
-        "  prev=\"${COMP_WORDS[COMP_CWORD-1]}\"",
+        '  cur="${COMP_WORDS[COMP_CWORD]}"',
+        '  prev="${COMP_WORDS[COMP_CWORD-1]}"',
         '',
         '  opts="analyze scan fix review auth config init exec run test lint build file:read file:write file:edit file:glob file:grep ai:ask ai:explain ai:generate ai:refactor help version status dashboard"',
         '',
@@ -343,10 +343,10 @@ compdef _sentinel sentinel
 
     try {
       await fs.writeFile(installPath, script);
-      return { 
-        success: true, 
+      return {
+        success: true,
         installPath,
-        instructions: shell === 'bash' 
+        instructions: shell === 'bash'
           ? `Add to ~/.bashrc: source ${installPath}`
           : `Add to ~/.zshrc: fpath+=${path.dirname(installPath)}`
       };

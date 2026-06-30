@@ -12,6 +12,11 @@ export class BaseAnalyzer {
     // Configuration for parallel processing
     this.parallelChunkSize = config?.parallelChunkSize || 10;
     this.enableParallel = config?.enableParallel !== false;
+    this.ruleEngine = null;
+  }
+
+  async setRuleEngine(engine) {
+    this.ruleEngine = engine;
   }
 
   /**
@@ -131,17 +136,19 @@ export class BaseAnalyzer {
    * Check if file should be analyzed based on configuration
    */
   shouldAnalyzeFile(filePath) {
+    if (this.ruleEngine) {
+      return this.ruleEngine.shouldAnalyze(filePath);
+    }
+
     const ignoredFiles = this.config.getIgnoredFiles();
     const supportedLanguages = this.config.getSupportedLanguages();
 
-    // Check if file is in ignored patterns
     for (const pattern of ignoredFiles) {
       if (this.matchesPattern(filePath, pattern)) {
         return false;
       }
     }
 
-    // Check if file extension is supported
     const extension = filePath.split('.').pop()?.toLowerCase();
     const languageMap = {
       js: 'javascript',

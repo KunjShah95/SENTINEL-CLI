@@ -204,7 +204,7 @@ export class DoctorCommand {
         name: 'Dependencies',
         status: 'pass',
         message: 'Installed',
-        details: `node_modules ready`,
+        details: 'node_modules ready',
       };
     } catch (e) {
       return {

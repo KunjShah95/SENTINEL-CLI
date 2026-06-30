@@ -120,13 +120,13 @@ export class IntentAwareAnalysis {
 
   async analyzeFunction(filePath, functionCode, issue) {
     const cacheKey = `${filePath}:${functionCode.substring(0, 50)}`;
-    
+
     if (this.cache.has(cacheKey)) {
       return this.cache.get(cacheKey);
     }
 
     let intent = await this.detectIntentWithLLM(filePath, functionCode, issue);
-    
+
     if (!intent) {
       intent = this.detectIntentWithPatterns(functionCode);
     }
@@ -149,7 +149,7 @@ export class IntentAwareAnalysis {
     let bestMatch = { type: 'unknown', confidence: 0, explanation: '' };
     for (const [intentType, config] of Object.entries(this.intentPatterns)) {
       let matchCount = 0;
-      
+
       for (const indicator of config.indicators) {
         if (indicator.test(functionCode)) {
           matchCount++;
@@ -157,7 +157,7 @@ export class IntentAwareAnalysis {
       }
 
       const confidence = matchCount / config.indicators.length;
-      
+
       if (confidence > bestMatch.confidence && matchCount > 0) {
         bestMatch = {
           type: intentType,
@@ -209,8 +209,8 @@ Respond in JSON format:
     }
 
     const issueType = (issue?.type || issue?.ruleId || '').toLowerCase();
-    
-    return intentConfig.falsePositives.some(fp => 
+
+    return intentConfig.falsePositives.some(fp =>
       issueType.includes(fp.toLowerCase())
     );
   }
@@ -219,11 +219,11 @@ Respond in JSON format:
     try {
       const content = await fs.readFile(filePath, 'utf-8');
       const functions = this.extractFunctions(content, filePath);
-      
+
       const analyzedIssues = [];
-      
+
       for (const issue of issues) {
-        const relevantFunction = functions.find(f => 
+        const relevantFunction = functions.find(f =>
           f.line <= issue.line && f.endLine >= issue.line
         );
 
@@ -258,7 +258,7 @@ Respond in JSON format:
   extractFunctions(content, _filePath) {
     const functions = [];
     const lines = content.split('\n');
-    
+
     const functionPatterns = [
       /function\s+(\w+)/,
       /const\s+(\w+)\s*=\s*(?:async\s*)?\(/,
@@ -273,14 +273,14 @@ Respond in JSON format:
         if (match) {
           const functionName = match[1];
           const startLine = i + 1;
-          
+
           let braceCount = 0;
           let endLine = i;
-          
+
           for (let j = i; j < lines.length && j < i + 100; j++) {
             braceCount += (lines[j].match(/{/g) || []).length;
             braceCount -= (lines[j].match(/}/g) || []).length;
-            
+
             if (braceCount === 0 && j > i) {
               endLine = j + 1;
               break;
@@ -293,7 +293,7 @@ Respond in JSON format:
             endLine,
             code: lines.slice(i, endLine).join('\n')
           });
-          
+
           i = endLine - 1;
           break;
         }
@@ -305,7 +305,7 @@ Respond in JSON format:
 
   async batchAnalyze(projectPath, issues) {
     const byFile = {};
-    
+
     for (const issue of issues) {
       if (!byFile[issue.file]) {
         byFile[issue.file] = [];
@@ -314,7 +314,7 @@ Respond in JSON format:
     }
 
     const results = [];
-    
+
     for (const [file, fileIssues] of Object.entries(byFile)) {
       const analyzed = await this.analyzeFile(file, fileIssues);
       results.push(...analyzed);

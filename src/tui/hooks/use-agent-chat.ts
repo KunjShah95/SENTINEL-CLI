@@ -53,12 +53,16 @@ function buildLocalSystemPrompt(mode: string) {
   return 'You are a senior software engineer working in a terminal. You have access to tools: readFile, listDirectory, glob, grep, searchWeb, writeFile, editFile, batchEdit, bash. You can read, write, and execute commands. Be thorough and precise.';
 }
 
+type PermissionResult = 'allow' | 'deny' | 'allow-session';
+
 type UseAgentChatOptions = {
   initialSessionId?: string;
   initialMode?: AgentMode;
   initialModel?: string;
   /** Function to navigate to a new route (e.g. /sessions/new). */
   onSessionCreated?: (id: string) => void;
+  /** Callback to request user permission before executing tools. Return 'deny' to skip, 'allow' for one-time, 'allow-session' to auto-allow for the session. */
+  onPermissionRequest?: (toolName: string, toolCallId: string, input: unknown) => Promise<PermissionResult>;
 };
 
 export function useAgentChat(options: UseAgentChatOptions = {}) {
@@ -330,7 +334,12 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
               systemPrompt = buildLocalSystemPrompt(modeRef.current);
             }
             const { getLLMOrchestrator } = await import("../../llm/llmOrchestrator.js");
-            const orchestrator = getLLMOrchestrator({});
+            const fallbackModelId = modelRef.current || '';
+            const isOllama = fallbackModelId.startsWith('ollama/');
+            const orchestrator = getLLMOrchestrator(isOllama ? {
+              provider: 'ollama',
+              model: fallbackModelId.replace(/^ollama\//, ''),
+            } : {});
             const stream = await orchestrator.streamChat(userText, { systemPrompt });
             for await (const chunk of stream) {
               if (ctrl.signal.aborted) break;
@@ -444,6 +453,24 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
           // Execute the tool locally. PLAN mode blocks write/edit/bash.
           (async () => {
             try {
+              // Check permission before executing the tool
+              if (options.onPermissionRequest) {
+                const permission = await options.onPermissionRequest(toolName, toolCallId, input);
+                if (permission === 'deny') {
+                  updateLastMessage((msg) => {
+                    if (msg.id !== assistantId) return msg;
+                    return {
+                      ...msg,
+                      parts: msg.parts.map((p) =>
+                        p.type === "tool-call" && p.toolCallId === toolCallId
+                          ? { ...p, state: "output-error", errorText: "User denied permission" }
+                          : p
+                      ),
+                    };
+                  });
+                  return;
+                }
+              }
               const output = await runLocalTool(toolName, input, modeRef.current);
               if (abortRef.current?.signal.aborted) return;
               updateLastMessage((msg) => {

@@ -24,7 +24,7 @@ export class AgentLearningSystem {
     try {
       const dir = path.dirname(this.storagePath);
       await fs.mkdir(dir, { recursive: true });
-      
+
       try {
         const content = await fs.readFile(this.storagePath, 'utf-8');
         this.data = { ...this.data, ...JSON.parse(content) };
@@ -86,7 +86,7 @@ export class AgentLearningSystem {
 
     const perf = this.data.agentPerformance[agentType];
     perf.totalTasks++;
-    
+
     if (result.success) {
       perf.successfulTasks++;
     } else {
@@ -112,11 +112,11 @@ export class AgentLearningSystem {
    */
   recordSuccessPattern(agentType, task) {
     const key = this.getPatternKey(task);
-    
+
     if (!this.data.successPatterns[agentType]) {
       this.data.successPatterns[agentType] = {};
     }
-    
+
     if (!this.data.successPatterns[agentType][key]) {
       this.data.successPatterns[agentType][key] = {
         count: 0,
@@ -126,7 +126,7 @@ export class AgentLearningSystem {
 
     const pattern = this.data.successPatterns[agentType][key];
     pattern.count++;
-    
+
     if (pattern.examples.length < 5) {
       pattern.examples.push({
         task: task.type,
@@ -141,11 +141,11 @@ export class AgentLearningSystem {
   recordErrorPattern(agentType, task, error) {
     const key = this.getPatternKey(task);
     const errorType = this.categorizeError(error);
-    
+
     if (!this.data.errorPatterns[agentType]) {
       this.data.errorPatterns[agentType] = {};
     }
-    
+
     if (!this.data.errorPatterns[agentType][errorType]) {
       this.data.errorPatterns[agentType][errorType] = {
         count: 0,
@@ -157,7 +157,7 @@ export class AgentLearningSystem {
     const pattern = this.data.errorPatterns[agentType][errorType];
     pattern.count++;
     pattern.lastError = error;
-    
+
     if (pattern.tasks.length < 10) {
       pattern.tasks.push({
         task: task.type,
@@ -183,16 +183,16 @@ export class AgentLearningSystem {
    */
   categorizeError(error) {
     if (!error) return 'unknown';
-    
+
     const errorStr = String(error).toLowerCase();
-    
+
     if (errorStr.includes('timeout')) return 'timeout';
     if (errorStr.includes('parse') || errorStr.includes('syntax')) return 'parsing';
     if (errorStr.includes('network') || errorStr.includes('fetch')) return 'network';
     if (errorStr.includes('auth') || errorStr.includes('permission')) return 'auth';
     if (errorStr.includes('memory')) return 'memory';
     if (errorStr.includes('not found') || errorStr.includes('enoent')) return 'not_found';
-    
+
     return 'other';
   }
 
@@ -283,7 +283,7 @@ export class AgentLearningSystem {
       not_found: 'Verify file paths and resource availability',
       other: 'Review error details and handle appropriately'
     };
-    
+
     return suggestions[errorType] || suggestions.other;
   }
 
@@ -293,7 +293,7 @@ export class AgentLearningSystem {
   getStats() {
     const totalTasks = Object.values(this.data.agentPerformance)
       .reduce((sum, p) => sum + p.totalTasks, 0);
-    
+
     const successfulTasks = Object.values(this.data.agentPerformance)
       .reduce((sum, p) => sum + p.successfulTasks, 0);
 
@@ -320,7 +320,7 @@ export class AgentLearningSystem {
       errorPatterns: {},
       recommendations: {}
     };
-    
+
     await this.save();
     return { success: true };
   }

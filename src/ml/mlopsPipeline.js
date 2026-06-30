@@ -1,9 +1,9 @@
 /**
  * MLOPS PIPELINE
- * 
+ *
  * Inspired by Andrew Ng's MLOps principles and DeepMind's production ML systems.
  * Provides model lifecycle management, versioning, and deployment capabilities.
- * 
+ *
  * Key Features:
  * - Model registry
  * - Version control
@@ -54,16 +54,16 @@ export class MLOpsPipeline extends EventEmitter {
 
     // Model registry
     this.registry = new Map();
-    
+
     // Deployment status
     this.deployments = new Map();
-    
+
     // A/B tests
     this.abTests = new Map();
-    
+
     // Current active model
     this.activeModel = null;
-    
+
     // Metrics
     this.metrics = {
       totalModels: 0,
@@ -71,7 +71,7 @@ export class MLOpsPipeline extends EventEmitter {
       failedDeployments: 0,
       rollbacks: 0
     };
-    
+
     // Ensure model directory exists
     this._ensureModelDirectory();
   }
@@ -90,7 +90,7 @@ export class MLOpsPipeline extends EventEmitter {
    */
   async registerModel(modelConfig) {
     const modelId = `model-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
-    
+
     const model = {
       id: modelId,
       name: modelConfig.name,
@@ -110,15 +110,15 @@ export class MLOpsPipeline extends EventEmitter {
 
     // Save model to registry
     this.registry.set(modelId, model);
-    
+
     // Save model file
     await this._saveModelFile(model);
-    
+
     // Update metrics
     this.metrics.totalModels++;
-    
+
     this.emit('model:registered', model);
-    
+
     return model;
   }
 
@@ -127,10 +127,10 @@ export class MLOpsPipeline extends EventEmitter {
    */
   async _saveModelFile(model) {
     const modelPath = path.join(
-      this.options.modelDir, 
+      this.options.modelDir,
       `${model.name}-${model.version}.json`
     );
-    
+
     fs.writeFileSync(modelPath, JSON.stringify(model, null, 2));
   }
 
@@ -183,11 +183,11 @@ export class MLOpsPipeline extends EventEmitter {
     model.status = status;
     model.updatedAt = Date.now();
     model.metadata = { ...model.metadata, ...metadata };
-    
+
     await this._saveModelFile(model);
-    
+
     this.emit('model:status_updated', { modelId, status });
-    
+
     return model;
   }
 
@@ -202,11 +202,11 @@ export class MLOpsPipeline extends EventEmitter {
 
     model.metrics = { ...model.metrics, ...metrics };
     model.updatedAt = Date.now();
-    
+
     await this._saveModelFile(model);
-    
+
     this.emit('model:metrics_updated', { modelId, metrics });
-    
+
     return model;
   }
 
@@ -233,24 +233,24 @@ export class MLOpsPipeline extends EventEmitter {
 
     // Update model status
     await this.updateModelStatus(modelId, ModelStatus.DEPLOYED);
-    
+
     // Save deployment
     this.deployments.set(deployment.id, deployment);
-    
+
     // Set as active model
     this.activeModel = model;
     this.metrics.deployedModels++;
-    
+
     deployment.status = 'deployed';
     deployment.completedAt = Date.now();
-    
+
     this.emit('model:deployed', { model, deployment });
-    
+
     // Auto-archive old versions if enabled
     if (this.options.autoArchive) {
       await this._autoArchiveOldVersions(model.name);
     }
-    
+
     return { model, deployment };
   }
 
@@ -259,10 +259,10 @@ export class MLOpsPipeline extends EventEmitter {
    */
   async _autoArchiveOldVersions(modelName) {
     const models = this.getModelsByName(modelName);
-    
+
     if (models.length > this.options.maxVersions) {
       const toArchive = models.slice(this.options.maxVersions);
-      
+
       for (const model of toArchive) {
         if (model.status !== ModelStatus.ARCHIVED) {
           await this.updateModelStatus(model.id, ModelStatus.ARCHIVED);
@@ -288,34 +288,34 @@ export class MLOpsPipeline extends EventEmitter {
     // Find previous stable version
     const previousModels = this.getModelsByName(model.name)
       .filter(m => m.id !== model.id && m.status === ModelStatus.DEPLOYED);
-    
+
     if (previousModels.length === 0) {
       throw new Error('No previous version available for rollback');
     }
 
     const previousModel = previousModels[0];
-    
+
     // Archive current
     await this.updateModelStatus(model.id, ModelStatus.ARCHIVED);
-    
+
     // Deploy previous
     const newDeployment = await this.deployModel(previousModel.id);
-    
+
     // Record rollback
     deployment.rollbackHistory.push({
       timestamp: Date.now(),
       toModelId: previousModel.id,
       reason
     });
-    
+
     this.metrics.rollbacks++;
-    
+
     this.emit('deployment:rolled_back', {
       from: model,
       to: previousModel,
       reason
     });
-    
+
     return {
       rolledBack: model,
       rolledTo: previousModel,
@@ -332,10 +332,10 @@ export class MLOpsPipeline extends EventEmitter {
     }
 
     const { modelAId, modelBId, trafficSplit = 50, metrics = [] } = config;
-    
+
     const modelA = this.registry.get(modelAId);
     const modelB = this.registry.get(modelBId);
-    
+
     if (!modelA || !modelB) {
       throw new Error('One or both models not found');
     }
@@ -358,9 +358,9 @@ export class MLOpsPipeline extends EventEmitter {
     };
 
     this.abTests.set(test.id, test);
-    
+
     this.emit('abtest:started', test);
-    
+
     return test;
   }
 
@@ -375,11 +375,11 @@ export class MLOpsPipeline extends EventEmitter {
 
     const variantKey = variant === 'a' ? 'a' : 'b';
     test.results[variantKey].requests++;
-    
+
     if (metric.conversion) {
       test.results[variantKey].conversions++;
     }
-    
+
     this.emit('abtest:metric_recorded', { testId, variant, metric });
   }
 
@@ -395,29 +395,29 @@ export class MLOpsPipeline extends EventEmitter {
     test.status = 'completed';
     test.completedAt = Date.now();
     test.winner = winner;
-    
+
     // Calculate results
-    const aConversionRate = test.results.a.requests > 0 
-      ? test.results.a.conversions / test.results.a.requests 
+    const aConversionRate = test.results.a.requests > 0
+      ? test.results.a.conversions / test.results.a.requests
       : 0;
-    const bConversionRate = test.results.b.requests > 0 
-      ? test.results.b.conversions / test.results.b.requests 
+    const bConversionRate = test.results.b.requests > 0
+      ? test.results.b.conversions / test.results.b.requests
       : 0;
-    
+
     test.results.comparison = {
       a: { conversionRate: aConversionRate, requests: test.results.a.requests },
       b: { conversionRate: bConversionRate, requests: test.results.b.requests },
       winner: aConversionRate > bConversionRate ? 'a' : 'b'
     };
-    
+
     // Deploy winner if specified
     if (winner) {
       const winningModelId = winner === 'a' ? test.modelAId : test.modelBId;
       await this.deployModel(winningModelId);
     }
-    
+
     this.emit('abtest:completed', test);
-    
+
     return test;
   }
 
@@ -429,13 +429,13 @@ export class MLOpsPipeline extends EventEmitter {
     if (!test) {
       return null;
     }
-    
+
     return {
       ...test.results,
       status: test.status,
       winner: test.winner,
-      duration: test.completedAt 
-        ? test.completedAt - test.startedAt 
+      duration: test.completedAt
+        ? test.completedAt - test.startedAt
         : Date.now() - test.startedAt
     };
   }
@@ -452,11 +452,11 @@ export class MLOpsPipeline extends EventEmitter {
    */
   getDeploymentHistory(modelId = null) {
     const deployments = Array.from(this.deployments.values());
-    
+
     if (modelId) {
       return deployments.filter(d => d.modelId === modelId);
     }
-    
+
     return deployments;
   }
 
@@ -465,7 +465,7 @@ export class MLOpsPipeline extends EventEmitter {
    */
   compareModels(modelIds) {
     const models = modelIds.map(id => this.registry.get(id)).filter(Boolean);
-    
+
     if (models.length < 2) {
       return null;
     }
@@ -480,7 +480,7 @@ export class MLOpsPipeline extends EventEmitter {
       })),
       comparisonAt: Date.now()
     };
-    
+
     return comparison;
   }
 
@@ -505,19 +505,19 @@ export class MLOpsPipeline extends EventEmitter {
         this.registry.set(model.id, model);
       }
     }
-    
+
     if (data.deployments) {
       for (const deployment of data.deployments) {
         this.deployments.set(deployment.id, deployment);
       }
     }
-    
+
     if (data.abTests) {
       for (const test of data.abTests) {
         this.abTests.set(test.id, test);
       }
     }
-    
+
     this.emit('registry:imported');
   }
 
@@ -526,7 +526,7 @@ export class MLOpsPipeline extends EventEmitter {
    */
   getStatistics() {
     const models = Array.from(this.registry.values());
-    
+
     return {
       totalModels: models.length,
       deployedModels: models.filter(m => m.status === ModelStatus.DEPLOYED).length,
@@ -562,10 +562,10 @@ export class MLOpsPipeline extends EventEmitter {
 
     // Delete file
     const modelPath = path.join(
-      this.options.modelDir, 
+      this.options.modelDir,
       `${model.name}-${model.version}.json`
     );
-    
+
     if (fs.existsSync(modelPath)) {
       fs.unlinkSync(modelPath);
     }
@@ -573,7 +573,7 @@ export class MLOpsPipeline extends EventEmitter {
     // Remove from registry
     this.registry.delete(modelId);
     this.metrics.totalModels--;
-    
+
     this.emit('model:deleted', { modelId });
   }
 }

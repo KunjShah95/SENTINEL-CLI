@@ -6,12 +6,12 @@ async function executeTask(task) {
   const { type, analyzer, file, content, options } = task;
 
   switch (type) {
-    case 'analyze':
-      return await analyzeFile(analyzer, file, content, options);
-    case 'scan':
-      return await scanContent(type, content, options);
-    default:
-      throw new Error(`Unknown task type: ${type}`);
+  case 'analyze':
+    return await analyzeFile(analyzer, file, content, options);
+  case 'scan':
+    return await scanContent(type, content, options);
+  default:
+    throw new Error(`Unknown task type: ${type}`);
   }
 }
 
@@ -20,20 +20,20 @@ async function analyzeFile(analyzerName, filePath, content, _options) {
     let result;
 
     switch (analyzerName) {
-      case 'security':
-        result = await runSecurityAnalysis(content, filePath);
-        break;
-      case 'quality':
-        result = await runQualityAnalysis(content, filePath);
-        break;
-      case 'bugs':
-        result = await runBugAnalysis(content, filePath);
-        break;
-      case 'performance':
-        result = await runPerformanceAnalysis(content, filePath);
-        break;
-      default:
-        result = await runGenericAnalysis(analyzerName, content, filePath);
+    case 'security':
+      result = await runSecurityAnalysis(content, filePath);
+      break;
+    case 'quality':
+      result = await runQualityAnalysis(content, filePath);
+      break;
+    case 'bugs':
+      result = await runBugAnalysis(content, filePath);
+      break;
+    case 'performance':
+      result = await runPerformanceAnalysis(content, filePath);
+      break;
+    default:
+      result = await runGenericAnalysis(analyzerName, content, filePath);
     }
 
     return {
@@ -246,9 +246,9 @@ function calculateComplexity(code) {
 export function isRegexDefinitionLine(line) {
   const trimmed = line.trim();
   if (!trimmed) return true;
-  if (/^\s*\/\//.test(trimmed)) return true;
+  if (/^\/\//.test(trimmed)) return true;
   if (/pattern\s*:\s*\//.test(trimmed)) return true;
-  if (/=\s*\//.test(trimmed) && /\/[gimsuy]*\s*[,;)\]}]?\s*$/.test(trimmed)) return true;
+  if (/[=:]\s*\//.test(trimmed) && /\/[gimsuy]*\s*[,;)\]}]?\s*$/.test(trimmed)) return true;
   if (/new\s+RegExp\s*\(/.test(trimmed)) return true;
   if (/return\s+\//.test(trimmed) && /\/[gimsuy]*\s*[,;]?\s*$/.test(trimmed)) return true;
   return false;
@@ -290,7 +290,11 @@ async function main() {
   });
 }
 
-main().catch(error => {
-  console.error('Worker error:', error);
-  process.exit(1);
-});
+// Only start the worker message loop when running inside an actual worker thread
+// (parentPort is null when the module is imported for testing in Jest)
+if (parentPort) {
+  main().catch(error => {
+    console.error('Worker error:', error);
+    process.exit(1);
+  });
+}

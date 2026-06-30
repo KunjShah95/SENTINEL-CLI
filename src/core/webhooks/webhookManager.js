@@ -10,7 +10,7 @@ class WebhookManager {
     this.timeout = options.timeout || 30000;
     this.secret = options.secret || process.env.WEBHOOK_SECRET || this.generateSecret();
     this.enableSigning = options.enableSigning !== false;
-    
+
     this.setupEventListeners();
   }
 
@@ -36,7 +36,7 @@ class WebhookManager {
   // Register a new webhook
   register(webhook) {
     const id = `wh_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
-    
+
     const config = {
       id,
       url: webhook.url,
@@ -54,7 +54,7 @@ class WebhookManager {
     };
 
     this.webhooks.set(id, config);
-    
+
     return {
       id,
       url: config.url,
@@ -79,17 +79,17 @@ class WebhookManager {
   // Get all webhooks
   getAll(filters = {}) {
     let webhooks = Array.from(this.webhooks.values());
-    
+
     if (filters.active !== undefined) {
       webhooks = webhooks.filter(wh => wh.active === filters.active);
     }
-    
+
     if (filters.event) {
-      webhooks = webhooks.filter(wh => 
+      webhooks = webhooks.filter(wh =>
         wh.events.includes(filters.event) || wh.events.includes('*')
       );
     }
-    
+
     return webhooks.map(wh => this.sanitizeWebhook(wh));
   }
 
@@ -99,7 +99,7 @@ class WebhookManager {
     if (!webhook) return null;
 
     const allowedFields = ['url', 'events', 'active', 'metadata', 'headers', 'filters'];
-    
+
     for (const field of allowedFields) {
       if (updates[field] !== undefined) {
         webhook[field] = updates[field];
@@ -113,13 +113,13 @@ class WebhookManager {
   // Trigger webhooks for an event
   async triggerWebhooks(eventType, data) {
     const matchingWebhooks = this.getAll({ event: eventType, active: true });
-    
+
     for (const webhook of matchingWebhooks) {
       // Check filters
       if (!this.matchesFilters(data, webhook.filters)) {
         continue;
       }
-      
+
       // Send webhook asynchronously
       this.sendWebhook(webhook, eventType, data).catch(error => {
         console.error(`Webhook delivery failed for ${webhook.id}:`, error.message);
@@ -135,7 +135,7 @@ class WebhookManager {
 
     for (const [key, value] of Object.entries(filters)) {
       const dataValue = this.getNestedValue(data, key);
-      
+
       if (Array.isArray(value)) {
         if (!value.includes(dataValue)) {
           return false;
@@ -159,16 +159,16 @@ class WebhookManager {
 
   evaluateOperator(actual, operator, expected) {
     switch (operator) {
-      case 'eq': return actual === expected;
-      case 'ne': return actual !== expected;
-      case 'gt': return actual > expected;
-      case 'gte': return actual >= expected;
-      case 'lt': return actual < expected;
-      case 'lte': return actual <= expected;
-      case 'in': return expected.includes(actual);
-      case 'contains': return String(actual).includes(expected);
-      case 'matches': return new RegExp(expected).test(String(actual));
-      default: return false;
+    case 'eq': return actual === expected;
+    case 'ne': return actual !== expected;
+    case 'gt': return actual > expected;
+    case 'gte': return actual >= expected;
+    case 'lt': return actual < expected;
+    case 'lte': return actual <= expected;
+    case 'in': return expected.includes(actual);
+    case 'contains': return String(actual).includes(expected);
+    case 'matches': return new RegExp(expected).test(String(actual));
+    default: return false;
     }
   }
 
@@ -269,7 +269,7 @@ class WebhookManager {
   // Verify webhook signature
   verifySignature(payload, signature, secret) {
     const expected = this.signPayload(payload, secret);
-    
+
     try {
       return crypto.timingSafeEqual(
         Buffer.from(signature),
@@ -285,10 +285,10 @@ class WebhookManager {
     if (!this.deliveryAttempts.has(result.webhookId)) {
       this.deliveryAttempts.set(result.webhookId, []);
     }
-    
+
     const attempts = this.deliveryAttempts.get(result.webhookId);
     attempts.push(result);
-    
+
     // Keep only last 1000 attempts per webhook
     if (attempts.length > 1000) {
       attempts.shift();
@@ -298,25 +298,25 @@ class WebhookManager {
   // Get delivery history
   getDeliveryHistory(webhookId, options = {}) {
     const attempts = this.deliveryAttempts.get(webhookId) || [];
-    
+
     let filtered = [...attempts];
-    
+
     if (options.since) {
       filtered = filtered.filter(a => a.timestamp >= options.since);
     }
-    
+
     if (options.success !== undefined) {
       filtered = filtered.filter(a => a.success === options.success);
     }
-    
+
     // Sort by timestamp descending
     filtered.sort((a, b) => b.timestamp - a.timestamp);
-    
+
     // Limit results
     if (options.limit) {
       filtered = filtered.slice(0, options.limit);
     }
-    
+
     return filtered;
   }
 
@@ -341,7 +341,7 @@ class WebhookManager {
         'webhook.test',
         testPayload.data
       );
-      
+
       return {
         success: result.success,
         statusCode: result.statusCode,
@@ -379,7 +379,7 @@ class WebhookManager {
     const total = attempts.length;
     const successful = attempts.filter(a => a.success).length;
     const failed = total - successful;
-    
+
     const byStatus = attempts.reduce((acc, a) => {
       const status = a.statusCode || 'error';
       acc[status] = (acc[status] || 0) + 1;

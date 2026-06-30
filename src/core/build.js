@@ -71,9 +71,9 @@ class BuildTool {
         dest: path.join(this.distDir, 'cli.js'),
         transform: (content) => {
           // Replace static imports: from '../...' to from './...'
-          let transformed = content.replace(/from\s+['"]\.\.\/([^'"]+)['"]/g, "from './$1'");
+          let transformed = content.replace(/from\s+['"]\.\.\/([^'"]+)['"]/g, 'from \'./$1\'');
           // Replace dynamic imports: import('../...') to import('./...')
-          transformed = transformed.replace(/import\s*\(\s*['"]\.\.\/([^'"]+)['"]\s*\)/g, "import('./$1')");
+          transformed = transformed.replace(/import\s*\(\s*['"]\.\.\/([^'"]+)['"]\s*\)/g, 'import(\'./$1\')');
           return transformed;
         }
       },
@@ -82,9 +82,9 @@ class BuildTool {
         dest: path.join(this.distDir, 'bot.js'),
         transform: (content) => {
           // First, replace ./ with ./core/ for local imports
-          let transformed = content.replace(/from\s+['"]\.\/([^'"]+)['"]/g, "from './core/$1'");
+          let transformed = content.replace(/from\s+['"]\.\/([^'"]+)['"]/g, 'from \'./core/$1\'');
           // Next, replace ../ with ./
-          transformed = transformed.replace(/from\s+['"]\.\.\/([^'"]+)['"]/g, "from './$1'");
+          transformed = transformed.replace(/from\s+['"]\.\.\/([^'"]+)['"]/g, 'from \'./$1\'');
           return transformed;
         }
       },

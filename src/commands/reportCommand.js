@@ -6,104 +6,104 @@ import { CodeReviewBot } from '../core/bot.js';
 import Config from '../config/config.js';
 
 export class ReportCommand {
-    constructor(options = {}) {
-        this.projectPath = options.projectPath || process.cwd();
+  constructor(options = {}) {
+    this.projectPath = options.projectPath || process.cwd();
+  }
+
+  async run(args) {
+    const format = this.parseFormat(args);
+    const options = this.parseOptions(args);
+
+    console.log(chalk.cyan('\n═══════════════════════════════════════════════════════════════'));
+    console.log(chalk.cyan('  ') + chalk.white(`Sentinel Report (${format.toUpperCase()})`));
+    console.log(chalk.cyan('═══════════════════════════════════════════════════════════════\n'));
+
+    console.log(chalk.gray('  Generating report...\n'));
+
+    const analysis = await this.runAnalysis(options);
+
+    switch (format) {
+    case 'html':
+      return this.generateHtmlReport(analysis, options);
+    case 'markdown':
+      return this.generateMarkdownReport(analysis, options);
+    case 'json':
+      return this.generateJsonReport(analysis, options);
+    case 'csv':
+      return this.generateCsvReport(analysis, options);
+    case 'junit':
+      return this.generateJUnitReport(analysis, options);
+    case 'sarif':
+      return this.generateSarifReport(analysis, options);
+    default:
+      console.log(chalk.red('  Unknown format: ' + format));
+    }
+  }
+
+  parseFormat(args) {
+    const formats = ['html', 'markdown', 'json', 'csv', 'junit', 'sarif'];
+    for (const arg of args) {
+      if (formats.includes(arg.toLowerCase())) {
+        return arg.toLowerCase();
+      }
+    }
+    return 'html';
+  }
+
+  parseOptions(args) {
+    const options = {
+      analyzers: ['security', 'quality', 'bugs', 'dependency'],
+      output: null,
+      minSeverity: 'low'
+    };
+
+    for (let i = 0; i < args.length; i++) {
+      if (args[i] === '--output' || args[i] === '-o') {
+        options.output = args[i + 1];
+        i++;
+      } else if (args[i] === '--analyzers') {
+        options.analyzers = args[i + 1].split(',');
+        i++;
+      } else if (args[i] === '--min-severity') {
+        options.minSeverity = args[i + 1];
+        i++;
+      }
     }
 
-    async run(args) {
-        const format = this.parseFormat(args);
-        const options = this.parseOptions(args);
-        
-        console.log(chalk.cyan('\n═══════════════════════════════════════════════════════════════'));
-        console.log(chalk.cyan('  ') + chalk.white(`Sentinel Report (${format.toUpperCase()})`));
-        console.log(chalk.cyan('═══════════════════════════════════════════════════════════════\n'));
+    return options;
+  }
 
-        console.log(chalk.gray('  Generating report...\n'));
-        
-        const analysis = await this.runAnalysis(options);
-        
-        switch (format) {
-            case 'html':
-                return this.generateHtmlReport(analysis, options);
-            case 'markdown':
-                return this.generateMarkdownReport(analysis, options);
-            case 'json':
-                return this.generateJsonReport(analysis, options);
-            case 'csv':
-                return this.generateCsvReport(analysis, options);
-            case 'junit':
-                return this.generateJUnitReport(analysis, options);
-            case 'sarif':
-                return this.generateSarifReport(analysis, options);
-            default:
-                console.log(chalk.red('  Unknown format: ' + format));
-        }
-    }
+  async runAnalysis(options) {
+    const config = new Config();
+    await config.load();
 
-    parseFormat(args) {
-        const formats = ['html', 'markdown', 'json', 'csv', 'junit', 'sarif'];
-        for (const arg of args) {
-            if (formats.includes(arg.toLowerCase())) {
-                return arg.toLowerCase();
-            }
-        }
-        return 'html';
-    }
+    const bot = new CodeReviewBot();
+    await bot.initialize();
 
-    parseOptions(args) {
-        const options = {
-            analyzers: ['security', 'quality', 'bugs', 'dependency'],
-            output: null,
-            minSeverity: 'low'
-        };
+    const files = await glob('**/*.{js,ts,jsx,tsx,py,java,go,rs}', {
+      cwd: this.projectPath,
+      ignore: ['node_modules/**', 'dist/**', 'build/**']
+    });
 
-        for (let i = 0; i < args.length; i++) {
-            if (args[i] === '--output' || args[i] === '-o') {
-                options.output = args[i + 1];
-                i++;
-            } else if (args[i] === '--analyzers') {
-                options.analyzers = args[i + 1].split(',');
-                i++;
-            } else if (args[i] === '--min-severity') {
-                options.minSeverity = args[i + 1];
-                i++;
-            }
-        }
+    const result = await bot.runAnalysis({
+      files: files.slice(0, 100),
+      analyzers: options.analyzers,
+      format: 'json',
+      silent: true
+    });
 
-        return options;
-    }
+    return result || { issues: [], summary: {} };
+  }
 
-    async runAnalysis(options) {
-        const config = new Config();
-        await config.load();
+  async generateHtmlReport(analysis, options) {
+    const severityColors = {
+      critical: '#dc2626',
+      high: '#ea580c',
+      medium: '#ca8a04',
+      low: '#2563eb'
+    };
 
-        const bot = new CodeReviewBot();
-        await bot.initialize();
-
-        const files = await glob('**/*.{js,ts,jsx,tsx,py,java,go,rs}', {
-            cwd: this.projectPath,
-            ignore: ['node_modules/**', 'dist/**', 'build/**']
-        });
-
-        const result = await bot.runAnalysis({
-            files: files.slice(0, 100),
-            analyzers: options.analyzers,
-            format: 'json',
-            silent: true
-        });
-
-        return result || { issues: [], summary: {} };
-    }
-
-    async generateHtmlReport(analysis, options) {
-        const severityColors = {
-            critical: '#dc2626',
-            high: '#ea580c',
-            medium: '#ca8a04',
-            low: '#2563eb'
-        };
-
-        const html = `<!DOCTYPE html>
+    const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -150,15 +150,15 @@ export class ReportCommand {
 </body>
 </html>`;
 
-        const outputPath = options.output || path.join(this.projectPath, 'sentinel-report.html');
-        await fs.writeFile(outputPath, html, 'utf8');
-        
-        console.log(chalk.green(`  ✓ Report saved to ${outputPath}`));
-        return { success: true, path: outputPath };
-    }
+    const outputPath = options.output || path.join(this.projectPath, 'sentinel-report.html');
+    await fs.writeFile(outputPath, html, 'utf8');
 
-    async generateMarkdownReport(analysis, options) {
-        const md = `# 🛡️ Sentinel Security Report
+    console.log(chalk.green(`  ✓ Report saved to ${outputPath}`));
+    return { success: true, path: outputPath };
+  }
+
+  async generateMarkdownReport(analysis, options) {
+    const md = `# 🛡️ Sentinel Security Report
 
 Generated: ${new Date().toISOString()}
 
@@ -188,98 +188,98 @@ ${issue.suggestion ? `- **Suggestion:** ${issue.suggestion}` : ''}
 ${this.getRecommendations(analysis)}
 `;
 
-        const outputPath = options.output || path.join(this.projectPath, 'sentinel-report.md');
-        await fs.writeFile(outputPath, md, 'utf8');
-        
-        console.log(chalk.green(`  ✓ Report saved to ${outputPath}`));
-        return { success: true, path: outputPath };
-    }
+    const outputPath = options.output || path.join(this.projectPath, 'sentinel-report.md');
+    await fs.writeFile(outputPath, md, 'utf8');
 
-    async generateJsonReport(analysis, options) {
-        const outputPath = options.output || path.join(this.projectPath, 'sentinel-report.json');
-        await fs.writeFile(outputPath, JSON.stringify(analysis, null, 2), 'utf8');
-        
-        console.log(chalk.green(`  ✓ Report saved to ${outputPath}`));
-        return { success: true, path: outputPath };
-    }
+    console.log(chalk.green(`  ✓ Report saved to ${outputPath}`));
+    return { success: true, path: outputPath };
+  }
 
-    async generateCsvReport(analysis, options) {
-        const header = 'Severity,File,Line,Message,Analyzer,Suggestion\n';
-        const rows = (analysis.issues || []).map(issue => 
-            `${issue.severity || 'unknown'},${issue.file || ''},${issue.line || ''},"${(issue.message || '').replace(/"/g, '""')}",${issue.analyzer || ''},"${(issue.suggestion || '').replace(/"/g, '""')}"`
-        ).join('\n');
+  async generateJsonReport(analysis, options) {
+    const outputPath = options.output || path.join(this.projectPath, 'sentinel-report.json');
+    await fs.writeFile(outputPath, JSON.stringify(analysis, null, 2), 'utf8');
 
-        const outputPath = options.output || path.join(this.projectPath, 'sentinel-report.csv');
-        await fs.writeFile(outputPath, header + rows, 'utf8');
-        
-        console.log(chalk.green(`  ✓ Report saved to ${outputPath}`));
-        return { success: true, path: outputPath };
-    }
+    console.log(chalk.green(`  ✓ Report saved to ${outputPath}`));
+    return { success: true, path: outputPath };
+  }
 
-    async generateJUnitReport(analysis, options) {
-        const xml = `<?xml version="1.0" encoding="UTF-8"?>
+  async generateCsvReport(analysis, options) {
+    const header = 'Severity,File,Line,Message,Analyzer,Suggestion\n';
+    const rows = (analysis.issues || []).map(issue =>
+      `${issue.severity || 'unknown'},${issue.file || ''},${issue.line || ''},"${(issue.message || '').replace(/"/g, '""')}",${issue.analyzer || ''},"${(issue.suggestion || '').replace(/"/g, '""')}"`
+    ).join('\n');
+
+    const outputPath = options.output || path.join(this.projectPath, 'sentinel-report.csv');
+    await fs.writeFile(outputPath, header + rows, 'utf8');
+
+    console.log(chalk.green(`  ✓ Report saved to ${outputPath}`));
+    return { success: true, path: outputPath };
+  }
+
+  async generateJUnitReport(analysis, options) {
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <testsuite name="sentinel" tests="${analysis.issues?.length || 0}" failures="${analysis.issues?.filter(i => i.severity === 'critical' || i.severity === 'high').length || 0}" errors="0" time="0">
 ${(analysis.issues || []).map(issue => `  <testcase name="${(issue.message || 'Unknown').substring(0, 50)}" classname="${issue.file}">
     <failure message="${issue.message}" type="${issue.severity}">${issue.message}${issue.suggestion ? '\\n' + issue.suggestion : ''}</failure>
   </testcase>`).join('\n')}
 </testsuite>`;
 
-        const outputPath = options.output || path.join(this.projectPath, 'sentinel-results.xml');
-        await fs.writeFile(outputPath, xml, 'utf8');
-        
-        console.log(chalk.green(`  ✓ Report saved to ${outputPath}`));
-        return { success: true, path: outputPath };
-    }
+    const outputPath = options.output || path.join(this.projectPath, 'sentinel-results.xml');
+    await fs.writeFile(outputPath, xml, 'utf8');
 
-    async generateSarifReport(analysis, options) {
-        const sarif = {
-            version: '2.1.0',
-            $schema: 'https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json',
-            runs: [{
-                tool: {
-                    driver: {
-                        name: 'Sentinel',
-                        version: '1.9.0',
-                        informationUri: 'https://github.com/KunjShah95/SENTINEL-CLI'
-                    }
-                },
-                results: (analysis.issues || []).map(issue => ({
-                    ruleId: issue.analyzer || 'unknown',
-                    level: issue.severity === 'critical' || issue.severity === 'high' ? 'error' : 'warning',
-                    message: { text: issue.message },
-                    locations: [{
-                        physicalLocation: {
-                            artifactLocation: { uri: issue.file },
-                            region: { startLine: issue.line || 1 }
-                        }
-                    }]
-                }))
-            }]
-        };
+    console.log(chalk.green(`  ✓ Report saved to ${outputPath}`));
+    return { success: true, path: outputPath };
+  }
 
-        const outputPath = options.output || path.join(this.projectPath, 'sentinel-results.sarif');
-        await fs.writeFile(outputPath, JSON.stringify(sarif, null, 2), 'utf8');
-        
-        console.log(chalk.green(`  ✓ Report saved to ${outputPath}`));
-        return { success: true, path: outputPath };
-    }
+  async generateSarifReport(analysis, options) {
+    const sarif = {
+      version: '2.1.0',
+      $schema: 'https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json',
+      runs: [{
+        tool: {
+          driver: {
+            name: 'Sentinel',
+            version: '1.9.0',
+            informationUri: 'https://github.com/KunjShah95/SENTINEL-CLI'
+          }
+        },
+        results: (analysis.issues || []).map(issue => ({
+          ruleId: issue.analyzer || 'unknown',
+          level: issue.severity === 'critical' || issue.severity === 'high' ? 'error' : 'warning',
+          message: { text: issue.message },
+          locations: [{
+            physicalLocation: {
+              artifactLocation: { uri: issue.file },
+              region: { startLine: issue.line || 1 }
+            }
+          }]
+        }))
+      }]
+    };
 
-    getRecommendations(analysis) {
-        const recs = [];
-        const criticalCount = analysis.issues?.filter(i => i.severity === 'critical').length || 0;
-        const highCount = analysis.issues?.filter(i => i.severity === 'high').length || 0;
+    const outputPath = options.output || path.join(this.projectPath, 'sentinel-results.sarif');
+    await fs.writeFile(outputPath, JSON.stringify(sarif, null, 2), 'utf8');
 
-        if (criticalCount > 0) recs.push('- 🔴 Address critical issues immediately');
-        if (highCount > 0) recs.push('- 🟡 Fix high severity issues in this sprint');
-        if (recs.length === 0) recs.push('- ✅ No critical issues found - keep it up!');
+    console.log(chalk.green(`  ✓ Report saved to ${outputPath}`));
+    return { success: true, path: outputPath };
+  }
 
-        return recs.join('\n');
-    }
+  getRecommendations(analysis) {
+    const recs = [];
+    const criticalCount = analysis.issues?.filter(i => i.severity === 'critical').length || 0;
+    const highCount = analysis.issues?.filter(i => i.severity === 'high').length || 0;
+
+    if (criticalCount > 0) recs.push('- 🔴 Address critical issues immediately');
+    if (highCount > 0) recs.push('- 🟡 Fix high severity issues in this sprint');
+    if (recs.length === 0) recs.push('- ✅ No critical issues found - keep it up!');
+
+    return recs.join('\n');
+  }
 }
 
 export async function runReportCommand(args, options = {}) {
-    const command = new ReportCommand(options);
-    return command.run(args);
+  const command = new ReportCommand(options);
+  return command.run(args);
 }
 
 export default { ReportCommand, runReportCommand };

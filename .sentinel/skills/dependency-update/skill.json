@@ -1,0 +1,12 @@
+{
+  "enabled": true,
+  "config": {
+    "testCommand": "npm test",
+    "commitPrefix": "chore(deps):",
+    "maxPatchUpdates": 10,
+    "maxMinorUpdates": 5,
+    "skipMajor": true,
+    "skipPackages": [],
+    "gitBranch": "deps/update-{{date}}"
+  }
+}

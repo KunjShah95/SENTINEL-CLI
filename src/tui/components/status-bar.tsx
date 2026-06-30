@@ -12,10 +12,8 @@ type Props = {
   compacting?: boolean;
   serverStatus?: 'connected' | 'local';
   costUsd?: number;
-};
-
-const MODE_SYMBOL: Record<Mode, string> = {
-  BUILD: '⬡ BUILD', PLAN: '◎ PLAN', REVIEW: '⊕ REVIEW', SCAN: '◈ SCAN', FIX: '⚙ FIX',
+  showThinking?: boolean;
+  showDetails?: boolean;
 };
 
 function useGitBranch() {
@@ -29,10 +27,10 @@ function useGitBranch() {
 }
 
 function Pipe({ colors }: { colors: any }) {
-  return <Text color={colors.dimSeparator}>{' │ '}</Text>;
+  return <Text color={colors.dimSeparator}>{' · '}</Text>;
 }
 
-export function StatusBar({ mode = 'BUILD', model, statusText, sessionId, tokenUsage, compacting, serverStatus, costUsd }: Props) {
+export function StatusBar({ mode = 'BUILD', model, statusText, sessionId, tokenUsage, compacting, serverStatus, costUsd, showThinking = true, showDetails = true }: Props) {
   const { colors } = useTheme();
   const branch = useGitBranch();
 
@@ -42,8 +40,9 @@ export function StatusBar({ mode = 'BUILD', model, statusText, sessionId, tokenU
     mode === 'REVIEW' ? colors.critical  :
     mode === 'SCAN'   ? colors.warning   : colors.error;
 
-  const shortModel = model
-    ? model.replace('claude-', '').replace('-latest', '').replace('gpt-4', 'gpt4')
+  const [provider, modelName] = model ? (model.includes('/') ? model.split('/') : [null, model]) : [null, null];
+  const shortModel = modelName
+    ? modelName.replace('claude-', '').replace('-latest', '').replace('gpt-4', 'gpt4')
     : null;
 
   return (
@@ -54,70 +53,35 @@ export function StatusBar({ mode = 'BUILD', model, statusText, sessionId, tokenU
       paddingX={1}
       width="100%"
       alignItems="center"
+      minHeight={1}
     >
-      <Text bold color={modeColor}>{MODE_SYMBOL[mode]}</Text>
+      <Text bold color={modeColor}>{mode}</Text>
 
-      {shortModel && (<><Pipe colors={colors} /><Text dimColor>{shortModel}</Text></>)}
+      {shortModel && (
+        <><Pipe colors={colors} /><Text dimColor>{shortModel}</Text></>
+      )}
 
       {branch && (
-        <>
-          <Pipe colors={colors} />
-          <Text color={colors.info}>{'⎇ '}</Text>
-          <Text dimColor>{branch}</Text>
-        </>
+        <><Pipe colors={colors} /><Text dimColor>{branch}</Text></>
       )}
 
       {sessionId && (
-        <>
-          <Pipe colors={colors} />
-          <Text dimColor>{'#'}{sessionId.slice(0, 8)}</Text>
-        </>
-      )}
-
-      {statusText && (
-        <>
-          <Pipe colors={colors} />
-          <Text dimColor>{statusText}</Text>
-        </>
+        <><Pipe colors={colors} /><Text dimColor>{'#'}{sessionId.slice(0, 8)}</Text></>
       )}
 
       {compacting && (
-        <>
-          <Pipe colors={colors} />
-          <Text color={colors.warning}>{'⟳ compacting…'}</Text>
-        </>
+        <><Pipe colors={colors} /><Text color={colors.warning}>{'⟳ compacting…'}</Text></>
       )}
 
-      {tokenUsage && tokenUsage.estimated > 0 && (
-        <>
-          <Pipe colors={colors} />
-          <Text color={
-            tokenUsage.percentage >= 80 ? colors.error :
-            tokenUsage.percentage >= 60 ? colors.warning : colors.dimSeparator
-          }>
-            {`~${(tokenUsage.estimated / 1000).toFixed(1)}k/${(tokenUsage.limit / 1000).toFixed(0)}k tok`}
-          </Text>
-        </>
-      )}
-
-      {costUsd !== undefined && costUsd > 0 && (
-        <>
-          <Pipe colors={colors} />
-          <Text dimColor>{`~$${costUsd.toFixed(3)}`}</Text>
-        </>
-      )}
-
-      {serverStatus && (
-        <>
-          <Pipe colors={colors} />
-          <Text color={serverStatus === 'connected' ? colors.success : colors.warning}>
-            {serverStatus === 'connected' ? '⬤ server' : '◌ local'}
-          </Text>
-        </>
-      )}
+      {!showThinking && <><Pipe colors={colors} /><Text color={colors.thinking}>{'thinking⊘'}</Text></>}
+      {!showDetails && <><Pipe colors={colors} /><Text color={colors.info}>{'details⊘'}</Text></>}
 
       <Box flexGrow={1} />
-      <Text dimColor>{'Ctrl+P commands · Tab mode'}</Text>
+
+      {serverStatus === 'connected' && <Text dimColor color={colors.success}>{'⬤'}</Text>}
+      {serverStatus === 'local' && <Text dimColor color={colors.warning}>{'◌'}</Text>}
+
+      <Text dimColor>{'  ? help'}</Text>
     </Box>
   );
 }

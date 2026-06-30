@@ -11,11 +11,11 @@ export class WorkflowEngine {
   async detectProjectType() {
     const pkgPath = `${this.projectPath}/package.json`;
     const hasPkg = await this.files.exists(pkgPath);
-    
+
     if (hasPkg) {
       const pkg = await this.files.read(pkgPath);
       const json = JSON.parse(pkg.content);
-      
+
       if (json.dependencies?.react || json.devDependencies?.react) {
         return { type: 'react', framework: 'React' };
       }
@@ -42,23 +42,23 @@ export class WorkflowEngine {
       }
       return { type: 'node', framework: 'Node.js' };
     }
-    
+
     const pyproject = await this.files.exists(`${this.projectPath}/pyproject.toml`);
     if (pyproject) return { type: 'python', framework: 'Python' };
-    
+
     const cargo = await this.files.exists(`${this.projectPath}/Cargo.toml`);
     if (cargo) return { type: 'rust', framework: 'Rust' };
-    
+
     const gemfile = await this.files.exists(`${this.projectPath}/Gemfile`);
     if (gemfile) return { type: 'ruby', framework: 'Ruby' };
-    
+
     return { type: 'unknown', framework: 'Unknown' };
   }
 
   async getAvailableScripts() {
     const pkgPath = `${this.projectPath}/package.json`;
     const hasPkg = await this.files.exists(pkgPath);
-    
+
     if (hasPkg) {
       const pkg = await this.files.read(pkgPath);
       const json = JSON.parse(pkg.content);
@@ -70,7 +70,7 @@ export class WorkflowEngine {
   async runWorkflow(workflowName, _options = {}) {
     const projectType = await this.detectProjectType();
     const scripts = await this.getAvailableScripts();
-    
+
     const workflows = {
       dev: async () => this.runDevWorkflow(projectType, scripts),
       test: async () => this.runTestWorkflow(projectType, scripts),
@@ -94,7 +94,7 @@ export class WorkflowEngine {
 
   async runDevWorkflow(projectType, scripts) {
     const steps = [];
-    
+
     if (scripts.dev) {
       steps.push({ command: 'npm run dev', label: 'Starting dev server', wait: false });
     } else if (scripts.start) {
@@ -110,7 +110,7 @@ export class WorkflowEngine {
 
   async runTestWorkflow(projectType, scripts) {
     const steps = [];
-    
+
     if (scripts.test) {
       steps.push({ command: 'npm test', label: 'Running tests' });
     } else if (projectType.type === 'python') {
@@ -126,7 +126,7 @@ export class WorkflowEngine {
 
   async runBuildWorkflow(projectType, scripts) {
     const steps = [];
-    
+
     if (scripts.build) {
       steps.push({ command: 'npm run build', label: 'Building project' });
     } else if (projectType.type === 'react') {
@@ -144,7 +144,7 @@ export class WorkflowEngine {
 
   async runLintWorkflow(projectType, scripts) {
     const steps = [];
-    
+
     if (scripts.lint) {
       steps.push({ command: 'npm run lint', label: 'Running linter' });
     } else if (scripts['lint:fix']) {
@@ -158,7 +158,7 @@ export class WorkflowEngine {
 
   async runTestWatchWorkflow(projectType, scripts) {
     const steps = [];
-    
+
     if (scripts['test:watch']) {
       steps.push({ command: 'npm run test:watch', label: 'Running tests in watch mode' });
     } else {
@@ -170,7 +170,7 @@ export class WorkflowEngine {
 
   async runCIWorkflow(projectType, scripts) {
     const steps = [];
-    
+
     if (scripts['lint']) {
       steps.push({ command: 'npm run lint', label: 'Lint check' });
     }
@@ -190,7 +190,7 @@ export class WorkflowEngine {
 
   async runDeployWorkflow(projectType, scripts) {
     const steps = [];
-    
+
     if (scripts.deploy) {
       steps.push({ command: 'npm run deploy', label: 'Deploying' });
     } else if (scripts['deploy:prod']) {
@@ -205,7 +205,7 @@ export class WorkflowEngine {
 
   async runAnalyzeWorkflow(projectType, _scripts) {
     const steps = [];
-    
+
     steps.push({ command: 'npx sentinel analyze', label: 'Running Sentinel analysis' });
 
     return { success: true, workflow: 'analyze', steps, projectType };
@@ -213,7 +213,7 @@ export class WorkflowEngine {
 
   async runFixWorkflow(projectType, scripts) {
     const steps = [];
-    
+
     if (scripts['lint:fix']) {
       steps.push({ command: 'npm run lint:fix', label: 'Auto-fixing lint issues' });
     }
@@ -224,7 +224,7 @@ export class WorkflowEngine {
 
   async runCleanWorkflow(projectType, _scripts) {
     const steps = [];
-    
+
     steps.push({ command: 'rm -rf node_modules/.cache', label: 'Cleaning cache' });
     steps.push({ command: 'rm -rf dist build .next', label: 'Cleaning build directories' });
 
@@ -233,13 +233,13 @@ export class WorkflowEngine {
 
   async executeSteps(steps, onStep) {
     const results = [];
-    
+
     for (const step of steps) {
       if (onStep) onStep(step);
-      
+
       const result = await this.shell.exec(step.command);
       results.push({ ...step, ...result });
-      
+
       if (!result.success && step.critical) {
         return { success: false, results, failedAt: step };
       }
@@ -251,10 +251,10 @@ export class WorkflowEngine {
   async getWorkflowStatus() {
     const projectType = await this.detectProjectType();
     const scripts = await this.getAvailableScripts();
-    
+
     return {
       projectType,
-      availableWorkflows: Object.keys(scripts).filter(s => 
+      availableWorkflows: Object.keys(scripts).filter(s =>
         ['dev', 'start', 'build', 'test', 'lint', 'deploy'].includes(s)
       ),
       allScripts: Object.keys(scripts)

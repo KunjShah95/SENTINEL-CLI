@@ -16,7 +16,7 @@ export class DockerManager {
     const args = buildArgs.map(arg => `--build-arg ${arg}`).join(' ');
     const noCache = options.noCache ? '--no-cache' : '';
     const command = `docker build ${noCache} -t ${imageName}:${tag} ${args} .`;
-    
+
     return await this.shell.exec(command);
   }
 
@@ -27,7 +27,7 @@ export class DockerManager {
     const detached = options.detached ? '-d' : '';
     const name = options.name ? `--name ${options.name}` : '';
     const command = `docker run ${detached} ${port} ${env} ${volume} ${name} ${imageName}:${tag}`;
-    
+
     return await this.shell.exec(command);
   }
 

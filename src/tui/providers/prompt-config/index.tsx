@@ -8,7 +8,7 @@
  * the AI coding agent chat only uses BUILD and PLAN.
  */
 
-import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
+import React, { createContext, useCallback, useContext, useState, type ReactNode } from "react";
 import { Mode } from "../../../shared/schemas/mode.js";
 import {
   SUPPORTED_CHAT_MODELS,

@@ -44,7 +44,7 @@ class SentinelAPIServer {
     this.app.use(helmet({
       contentSecurityPolicy: false,
     }));
-    
+
     this.app.use(cors({
       origin: process.env.SENTINEL_CORS_ORIGIN || '*',
       methods: ['GET', 'POST', 'PUT', 'DELETE'],
@@ -70,11 +70,11 @@ class SentinelAPIServer {
 
   authenticate(req, res, next) {
     const token = req.headers.authorization?.replace('Bearer ', '');
-    
+
     if (!token || token !== this.authToken) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
-    
+
     next();
   }
 
@@ -137,14 +137,14 @@ class SentinelAPIServer {
   }
 
   setupWebSocket() {
-    this.wss = new WebSocketServer({ 
+    this.wss = new WebSocketServer({
       server: this.server,
       path: '/ws',
     });
 
     this.wss.on('connection', (ws, _req) => {
       const clientId = this.generateClientId();
-      
+
       this.clients.set(clientId, {
         ws,
         id: clientId,
@@ -185,36 +185,36 @@ class SentinelAPIServer {
       if (!client) return;
 
       switch (message.type) {
-        case 'subscribe':
-          client.subscriptions = message.channels || [];
-          client.ws.send(JSON.stringify({
-            type: 'subscribed',
-            channels: client.subscriptions,
-          }));
-          break;
+      case 'subscribe':
+        client.subscriptions = message.channels || [];
+        client.ws.send(JSON.stringify({
+          type: 'subscribed',
+          channels: client.subscriptions,
+        }));
+        break;
 
-        case 'unsubscribe':
-          client.subscriptions = client.subscriptions.filter(
-            c => !message.channels?.includes(c)
-          );
-          break;
+      case 'unsubscribe':
+        client.subscriptions = client.subscriptions.filter(
+          c => !message.channels?.includes(c)
+        );
+        break;
 
-        case 'ping':
-          client.ws.send(JSON.stringify({
-            type: 'pong',
-            timestamp: Date.now(),
-          }));
-          break;
+      case 'ping':
+        client.ws.send(JSON.stringify({
+          type: 'pong',
+          timestamp: Date.now(),
+        }));
+        break;
 
-        case 'analyze':
-          this.handleWebSocketAnalyze(clientId, message);
-          break;
+      case 'analyze':
+        this.handleWebSocketAnalyze(clientId, message);
+        break;
 
-        default:
-          client.ws.send(JSON.stringify({
-            type: 'error',
-            message: `Unknown message type: ${message.type}`,
-          }));
+      default:
+        client.ws.send(JSON.stringify({
+          type: 'error',
+          message: `Unknown message type: ${message.type}`,
+        }));
       }
     } catch (error) {
       console.error('WebSocket message error:', error);
@@ -248,7 +248,7 @@ class SentinelAPIServer {
     });
 
     for (const client of this.clients.values()) {
-      if (client.subscriptions.includes(eventType) || 
+      if (client.subscriptions.includes(eventType) ||
           client.subscriptions.includes('*')) {
         if (client.ws.readyState === WebSocket.OPEN) {
           client.ws.send(message);
@@ -321,7 +321,7 @@ class SentinelAPIServer {
 
   async handleGetIssues(req, res) {
     const { severity, type, file } = req.query;
-    
+
     // Query issues from database
     res.json({
       issues: [],
@@ -381,7 +381,7 @@ class SentinelAPIServer {
 
   async handleEvaluatePolicy(req, res) {
     const { policyId } = req.body;
-    
+
     res.json({
       policy: policyId,
       compliant: true,
@@ -444,7 +444,7 @@ class SentinelAPIServer {
 
   async handleDownloadReport(req, res) {
     const { id } = req.params;
-    
+
     res.status(404).json({
       error: 'Report not found',
       id,
@@ -495,9 +495,9 @@ class SentinelAPIServer {
 
   async start() {
     this.server = createServer(this.app);
-    
+
     // Re-initialize WebSocket server with HTTP server
-    this.wss = new WebSocketServer({ 
+    this.wss = new WebSocketServer({
       server: this.server,
       path: '/ws',
     });

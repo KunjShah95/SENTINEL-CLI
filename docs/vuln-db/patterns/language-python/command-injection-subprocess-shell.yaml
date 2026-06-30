@@ -1,0 +1,56 @@
+﻿id: command-injection-subprocess-shell
+title: Command Injection via subprocess with shell=True
+severity: critical
+languages: [python]
+cwe: [CWE-78]
+tags: [injection, rce, command, shell, subprocess]
+description: |
+  Passing shell=True to Python's subprocess module (run(), call(), Popen())
+  causes the command to be executed through the system shell (/bin/sh or
+  cmd.exe). When user-controlled input is concatenated into the command string,
+  shell metacharacters can be injected to execute arbitrary commands.
+
+  This is one of the most common RCE vectors in Python applications, especially
+  in automation scripts, CI pipelines, and web backends that invoke external
+  tools.
+detection: |
+  Find all calls to subprocess.run(), subprocess.call(), subprocess.Popen(),
+  subprocess.check_call(), and os.system().
+  For each call with shell=True:
+  - Check if the command string contains variable interpolation (f-strings,
+    % formatting, .format(), or string concatenation)
+  - Trace whether any interpolated variable originates from user input,
+    file contents, environment variables, or API responses
+
+  Also check os.popen() and shlex.quote() usage — wrapping one argument in
+  shlex.quote() while leaving others unquoted still leaves injection surface.
+remediation: |
+  Prefer the argument-array form with shell=False (the default). This avoids
+  shell interpretation entirely by passing arguments directly to the OS:
+
+  Instead of:
+    subprocess.run(f"ffmpeg -i {filename} output.mp4", shell=True)
+  Use:
+    subprocess.run(["ffmpeg", "-i", filename, "output.mp4"])
+
+  If shell=True is genuinely required (for shell pipelines, wildcards, or
+  built-in commands):
+  - Validate all user input against a strict allowlist of allowed characters
+  - Use shlex.quote() on every interpolated value
+  - Never pass unsanitized free-text input to a shell context
+example:
+  vulnerable: |
+    import subprocess
+    filename = request.GET["file"]
+    subprocess.run(f"ffmpeg -i {filename} -vcodec libx264 output.mp4", shell=True)
+  fixed: |
+    import subprocess
+    filename = request.GET["file"]
+    if not re.match(r"^[\w.-]+$", filename):
+        raise ValueError("Invalid filename")
+    subprocess.run(["ffmpeg", "-i", filename, "-vcodec", "libx264", "output.mp4"])
+references:
+  - url: https://docs.python.org/3/library/subprocess.html#security-considerations
+    title: Python subprocess Security Considerations
+  - url: https://cwe.mitre.org/data/definitions/78.html
+    title: CWE-78: Improper Neutralization of Special Elements used in an OS Command

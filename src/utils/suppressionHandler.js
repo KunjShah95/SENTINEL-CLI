@@ -21,7 +21,7 @@ export class SuppressionHandler {
       /\{\s*#\s*sentinel-ignore\s*#\s*\}/,
       /\{\s*#\s*sentinel-ignore-file\s*#\s*\}/,
     ];
-    
+
     // Additional patterns from IssueSuppression
     this.suppressionPatterns = {
       ignoreNextLine: /\/\/\s*sentinel-ignore-next-line(?:\s+([\w\-,/ ]+))?/i,
@@ -66,14 +66,14 @@ export class SuppressionHandler {
    */
   parseSuppressionLine(match, fullLine, lineNumber, filePath) {
     const cleanMatch = match.trim();
-    
+
     // Extract specific rules if mentioned
     const ruleMatch = cleanMatch.match(/sentinel-ignore(?:-next-line|-file)?\s+(.+)/);
     const specificRules = ruleMatch ? ruleMatch[1].split(/\s+/).map(r => r.trim()) : ['all'];
 
     return {
-      type: cleanMatch.includes('next-line') ? 'next-line' : 
-            cleanMatch.includes('file') ? 'file' : 'line',
+      type: cleanMatch.includes('next-line') ? 'next-line' :
+        cleanMatch.includes('file') ? 'file' : 'line',
       line: lineNumber,
       filePath,
       rules: specificRules,
@@ -86,7 +86,7 @@ export class SuppressionHandler {
    */
   shouldSuppressIssue(issue) {
     const suppressions = this.suppressions.get(issue.file) || [];
-    
+
     for (const suppression of suppressions) {
       if (this.matchesSuppression(issue, suppression)) {
         return true;
@@ -107,14 +107,14 @@ export class SuppressionHandler {
       // Check specific rule match
       const issueRule = `${issue.analyzer}/${issue.type}`;
       const analyzerOnly = issue.analyzer.toLowerCase();
-      
+
       const matches = suppression.rules.some(rule => {
         const ruleLower = rule.toLowerCase();
-        return issueRule === ruleLower || 
+        return issueRule === ruleLower ||
                analyzerOnly === ruleLower ||
                issue.type.toLowerCase() === ruleLower;
       });
-      
+
       if (!matches) return false;
     }
 
@@ -122,11 +122,11 @@ export class SuppressionHandler {
     if (suppression.type === 'next-line' && suppression.line + 1 === issue.line) {
       return true;
     }
-    
+
     if (suppression.type === 'line' && suppression.line === issue.line) {
       return true;
     }
-    
+
     if (suppression.type === 'file') {
       return true;
     }
@@ -152,7 +152,7 @@ export class SuppressionHandler {
    */
   ruleMatches(suppressionRule, issueRuleId) {
     if (suppressionRule === '*' || suppressionRule === 'all') return true;
-    
+
     if (suppressionRule === issueRuleId) return true;
     if (issueRuleId.startsWith(`${suppressionRule}/`)) return true;
     if (issueRuleId.includes(suppressionRule + '/')) return true;
@@ -187,7 +187,7 @@ export class SuppressionHandler {
    */
   getSuppressionSummary(issues) {
     const result = this.filterSuppressedIssues(issues);
-    
+
     return {
       totalIssues: result.total,
       activeIssues: result.filtered.length,
@@ -202,7 +202,7 @@ export class SuppressionHandler {
    */
   getSuppressionsByFile() {
     const byFile = {};
-    
+
     for (const [filePath, suppressions] of this.suppressions) {
       byFile[filePath] = {
         total: suppressions.length,
@@ -238,7 +238,7 @@ export class SuppressionHandler {
       // Check for malformed suppressions
       if (line.includes('sentinel-ignore')) {
         const hasValidPattern = this.ignorePatterns.some(pattern => pattern.test(line));
-        
+
         if (!hasValidPattern) {
           issues.push({
             line: lineNumber,
@@ -252,7 +252,7 @@ export class SuppressionHandler {
         if (ruleMatch) {
           const rules = ruleMatch[1].split(/\s+/);
           const validAnalyzers = ['security', 'quality', 'bugs', 'performance', 'dependency', 'accessibility', 'typescript', 'react', 'api', 'secrets', 'custom'];
-          
+
           for (const rule of rules) {
             const [analyzer] = rule.split('/');
             if (analyzer !== 'all' && !validAnalyzers.includes(analyzer.toLowerCase())) {

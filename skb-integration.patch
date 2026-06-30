@@ -1,0 +1,56 @@
+--- a/src/server/api/lib/pr-review-orchestrator.js
++++ b/src/server/api/lib/pr-review-orchestrator.js
+@@ -3,6 +3,8 @@
+  * and posts findings back to the PR (inline comments, summary, check run, SARIF).
+  */
+ 
+ import { GitHubIntegration } from '../../../integrations/github.js';
++import { getKnowledgeBase } from '../../../shared/security/knowledge-base.js';
++
+ 
+ // ─── Provider config ───────────────────────────────────────────────────────────
+ 
+@@ -157,23 +159,35 @@
+ // ─── 4. runAiReview ─────────────────────────────────────────────────────────────
+ 
+ export async function runAiReview(diff, files, lspContext = null) {
++  const kb = getKnowledgeBase();
+   const { buildReviewPrompt, parseReviewResponse } = await import('../../../tui/lib/security-reviewer.js');
+ 
+   const MAX_DIFF_LENGTH = 15000;
+-  const truncatedDiff = diff.length > MAX_DIFF_LENGTH
++  const truncatedDiff = diff.length > MAX_DIFF_LENGTH ? diff.slice(0, MAX_DIFF_LENGTH) + '\n\n[Diff truncated at 15000 characters — review limited to visible portion]' : diff;
++
++  // Get security patterns relevant to the file context
++  const relevantPatterns = kb.findRelevantPatterns(files?.[0]?.filename || '', '');
++  let kbGuidance = '';
++  if (relevantPatterns.length > 0) {
++    kbGuidance = kb.formatAsGuidelines(relevantPatterns);
++  }
++
+-  const prompt = buildReviewPrompt(truncatedDiff, { files, focus: 'all', lspContext: lspContext || undefined });
++  const prompt = buildReviewPrompt(truncatedDiff, { files, focus: 'all', lspContext: lspContext || undefined, kbGuidance });
+   const response = await callLLM(prompt);
+   const parsed = parseReviewResponse(response, files);
+ 
+   // Stamp provenance on each issue using the first working provider
+   const provider = PROVIDERS.find(p => p.key());
+   const modelId = provider?.model || 'unknown';
+   const providerName = provider?.type || 'unknown';
+   const now = Date.now();
+ 
+   for (const issue of parsed.issues) {
+     issue.provenance = {
+       modelId,
+       provider: providerName,
+-      timestamp: now,
+-      confidence: issue.severity === 'critical' ? 0.9 : issue.severity === 'high' ? 0.8 : issue.severity === 'medium' ? 0.6 : 0.4,
++      timestamp: now,
++      confidence: issue.severity === 'critical' ? 0.9 : issue.severity === 'high' ? 0.8 : issue.severity === 'medium' ? 0.6 : 0.4,
++      knowledgeBaseIntegrated: relevantPatterns.length > 0,
+     };
+   }
+ 
+   return parsed.issues;
+ }
++

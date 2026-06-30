@@ -317,21 +317,21 @@ export class Linter {
       let result;
 
       switch (linter.name) {
-        case 'eslint':
-        case 'typescript-eslint':
-          result = await this.runESLint({ fix, format: 'json' });
-          break;
-        case 'prettier':
-          result = await this.runPrettier({ fix });
-          break;
-        case 'stylelint':
-          result = await this.runStylelint({ fix });
-          break;
-        case 'htmlhint':
-          result = await this.runHTMLHint({ fix });
-          break;
-        default:
-          result = { success: false, error: `Unknown linter: ${linter.name}` };
+      case 'eslint':
+      case 'typescript-eslint':
+        result = await this.runESLint({ fix, format: 'json' });
+        break;
+      case 'prettier':
+        result = await this.runPrettier({ fix });
+        break;
+      case 'stylelint':
+        result = await this.runStylelint({ fix });
+        break;
+      case 'htmlhint':
+        result = await this.runHTMLHint({ fix });
+        break;
+      default:
+        result = { success: false, error: `Unknown linter: ${linter.name}` };
       }
 
       results.push({
@@ -388,17 +388,17 @@ export class Linter {
         let result;
 
         switch (linter.name) {
-          case 'eslint':
-            result = await this.runESLint({ fix: true, format: 'json' });
-            break;
-          case 'prettier':
-            result = await this.runPrettier({ fix: true });
-            break;
-          case 'stylelint':
-            result = await this.runStylelint({ fix: true });
-            break;
-          default:
-            result = { success: false, error: `Auto-fix not supported for ${linter.name}` };
+        case 'eslint':
+          result = await this.runESLint({ fix: true, format: 'json' });
+          break;
+        case 'prettier':
+          result = await this.runPrettier({ fix: true });
+          break;
+        case 'stylelint':
+          result = await this.runStylelint({ fix: true });
+          break;
+        default:
+          result = { success: false, error: `Auto-fix not supported for ${linter.name}` };
         }
 
         fixes.push({
@@ -426,17 +426,17 @@ export class Linter {
       let command;
 
       switch (linter) {
-        case 'prettier':
-          command = `npx prettier --write "${filePath}"`;
-          break;
-        case 'eslint':
-          command = `npx eslint --fix "${filePath}"`;
-          break;
-        case 'stylelint':
-          command = `npx stylelint --fix "${filePath}"`;
-          break;
-        default:
-          return { success: false, error: `Unknown linter: ${linter}` };
+      case 'prettier':
+        command = `npx prettier --write "${filePath}"`;
+        break;
+      case 'eslint':
+        command = `npx eslint --fix "${filePath}"`;
+        break;
+      case 'stylelint':
+        command = `npx stylelint --fix "${filePath}"`;
+        break;
+      default:
+        return { success: false, error: `Unknown linter: ${linter}` };
       }
 
       const { stdout, stderr } = await execAsync(command, {

@@ -320,7 +320,7 @@ export class UniversalAgent {
     } catch (e) {
       // Ignore package.json parse errors
     }
-    
+
     try {
       const rulesFile = await this.files.read(rulesPath);
       if (rulesFile.success && rulesFile.content) {
@@ -384,7 +384,7 @@ Begin by understanding the task, then execute the necessary steps using the avai
 
     let iterations = 0;
     let finalResult = '';
-    let messages = [
+    const messages = [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userMessage }
     ];

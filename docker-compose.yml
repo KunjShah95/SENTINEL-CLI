@@ -220,6 +220,9 @@ services:
       - SENTINEL_DOCKER=true
       - GITHUB_TOKEN=${GITHUB_TOKEN:?GITHUB_TOKEN is required}
       - WEBHOOK_SECRET=${WEBHOOK_SECRET:-}
+      - AUTO_FIX=${AUTO_FIX:-true}
+      - PARALLEL_REVIEW=${PARALLEL_REVIEW:-false}
+      - LSP_ENABLED=${LSP_ENABLED:-false}
     ports:
       - '3001:3001'
     depends_on:

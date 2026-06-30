@@ -6,7 +6,7 @@
  * - Variable renaming
  * - Import/export refactoring
  * - Component extraction
- * 
+ *
  * Uses simple regex-based patterns for MVP, with hooks for Tree-sitter integration
  */
 
@@ -63,7 +63,7 @@ export class RefactoringEngine {
 
   /**
    * Rename a function across the codebase
-   * 
+   *
    * Limitations: Regex-based. For full accuracy, use Tree-sitter.
    */
   async renameFunction(oldName, newName, options = {}) {
@@ -236,8 +236,8 @@ export class RefactoringEngine {
       ? content.lastIndexOf('export')
       : content.length;
 
-    const newContent = content.substring(0, insertionPoint) + 
-                      functionCode + 
+    const newContent = content.substring(0, insertionPoint) +
+                      functionCode +
                       content.substring(insertionPoint);
 
     refactoring.addChange(targetFile, [

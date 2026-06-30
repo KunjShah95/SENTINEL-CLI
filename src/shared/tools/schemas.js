@@ -136,6 +136,9 @@ export const toolInputSchemas = {
   undoLastChange: validator(_input => {
     return { ok: true, value: {} };
   }),
+  redoLastUndo: validator(_input => {
+    return { ok: true, value: {} };
+  }),
 };
 
 export const READ_ONLY_TOOL_NAMES = ['readFile', 'listDirectory', 'glob', 'grep', 'searchWeb'];
@@ -147,6 +150,7 @@ export const BUILD_TOOL_NAMES = [
   'batchEdit',
   'diffFile',
   'undoLastChange',
+  'redoLastUndo',
 ];
 
 export function isReadOnly(toolName) {
