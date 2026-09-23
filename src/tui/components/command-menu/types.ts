@@ -2,8 +2,7 @@ export type CommandContext = {
   exit: () => void;
   navigate: (path: string) => void;
   execute: (action: string, args?: Record<string, unknown>) => void;
-  mode: 'BUILD' | 'PLAN' | 'REVIEW' | 'SCAN' | 'FIX';
-  setMode: (mode: 'BUILD' | 'PLAN' | 'REVIEW' | 'SCAN' | 'FIX') => void;
+  toggleSessionPanel: () => void;
 };
 
 export type Command = {

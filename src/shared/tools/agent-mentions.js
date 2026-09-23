@@ -122,7 +122,7 @@ export function parseMentions(message) {
  * @param {string} name — agent name (lowercase)
  * @returns {boolean}
  */
-export function isCustomAgent(name) {
+export function isCustomAgent(_name) {
   // Custom agents would be loaded from config — for now, always false
   // This will be wired when agents config is loaded
   return false;

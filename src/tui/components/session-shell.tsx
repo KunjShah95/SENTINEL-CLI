@@ -1,5 +1,5 @@
 import React, { type ReactNode } from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text, useInput } from 'ink';
 import { InputBar } from './input-bar.js';
 import { Spinner } from './spinner.js';
 import { StatusBar } from './status-bar.js';
@@ -24,8 +24,10 @@ type Props = {
   compacting?: boolean;
   serverStatus?: 'connected' | 'local';
   costUsd?: number;
+  microcompactSaved?: number;
   showThinking?: boolean;
   showDetails?: boolean;
+  onStop?: () => void;
 };
 
 export function SessionShell({
@@ -43,13 +45,19 @@ export function SessionShell({
   statusText,
   sessionId,
   tokenUsage,
+  microcompactSaved,
   compacting,
   serverStatus,
   costUsd,
   showThinking = true,
   showDetails = true,
+  onStop,
 }: Props) {
   const { colors } = useTheme();
+
+  useInput((_input, key) => {
+    if (key.escape && loading && onStop) onStop();
+  });
 
   const modeColor =
     mode === 'BUILD'  ? colors.success   :
@@ -89,8 +97,9 @@ export function SessionShell({
 
       {/* Spinner shown while loading */}
       {loading ? (
-        <Box flexShrink={0}>
+        <Box flexShrink={0} flexDirection="row" alignItems="center" gap={1}>
           <Spinner mode={mode} />
+          {onStop ? <Text dimColor>{'Esc to stop'}</Text> : null}
         </Box>
       ) : null}
 
@@ -116,6 +125,7 @@ export function SessionShell({
           statusText={statusText}
           sessionId={sessionId}
           tokenUsage={tokenUsage}
+          microcompactSaved={microcompactSaved}
           compacting={compacting}
           serverStatus={serverStatus}
           costUsd={costUsd}

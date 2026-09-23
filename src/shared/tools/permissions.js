@@ -35,15 +35,18 @@ const TOOL_CATEGORIES = Object.freeze({
   listDirectory: 'read',
   glob: 'read',
   grep: 'read',
+  codeMap: 'read',
   diffFile: 'read',
 
   // Write tools (modifies filesystem)
   writeFile: 'write',
   editFile: 'write',
   batchEdit: 'write',
+  applyPatch: 'write',
 
   // Shell execution (high risk)
   bash: 'shell',
+  runTests: 'shell',
 
   // Network tools
   searchWeb: 'network',
@@ -67,6 +70,7 @@ const DEFAULT_CATEGORY_POLICIES = Object.freeze({
 
 const DEFAULT_TOOL_POLICIES = Object.freeze({
   bash: 'ask',
+  runTests: 'ask',
 });
 
 // ── Permission check ─────────────────────────────────────────────────
@@ -95,14 +99,14 @@ export function getToolPolicy(toolName) {
     }
   }
 
-  // 3. Hardcoded defaults
-  if (category && DEFAULT_CATEGORY_POLICIES[category]) {
-    return DEFAULT_CATEGORY_POLICIES[category];
-  }
-
-  // 4. Per-tool hardcoded override
+  // 3. Per-tool hardcoded override (checked before category so bash/runTests stay 'ask' even if category changes)
   if (DEFAULT_TOOL_POLICIES[toolName]) {
     return DEFAULT_TOOL_POLICIES[toolName];
+  }
+
+  // 4. Hardcoded category defaults
+  if (category && DEFAULT_CATEGORY_POLICIES[category]) {
+    return DEFAULT_CATEGORY_POLICIES[category];
   }
 
   // Unknown tools default to 'ask' for safety
@@ -131,8 +135,7 @@ export function checkPermission(toolName) {
     };
 
   case 'ask':
-    // In CLI/TUI mode, this would prompt the user. For now, allow but flag.
-    return { allowed: true, policy, message: `Tool "${toolName}" requires confirmation.` };
+    return { allowed: false, needsConfirmation: true, policy, message: `Tool "${toolName}" requires user confirmation (policy: ask).` };
 
   default:
     return { allowed: false, policy: 'unknown', message: `Unknown policy: ${policy}` };

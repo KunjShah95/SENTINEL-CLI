@@ -18,11 +18,11 @@
  * UUIDs for sessions. No persistence across restarts in local mode.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { randomUUID } from "node:crypto";
-import { streamChat, Sessions, checkServerHealth, type ChatEvent } from "../lib/api-client.js";
-import { runLocalTool, Mode, isReadOnlyTool } from "../lib/local-tools.js";
-import { shouldCompact, compactMessages, estimateTokens, getCompactionState } from "../lib/context-compactor.js";
+import { streamChat, Sessions, type ChatEvent } from "../lib/api-client.js";
+import { Mode, isReadOnlyTool } from "../lib/local-tools.js";
+import { shouldCompact, compactMessages, estimateTokens, getCompactionState, microcompactMessages } from "../lib/context-compactor.js";
 import { DEFAULT_CHAT_MODEL_ID, resolveSmallModel } from "../../shared/models/index.js";
 
 export type AgentMode = "BUILD" | "PLAN" | "REVIEW";
@@ -46,13 +46,6 @@ function nextId(prefix = "msg"): string {
   return `${prefix}_${Date.now()}_${++idCounter}`;
 }
 
-function buildLocalSystemPrompt(mode: string) {
-  if (mode === 'PLAN') {
-    return 'You are a senior software engineer. Your task is to explore the codebase and propose a plan. You have access to read-only tools: readFile, listDirectory, glob, grep, searchWeb. Do NOT write any code or make changes. Be thorough in your analysis.';
-  }
-  return 'You are a senior software engineer working in a terminal. You have access to tools: readFile, listDirectory, glob, grep, searchWeb, writeFile, editFile, batchEdit, bash. You can read, write, and execute commands. Be thorough and precise.';
-}
-
 type PermissionResult = 'allow' | 'deny' | 'allow-session';
 
 type UseAgentChatOptions = {
@@ -63,6 +56,8 @@ type UseAgentChatOptions = {
   onSessionCreated?: (id: string) => void;
   /** Callback to request user permission before executing tools. Return 'deny' to skip, 'allow' for one-time, 'allow-session' to auto-allow for the session. */
   onPermissionRequest?: (toolName: string, toolCallId: string, input: unknown) => Promise<PermissionResult>;
+  /** Fired after a microcompact gate applies: tombstoned calls and tokens saved. */
+  onMicrocompact?: (stats: { droppedCount: number; estimatedTokensSaved: number }) => void;
 };
 
 export function useAgentChat(options: UseAgentChatOptions = {}) {
@@ -81,7 +76,9 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
     atAsyncThreshold: false,
     atSyncThreshold: false,
   });
-  const [tokenUsage, setTokenUsage] = useState<{ estimated: number; limit: number; percentage: number }>({
+  // Cumulative tokens freed by the microcompact gate this session.
+  const [microcompactSaved, setMicrocompactSaved] = useState(0);
+  const [tokenUsage, setTokenUsage] = useState<{ estimated: number; limit: number; percentage: number; costUsd?: number }>({
     estimated: 0,
     limit: 40_000,
     percentage: 0,
@@ -93,9 +90,10 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
   const abortRef = useRef<AbortController | null>(null);
   const loadedRef = useRef(false);
   const messagesRef = useRef(messages);
-  const [useServer, setUseServer] = useState(true);
+  const compactingGuard = useRef(false);
+  const [useServer, setUseServer] = useState(false);
   const serverAvailableRef = useRef(true);
-  const [serverStatus, setServerStatus] = useState<"connected" | "local">("connected");
+  const [serverStatus, setServerStatus] = useState<"connected" | "local">("local");
 
   useEffect(() => {
     sessionIdRef.current = sessionId;
@@ -167,7 +165,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
       const sid = sessionIdRef.current;
       if (!sid) return "";
 
-      const compactModel = await resolveSmallModel().catch(() => modelRef.current);
+      const compactModel = await resolveSmallModel().catch(() => ({ modelId: modelRef.current, provider: '' }));
 
       const summaryUserMsg = {
         id: `compaction-req-${Date.now()}`,
@@ -201,11 +199,38 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
     []
   );
 
+  // Microcompact gate: when superseded tool results alone push usage past
+  // the async threshold, tombstone them first — cheaper than a summary.
+  const micro = useMemo(() => microcompactMessages(messages), [messages]);
   useEffect(() => {
-    if (compacting || messages.length === 0) return;
+    if (compactingGuard.current || compacting || micro.droppedCount === 0) return;
+    const before = getCompactionState(messages);
+    const after = getCompactionState(micro.messages);
+    if (before.atAsyncThreshold && !after.atAsyncThreshold) {
+      compactingGuard.current = true;
+      setMessages(micro.messages);
+      const newEstimated = estimateTokens(micro.messages);
+      setTokenUsage({
+        estimated: newEstimated,
+        limit: 40_000,
+        percentage: Math.round(newEstimated / 400),
+      });
+      setMicrocompactSaved((prev) => prev + micro.estimatedTokensSaved);
+      options.onMicrocompact?.({
+        droppedCount: micro.droppedCount,
+        estimatedTokensSaved: micro.estimatedTokensSaved,
+      });
+      compactingGuard.current = false;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [micro.droppedCount]);
+
+  useEffect(() => {
+    if (compactingGuard.current || compacting || messages.length === 0) return;
     const state = getCompactionState(messages);
     setCompactionState(state);
     if (!state.atAsyncThreshold) return;
+    compactingGuard.current = true;
     setCompacting(true);
     const snapshot = messages;
     compactMessages(snapshot, submitAndWaitForCompaction, {
@@ -227,8 +252,10 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
         });
       }
       setCompacting(false);
+      setTimeout(() => { compactingGuard.current = false; }, 0);
     }).catch(() => {
       setCompacting(false);
+      setTimeout(() => { compactingGuard.current = false; }, 0);
     });
   }, [messages, compacting, submitAndWaitForCompaction]);
 
@@ -238,7 +265,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
       setError(null);
 
       // Build a session if needed.
-      let sid = sessionIdRef.current;
+      let sid: string = sessionIdRef.current || '';
       if (!sid) {
         const session = await Sessions.create({
           title: userText.slice(0, 100),
@@ -252,14 +279,15 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
           sessionIdRef.current = sid;
           options.onSessionCreated?.(sid);
         } else {
-          // Server not available — fall back to local mode
-          serverAvailableRef.current = false;
-          setServerStatus("local");
+          // Local store is always available — UUIDs here are only a fallback
           sid = randomUUID();
           setSessionId(sid);
           sessionIdRef.current = sid;
         }
       }
+
+      // Capture history snapshot BEFORE appending the new user message to avoid duplication
+      const historySnapshot = messagesRef.current.slice();
 
       // Append user message.
       appendMessage({
@@ -292,8 +320,8 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
 
       try {
         const allMessages: AgentMessage[] = [
-          // Snapshot of messages BEFORE the placeholder
-          ...messagesRef.current,
+          // Use pre-append snapshot so the user message appears exactly once
+          ...historySnapshot,
           {
             id: nextId("user"),
             role: "user",
@@ -304,18 +332,24 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
           },
         ];
 
-        const stream = streamChat({
-          id: sid,
-          messages: allMessages.map((m) => ({
-            id: m.id,
-            role: m.role,
-            content: m.parts.find((p) => p.type === "text")?.text,
-            parts: m.parts,
-            metadata: { mode: m.mode, model: m.model },
-          })),
-          mode: modeRef.current,
-          model: modelRef.current,
-        });
+        const stream = streamChat(
+          {
+            id: sid,
+            messages: allMessages.map((m) => ({
+              id: m.id,
+              role: m.role,
+              content: m.parts.find((p) => p.type === "text")?.text,
+              parts: m.parts,
+              metadata: { mode: m.mode, model: m.model },
+            })),
+            mode: modeRef.current,
+            model: modelRef.current,
+          },
+          {
+            signal: ctrl.signal,
+            onPermissionRequest: options.onPermissionRequest,
+          }
+        );
 
         for await (const ev of stream) {
           if (ctrl.signal.aborted) break;
@@ -323,49 +357,11 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
           handleEvent(ev, assistantId);
         }
       } catch (e: any) {
-        if (!serverAvailableRef.current) {
-          // Fallback to local orchestrator
-          try {
-            let systemPrompt: string;
-            try {
-              const { buildSystemPrompt } = await import("../../server/api/lib/system-prompt.js");
-              systemPrompt = buildSystemPrompt({ mode: modeRef.current });
-            } catch {
-              systemPrompt = buildLocalSystemPrompt(modeRef.current);
-            }
-            const { getLLMOrchestrator } = await import("../../llm/llmOrchestrator.js");
-            const fallbackModelId = modelRef.current || '';
-            const isOllama = fallbackModelId.startsWith('ollama/');
-            const orchestrator = getLLMOrchestrator(isOllama ? {
-              provider: 'ollama',
-              model: fallbackModelId.replace(/^ollama\//, ''),
-            } : {});
-            const stream = await orchestrator.streamChat(userText, { systemPrompt });
-            for await (const chunk of stream) {
-              if (ctrl.signal.aborted) break;
-              setStatus("streaming");
-              if (chunk.type === 'content') {
-                handleEvent({ event: 'text', data: { delta: chunk.content } }, assistantId);
-              } else if (chunk.type === 'error') {
-                handleEvent({ event: 'error', data: { message: chunk.content } }, assistantId);
-              } else if (chunk.type === 'done') {
-                break;
-              }
-            }
-          } catch (fallbackErr: any) {
-            setError(fallbackErr);
-            appendMessage({
-              role: "error",
-              parts: [{ type: "text", text: fallbackErr?.message || String(fallbackErr) }],
-            });
-          }
-        } else {
-          setError(e);
-          appendMessage({
-            role: "error",
-            parts: [{ type: "text", text: e?.message || String(e) }],
-          });
-        }
+        setError(e);
+        appendMessage({
+          role: "error",
+          parts: [{ type: "text", text: e?.message || String(e) }],
+        });
       } finally {
         setStatus("idle");
         setLoading(false);
@@ -383,7 +379,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
         });
       }
     },
-    [messages, appendMessage, options, submitAndWaitForCompaction]
+    [appendMessage, options, submitAndWaitForCompaction]
   );
 
   const handleEvent = useCallback(
@@ -450,57 +446,21 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
               ],
             };
           });
-          // Execute the tool locally. PLAN mode blocks write/edit/bash.
-          (async () => {
-            try {
-              // Check permission before executing the tool
-              if (options.onPermissionRequest) {
-                const permission = await options.onPermissionRequest(toolName, toolCallId, input);
-                if (permission === 'deny') {
-                  updateLastMessage((msg) => {
-                    if (msg.id !== assistantId) return msg;
-                    return {
-                      ...msg,
-                      parts: msg.parts.map((p) =>
-                        p.type === "tool-call" && p.toolCallId === toolCallId
-                          ? { ...p, state: "output-error", errorText: "User denied permission" }
-                          : p
-                      ),
-                    };
-                  });
-                  return;
-                }
-              }
-              const output = await runLocalTool(toolName, input, modeRef.current);
-              if (abortRef.current?.signal.aborted) return;
-              updateLastMessage((msg) => {
-                if (msg.id !== assistantId) return msg;
-                return {
-                  ...msg,
-                  parts: msg.parts.map((p) =>
-                    p.type === "tool-call" && p.toolCallId === toolCallId
-                      ? output && typeof output === "object" && "error" in output
-                        ? { ...p, state: "output-error", errorText: output.error as string }
-                        : { ...p, state: "output-available", output }
-                      : p
-                  ),
-                };
-              });
-            } catch (e) {
-              // tool execution failed — tool output stays as pending
-            }
-          })();
+          // Execution happens inside the agent loop (src/agent/loop.js);
+          // the loop follows up with a 'tool_result' event for this call.
           break;
         }
         case "tool_result": {
-          const { toolCallId, output } = ev.data as any;
+          const { toolCallId, output, error } = ev.data as any;
           updateLastMessage((msg) => {
             if (msg.id !== assistantId) return msg;
             return {
               ...msg,
               parts: msg.parts.map((p) =>
                 p.type === "tool-call" && p.toolCallId === toolCallId
-                  ? { ...p, state: "output-available", output }
+                  ? error
+                    ? { ...p, state: "output-error", errorText: error }
+                    : { ...p, state: "output-available", output }
                   : p
               ),
             };
@@ -516,13 +476,15 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
         }
         case "finish":
         case "done": {
-          const usageData = (ev as any).data?.usage;
-          if (usageData?.totalTokens) {
-            setTokenUsage({
-              estimated: usageData.totalTokens,
+          const data = (ev as any).data || {};
+          const usageData = data.usage;
+          if (usageData?.totalTokens || data.costUsd !== undefined) {
+            setTokenUsage((prev) => ({
+              estimated: usageData?.totalTokens ?? prev.estimated,
               limit: 40_000,
-              percentage: Math.round((usageData.totalTokens / 40000) * 100),
-            });
+              percentage: Math.round(((usageData?.totalTokens ?? 0) / 40000) * 100),
+              costUsd: data.costUsd ?? prev.costUsd,
+            }));
           }
           break;
         }
@@ -535,6 +497,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
     setMessages([]);
     setStreamedText("");
     setError(null);
+    setMicrocompactSaved(0);
   }, []);
 
   return {
@@ -544,6 +507,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
     loading,
     status,
     error,
+    microcompactSaved,
     mode,
     setMode,
     toggleMode: () => setMode((m) => (m === "BUILD" ? "PLAN" : "BUILD")),

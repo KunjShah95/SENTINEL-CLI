@@ -24,6 +24,7 @@ export function ModelPickerDialog({ currentModel, onSelect }: ModelPickerDialogP
   const [models, setModels] = useState<ModelEntry[]>([]);
   const [filtered, setFiltered] = useState<ModelEntry[]>([]);
   const [selectedIdx, setSelectedIdx] = useState(0);
+  const [scrollOffset, setScrollOffset] = useState(0);
   const [query, setQuery] = useState('');
   const loaded = useRef(false);
 
@@ -63,15 +64,24 @@ export function ModelPickerDialog({ currentModel, onSelect }: ModelPickerDialogP
     close();
   }, [onSelect, close]);
 
-  const visible = filtered.slice(0, 18);
+  const PAGE = 18;
+  const visible = filtered.slice(scrollOffset, scrollOffset + PAGE);
 
   useInput((input, key) => {
-    if (key.upArrow || input === 'k') {
-      setSelectedIdx(i => Math.max(0, i - 1));
+    if (key.upArrow || (!query && input === 'k')) {
+      setSelectedIdx(i => {
+        const next = Math.max(0, i - 1);
+        setScrollOffset(o => next < o ? next : o);
+        return next;
+      });
       return;
     }
-    if (key.downArrow || input === 'j') {
-      setSelectedIdx(i => Math.min(filtered.length - 1, i + 1));
+    if (key.downArrow || (!query && input === 'j')) {
+      setSelectedIdx(i => {
+        const next = Math.min(filtered.length - 1, i + 1);
+        setScrollOffset(o => next >= o + 18 ? next - 17 : o);
+        return next;
+      });
       return;
     }
     if (key.leftArrow) {
@@ -135,7 +145,7 @@ export function ModelPickerDialog({ currentModel, onSelect }: ModelPickerDialogP
       ) : (
         <Box flexDirection="column">
           {visible.map((m, i) => {
-            const isSelected = i === selectedIdx;
+            const isSelected = i + scrollOffset === selectedIdx;
             const isCurrent = m.id === currentModel;
             const isFree = m.inputUsdPerMillionTokens === 0 && m.outputUsdPerMillionTokens === 0;
             const priceStr = isFree ? '' : ` \$${m.inputUsdPerMillionTokens}/\$${m.outputUsdPerMillionTokens}`;

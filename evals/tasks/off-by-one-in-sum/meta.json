@@ -1,0 +1,1 @@
+{"id":"off-by-one-in-sum","mode":"BUILD","kind":"fix","source":"synthetic F2P in the SWE-smith style: breaks 1 test pre-patch, passes post-patch"}

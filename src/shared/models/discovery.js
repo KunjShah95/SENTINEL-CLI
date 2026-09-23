@@ -302,25 +302,51 @@ export async function discoverAllModels() {
 
 export function getFallbackModels() {
   return [
-    { id: 'llama-3.1-8b-instant', provider: 'groq', label: 'Llama 3.1 8B Instant (Groq)', inputUsdPerMillionTokens: 0, outputUsdPerMillionTokens: 0 },
-    { id: 'gemma2-9b-it', provider: 'groq', label: 'Gemma 9B (Groq)', inputUsdPerMillionTokens: 0, outputUsdPerMillionTokens: 0 },
-    { id: 'mixtral-8x7b-32768', provider: 'groq', label: 'Mixtral 8x7B (Groq)', inputUsdPerMillionTokens: 0, outputUsdPerMillionTokens: 0 },
-    { id: 'qwen-qwq-32b', provider: 'groq', label: 'Qwen QwQ 32B (Groq)', inputUsdPerMillionTokens: 0, outputUsdPerMillionTokens: 0 },
-    { id: 'claude-sonnet-4-6', provider: 'anthropic', label: 'Claude Sonnet 4.6', inputUsdPerMillionTokens: 3, outputUsdPerMillionTokens: 15 },
-    { id: 'claude-haiku-4-5', provider: 'anthropic', label: 'Claude Haiku 4.5', inputUsdPerMillionTokens: 1, outputUsdPerMillionTokens: 5 },
-    { id: 'gpt-4o-mini', provider: 'openai', label: 'GPT-4o mini', inputUsdPerMillionTokens: 0.15, outputUsdPerMillionTokens: 0.6 },
-    { id: 'mistral-small-latest', provider: 'mistral', label: 'Mistral Small', inputUsdPerMillionTokens: 0.1, outputUsdPerMillionTokens: 0.3 },
+    { id: 'openai/gpt-oss-20b', provider: 'groq', label: 'GPT-OSS 20B (Groq, free tier)', inputUsdPerMillionTokens: 0, outputUsdPerMillionTokens: 0 },
+    { id: 'openai/gpt-oss-120b', provider: 'groq', label: 'GPT-OSS 120B (Groq, free tier)', inputUsdPerMillionTokens: 0, outputUsdPerMillionTokens: 0 },
+    { id: 'qwen/qwen3.8-27b', provider: 'groq', label: 'Qwen 3.8 27B (Groq, free tier)', inputUsdPerMillionTokens: 0, outputUsdPerMillionTokens: 0 },
+    { id: 'claude-opus-5-5', provider: 'anthropic', label: 'Claude Opus 5.5', inputUsdPerMillionTokens: 4, outputUsdPerMillionTokens: 20, thinking: true, tier: 'flagship' },
+    { id: 'claude-sonnet-4-6', provider: 'anthropic', label: 'Claude Sonnet 4.6', inputUsdPerMillionTokens: 3, outputUsdPerMillionTokens: 15, tier: 'mid' },
+    { id: 'claude-haiku-4-5', provider: 'anthropic', label: 'Claude Haiku 4.5', inputUsdPerMillionTokens: 1, outputUsdPerMillionTokens: 5, tier: 'budget' },
+    { id: 'gpt-6-astra', provider: 'openai', label: 'GPT-6 Astra', inputUsdPerMillionTokens: 10, outputUsdPerMillionTokens: 50, thinking: true, tier: 'flagship' },
+    { id: 'gpt-6-sol', provider: 'openai', label: 'GPT-6 Sol', inputUsdPerMillionTokens: 2, outputUsdPerMillionTokens: 10, thinking: true, tier: 'mid' },
+    { id: 'gpt-6-luna', provider: 'openai', label: 'GPT-6 Luna', inputUsdPerMillionTokens: 0.1, outputUsdPerMillionTokens: 0.5, tier: 'budget' },
+    { id: 'gpt-4o-mini', provider: 'openai', label: 'GPT-4o mini', inputUsdPerMillionTokens: 0.15, outputUsdPerMillionTokens: 0.6, tier: 'budget' },
+    { id: 'mistral-small-latest', provider: 'mistral', label: 'Mistral Small', inputUsdPerMillionTokens: 0.1, outputUsdPerMillionTokens: 0.3, tier: 'budget' },
   ];
 }
 
 function getAnthropicStaticModels() {
+  // Static catalog: Anthropic exposes no model-listing API, and flagship
+  // pricing below is pinned from official Sep 2026 announcements so cost
+  // accounting is right even before a live discovery refresh. `tier`
+  // classifies entries for the model picker (flagship | mid | budget).
   return [
-    { id: 'claude-opus-4-6', provider: 'anthropic', label: 'Claude Opus 4.6', inputUsdPerMillionTokens: 5, outputUsdPerMillionTokens: 25, thinking: true },
-    { id: 'claude-sonnet-4-6', provider: 'anthropic', label: 'Claude Sonnet 4.6', inputUsdPerMillionTokens: 3, outputUsdPerMillionTokens: 15, thinking: true },
-    { id: 'claude-haiku-4-5', provider: 'anthropic', label: 'Claude Haiku 4.5', inputUsdPerMillionTokens: 1, outputUsdPerMillionTokens: 5 },
-    { id: 'claude-opus-4-5', provider: 'anthropic', label: 'Claude Opus 4.5', inputUsdPerMillionTokens: 10, outputUsdPerMillionTokens: 30, thinking: true },
-    { id: 'claude-sonnet-4-5', provider: 'anthropic', label: 'Claude Sonnet 4.5', inputUsdPerMillionTokens: 3, outputUsdPerMillionTokens: 15, thinking: true },
+    { id: 'claude-opus-5-5', provider: 'anthropic', label: 'Claude Opus 5.5', inputUsdPerMillionTokens: 4, outputUsdPerMillionTokens: 20, thinking: true, tier: 'flagship' },
+    { id: 'gpt-6-astra', provider: 'openai', label: 'GPT-6 Astra', inputUsdPerMillionTokens: 10, outputUsdPerMillionTokens: 50, thinking: true, tier: 'flagship' },
+    { id: 'gpt-6-sol', provider: 'openai', label: 'GPT-6 Sol', inputUsdPerMillionTokens: 2, outputUsdPerMillionTokens: 10, thinking: true, tier: 'mid' },
+    { id: 'gpt-6-luna', provider: 'openai', label: 'GPT-6 Luna', inputUsdPerMillionTokens: 0.1, outputUsdPerMillionTokens: 0.5, tier: 'budget' },
+    { id: 'claude-opus-4-6', provider: 'anthropic', label: 'Claude Opus 4.6', inputUsdPerMillionTokens: 5, outputUsdPerMillionTokens: 25, thinking: true, tier: 'flagship' },
+    { id: 'claude-sonnet-4-6', provider: 'anthropic', label: 'Claude Sonnet 4.6', inputUsdPerMillionTokens: 3, outputUsdPerMillionTokens: 15, thinking: true, tier: 'mid' },
+    { id: 'claude-haiku-4-5', provider: 'anthropic', label: 'Claude Haiku 4.5', inputUsdPerMillionTokens: 1, outputUsdPerMillionTokens: 5, tier: 'budget' },
+    { id: 'claude-opus-4-5', provider: 'anthropic', label: 'Claude Opus 4.5', inputUsdPerMillionTokens: 10, outputUsdPerMillionTokens: 30, thinking: true, tier: 'flagship' },
+    { id: 'claude-sonnet-4-5', provider: 'anthropic', label: 'Claude Sonnet 4.5', inputUsdPerMillionTokens: 3, outputUsdPerMillionTokens: 15, thinking: true, tier: 'mid' },
   ];
+}
+
+/**
+ * Classify any registry model (static or live-discovered) into a pricing
+ * tier. Static entries carry their own tier; discovered models (which
+ * usually lack pricing) are classified by id prefix.
+ */
+export function getModelTier(model) {
+  if (model?.tier) return model.tier;
+  const id = String(model?.id || '').toLowerCase();
+  const label = String(model?.label || '').toLowerCase();
+  const hay = `${id} ${label}`;
+  if (/opus|astra|fable|gpt-5($|[.-])|o1|o3|pro|ultra|236b|405b/.test(hay)) return 'flagship';
+  if (/mini|haiku|flash|sol|sonnet|27b|20b|13b|8b|7b|small|lite|luna/.test(hay)) return 'budget';
+  return 'mid';
 }
 
 export function invalidateCache() {

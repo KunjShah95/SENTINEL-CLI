@@ -14,13 +14,13 @@ type SessionPanelProps = {
 type SessionItem = {
   id: string;
   title: string;
-  createdAt: string;
+  createdAt: number | string;
   mode: string;
   model: string;
 };
 
-function relativeDate(dateStr: string): string {
-  const date = new Date(dateStr);
+function relativeDate(dateStr: number | string): string {
+  const date = new Date(dateStr as any);
   const diff = Date.now() - date.getTime();
   const mins = Math.floor(diff / 60000);
   if (mins < 1) return 'just now';

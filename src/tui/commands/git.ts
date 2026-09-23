@@ -3,15 +3,12 @@ import type { CommandContext } from './types.js';
 export async function handleCommit(ctx: CommandContext) {
   const { toast, appendMessage, mode, model, setMode, submit } = ctx;
   try {
-    const { getGitDiff, getChangedFiles } = await import('../lib/security-reviewer.js');
+    const { getGitDiff, getChangedFiles } = await import('../lib/git-diff.js');
     const diff = getGitDiff({ staged: true }) || getGitDiff();
     if (!diff) { toast.error('No changes to commit.'); return; }
     const files = getChangedFiles({ staged: true });
     const prompt = `Generate a concise git commit message for these changes. Output ONLY the commit message (subject line + optional body). No preamble.\n\nChanged files: ${files.join(', ')}\n\n\`\`\`diff\n${diff.slice(0, 6000)}\n\`\`\``;
-    const prevMode = mode;
-    setMode('PLAN' as any);
-    await submit(prompt);
-    setMode(prevMode as any);
+    submit(prompt);
   } catch (e) { toast.error('Commit generation failed: ' + String(e)); }
 }
 
@@ -19,10 +16,11 @@ export async function handleDiff(ctx: CommandContext) {
   const { args: raw, toast, appendMessage, mode, model } = ctx;
   const arg = raw.trim();
   try {
-    const { getGitDiff } = await import('../lib/security-reviewer.js');
+    const { getGitDiff } = await import('../lib/git-diff.js');
     const isStaged = arg === '--staged';
-    const branch = !isStaged && arg ? arg : undefined;
-    const file = !isStaged && !branch && arg ? arg : undefined;
+    const looksLikeFile = arg.includes('.') || arg.includes('/') || arg.includes('\\');
+    const branch = !isStaged && arg && !looksLikeFile ? arg : undefined;
+    const file = !isStaged && arg && looksLikeFile ? arg : undefined;
     const diff = isStaged ? getGitDiff({ staged: true })
       : branch ? getGitDiff({ branch })
       : file ? getGitDiff({ file })

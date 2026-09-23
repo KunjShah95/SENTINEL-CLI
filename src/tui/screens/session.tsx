@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Box, Text, useInput } from 'ink';
-import { useLocation, useNavigate } from 'react-router';
 import { SessionShell } from '../components/session-shell.js';
 import { SessionPanel } from '../components/session-panel.js';
 import { UserMessage, BotMessage, ErrorMessage } from '../components/messages/index.js';
@@ -18,19 +17,11 @@ import { Sessions } from '../lib/api-client.js';
 import { executeCommand } from '../commands/index.js';
 import { executeCustomCommand } from '../lib/custom-commands.js';
 import { parseMentions, buildAgentPrompt } from '../../shared/tools/agent-mentions.js';
-import type { CommandContext } from '../components/command-menu/types.js';
-import type { AgentMode, AgentMessagePart } from '../hooks/use-agent-chat.js';
+import type { CommandContext } from '../commands/types.js';
+import type { CommandContext as PaletteCommandContext } from '../components/command-menu/types.js';
+import type { AgentMode, AgentMessage, AgentMessagePart } from '../hooks/use-agent-chat.js';
 
 export function Session() {
-  const location = useLocation();
-  const initialState = location.state as {
-    message?: string;
-    mode?: 'BUILD' | 'PLAN' | 'REVIEW' | 'SCAN' | 'FIX';
-  } | null;
-  const initialMessage = initialState?.message;
-  const initialMode = initialState?.mode;
-  const initialSent = useRef(false);
-
   const toast = useToast();
   const dialog = useDialog();
   const { requestPermission } = usePermission();
@@ -38,67 +29,20 @@ export function Session() {
   const {
     messages, loading, mode, setMode, toggleMode,
     submit, stop, clear, appendMessage, model, setModel, status, sessionId,
-    serverStatus, compacting, submitAndWaitForCompaction,
+    serverStatus, compacting, submitAndWaitForCompaction, microcompactSaved,
   } = useAgentChat({
-    initialMode: initialMode === 'BUILD' || initialMode === 'PLAN' || initialMode === 'REVIEW' ? initialMode : undefined,
     onPermissionRequest: useCallback(async (toolName: string, toolCallId: string, input: unknown) => {
       return requestPermission({ toolName, toolCallId, input });
     }, [requestPermission]),
+    onMicrocompact: useCallback((stats: { droppedCount: number; estimatedTokensSaved: number }) => {
+      toast.success(
+        `Microcompacted ${stats.droppedCount} stale tool result${stats.droppedCount === 1 ? '' : 's'} — saved ~${stats.estimatedTokensSaved.toLocaleString()} tokens`
+      );
+    }, [toast]),
   });
 
   const [showThinking, setShowThinking] = useState(true);
   const [showDetails, setShowDetails] = useState(true);
-
-  const [loopState, setLoopState] = useState<{
-    active: boolean;
-    prompt: string;
-    iterations: number;
-    maxIterations: number;
-  }>({ active: false, prompt: '', iterations: 0, maxIterations: 20 });
-
-  const prevLoadingRef = useRef(loading);
-  const loopPromptRef = useRef('');
-  const loopActiveRef = useRef(false);
-  const loopIterationsRef = useRef(0);
-  const loopTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Detect agent idle while loop is active
-  useEffect(() => {
-    if (prevLoadingRef.current && !loading && loopActiveRef.current) {
-      const lastMsg = messages[messages.length - 1];
-      const hasPromise = lastMsg?.parts?.some(p =>
-        p.type === 'text' && typeof p.text === 'string' && p.text.includes('<promise>DONE</promise>')
-      );
-
-      if (hasPromise) {
-        toast.success(`Loop completed after ${loopIterationsRef.current} iteration(s)`);
-        setLoopState({ active: false, prompt: '', iterations: 0, maxIterations: 20 });
-        loopActiveRef.current = false;
-        appendMessage({ role: 'assistant', mode, model, parts: [{ type: 'text', text: `✓ Loop completed after ${loopIterationsRef.current} iteration(s).` }] });
-      } else {
-        const nextIter = loopIterationsRef.current + 1;
-        if (nextIter >= (loopState.maxIterations || 20)) {
-          toast.warning('Max iterations reached, stopping loop');
-          appendMessage({ role: 'assistant', mode, model, parts: [{ type: 'text', text: `⚠ Loop stopped after ${nextIter} iterations (max reached).` }] });
-          setLoopState({ active: false, prompt: '', iterations: 0, maxIterations: 20 });
-          loopActiveRef.current = false;
-        } else {
-          loopIterationsRef.current = nextIter;
-          setLoopState(s => ({ ...s, iterations: nextIter }));
-          toast.info(`Loop iteration ${nextIter}/${loopState.maxIterations}`);
-          if (loopTimeoutRef.current) clearTimeout(loopTimeoutRef.current);
-          loopTimeoutRef.current = setTimeout(() => submit(loopPromptRef.current), 500);
-        }
-      }
-    }
-    prevLoadingRef.current = loading;
-    return () => {
-      if (loopTimeoutRef.current) {
-        clearTimeout(loopTimeoutRef.current);
-        loopTimeoutRef.current = null;
-      }
-    };
-  }, [loading, messages]);
 
   const tokenUsage = {
     estimated: messages.reduce((acc, m) =>
@@ -148,22 +92,19 @@ export function Session() {
     }
   }, [submit, toast]);
 
-  const navigate = useNavigate();
   const { theme } = useTheme();
 
-  const handleSetMode = useCallback((m: 'BUILD' | 'PLAN' | 'REVIEW' | 'SCAN' | 'FIX') => {
-    if (m === 'BUILD' || m === 'PLAN' || m === 'REVIEW') {
-      setMode(m);
-    }
-  }, [setMode]);
-
-  const commandCtx: CommandContext = {
-    exit: () => process.exit(0),
-    navigate: (path: string) => navigate(path),
-    execute: (action: string) => { submit(`/${action}`); },
-    mode,
-    setMode: handleSetMode,
-  };
+  const appendMessageSafe = useCallback(
+    (msg: Omit<AgentMessage, 'id' | 'timestamp'>) => {
+      appendMessage({
+        role: msg.role,
+        mode: msg.mode,
+        model: msg.model,
+        parts: msg.parts as unknown as AgentMessagePart[],
+      });
+    },
+    [appendMessage]
+  );
 
   const handleShell = useCallback(async (cmd: string) => {
     appendMessage({ role: 'user', mode, model, parts: [{ type: 'text', text: `! ${cmd}` }] });
@@ -177,10 +118,43 @@ export function Session() {
     }
   }, [appendMessage, mode, model]);
 
-  const handleThinkingToggle = useCallback(() => setShowThinking(v => !v), []);
+  const handleSelectSession = useCallback(async (id: string) => {
+    try {
+      const session = await Sessions.get(id);
+      if (!session) { toast.error('Session not found'); return; }
+      clear();
+      if (session.messages && Array.isArray(session.messages)) {
+        for (const m of session.messages) {
+          appendMessage({
+            role: m.role === 'user' || m.role === 'assistant' || m.role === 'error' ? m.role : 'assistant',
+            parts: (m.parts || (m.content ? [{ type: 'text', text: m.content }] : [])) as unknown as AgentMessagePart[],
+            mode: (m.metadata?.mode === 'BUILD' || m.metadata?.mode === 'PLAN' || m.metadata?.mode === 'REVIEW' ? m.metadata.mode : session.mode) as AgentMode | undefined,
+            model: ((m.metadata?.model as string | undefined) ?? session.model) || undefined,
+          });
+        }
+      }
+      if (session.mode === 'BUILD' || session.mode === 'PLAN' || session.mode === 'REVIEW') setMode(session.mode as AgentMode);
+      if (session.model) setModel(session.model);
+      setShowSessionPanel(false);
+    } catch { toast.error('Failed to load session'); }
+  }, [clear, appendMessage, setMode, setModel, toast]);
+
+  const handleDeleteSession = useCallback(async (id: string) => {
+    try {
+      const ok = await Sessions.delete(id);
+      if (ok) {
+        if (messages.length > 0) clear();
+        toast.success('Session deleted');
+      } else {
+        toast.error('Failed to delete session');
+      }
+    } catch {
+      toast.error('Failed to delete session');
+    }
+  }, [clear, toast]);
 
   const wrappedSubmit = useCallback(
-    (value: string) => {
+    async (value: string) => {
       if (value.startsWith('/')) {
         const cmd = value.replace(/^\//, '').split(/\s+/)[0].toLowerCase();
         const args = value.replace(/^\/(\w+)\s*/i, '').trim();
@@ -188,22 +162,25 @@ export function Session() {
         // Route to extracted command handlers
         const handled = await executeCommand(cmd, {
           cmd, args, mode, model, messages, showThinking, showDetails,
-          loading, compacting, sessionId,
-          navigate, toast, dialog, appendMessage, submit, clear,
+          loading, compacting, sessionId: sessionId ?? null,
+          toast,
+          dialog,
+          appendMessage: appendMessageSafe as CommandContext['appendMessage'],
+          submit,
+          clear,
           setMode, setModel, toggleMode, setShowThinking, setShowDetails,
-          setLoopState, handleExternalEditor, handleSelectSession,
+          handleExternalEditor, handleSelectSession,
           submitAndWaitForCompaction,
         });
         if (handled) return;
 
         if (cmd === 'clear') { clear(); return; }
-        if (cmd === 'new') { navigate('/'); return; }
+        if (cmd === 'new') { clear(); toast.info('New session'); return; }
         if (cmd === 'mode') { toggleMode(); return; }
         if (cmd === 'editor') { handleExternalEditor(); return; }
         if (cmd === 'thinking') { setShowThinking(v => !v); toast.info(`Thinking blocks ${showThinking ? 'hidden' : 'shown'}`); return; }
         if (cmd === 'details') { setShowDetails(v => !v); toast.info(`Tool details ${showDetails ? 'hidden' : 'shown'}`); return; }
-        if (cmd === 'watch') { navigate('/loop'); toast.info('Loop Engine opened. Select Watch Loop and press Enter.'); return; }
-        if (cmd === 'pipeline') { navigate('/loop'); toast.info('Loop Engine opened. Select Pipeline Loop and press Enter.'); return; }
+        if (cmd === 'sessions' || cmd === 'panel') { setShowSessionPanel(v => !v); return; }
 
         if (cmd === 'compact') {
           (async () => {
@@ -251,67 +228,13 @@ export function Session() {
           }
           const enhancedPrompt = `[Agent: ${agentResult.agent.label}]\n${agentResult.agentHint}\n\n${agentResult.prompt}`;
           submit(enhancedPrompt);
-          if (agentResult.mode !== prevMode) {
-            setTimeout(() => setMode(prevMode), 100);
-          }
           return;
         }
       }
       submit(value);
     },
-    [clear, navigate, dialog, appendMessage, mode, model, toggleMode, toast, submit, setMode, handleExternalEditor]
+    [clear, dialog, appendMessage, mode, model, toggleMode, toast, submit, setMode, handleExternalEditor, appendMessageSafe, messages, showThinking, showDetails, loading, compacting, sessionId, setModel, submitAndWaitForCompaction, handleSelectSession]
   );
-
-  const handleSelectSession = useCallback(async (id: string) => {
-    try {
-      const session = await Sessions.get(id);
-      if (!session) { toast.error('Session not found'); return; }
-      clear();
-      if (session.messages && Array.isArray(session.messages)) {
-        for (const m of session.messages) {
-          appendMessage({
-            role: m.role === 'user' || m.role === 'assistant' || m.role === 'error' ? m.role : 'assistant',
-            parts: (m.parts || (m.content ? [{ type: 'text', text: m.content }] : [])) as AgentMessagePart[],
-            mode: (m.metadata?.mode === 'BUILD' || m.metadata?.mode === 'PLAN' ? m.metadata.mode : session.mode) as AgentMode | undefined,
-            model: (m.metadata?.model as string) || session.model,
-          });
-        }
-      }
-      if (session.mode === 'BUILD' || session.mode === 'PLAN' || session.mode === 'REVIEW') setMode(session.mode as AgentMode);
-      if (session.model) setModel(session.model);
-      setShowSessionPanel(false);
-    } catch { toast.error('Failed to load session'); }
-  }, [clear, appendMessage, setMode, setModel, toast]);
-
-  const handleForkSession = useCallback(async (id: string) => {
-    try {
-      const session = await Sessions.get(id);
-      if (!session) { toast.error('Session not found'); return; }
-      const newSession = await Sessions.create({
-        title: session.title + ' (fork)',
-        mode: session.mode,
-        model: session.model,
-        projectPath: process.cwd(),
-      });
-      if (!newSession || !newSession.id) { toast.error('Failed to create session'); return; }
-      await handleSelectSession(newSession.id);
-      toast.success('Session forked');
-    } catch { toast.error('Failed to fork session'); }
-  }, [handleSelectSession, toast]);
-
-  const handleDeleteSession = useCallback(async (id: string) => {
-    try {
-      const ok = await Sessions.delete(id);
-      if (ok) {
-        if (messages.length > 0) clear();
-        toast.success('Session deleted');
-      } else {
-        toast.error('Failed to delete session');
-      }
-    } catch {
-      toast.error('Failed to delete session');
-    }
-  }, [clear, toast]);
 
   const [leaderKey, setLeaderKey] = useState<'none' | 'ctrl-x'>('none');
   const leaderTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -326,7 +249,7 @@ export function Session() {
       if (ch === 'm')       { dialog.open({ title: 'Model Picker', width: 60, height: 25, children: <ModelPickerDialog currentModel={model} onSelect={(m) => { setModel(m); dialog.close(); }} /> }); return; }
       if (ch === 'p')       { setShowCommands(v => !v); return; }
       if (ch === 'c')       { clear(); return; }
-      if (ch === 'n')       { navigate('/'); return; }
+      if (ch === 'n')       { clear(); toast.info('New session'); return; }
       if (ch === 's')       { setShowSessionPanel(v => !v); return; }
       if (ch === 'e' || ch === 'i') { handleExternalEditor(); return; }
       if (ch === 'l')       { handleLogs(); return; }
@@ -353,13 +276,6 @@ export function Session() {
       return;
     }
   });
-
-  useEffect(() => {
-    if (initialMessage && !initialSent.current) {
-      initialSent.current = true;
-      submit(initialMessage);
-    }
-  }, [initialMessage, submit]);
 
   const lastModelRef = useRef(model);
   useEffect(() => {
@@ -412,21 +328,22 @@ export function Session() {
     })();
   }, []);
 
-  const autoCompactRef = useRef(false);
-  const autoCompactTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Keep a ref so the interval always reads the latest messages without needing to re-register.
+  const autoCompactMessagesRef = useRef(messages);
+  useEffect(() => { autoCompactMessagesRef.current = messages; }, [messages]);
+
   useEffect(() => {
-    if (autoCompactRef.current) return;
-    autoCompactRef.current = true;
-    autoCompactTimerRef.current = setInterval(() => {
+    const timer = setInterval(() => {
       if (loading || compacting) return;
+      const currentMessages = autoCompactMessagesRef.current;
       import('../lib/context-compactor.js').then(({ getCompactionState, compactMessages }) => {
-        const state = getCompactionState(messages);
+        const state = getCompactionState(currentMessages);
         if (state.atSyncThreshold) {
           appendLog('warn', `Auto-compact triggered at ${state.percentage}% token usage`);
           toast.warning(`Token usage at ${state.percentage}% — auto-compacting...`);
           (async () => {
             try {
-              const result = await compactMessages(messages, submitAndWaitForCompaction);
+              const result = await compactMessages(currentMessages, submitAndWaitForCompaction);
               if (result.compacted && Array.isArray(result.messages)) {
                 clear();
                 for (const msg of result.messages) {
@@ -442,23 +359,28 @@ export function Session() {
         }
       }).catch(() => {});
     }, 30000);
-    return () => {
-      if (autoCompactTimerRef.current) clearInterval(autoCompactTimerRef.current);
-    };
-  }, [loading, compacting, messages, toast, submitAndWaitForCompaction, clear, appendMessage]);
+    return () => clearInterval(timer);
+  }, [toast, submitAndWaitForCompaction, clear, appendMessage]);
 
   const handleModeToggle = useCallback(() => toggleMode(), [toggleMode]);
   const handleCommandPalette = useCallback(() => setShowCommands(v => !v), []);
 
   const isLoading = loading || status === 'streaming';
 
+  const commandCtx: PaletteCommandContext = {
+    exit: () => process.exit(0),
+    navigate: () => {},
+    execute: (action: string) => { wrappedSubmit(`/${action}`); },
+    toggleSessionPanel: () => setShowSessionPanel(v => !v),
+  };
+
   return (
     <Box flexGrow={1} width="100%" flexDirection="row">
       {showSessionPanel ? (
         <SessionPanel
-          currentSessionId={undefined}
+          currentSessionId={sessionId}
           onSelect={handleSelectSession}
-          onFork={handleForkSession}
+          onFork={async () => { toast.info('Fork: start a new session and /export for history'); }}
           onDelete={handleDeleteSession}
           onClose={() => setShowSessionPanel(false)}
         />
@@ -473,14 +395,16 @@ export function Session() {
           onModeToggle={handleModeToggle}
           onCommandPalette={handleCommandPalette}
           model={model}
-          sessionId={sessionId ?? undefined}
+          sessionId={sessionId}
           statusText={`${messages.length} msgs · ${theme.name}`}
           tokenUsage={tokenUsage.estimated > 0 ? tokenUsage : undefined}
+          microcompactSaved={microcompactSaved}
           serverStatus={serverStatus}
           costUsd={costUsd}
           showThinking={showThinking}
           showDetails={showDetails}
           compacting={compacting}
+          onStop={stop}
         >
           {messages.length === 0 ? (
             <Box padding={2} alignItems="center" justifyContent="center">

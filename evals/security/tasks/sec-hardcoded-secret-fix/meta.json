@@ -1,0 +1,1 @@
+{"id":"sec-hardcoded-secret-fix","mode":"BUILD","kind":"fix","source":"synthetic DeepSec DS-SECRET-KEY: hardcoded credential must move to env"}

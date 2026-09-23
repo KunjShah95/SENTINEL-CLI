@@ -48,7 +48,9 @@ export function runSandboxed(command, options = {}) {
       try {
         return execFileSync('sandbox-exec', ['-f', profilePath, 'sh', '-c', command], execOpts);
       } finally {
-        try { unlinkSync(profilePath); } catch {}
+        try { unlinkSync(profilePath); } catch {
+          // ignore
+        }
       }
     } catch {
       return execSync(command, execOpts);

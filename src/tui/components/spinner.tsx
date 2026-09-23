@@ -1,6 +1,5 @@
 import React from 'react';
 import { Box, Text } from 'ink';
-import InkSpinner from 'ink-spinner';
 
 type Mode = 'BUILD' | 'PLAN' | 'REVIEW' | 'SCAN' | 'FIX';
 type Props = { mode?: Mode; label?: string };
@@ -13,12 +12,20 @@ const MODE_LABEL: Record<Mode, string> = {
   BUILD: 'Thinking', PLAN: 'Planning', REVIEW: 'Analyzing', SCAN: 'Scanning', FIX: 'Fixing',
 };
 
+const FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+
+/** Zero-dependency spinner (replaces ink-spinner, which was removed). */
 export function Spinner({ mode = 'BUILD', label }: Props) {
+  const [frame, setFrame] = React.useState(0);
+  React.useEffect(() => {
+    const t = setInterval(() => setFrame((f) => (f + 1) % FRAMES.length), 80);
+    return () => clearInterval(t);
+  }, []);
   const color = MODE_COLOR[mode];
   const text = label ?? `${MODE_LABEL[mode]}...`;
   return (
     <Box flexDirection="row" gap={1} paddingLeft={4}>
-      <Text color={color}><InkSpinner type="dots" /></Text>
+      <Text color={color}>{FRAMES[frame]}</Text>
       <Text dimColor>{text}</Text>
     </Box>
   );
