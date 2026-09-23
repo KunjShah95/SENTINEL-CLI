@@ -17,7 +17,7 @@ import { runSandboxed } from './sandbox.js';
 import { createCheckpoint, restoreCheckpoint, redoCheckpoint } from './checkpoint.js';
 import { toolInputSchemas, READ_ONLY_TOOL_NAMES, BUILD_TOOL_NAMES, isReadOnly } from './schemas.js';
 
-// Re-export so callers can do `import { Mode, toolInputSchemas } from "./tools"`.
+// Re-export so callers can import Mode and toolInputSchemas from this module directly.
 export {
   Mode,
   isReadOnlyTool,
@@ -51,7 +51,9 @@ export function resolveInsideCwd(inputPath) {
   try {
     resolvedTarget = realpathSync(target);
     resolvedCwd = realpathSync(cwd);
-  } catch {}
+  } catch {
+    // ignore
+  }
 
   const rel = path.relative(resolvedCwd, resolvedTarget);
   if (rel.startsWith('..') || path.isAbsolute(rel)) {
@@ -252,7 +254,9 @@ async function writeFileImpl(input) {
   // Checkpoint before overwriting
   try {
     await createCheckpoint([resolved]);
-  } catch {}
+  } catch {
+    // ignore
+  }
   await fs.mkdir(path.dirname(resolved), { recursive: true });
   await fs.writeFile(resolved, content, 'utf-8');
   return {
@@ -279,7 +283,9 @@ async function editFileImpl(input) {
   // Checkpoint before editing
   try {
     await createCheckpoint([resolved]);
-  } catch {}
+  } catch {
+    // ignore
+  }
   await fs.writeFile(resolved, current.replace(oldString, newString), 'utf-8');
   return { success: true, path: relative };
 }
@@ -330,12 +336,16 @@ async function batchEditImpl(input) {
           for (let j = 0; j < backups.length; j++) {
             try {
               await fs.copyFile(backups[j], resolved[j].resolved);
-            } catch {}
+            } catch {
+              // ignore
+            }
           }
           for (const b of backups) {
             try {
               await fs.rm(b);
-            } catch {}
+            } catch {
+              // ignore
+            }
           }
           return { success: false, error: 'Batch edit failed, all changes reverted' };
         }
@@ -346,7 +356,9 @@ async function batchEditImpl(input) {
     for (const b of backups) {
       try {
         await fs.rm(b);
-      } catch {}
+      } catch {
+        // ignore
+      }
     }
 
     if (errors.length > 0) {
@@ -584,7 +596,7 @@ export function getToolNames(mode) {
  * @param {object} [options]
  * @param {function} [options.onPermissionAsk] — callback for 'ask' policy
  */
-export async function executeLocalTool(toolName, input, mode = Mode.BUILD, options = {}) {
+export async function executeLocalTool(toolName, input, mode = Mode.BUILD, _options = {}) {
   // ── Permission check (opencode-inspired) ──────────────────────────
   let permCheck;
   try {

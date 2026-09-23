@@ -1,4 +1,4 @@
-import type { AgentMessage, AgentMode } from '../hooks/use-agent-chat.js';
+import type { AgentMessage, AgentMode, AgentMessagePart } from '../hooks/use-agent-chat.js';
 
 export type CommandHandlerResult = void | 'handled';
 export type CommandHandler = (ctx: CommandContext) => Promise<CommandHandlerResult>;
@@ -14,7 +14,6 @@ export interface CommandContext {
   loading: boolean;
   compacting: boolean;
   sessionId: string | null;
-  navigate: (path: string) => void;
   toast: {
     success: (msg: string) => void;
     error: (msg: string) => void;
@@ -29,7 +28,7 @@ export interface CommandContext {
     role: 'user' | 'assistant' | 'error';
     mode?: AgentMode;
     model?: string;
-    parts: { type: string; text?: string; [key: string]: any }[];
+    parts: AgentMessagePart[];
   }) => void;
   submit: (prompt: string) => void;
   clear: () => void;
@@ -38,12 +37,6 @@ export interface CommandContext {
   toggleMode: () => void;
   setShowThinking: (v: boolean) => void;
   setShowDetails: (v: boolean) => void;
-  setLoopState: (state: {
-    active: boolean;
-    prompt: string;
-    iterations: number;
-    maxIterations: number;
-  }) => void;
   handleExternalEditor: () => Promise<void>;
   handleSelectSession: (id: string) => Promise<void>;
   submitAndWaitForCompaction: (prompt: string) => Promise<any>;

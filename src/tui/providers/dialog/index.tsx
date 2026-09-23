@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
 import { Box, Text, useInput } from 'ink';
-import { useKeyboardLayer } from '../keyboard-layer/index.js';
 import { useTheme } from '../theme/index.js';
 import type { DialogConfig } from './types.js';
 
@@ -14,20 +13,17 @@ const DialogContext = createContext<DialogContextValue | null>(null);
 
 export function DialogProvider({ children }: { children: ReactNode }) {
   const [dialog, setDialog] = useState<DialogConfig | null>(null);
-  const { push, pop } = useKeyboardLayer();
   const { colors } = useTheme();
 
   const close = useCallback(() => {
     setDialog(null);
-    pop('dialog');
-  }, [pop]);
+  }, []);
 
   const open = useCallback(
     (config: DialogConfig) => {
       setDialog(config);
-      push('dialog');
     },
-    [push]
+    []
   );
 
   useInput((input, key) => {

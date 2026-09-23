@@ -1,6 +1,5 @@
 import React from 'react';
 import { Box, Text } from 'ink';
-import InkSpinner from 'ink-spinner';
 import { useTheme } from '../../providers/theme/index.js';
 
 type ToolCall = { name: string; args?: Record<string, unknown>; result?: string };
@@ -32,7 +31,7 @@ function ToolRow({ part }: { part: MessagePart }) {
             : null}
           {done
             ? <Text color={colors.success}>{'✓'}</Text>
-            : <Text color={colors.info}><InkSpinner type="dots" /></Text>}
+            : <Text color={colors.info}>{'…'}</Text>}
         </Box>
         {done && part.toolCall.result
           ? <Box paddingLeft={3}><Text dimColor>{String(part.toolCall.result).slice(0, 200)}</Text></Box>
@@ -58,7 +57,7 @@ function ToolRow({ part }: { part: MessagePart }) {
         <Text color={colors.dimSeparator}>{'↳'}</Text>
         <Text color={colors.info}>{name}</Text>
         {inputStr ? <Text dimColor>{inputStr}</Text> : null}
-        {isPending ? <Text color={colors.info}><InkSpinner type="dots" /></Text> : null}
+        {isPending ? <Text color={colors.info}>{'…'}</Text> : null}
         {isDone    ? <Text color={colors.success}>{'✓'}</Text> : null}
         {isError   ? <Text color={colors.error}>{'✗'}</Text>  : null}
       </Box>

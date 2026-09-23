@@ -47,7 +47,7 @@ export function parseFrontmatter(content) {
 
   const raw = match[1];
   const body = content.slice(match[0].length).trim();
-  const metadata = {};
+  const metadata: Record<string, any> = {};
 
   for (const line of raw.split('\n')) {
     const trimmed = line.trim();
@@ -92,7 +92,7 @@ export function parseFrontmatter(content) {
 export function parsePositionalArgs(argString) {
   if (!argString || !argString.trim()) return [];
 
-  const args = [];
+  const args: string[] = [];
   let current = '';
   let inQuote = false;
   let quoteChar = '';
@@ -136,7 +136,7 @@ export function executeShellInjection(command, timeoutMs = 5000) {
       stdio: ['pipe', 'pipe', 'pipe'],
     });
     return result.trim();
-  } catch (err) {
+  } catch (err: any) {
     return `[shell error: ${err.message}]`;
   }
 }
@@ -158,7 +158,7 @@ export function readFileReference(filePath, maxChars = 10000) {
       return content.slice(0, maxChars) + `\n... (truncated, ${content.length} total chars)`;
     }
     return content;
-  } catch (err) {
+  } catch (err: any) {
     return `[file error: ${err.message}]`;
   }
 }
@@ -175,7 +175,7 @@ export function readFileReference(filePath, maxChars = 10000) {
  * @param {boolean} [context.allowFileRefs] — allow @file references (default: true)
  * @returns {string} — processed prompt
  */
-export function processTemplate(template, context = {}) {
+export function processTemplate(template, context: Record<string, any> = {}) {
   const {
     arguments: argString = '',
     mode = 'BUILD',

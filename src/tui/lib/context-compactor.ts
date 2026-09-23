@@ -1,5 +1,13 @@
 import type { AgentMessage } from '../hooks/use-agent-chat.js';
-import type { SubmitAndWait } from './loop-engine.js';
+
+/** Async function that submits a prompt and waits for the agent turn to finish. */
+type SubmitAndWait = (prompt: string, mode?: "BUILD" | "PLAN" | "REVIEW") => Promise<string>;
+
+import {
+  estimateTokens as estimateTokensShared,
+  getCompactionState as getStateShared,
+  formatTokenUsage as formatTokenUsageShared,
+} from '../../agent/context.js';
 
 export type CompactionResult = {
   messages: AgentMessage[];
@@ -24,36 +32,14 @@ const FROZEN_COUNT = 2;
 const ACTIVE_COUNT = 8;
 
 export function estimateTokens(messages: AgentMessage[]): number {
-  let charCount = 0;
-  for (const msg of messages) {
-    for (const part of msg.parts) {
-      if (part.type === 'text' || part.type === 'reasoning') {
-        charCount += part.text.length;
-      } else if (part.type === 'tool-call') {
-        try { charCount += JSON.stringify(part.input).length; } catch {}
-        if (part.output !== undefined) {
-          try { charCount += JSON.stringify(part.output).length; } catch {}
-        }
-        if (part.errorText) charCount += part.errorText.length;
-      }
-    }
-  }
-  return Math.ceil(charCount / 3.8);
+  return estimateTokensShared(messages as any);
 }
 
 export function getCompactionState(
   messages: AgentMessage[],
   options?: { maxTokens?: number }
 ): CompactionState {
-  const maxTokens = options?.maxTokens ?? DEFAULT_MAX_TOKENS;
-  const estimated = estimateTokens(messages);
-  const ratio = estimated / maxTokens;
-  return {
-    estimatedTokens: estimated,
-    atAsyncThreshold: ratio >= ASYNC_THRESHOLD,
-    atSyncThreshold: ratio >= SYNC_THRESHOLD,
-    percentage: Math.min(100, Math.round(ratio * 100)),
-  };
+  return getStateShared(messages as any, options) as CompactionState;
 }
 
 export function shouldCompact(
@@ -62,8 +48,7 @@ export function shouldCompact(
     maxTokens?: number;
   }
 ): boolean {
-  const state = getCompactionState(messages, options);
-  return state.atAsyncThreshold;
+  return getStateShared(messages as any, options).atAsyncThreshold;
 }
 
 export async function compactMessages(
@@ -127,7 +112,7 @@ Conversation:\n\n${headText}`;
 
   let summary: string;
   try {
-    summary = await submitAndWait(summaryPrompt, 'PLAN');
+    summary = await submitAndWait(summaryPrompt);
   } catch {
     onProgress?.('done');
     return {
@@ -201,10 +186,5 @@ Conversation:\n\n${headText}`;
 }
 
 export function formatTokenUsage(messages: AgentMessage[], maxTokens?: number): string {
-  const limit = maxTokens ?? DEFAULT_MAX_TOKENS;
-  const state = getCompactionState(messages, { maxTokens: limit });
-  const remaining = Math.max(0, limit - state.estimatedTokens);
-  const fmt = (n: number) => n.toLocaleString('en-US');
-  const warning = state.atSyncThreshold ? ' ⚠️ OVER 80%' : state.atAsyncThreshold ? ' ⚡ above 60%' : '';
-  return `~${fmt(state.estimatedTokens)} tokens used · ${fmt(remaining)} remaining (${fmt(limit)} limit)${warning}`;
+  return formatTokenUsageShared(messages as any, maxTokens);
 }

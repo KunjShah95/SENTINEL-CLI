@@ -1,153 +1,116 @@
 #!/usr/bin/env node
-
+/**
+ * Sentinel MCP server (stdio transport).
+ *
+ * Exposes the minimal assistant to MCP clients (Claude Desktop, Cursor, VS Code):
+ *   sentinel_health        provider/version status
+ *   sentinel_ask           one-shot question with the local tool set
+ *   sentinel_review_diff   AI review of a diff (read-only REVIEW mode)
+ */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
+import { readFileSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-import { runAiReview, mergeResults, default as reviewPullRequest } from '../src/server/api/lib/pr-review-orchestrator.js';
-import { runSast } from '../dist/tui/lib/sast-runner.js';
-
-const server = new McpServer({
-  name: 'sentinel-cli',
-  version: '2.0.0',
-});
-
-server.tool(
-  'sentinel_review_diff',
-  'Run AI code review on a diff string. Returns issues with severity, file, line, title, description.',
-  {
-    diff: z.string().describe('The git diff output to review.'),
-    files: z.array(z.string()).optional().describe('Optional array of filenames included in the diff.'),
-  },
-  async ({ diff, files }) => {
-    try {
-      const issues = await runAiReview(diff, files || []);
-      return { content: [{ type: 'text', text: JSON.stringify(issues, null, 2) }] };
-    } catch (err) {
-      return { content: [{ type: 'text', text: JSON.stringify({ error: err.message }) }] };
-    }
+const VERSION = (() => {
+  try {
+    const pkg = join(dirname(fileURLToPath(import.meta.url)), '..', 'package.json');
+    return JSON.parse(readFileSync(pkg, 'utf8')).version || '0.0.0';
+  } catch {
+    return '0.0.0';
   }
-);
+})();
 
-server.tool(
-  'sentinel_run_sast',
-  'Run static analysis security tools (SAST) on a target directory. Returns findings with severity, file, line, rule, and suggestions.',
-  {
-    target: z.string().optional().default('.').describe('Directory to scan. Defaults to current working directory.'),
-  },
-  async ({ target }) => {
-    try {
-      const result = await runSast({ target });
-      return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-    } catch (err) {
-      return { content: [{ type: 'text', text: JSON.stringify({ error: err.message }) }] };
-    }
-  }
-);
+const server = new McpServer({ name: 'sentinel-cli', version: VERSION });
 
-server.tool(
-  'sentinel_review_pr',
-  'Run full PR review: fetch diff, run SAST + AI analysis, post inline comments and summary. Returns conclusion and duration.',
-  {
-    owner: z.string().describe('GitHub repository owner (user or org).'),
-    repo: z.string().describe('GitHub repository name.'),
-    prNumber: z.number().describe('Pull request number.'),
-  },
-  async ({ owner, repo, prNumber }) => {
-    try {
-      const result = await reviewPullRequest(owner, repo, prNumber);
-      return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-    } catch (err) {
-      return { content: [{ type: 'text', text: JSON.stringify({ error: err.message }) }] };
-    }
+/** Collect the final text of an agent turn (REVIEW/PLAN modes are read-only). */
+async function collectAgentText(history, mode, model) {
+  const { runAgentTurn } = await import('../src/agent/loop.js');
+  let text = '';
+  let error = null;
+  for await (const ev of runAgentTurn({ history, mode, model })) {
+    if (ev.event === 'text') text += ev.data.delta;
+    else if (ev.event === 'error') error = ev.data.message;
   }
-);
+  return { text, error };
+}
 
 server.tool(
   'sentinel_health',
-  'Returns server health info: available LLM providers, version, and status.',
+  'Provider and version status for the local Sentinel CLI.',
   {},
   async () => {
-    const providerKeys = {
-      groq: !!process.env.GROQ_API_KEY,
-      openai: !!process.env.OPENAI_API_KEY,
-      anthropic: !!process.env.ANTHROPIC_API_KEY,
-      gemini: !!process.env.GEMINI_API_KEY,
-      deepseek: !!process.env.DEEPSEEK_API_KEY,
-      openrouter: !!process.env.OPENROUTER_API_KEY,
-      github: !!process.env.GITHUB_TOKEN,
+    const envKeys = {
+      groq: 'GROQ_API_KEY',
+      openai: 'OPENAI_API_KEY',
+      anthropic: 'ANTHROPIC_API_KEY',
+      gemini: 'GEMINI_API_KEY',
+      deepseek: 'DEEPSEEK_API_KEY',
+      mistral: 'MISTRAL_API_KEY',
+      openrouter: 'OPENROUTER_API_KEY',
+      github: 'GITHUB_TOKEN',
     };
-
-    const available = Object.entries(providerKeys)
+    const providers = Object.fromEntries(
+      Object.entries(envKeys).map(([k, env]) => [k, !!process.env[env]])
+    );
+    providers.ollama = true; // local, requires no key
+    const available = Object.entries(providers)
       .filter(([, v]) => v)
       .map(([k]) => k);
-
     return {
-      content: [{
-        type: 'text',
-        text: JSON.stringify({
-          status: 'ok',
-          version: '2.0.0',
-          providers: providerKeys,
-          availableCount: available.length,
-          availableProviders: available,
-        }, null, 2),
-      }],
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({ status: 'ok', version: VERSION, providers, available }, null, 2),
+        },
+      ],
     };
   }
 );
 
 server.tool(
-  'sentinel_analyze_code',
-  'Runs both SAST and AI analysis on a code snippet. Returns merged, deduplicated results.',
+  'sentinel_ask',
+  'Ask the Sentinel assistant a question. Uses local tools (read files, grep, glob). Read-only unless allowBuild is true.',
   {
-    code: z.string().describe('The source code to analyze.'),
-    language: z.string().describe('Programming language (e.g. javascript, typescript, python, go, java, ruby, php, rust).'),
+    question: z.string().describe('The question to ask.'),
+    allowBuild: z.boolean().optional().describe('Allow file edits and shell commands (BUILD mode). Default false.'),
+    model: z.string().optional().describe('Model id (defaults to the cheap default model).'),
   },
-  async ({ code, language }) => {
+  async ({ question, allowBuild, model }) => {
     try {
-      const { writeFile, mkdir, rm } = await import('node:fs/promises');
-      const { join } = await import('node:path');
-      const { tmpdir } = await import('node:os');
-      const { randomUUID } = await import('node:crypto');
+      const { text, error } = await collectAgentText(
+        [{ id: `ask_${Date.now()}`, role: 'user', parts: [{ type: 'text', text: question }] }],
+        allowBuild ? 'BUILD' : 'PLAN',
+        model
+      );
+      return { content: [{ type: 'text', text: error ? JSON.stringify({ error }) : text }] };
+    } catch (err) {
+      return { content: [{ type: 'text', text: JSON.stringify({ error: err.message }) }] };
+    }
+  }
+);
 
-      const extMap = {
-        javascript: 'js', typescript: 'ts', python: 'py', go: 'go',
-        java: 'java', ruby: 'rb', php: 'php', rust: 'rs',
-      };
-      const ext = extMap[language?.toLowerCase()] || 'js';
-
-      const tmpDir = join(tmpdir(), `sentinel-mcp-${randomUUID()}`);
-      const tmpFile = join(tmpDir, `snippet.${ext}`);
-
-      await mkdir(tmpDir, { recursive: true });
-      await writeFile(tmpFile, code, 'utf8');
-
-      let sastResult;
-      try {
-        sastResult = await runSast({ target: tmpDir });
-      } finally {
-        await rm(tmpDir, { recursive: true, force: true }).catch(() => {});
-      }
-
-      const diff = `diff --git a/snippet.${ext} b/snippet.${ext}\nindex 0000000..0000000 100644\n--- a/snippet.${ext}\n+++ b/snippet.${ext}\n@@ -0,0 +1,${code.split('\n').length} @@\n` +
-        code.split('\n').map(l => `+${l}`).join('\n');
-
-      const aiIssues = await runAiReview(diff, [`snippet.${ext}`]);
-
-      const merged = mergeResults(sastResult?.findings || [], aiIssues);
-
-      return {
-        content: [{
-          type: 'text',
-          text: JSON.stringify({
-            sast: { findings: sastResult?.findings, toolsRun: sastResult?.toolsRun },
-            aiReview: { issues: aiIssues },
-            merged,
-            total: merged.length,
-          }, null, 2),
-        }],
-      };
+server.tool(
+  'sentinel_review_diff',
+  'AI code review of a diff string (read-only REVIEW mode). Returns a formatted review.',
+  {
+    diff: z.string().describe('Unified diff (git diff output) to review.'),
+    focus: z.string().optional().describe('Optional focus, e.g. "security" or "performance".'),
+  },
+  async ({ diff, focus }) => {
+    try {
+      const prompt =
+        `Review this diff${focus ? ` with a focus on ${focus}` : ''}:\n\n` +
+        '```diff\n' +
+        String(diff).slice(0, 60000) +
+        '\n```';
+      const { text, error } = await collectAgentText(
+        [{ id: 'diff', role: 'user', parts: [{ type: 'text', text: prompt }] }],
+        'REVIEW'
+      );
+      return { content: [{ type: 'text', text: error ? JSON.stringify({ error }) : text }] };
     } catch (err) {
       return { content: [{ type: 'text', text: JSON.stringify({ error: err.message }) }] };
     }

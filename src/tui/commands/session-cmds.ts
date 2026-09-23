@@ -47,14 +47,27 @@ export async function handleExport(ctx: CommandContext) {
 }
 
 export async function handleShare(ctx: CommandContext) {
-  const { toast, appendMessage, mode, model } = ctx;
+  const { toast, appendMessage, mode, model, sessionId, messages } = ctx;
   try {
-    const api = await import('../lib/api-client.js');
-    const { sessionId: sid } = await api.Sessions.current();
-    if (!sid) { toast.error('No active session to share'); return; }
-    const url = `${(globalThis as any).location?.origin || 'http://localhost:3000'}/viewer/session/${sid}`;
-    appendMessage({ role: 'assistant', mode, model, parts: [{ type: 'text', text: `📋 Session shared!\n\n\`${url}\`\n\nAnyone with this link can view the session (expires in 24h).` }] });
-    toast.success('Session URL copied to clipboard');
+    const sid = sessionId || null;
+    const lines: string[] = ['# Sentinel Session Export', ''];
+    for (const msg of messages || []) {
+      const role = (msg.role || 'user').toUpperCase();
+      const text = (msg.parts || [])
+        .filter((p: any) => p.type === 'text' && (p as any).text)
+        .map((p: any) => (p as any).text)
+        .join('\n');
+      if (text) {
+        lines.push(`### ${role}`, '', text, '');
+      }
+    }
+    const exportDir = process.cwd() + '/.sentinel/exports';
+    const fs = await import('fs');
+    fs.mkdirSync(exportDir, { recursive: true });
+    const exportPath = `${exportDir}/session-${sid || Date.now()}.md`;
+    fs.writeFileSync(exportPath, lines.join('\n'), 'utf-8');
+    toast.success(`Session exported to ${exportPath}`);
+    appendMessage({ role: 'assistant', mode, model, parts: [{ type: 'text', text: `📋 Session exported to \`${exportPath}\`` }] });
   } catch (e) { toast.error('Share failed: ' + String(e)); }
 }
 

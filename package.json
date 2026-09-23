@@ -1,12 +1,8 @@
 {
   "name": "sentinel-cli",
-  "version": "2.0.2",
-  "description": "🛡️ AI-Powered Code Guardian — TUI (Node.js-native, Ink). Analyze, audit, fix, and chat about your code with multi-LLM support (OpenAI, Gemini, Groq, Ollama).",
-  "main": "src/index.js",
-  "exports": {
-    ".": "./src/index.js",
-    "./sdk": "./src/shared/sdk.js"
-  },
+  "version": "3.0.0",
+  "description": "Minimalist AI coding assistant for the terminal (Pi-style). Multi-LLM, local tools, sessions, MCP — no servers, no telemetry.",
+  "main": "src/cli/main.js",
   "type": "module",
   "bin": {
     "sentinel": "bin/sentinel.js"
@@ -14,89 +10,34 @@
   "files": [
     "bin/**/*",
     "src/**/*",
-    "dist/**/*",
-    "github-app.yml",
+    "mcp/**/*",
     "README.md",
-    "CHANGELOG.md",
     "LICENSE",
-    "command_guide.md",
-    ".env.example",
-    ".sentinel.json.example",
-    ".sentinel.yaml.example",
-    "!src/intelligence/contextAware",
-    "!frontend/README.md",
-    "!src/dist/analyzers/**"
+    ".env.example"
   ],
   "scripts": {
     "start": "node bin/sentinel.js",
-    "go": "node bin/sentinel.js",
-    "launch": "node bin/sentinel.js dashboard",
-    "dev": "node --watch src/core/cli.js",
-    "auth": "node bin/sentinel.js auth",
-    "config": "node bin/sentinel.js config",
-    "review": "node bin/sentinel.js analyze",
-    "review:pipeline": "node src/commands/sentinel-review.js",
-    "security": "node bin/sentinel.js security-audit",
-    "full-scan": "node bin/sentinel.js full-scan",
-    "frontend": "node bin/sentinel.js frontend",
-    "backend": "node bin/sentinel.js backend",
-    "pre-commit": "node bin/sentinel.js pre-commit --block",
-    "install-hooks": "node bin/sentinel.js install-hooks",
-    "test": "npm run test:jest && npm run test:unit",
-    "test:jest": "node --experimental-vm-modules node_modules/jest/bin/jest.js --passWithNoTests",
-    "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
-    "test:coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",
-    "lint": "eslint src/",
-    "format": "prettier --write src/",
-    "pack:dry-run": "npm pack --dry-run",
-    "release:check": "npm run lint && npm test && npm run pack:dry-run && node scripts/publish-readiness.mjs",
-    "build": "node src/core/build.js",
-    "build:frontend": "cd frontend && npm install && npm run build",
-    "build:all": "npm run build && npm run build:frontend",
-    "build:server": "echo \"Server is plain Node.js — no build step needed. Run: npm run sentinel:server\"",
-    "dashboard": "node bin/sentinel.js dashboard",
-    "badge-server": "node bin/sentinel.js badge-server",
-    "webhook-server": "node bin/sentinel.js webhook-server",
-    "pr-bot": "node bin/sentinel.js pr-bot",
-    "pr-bot:dev": "node --watch bin/sentinel.js pr-bot",
-    "status": "node bin/sentinel.js status",
-    "benchmark": "node bin/sentinel.js benchmark",
-    "bench": "node bin/sentinel.js benchmark --quick",
-    "deploy": "npm run build:frontend && npx vercel --prod",
-    "demo": "node src/core/demo.js",
-    "tui": "node bin/sentinel.js",
-    "tui:build": "npx tsc -p src/tui/tsconfig.json",
-    "tui:tsx": "node node_modules/tsx/dist/cli.mjs src/tui/index.tsx",
-    "mcp:start": "node mcp/sentinel-mcp-server.js",
-    "mcp:dev": "node --watch mcp/sentinel-mcp-server.js",
-    "sentinel:server": "node src/server/api/start.js",
-    "sentinel:dev:server": "node --watch src/server/api/start.js",
-    "test:unit": "node --test __tests__/shared-tools.test.js __tests__/server-routes.test.js __tests__/server-api.test.js",
-    "test:all": "node --test __tests__/shared-tools.test.js __tests__/server-routes.test.js __tests__/server-api.test.js __tests__/pr-bot-server.test.js __tests__/analyzerWorker.test.js __tests__/sast-runner.test.js __tests__/configValidator.test.js __tests__/linter.test.js __tests__/fileOperations.test.js __tests__/sarifGenerator.test.js __tests__/errorHandler.test.js",
-    "test:coverage-node": "node --experimental-test-coverage --test __tests__/shared-tools.test.js __tests__/server-routes.test.js __tests__/server-api.test.js __tests__/pr-bot-server.test.js __tests__/analyzerWorker.test.js __tests__/sast-runner.test.js __tests__/configValidator.test.js __tests__/linter.test.js __tests__/fileOperations.test.js __tests__/sarifGenerator.test.js __tests__/errorHandler.test.js",
-    "test:coverage-all": "node scripts/coverage.mjs",
-    "test:e2e": "node scripts/verify-server.mjs",
-    "prepublishOnly": "npm run build && npm run tui:build",
-    "postversion": "git push && git push --tags",
-    "postinstall": "node -e \"var fs=require('fs'),cp=require('child_process'),p=console.log;if(!fs.existsSync('dist/cli.js')){try{cp.execSync('node src/core/build.js',{stdio:'inherit',cwd:process.cwd()})}catch(e){p('  ⚠ CLI build skipped: '+e.message)}};try{cp.execSync('npx tsc -p src/tui/tsconfig.json --noEmit',{stdio:'pipe',cwd:process.cwd()})}catch(e){};p();p('✨ Sentinel CLI ready! Run: sentinel (TUI) or sentinel --help (commands)');p()\""
+    "ask": "node bin/sentinel.js ask",
+    "mcp": "node mcp/sentinel-mcp-server.js",
+    "test": "npm run test:unit && npm run test:jest",
+    "test:jest": "node --experimental-vm-modules node_modules/jest/bin/jest.js --passWithNoTests __tests__/agent-context.test.js",
+    "test:unit": "node --test __tests__/configManager.test.js __tests__/errorHandler.test.js __tests__/shared-tools.test.js",
+    "lint": "eslint bin/ src/ mcp/",
+    "typecheck": "tsc -p src/tui/tsconfig.json --noEmit",
+    "check:imports": "node scripts/check-imports.mjs",
+    "release:check": "npm run lint && npm run typecheck && npm run check:imports && npm test"
   },
   "keywords": [
     "cli",
-    "tui",
-    "terminal-ui",
-    "code-review",
-    "security",
     "ai",
+    "coding-assistant",
+    "agent",
     "llm",
-    "static-analysis",
-    "linter",
-    "vulnerability",
     "openai",
     "gemini",
     "groq",
     "ollama",
-    "react",
-    "typescript"
+    "mcp"
   ],
   "author": "Kunj Shah",
   "license": "MIT",
@@ -109,116 +50,21 @@
   },
   "homepage": "https://github.com/KunjShah95/SENTINEL-CLI#readme",
   "dependencies": {
-    "@ai-sdk/groq": "^3.0.41",
-    "@ai-sdk/mistral": "^3.0.39",
-    "@google/generative-ai": "^0.1.3",
-    "@vercel/analytics": "^1.6.1",
-    "ajv": "^8.20.0",
-    "axios": "^1.6.2",
-    "bullmq": "^5.78.0",
-    "chalk": "^5.3.0",
-    "cline": "^2.2.2",
-    "commander": "^11.1.0",
-    "compression": "^1.8.1",
-    "cors": "^2.8.6",
-    "diff": "^5.1.0",
-    "eslint": "^8.55.0",
-    "eslint-plugin-security": "^1.7.1",
-    "express": "^4.18.2",
-    "express-rate-limit": "^8.2.1",
-    "figlet": "^1.7.0",
-    "glob": "^10.3.10",
-    "gradient-string": "^2.0.2",
-    "groq-sdk": "^0.3.3",
-    "handlebars": "^4.7.8",
-    "helmet": "^8.1.0",
-    "ink": "^7.0.6",
-    "ink-divider": "^4.1.1",
-    "ink-gradient": "^4.0.1",
-    "ink-select-input": "^6.2.0",
-    "ink-spinner": "^5.0.0",
-    "ink-text-input": "^6.0.0",
-    "inquirer": "^9.2.12",
-    "js-yaml": "^4.2.0",
-    "jshint": "^0.5.9",
-    "marked": "^11.1.0",
-    "ora": "^7.0.1",
-    "parse-diff": "^0.12.0",
-    "prisma": "^5.22.0",
-    "react": "^19.2.7",
-    "react-dom": "^19.2.7",
-    "react-router": "^7.16.0",
-    "redis": "^6.0.0",
-    "semver": "^7.5.4",
-    "sentinel": "^1.0.1",
-    "simple-git": "^3.24.0",
-    "sirv": "^3.0.2",
-    "sql.js": "^1.10.3",
-    "tsx": "^4.22.3",
-    "typescript": "^6.0.3",
-    "uuid": "^9.0.1",
-    "ws": "^8.14.2"
-  },
-  "devDependencies": {
     "@modelcontextprotocol/sdk": "^1.27.1",
-    "@types/node": "^20.19.33",
-    "@types/react": "^19.2.17",
-    "@types/react-dom": "^19.2.3",
-    "eslint-config-prettier": "^9.1.0",
-    "jest": "^29.7.0",
-    "playwright": "^1.58.1",
-    "prettier": "^3.1.0",
+    "chalk": "^5.3.0",
+    "commander": "^11.1.0",
+    "diff": "^5.1.0",
+    "ink": "^7.0.6",
+    "ink-text-input": "^6.0.0",
+    "react": "^19.2.7",
+    "tsx": "^4.22.3",
     "zod": "^4.3.6"
   },
-  "optionalDependencies": {
-    "@ai-sdk/anthropic": "^1.0.0",
-    "@ai-sdk/google": "^1.0.0",
-    "@ai-sdk/openai": "^1.0.0",
-    "@clerk/backend": "^1.0.0",
-    "@hono/node-server": "^1.12.0",
-    "@polar-sh/sdk": "^0.34.0",
-    "@prisma/client": "^5.22.0",
-    "ai": "^3.0.0",
-    "better-sqlite3": "^11.0.0",
-    "hono": "^4.0.0"
-  },
-  "peerDependenciesMeta": {
-    "hono": {
-      "optional": true
-    },
-    "@hono/node-server": {
-      "optional": true
-    },
-    "better-sqlite3": {
-      "optional": true
-    },
-    "@prisma/client": {
-      "optional": true
-    },
-    "@polar-sh/sdk": {
-      "optional": true
-    },
-    "@clerk/backend": {
-      "optional": true
-    },
-    "ai": {
-      "optional": true
-    },
-    "@ai-sdk/anthropic": {
-      "optional": true
-    },
-    "@ai-sdk/openai": {
-      "optional": true
-    },
-    "@ai-sdk/google": {
-      "optional": true
-    }
-  },
-  "engines": {
-    "node": ">=20.0.0"
-  },
-  "publishConfig": {
-    "access": "public",
-    "registry": "https://registry.npmjs.org/"
+  "devDependencies": {
+    "@types/node": "^20.19.33",
+    "@types/react": "^19",
+    "eslint": "^8.57.0",
+    "jest": "^29.7.0",
+    "typescript": "^5.9.3"
   }
 }

@@ -26,6 +26,7 @@ type Props = {
   costUsd?: number;
   showThinking?: boolean;
   showDetails?: boolean;
+  onStop?: () => void;
 };
 
 export function SessionShell({

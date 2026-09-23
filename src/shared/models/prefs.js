@@ -31,7 +31,9 @@ export async function saveLastModel(modelId) {
     const prefs = await ensurePrefs();
     prefs.lastModel = modelId;
     await fs.writeFile(PREFS_PATH, JSON.stringify(prefs, null, 2), { mode: 0o600 });
-  } catch {}
+  } catch {
+    // ignore
+  }
 }
 
 export async function loadLastModel() {
@@ -48,7 +50,9 @@ export async function saveSmallModel(modelId) {
     const prefs = await ensurePrefs();
     prefs.smallModel = modelId;
     await fs.writeFile(PREFS_PATH, JSON.stringify(prefs, null, 2), { mode: 0o600 });
-  } catch {}
+  } catch {
+    // ignore
+  }
 }
 
 export async function loadSmallModel() {
@@ -67,7 +71,9 @@ export async function saveModelConfig(provider, modelId, config) {
     if (!prefs.modelConfigs[provider]) prefs.modelConfigs[provider] = {};
     prefs.modelConfigs[provider][modelId] = config;
     await fs.writeFile(PREFS_PATH, JSON.stringify(prefs, null, 2), { mode: 0o600 });
-  } catch {}
+  } catch {
+    // ignore
+  }
 }
 
 export async function loadModelConfig(provider, modelId) {

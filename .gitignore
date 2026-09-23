@@ -1,58 +1,19 @@
-# Dependencies
-node_modules
+# dependencies
+node_modules/
 
-# Environment files
+# runtime state
+.sentinel/
+*.log
+
+# build
+dist/
+coverage/
+tsconfig.tsbuildinfo
+
+# env
 .env
 .env.local
-.env.*.local
 
-# Configuration with secrets
-.codereviewrc.json
-.codereview-cache.json
-.sentinel.json
-
-# Reports and output
-report.html
-report.json
-report.txt
-report.md
-coverage
-test-output.txt
-.sentinel_audit.jsonl
-*.log
-firebase-debug.log
-
-# System files
+# OS
 .DS_Store
 Thumbs.db
-
-# IDE and editor files
-.idea
-.vscode
-*.swp
-*.swo
-*~
-
-# Logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Build artifacts
-dist/
-src/dist/
-
-# Docker volumes
-reports/
-cache/
-
-# Temporary files
-tmp/
-temp/
-*.tmp
-landing page designer.agent.md
-remotion/
-.agents.claude/
-.claude/
-*.md

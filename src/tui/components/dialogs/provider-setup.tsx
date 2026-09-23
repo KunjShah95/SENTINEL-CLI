@@ -16,7 +16,7 @@ type ProviderDef = {
 };
 
 const PROVIDERS: ProviderDef[] = [
-  { id: 'groq', name: 'Groq (Free Tier)', envKey: 'GROQ_API_KEY', keyUrl: 'https://console.groq.com/keys', keyPrefix: 'gsk_', isLocal: false, isFree: true, defaultModel: 'llama-3.1-8b-instant', docs: 'Free Llama 3 / Gemma / Qwen models — default provider' },
+  { id: 'groq', name: 'Groq (Free Tier)', envKey: 'GROQ_API_KEY', keyUrl: 'https://console.groq.com/keys', keyPrefix: 'gsk_', isLocal: false, isFree: true, defaultModel: 'openai/gpt-oss-20b', docs: 'Free GPT-OSS / Qwen / Llama models — default provider' },
   { id: 'openai', name: 'OpenAI / ChatGPT', envKey: 'OPENAI_API_KEY', keyUrl: 'https://platform.openai.com/api-keys', keyPrefix: 'sk-', isLocal: false, isFree: false, defaultModel: 'gpt-4o-mini', docs: 'ChatGPT Plus/Pro users get API credits included' },
   { id: 'anthropic', name: 'Anthropic / Claude', envKey: 'ANTHROPIC_API_KEY', keyUrl: 'https://console.anthropic.com/settings/keys', keyPrefix: 'sk-ant-', isLocal: false, isFree: false, defaultModel: 'claude-sonnet-4-6', docs: 'Claude Pro/Max/Team users get API credits included' },
   { id: 'gemini', name: 'Google Gemini', envKey: 'GEMINI_API_KEY', keyUrl: 'https://aistudio.google.com/apikey', keyPrefix: 'AIza', isLocal: false, isFree: true, defaultModel: 'gemini-2.0-flash', docs: 'Free tier available from Google AI Studio' },

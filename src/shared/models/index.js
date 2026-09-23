@@ -40,7 +40,7 @@ function setModels(models) {
   SUPPORTED_CHAT_MODELS.push(...models);
 }
 
-export const DEFAULT_CHAT_MODEL_ID = 'llama-3.1-8b-instant';
+export const DEFAULT_CHAT_MODEL_ID = 'openai/gpt-oss-20b';
 
 export async function refreshModels() {
   if (_refreshPromise) return _refreshPromise;
@@ -238,7 +238,7 @@ export function calculateCreditsForUsage({ provider, model, usage }) {
 }
 
 const SMALL_MODEL_FALLBACKS = [
-  'llama-3.1-8b-instant', 'gemma2-9b-it', 'claude-haiku-4-5',
+  'openai/gpt-oss-20b', 'qwen/qwen3.8-27b', 'claude-haiku-4-5',
   'gpt-4o-mini', 'mistral-small-latest',
 ];
 

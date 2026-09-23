@@ -3,7 +3,7 @@ import type { CommandContext } from './types.js';
 export async function handleCommit(ctx: CommandContext) {
   const { toast, appendMessage, mode, model, setMode, submit } = ctx;
   try {
-    const { getGitDiff, getChangedFiles } = await import('../lib/security-reviewer.js');
+    const { getGitDiff, getChangedFiles } = await import('../lib/git-diff.js');
     const diff = getGitDiff({ staged: true }) || getGitDiff();
     if (!diff) { toast.error('No changes to commit.'); return; }
     const files = getChangedFiles({ staged: true });
@@ -19,7 +19,7 @@ export async function handleDiff(ctx: CommandContext) {
   const { args: raw, toast, appendMessage, mode, model } = ctx;
   const arg = raw.trim();
   try {
-    const { getGitDiff } = await import('../lib/security-reviewer.js');
+    const { getGitDiff } = await import('../lib/git-diff.js');
     const isStaged = arg === '--staged';
     const branch = !isStaged && arg ? arg : undefined;
     const file = !isStaged && !branch && arg ? arg : undefined;

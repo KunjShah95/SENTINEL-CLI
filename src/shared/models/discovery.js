@@ -302,10 +302,9 @@ export async function discoverAllModels() {
 
 export function getFallbackModels() {
   return [
-    { id: 'llama-3.1-8b-instant', provider: 'groq', label: 'Llama 3.1 8B Instant (Groq)', inputUsdPerMillionTokens: 0, outputUsdPerMillionTokens: 0 },
-    { id: 'gemma2-9b-it', provider: 'groq', label: 'Gemma 9B (Groq)', inputUsdPerMillionTokens: 0, outputUsdPerMillionTokens: 0 },
-    { id: 'mixtral-8x7b-32768', provider: 'groq', label: 'Mixtral 8x7B (Groq)', inputUsdPerMillionTokens: 0, outputUsdPerMillionTokens: 0 },
-    { id: 'qwen-qwq-32b', provider: 'groq', label: 'Qwen QwQ 32B (Groq)', inputUsdPerMillionTokens: 0, outputUsdPerMillionTokens: 0 },
+    { id: 'openai/gpt-oss-20b', provider: 'groq', label: 'GPT-OSS 20B (Groq, free tier)', inputUsdPerMillionTokens: 0, outputUsdPerMillionTokens: 0 },
+    { id: 'openai/gpt-oss-120b', provider: 'groq', label: 'GPT-OSS 120B (Groq, free tier)', inputUsdPerMillionTokens: 0, outputUsdPerMillionTokens: 0 },
+    { id: 'qwen/qwen3.8-27b', provider: 'groq', label: 'Qwen 3.8 27B (Groq, free tier)', inputUsdPerMillionTokens: 0, outputUsdPerMillionTokens: 0 },
     { id: 'claude-sonnet-4-6', provider: 'anthropic', label: 'Claude Sonnet 4.6', inputUsdPerMillionTokens: 3, outputUsdPerMillionTokens: 15 },
     { id: 'claude-haiku-4-5', provider: 'anthropic', label: 'Claude Haiku 4.5', inputUsdPerMillionTokens: 1, outputUsdPerMillionTokens: 5 },
     { id: 'gpt-4o-mini', provider: 'openai', label: 'GPT-4o mini', inputUsdPerMillionTokens: 0.15, outputUsdPerMillionTokens: 0.6 },
