@@ -3,12 +3,18 @@ node_modules/
 
 # runtime state
 .sentinel/
+.deepsec/
+findings/
+evals/results/
 *.log
+*.sarif
 
 # build
 dist/
+.next/
 coverage/
 tsconfig.tsbuildinfo
+*.tsbuildinfo
 
 # env
 .env

@@ -80,10 +80,11 @@ server.tool(
   },
   async ({ question, allowBuild, model }) => {
     try {
+      const { DEFAULT_CHAT_MODEL_ID } = await import('../src/shared/models/index.js');
       const { text, error } = await collectAgentText(
         [{ id: `ask_${Date.now()}`, role: 'user', parts: [{ type: 'text', text: question }] }],
         allowBuild ? 'BUILD' : 'PLAN',
-        model
+        model ?? DEFAULT_CHAT_MODEL_ID
       );
       return { content: [{ type: 'text', text: error ? JSON.stringify({ error }) : text }] };
     } catch (err) {
@@ -106,9 +107,11 @@ server.tool(
         '```diff\n' +
         String(diff).slice(0, 60000) +
         '\n```';
+      const { DEFAULT_CHAT_MODEL_ID } = await import('../src/shared/models/index.js');
       const { text, error } = await collectAgentText(
         [{ id: 'diff', role: 'user', parts: [{ type: 'text', text: prompt }] }],
-        'REVIEW'
+        'REVIEW',
+        DEFAULT_CHAT_MODEL_ID
       );
       return { content: [{ type: 'text', text: error ? JSON.stringify({ error }) : text }] };
     } catch (err) {

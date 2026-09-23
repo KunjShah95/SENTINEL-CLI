@@ -90,7 +90,10 @@ export const sessions = {
     const session = await readSession(id);
     if (!session) return false;
     const byId = new Map((session.messages || []).map((m) => [m.id, m]));
-    for (const m of messages) byId.set(m.id, m);
+    for (const m of messages) {
+      const key = (m.id != null && m.id !== '') ? m.id : `msg_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      byId.set(key, { ...m, id: key });
+    }
     session.messages = Array.from(byId.values());
     await writeSession(session);
     return true;

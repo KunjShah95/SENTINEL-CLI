@@ -25,6 +25,20 @@ function getRedoRoot() {
 }
 
 /**
+ * Manifest entries are trusted-but-verifiable: a corrupted or tampered
+ * _manifest.json with `../../etc` relatives must never let undo/redo write
+ * outside the project. Returns the clean relative path or null.
+ */
+export function sanitizeManifestRelative(rel) {
+  if (typeof rel !== 'string' || rel.length === 0) return null;
+  if (path.isAbsolute(rel)) return null;
+  const normalized = path.normalize(rel);
+  if (normalized.startsWith('..') || path.isAbsolute(normalized)) return null;
+  if (normalized.split(path.sep).includes('..')) return null;
+  return normalized;
+}
+
+/**
  * Create a checkpoint of the given files before they are modified.
  * @param {string[]} filePaths — absolute paths to files that will be changed
  * @returns {{ id: string, files: number }}
@@ -105,32 +119,53 @@ export async function restoreCheckpoint(id) {
   const restored = [];
   const deleted = [];
 
+  // Snapshot the current (post-edit) disk state into the redo dir BEFORE restoring.
+  // This is what redo needs — the state we're about to throw away.
+  await fs.mkdir(redoRoot, { recursive: true });
+  const redoDest = path.join(redoRoot, id);
+  if (existsSync(redoDest)) {
+    await fs.rm(redoDest, { recursive: true, force: true });
+  }
+  await fs.mkdir(redoDest, { recursive: true });
+  const redoManifest = { id, timestamp: Date.now(), files: [] };
   for (const file of manifest.files) {
-    const target = path.resolve(process.cwd(), file.relative);
+    const safe = sanitizeManifestRelative(file.relative);
+    if (!safe) continue;
+    const diskPath = path.resolve(process.cwd(), safe);
+    if (existsSync(diskPath)) {
+      const dest = path.join(redoDest, safe);
+      await fs.mkdir(path.dirname(dest), { recursive: true });
+      await fs.copyFile(diskPath, dest);
+      redoManifest.files.push({ relative: safe, existed: true });
+    } else {
+      redoManifest.files.push({ relative: safe, existed: false });
+    }
+  }
+  await fs.writeFile(path.join(redoDest, '_manifest.json'), JSON.stringify(redoManifest, null, 2), 'utf-8');
+
+  // Now restore the pre-edit files from the checkpoint
+  for (const file of manifest.files) {
+    const safe = sanitizeManifestRelative(file.relative);
+    if (!safe) continue; // never let a bad manifest write outside the project
+    const target = path.resolve(process.cwd(), safe);
 
     if (file.existed) {
-      const src = path.join(checkpointDir, file.relative);
+      const src = path.join(checkpointDir, safe);
       if (existsSync(src)) {
         await fs.mkdir(path.dirname(target), { recursive: true });
         await fs.copyFile(src, target);
-        restored.push(file.relative);
+        restored.push(safe);
       }
     } else {
       try {
         await fs.rm(target);
-        deleted.push(file.relative);
+        deleted.push(safe);
       } catch { /* file may already be gone */ }
     }
   }
 
-  // Move the checkpoint to the redo stack instead of deleting
-  await fs.mkdir(redoRoot, { recursive: true });
-  const redoDest = path.join(redoRoot, id);
-  // If redoDest exists from a previous companion, remove it first
-  if (existsSync(redoDest)) {
-    await fs.rm(redoDest, { recursive: true, force: true });
-  }
-  await fs.rename(checkpointDir, redoDest);
+  // Remove the checkpoint (redo entry now holds the forward state)
+  await fs.rm(checkpointDir, { recursive: true, force: true });
 
   return { restored, deleted };
 }
@@ -170,19 +205,21 @@ export async function redoCheckpoint() {
   const deleted = [];
 
   for (const file of manifest.files) {
-    const target = path.resolve(process.cwd(), file.relative);
+    const safe = sanitizeManifestRelative(file.relative);
+    if (!safe) continue; // never let a bad manifest write outside the project
+    const target = path.resolve(process.cwd(), safe);
 
     if (file.existed) {
-      const src = path.join(redoDir, file.relative);
+      const src = path.join(redoDir, safe);
       if (existsSync(src)) {
         await fs.mkdir(path.dirname(target), { recursive: true });
         await fs.copyFile(src, target);
-        restored.push(file.relative);
+        restored.push(safe);
       }
     } else {
       try {
         await fs.rm(target);
-        deleted.push(file.relative);
+        deleted.push(safe);
       } catch { /* file may already be gone */ }
     }
   }

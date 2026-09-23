@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
-import { Box, Text, useInput } from 'ink';
+import { Box, Text } from 'ink';
 import { useTheme } from '../theme/index.js';
 import type { DialogConfig } from './types.js';
 
@@ -25,12 +25,6 @@ export function DialogProvider({ children }: { children: ReactNode }) {
     },
     []
   );
-
-  useInput((input, key) => {
-    if (dialog && key.escape) {
-      close();
-    }
-  });
 
   return (
     <DialogContext.Provider value={{ open, close, isOpen: !!dialog }}>

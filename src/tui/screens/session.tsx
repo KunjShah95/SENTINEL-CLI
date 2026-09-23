@@ -29,11 +29,16 @@ export function Session() {
   const {
     messages, loading, mode, setMode, toggleMode,
     submit, stop, clear, appendMessage, model, setModel, status, sessionId,
-    serverStatus, compacting, submitAndWaitForCompaction,
+    serverStatus, compacting, submitAndWaitForCompaction, microcompactSaved,
   } = useAgentChat({
     onPermissionRequest: useCallback(async (toolName: string, toolCallId: string, input: unknown) => {
       return requestPermission({ toolName, toolCallId, input });
     }, [requestPermission]),
+    onMicrocompact: useCallback((stats: { droppedCount: number; estimatedTokensSaved: number }) => {
+      toast.success(
+        `Microcompacted ${stats.droppedCount} stale tool result${stats.droppedCount === 1 ? '' : 's'} — saved ~${stats.estimatedTokensSaved.toLocaleString()} tokens`
+      );
+    }, [toast]),
   });
 
   const [showThinking, setShowThinking] = useState(true);
@@ -223,9 +228,6 @@ export function Session() {
           }
           const enhancedPrompt = `[Agent: ${agentResult.agent.label}]\n${agentResult.agentHint}\n\n${agentResult.prompt}`;
           submit(enhancedPrompt);
-          if (agentResult.mode !== prevMode) {
-            setTimeout(() => setMode(prevMode), 100);
-          }
           return;
         }
       }
@@ -326,21 +328,22 @@ export function Session() {
     })();
   }, []);
 
-  const autoCompactRef = useRef(false);
-  const autoCompactTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Keep a ref so the interval always reads the latest messages without needing to re-register.
+  const autoCompactMessagesRef = useRef(messages);
+  useEffect(() => { autoCompactMessagesRef.current = messages; }, [messages]);
+
   useEffect(() => {
-    if (autoCompactRef.current) return;
-    autoCompactRef.current = true;
-    autoCompactTimerRef.current = setInterval(() => {
+    const timer = setInterval(() => {
       if (loading || compacting) return;
+      const currentMessages = autoCompactMessagesRef.current;
       import('../lib/context-compactor.js').then(({ getCompactionState, compactMessages }) => {
-        const state = getCompactionState(messages);
+        const state = getCompactionState(currentMessages);
         if (state.atSyncThreshold) {
           appendLog('warn', `Auto-compact triggered at ${state.percentage}% token usage`);
           toast.warning(`Token usage at ${state.percentage}% — auto-compacting...`);
           (async () => {
             try {
-              const result = await compactMessages(messages, submitAndWaitForCompaction);
+              const result = await compactMessages(currentMessages, submitAndWaitForCompaction);
               if (result.compacted && Array.isArray(result.messages)) {
                 clear();
                 for (const msg of result.messages) {
@@ -356,10 +359,8 @@ export function Session() {
         }
       }).catch(() => {});
     }, 30000);
-    return () => {
-      if (autoCompactTimerRef.current) clearInterval(autoCompactTimerRef.current);
-    };
-  }, [loading, compacting, messages, toast, submitAndWaitForCompaction, clear, appendMessage]);
+    return () => clearInterval(timer);
+  }, [toast, submitAndWaitForCompaction, clear, appendMessage]);
 
   const handleModeToggle = useCallback(() => toggleMode(), [toggleMode]);
   const handleCommandPalette = useCallback(() => setShowCommands(v => !v), []);
@@ -397,6 +398,7 @@ export function Session() {
           sessionId={sessionId}
           statusText={`${messages.length} msgs · ${theme.name}`}
           tokenUsage={tokenUsage.estimated > 0 ? tokenUsage : undefined}
+          microcompactSaved={microcompactSaved}
           serverStatus={serverStatus}
           costUsd={costUsd}
           showThinking={showThinking}

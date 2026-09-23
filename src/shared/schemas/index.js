@@ -166,7 +166,7 @@ export const createSessionSchema = z.object({
   title: z.string().refine((v) => typeof v === 'string' && v.length > 0, 'title is required'),
 });
 
-export const modeValidator = z.enum([Mode.BUILD, Mode.PLAN], 'mode must be BUILD or PLAN');
+export const modeValidator = z.enum([Mode.BUILD, Mode.PLAN, Mode.REVIEW, Mode.SCAN, Mode.FIX, Mode.SWE], 'mode must be a valid mode');
 
 export const submitSchema = z.object({
   id: z.string(),

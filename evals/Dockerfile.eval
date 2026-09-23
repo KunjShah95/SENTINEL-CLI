@@ -1,0 +1,17 @@
+# One shared image for evals: run agent trials and graders off-host.
+# (SWE-smith rule: one image per repo, mount task workspaces — never build
+# an image per task.) Linux-only: matches CI's ubuntu job and SWE-bench.
+FROM node:22-bookworm-slim
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends git patch ca-certificates \
+  && rm -rf /var/lib/apt/lists/* \
+  && git config --global --add safe.directory '*'
+
+WORKDIR /repo
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev --ignore-scripts
+COPY . .
+
+# Offline gates first (no key), then task oracles.
+CMD ["sh", "-c", "node scripts/bench-swe-mini.js && node evals/run.mjs --check"]

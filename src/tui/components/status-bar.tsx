@@ -12,6 +12,8 @@ type Props = {
   compacting?: boolean;
   serverStatus?: 'connected' | 'local';
   costUsd?: number;
+  /** Cumulative tokens freed by the microcompact gate this session. */
+  microcompactSaved?: number;
   showThinking?: boolean;
   showDetails?: boolean;
 };
@@ -30,7 +32,7 @@ function Pipe({ colors }: { colors: any }) {
   return <Text color={colors.dimSeparator}>{' · '}</Text>;
 }
 
-export function StatusBar({ mode = 'BUILD', model, statusText, sessionId, tokenUsage, compacting, serverStatus, costUsd, showThinking = true, showDetails = true }: Props) {
+export function StatusBar({ mode = 'BUILD', model, statusText, sessionId, tokenUsage, compacting, serverStatus, costUsd, microcompactSaved, showThinking = true, showDetails = true }: Props) {
   const { colors } = useTheme();
   const branch = useGitBranch();
 
@@ -71,6 +73,10 @@ export function StatusBar({ mode = 'BUILD', model, statusText, sessionId, tokenU
 
       {compacting && (
         <><Pipe colors={colors} /><Text color={colors.warning}>{'⟳ compacting…'}</Text></>
+      )}
+
+      {(microcompactSaved ?? 0) > 0 && (
+        <><Pipe colors={colors} /><Text color={colors.success}>{`⌫ micro ${Math.round((microcompactSaved ?? 0) / 100) / 10}k saved`}</Text></>
       )}
 
       {!showThinking && <><Pipe colors={colors} /><Text color={colors.thinking}>{'thinking⊘'}</Text></>}

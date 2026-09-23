@@ -1,8 +1,9 @@
 /**
- * Jest runs the jest-style suite (describe/it/expect + @jest/globals).
- * node:test suites live alongside in __tests__ and run via `npm run test:unit`
- * (node --test). Keeping the runners separate avoids the classic
- * "Your test suite must contain at least one test" failure.
+ * Jest runs the jest-style suite (describe/it/expect + @jest/globals):
+ * files named *.jest.test.js anywhere in the repo.
+ * node:test suites (*.test.js) run via `npm run test:unit` (node --test).
+ * The naming split keeps each runner on its own files and avoids the
+ * classic "Your test suite must contain at least one test" failure.
  */
 export default {
   testEnvironment: 'node',
@@ -12,7 +13,7 @@ export default {
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1',
   },
-  testMatch: ['**/__tests__/**/*.test.js'],
+  testMatch: ['**/*.jest.test.js'],
   testPathIgnorePatterns: ['/node_modules/', '/dist/'],
   collectCoverageFrom: ['src/**/*.js', '!src/**/*.test.js'],
   coverageDirectory: 'coverage',

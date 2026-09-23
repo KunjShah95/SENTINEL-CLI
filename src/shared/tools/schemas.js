@@ -64,6 +64,12 @@ export const toolInputSchemas = {
       },
     };
   }),
+  codeMap: validator(input => {
+    if (input.path !== undefined && typeof input.path !== 'string') {
+      return { ok: false, error: 'path must be a string' };
+    }
+    return { ok: true, value: { path: input.path ?? '.' } };
+  }),
   writeFile: validator(input => {
     if (typeof input.path !== 'string') return { ok: false, error: 'path is required' };
     if (typeof input.content !== 'string') return { ok: false, error: 'content is required' };
@@ -133,24 +139,73 @@ export const toolInputSchemas = {
     if (typeof input.newContent !== 'string') return { ok: false, error: 'newContent is required' };
     return { ok: true, value: { path: input.path, newContent: input.newContent } };
   }),
+  todoWrite: validator(input => {
+    if (!Array.isArray(input.todos) || input.todos.length === 0) {
+      return { ok: false, error: 'todos must be a non-empty array' };
+    }
+    return { ok: true, value: { todos: input.todos } };
+  }),
+  todoRead: validator(_input => {
+    return { ok: true, value: {} };
+  }),
+  skill: validator(input => {
+    if (typeof input.name !== 'string' || input.name.length === 0) {
+      return { ok: false, error: 'name is required' };
+    }
+    return { ok: true, value: { name: input.name } };
+  }),
+  spawnAgent: validator(input => {
+    if (typeof input.prompt !== 'string' || input.prompt.length === 0) {
+      return { ok: false, error: 'prompt is required' };
+    }
+    return {
+      ok: true,
+      value: {
+        prompt: input.prompt,
+        mode: input.mode === 'BUILD' ? 'BUILD' : 'PLAN',
+      },
+    };
+  }),
   undoLastChange: validator(_input => {
     return { ok: true, value: {} };
   }),
   redoLastUndo: validator(_input => {
     return { ok: true, value: {} };
   }),
+  runTests: validator(input => {
+    if (typeof input.command !== 'string' || input.command.length === 0) {
+      return { ok: false, error: 'command is required' };
+    }
+    return {
+      ok: true,
+      value: {
+        command: input.command,
+        timeout: typeof input.timeout === 'number' ? input.timeout : 120000,
+      },
+    };
+  }),
+  applyPatch: validator(input => {
+    if (typeof input.patch !== 'string' || input.patch.length === 0) {
+      return { ok: false, error: 'patch is required' };
+    }
+    return { ok: true, value: { patch: input.patch } };
+  }),
 };
 
-export const READ_ONLY_TOOL_NAMES = ['readFile', 'listDirectory', 'glob', 'grep', 'searchWeb'];
+export const READ_ONLY_TOOL_NAMES = ['readFile', 'listDirectory', 'glob', 'grep', 'codeMap', 'searchWeb', 'todoRead', 'skill'];
 export const BUILD_TOOL_NAMES = [
   ...READ_ONLY_TOOL_NAMES,
   'writeFile',
   'editFile',
   'bash',
+  'runTests',
+  'applyPatch',
   'batchEdit',
   'diffFile',
   'undoLastChange',
   'redoLastUndo',
+  'todoWrite',
+  'spawnAgent',
 ];
 
 export function isReadOnly(toolName) {

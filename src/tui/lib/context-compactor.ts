@@ -7,7 +7,11 @@ import {
   estimateTokens as estimateTokensShared,
   getCompactionState as getStateShared,
   formatTokenUsage as formatTokenUsageShared,
+  microcompactMessages as microcompactMessagesShared,
+  MICROCOMPACT_TOMBSTONE,
 } from '../../agent/context.js';
+
+export { MICROCOMPACT_TOMBSTONE };
 
 export type CompactionResult = {
   messages: AgentMessage[];
@@ -16,6 +20,7 @@ export type CompactionResult = {
   newCount: number;
   estimatedTokensSaved: number;
   zone?: 'async' | 'sync';
+  microcompacted?: boolean;
 };
 
 export type CompactionState = {
@@ -51,6 +56,13 @@ export function shouldCompact(
   return getStateShared(messages as any, options).atAsyncThreshold;
 }
 
+export function microcompactMessages(
+  messages: AgentMessage[],
+  options?: { protectLast?: number }
+): { messages: AgentMessage[]; droppedCount: number; estimatedTokensSaved: number } {
+  return microcompactMessagesShared(messages as any, options) as any;
+}
+
 export async function compactMessages(
   messages: AgentMessage[],
   submitAndWait: SubmitAndWait,
@@ -63,6 +75,27 @@ export async function compactMessages(
   const maxTokens = options?.maxTokens ?? DEFAULT_MAX_TOKENS;
   const keepTail = options?.keepTail ?? ACTIVE_COUNT;
   const onProgress = options?.onProgress;
+
+  // Microcompact first: tombstone superseded tool results before paying for
+  // a summary request. If it frees enough to leave both thresholds, summary
+  // compaction is skipped entirely.
+  const micro = microcompactMessages(messages, { protectLast: keepTail + FROZEN_COUNT });
+  if (micro.droppedCount > 0) {
+    const postMicro = getCompactionState(micro.messages, { maxTokens });
+    if (!postMicro.atAsyncThreshold) {
+      onProgress?.('done');
+      return {
+        messages: micro.messages,
+        compacted: true,
+        oldCount: messages.length,
+        newCount: messages.length,
+        estimatedTokensSaved: micro.estimatedTokensSaved,
+        zone: 'async',
+        microcompacted: true,
+      };
+    }
+  }
+
   const state = getCompactionState(messages, { maxTokens });
   const isSync = state.atSyncThreshold;
 

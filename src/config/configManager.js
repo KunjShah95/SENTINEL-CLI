@@ -42,7 +42,7 @@ class ConfigManager {
           apiKey: '',
           disabled: false
         },
-        gemini: {
+        google: {
           apiKey: '',
           disabled: false
         },
@@ -496,7 +496,7 @@ class ConfigManager {
     const envMap = {
       openai: 'OPENAI_API_KEY',
       anthropic: 'ANTHROPIC_API_KEY',
-      gemini: 'GEMINI_API_KEY',
+      google: 'GEMINI_API_KEY',
       groq: 'GROQ_API_KEY',
       openrouter: 'OPENROUTER_API_KEY',
       ollama: 'OLLAMA_HOST'

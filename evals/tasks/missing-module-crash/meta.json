@@ -1,0 +1,1 @@
+{"id":"missing-module-crash","mode":"BUILD","kind":"fix","source":"real: sentinel bench shipped importing scripts/bench-swe-mini.js before the file existed"}

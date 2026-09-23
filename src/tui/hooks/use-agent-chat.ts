@@ -18,11 +18,11 @@
  * UUIDs for sessions. No persistence across restarts in local mode.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { randomUUID } from "node:crypto";
 import { streamChat, Sessions, type ChatEvent } from "../lib/api-client.js";
 import { Mode, isReadOnlyTool } from "../lib/local-tools.js";
-import { shouldCompact, compactMessages, estimateTokens, getCompactionState } from "../lib/context-compactor.js";
+import { shouldCompact, compactMessages, estimateTokens, getCompactionState, microcompactMessages } from "../lib/context-compactor.js";
 import { DEFAULT_CHAT_MODEL_ID, resolveSmallModel } from "../../shared/models/index.js";
 
 export type AgentMode = "BUILD" | "PLAN" | "REVIEW";
@@ -56,6 +56,8 @@ type UseAgentChatOptions = {
   onSessionCreated?: (id: string) => void;
   /** Callback to request user permission before executing tools. Return 'deny' to skip, 'allow' for one-time, 'allow-session' to auto-allow for the session. */
   onPermissionRequest?: (toolName: string, toolCallId: string, input: unknown) => Promise<PermissionResult>;
+  /** Fired after a microcompact gate applies: tombstoned calls and tokens saved. */
+  onMicrocompact?: (stats: { droppedCount: number; estimatedTokensSaved: number }) => void;
 };
 
 export function useAgentChat(options: UseAgentChatOptions = {}) {
@@ -74,6 +76,8 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
     atAsyncThreshold: false,
     atSyncThreshold: false,
   });
+  // Cumulative tokens freed by the microcompact gate this session.
+  const [microcompactSaved, setMicrocompactSaved] = useState(0);
   const [tokenUsage, setTokenUsage] = useState<{ estimated: number; limit: number; percentage: number; costUsd?: number }>({
     estimated: 0,
     limit: 40_000,
@@ -86,6 +90,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
   const abortRef = useRef<AbortController | null>(null);
   const loadedRef = useRef(false);
   const messagesRef = useRef(messages);
+  const compactingGuard = useRef(false);
   const [useServer, setUseServer] = useState(false);
   const serverAvailableRef = useRef(true);
   const [serverStatus, setServerStatus] = useState<"connected" | "local">("local");
@@ -160,7 +165,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
       const sid = sessionIdRef.current;
       if (!sid) return "";
 
-      const compactModel = await resolveSmallModel().catch(() => modelRef.current);
+      const compactModel = await resolveSmallModel().catch(() => ({ modelId: modelRef.current, provider: '' }));
 
       const summaryUserMsg = {
         id: `compaction-req-${Date.now()}`,
@@ -194,11 +199,38 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
     []
   );
 
+  // Microcompact gate: when superseded tool results alone push usage past
+  // the async threshold, tombstone them first — cheaper than a summary.
+  const micro = useMemo(() => microcompactMessages(messages), [messages]);
   useEffect(() => {
-    if (compacting || messages.length === 0) return;
+    if (compactingGuard.current || compacting || micro.droppedCount === 0) return;
+    const before = getCompactionState(messages);
+    const after = getCompactionState(micro.messages);
+    if (before.atAsyncThreshold && !after.atAsyncThreshold) {
+      compactingGuard.current = true;
+      setMessages(micro.messages);
+      const newEstimated = estimateTokens(micro.messages);
+      setTokenUsage({
+        estimated: newEstimated,
+        limit: 40_000,
+        percentage: Math.round(newEstimated / 400),
+      });
+      setMicrocompactSaved((prev) => prev + micro.estimatedTokensSaved);
+      options.onMicrocompact?.({
+        droppedCount: micro.droppedCount,
+        estimatedTokensSaved: micro.estimatedTokensSaved,
+      });
+      compactingGuard.current = false;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [micro.droppedCount]);
+
+  useEffect(() => {
+    if (compactingGuard.current || compacting || messages.length === 0) return;
     const state = getCompactionState(messages);
     setCompactionState(state);
     if (!state.atAsyncThreshold) return;
+    compactingGuard.current = true;
     setCompacting(true);
     const snapshot = messages;
     compactMessages(snapshot, submitAndWaitForCompaction, {
@@ -220,8 +252,10 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
         });
       }
       setCompacting(false);
+      setTimeout(() => { compactingGuard.current = false; }, 0);
     }).catch(() => {
       setCompacting(false);
+      setTimeout(() => { compactingGuard.current = false; }, 0);
     });
   }, [messages, compacting, submitAndWaitForCompaction]);
 
@@ -251,6 +285,9 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
           sessionIdRef.current = sid;
         }
       }
+
+      // Capture history snapshot BEFORE appending the new user message to avoid duplication
+      const historySnapshot = messagesRef.current.slice();
 
       // Append user message.
       appendMessage({
@@ -283,8 +320,8 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
 
       try {
         const allMessages: AgentMessage[] = [
-          // Snapshot of messages BEFORE the placeholder
-          ...messagesRef.current,
+          // Use pre-append snapshot so the user message appears exactly once
+          ...historySnapshot,
           {
             id: nextId("user"),
             role: "user",
@@ -342,7 +379,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
         });
       }
     },
-    [messages, appendMessage, options, submitAndWaitForCompaction]
+    [appendMessage, options, submitAndWaitForCompaction]
   );
 
   const handleEvent = useCallback(
@@ -460,6 +497,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
     setMessages([]);
     setStreamedText("");
     setError(null);
+    setMicrocompactSaved(0);
   }, []);
 
   return {
@@ -469,6 +507,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
     loading,
     status,
     error,
+    microcompactSaved,
     mode,
     setMode,
     toggleMode: () => setMode((m) => (m === "BUILD" ? "PLAN" : "BUILD")),

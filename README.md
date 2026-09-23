@@ -90,7 +90,7 @@ CLI consume.
 ### Modes
 
 | Mode | File edits | Shell | Use for |
-|------|-----------|-------|---------|
+| ------ | ----------- | ------- | --------- |
 | `BUILD` | ✓ | ✓ | actually making changes |
 | `PLAN` | ✗ | ✗ | questions, code review, exploration |
 | `REVIEW` | ✗ | ✗ | diff review with review-focused prompt |
@@ -130,7 +130,7 @@ Transport is stdio — add it to your client config:
 Keys resolve in order: **env var → `~/.sentinel.json` → project `.sentinel.json`**.
 
 | Provider | Env var |
-|----------|---------|
+| ---------- | --------- |
 | Groq (free tier) | `GROQ_API_KEY` |
 | OpenAI | `OPENAI_API_KEY` |
 | Anthropic | `ANTHROPIC_API_KEY` |
@@ -159,6 +159,50 @@ npm run typecheck    # tsc over the TUI
 npm test             # node:test suites + jest suite
 npm run release:check  # all three
 ```
+
+## Changelog
+
+### v3.1.0 — Bug-fix release
+
+**Provider fixes**
+- Ollama models no longer get a 404 — `ollama/model:tag` prefix is stripped before the API call
+- Anthropic input token count was always 0 — now captured from `message_start` event
+- `sentinel_ask` MCP tool no longer throws `Unsupported model: undefined` when model param is omitted
+
+**TUI / slash commands**
+- `/help` was silently ignored — now registered and works
+- Slash command autocomplete rewritten: `↑↓` navigate, Tab complete, Esc dismiss, single-match Enter executes immediately
+- `!shell` commands now clear the input bar after execution
+- `/diff file.ts` now correctly passes the path as a file, not a branch
+- `/export` and `/share` no longer overwrite each other (unique timestamps in filenames)
+- `/commit` no longer races the mode toggle against the running stream
+- `/redo` now correctly restores the post-edit state (was restoring pre-edit — effectively a no-op)
+- Model picker `j`/`k` vim keys no longer block typing in the search box
+- Model picker navigation stays highlighted past item 17 (scroll window added)
+
+**Agent loop**
+- `diffFile` schema field renamed `newString → newContent` to match the implementation
+- SWE mode: assistant messages with `tool_calls` but empty text content are no longer dropped (broke multi-turn loops)
+- SWE mode: assistant messages with `undefined`/`null` content but valid `tool_calls` now preserved correctly
+- `spawnAgent` subagent no longer silently fails with `Unsupported model: undefined`
+- `batchEdit` uses pre-validated file content for each operation — no more stale reads mid-batch
+- Tool messages with missing `tool_call_id` in SWE mode are skipped instead of sending a bad API request
+
+**Permissions & security**
+- `ask` policy now correctly blocks tools in headless CLI mode instead of silently allowing everything
+- Tool permission priority was inverted (category defaults overrode per-tool policies) — fixed
+- FIX mode was blocking `searchWeb` instead of `runTests` — fixed
+
+**Sessions & state**
+- Messages with `null` or `undefined` id no longer collide in the session store (silent message loss)
+- `autoCompact` interval no longer resets every time the agent starts/stops streaming
+- Compaction loop guard added — `setMessages` no longer re-triggers compaction immediately
+- `microcompactMessages` moved from render-time to `useMemo` (eliminates O(n²) per-render cost)
+- `submit` callback no longer re-created on every streamed delta
+
+**Dialogs**
+- `DialogProvider` no longer double-handles Escape (called `close()` twice alongside child dialog)
+- Stop button (Escape while loading) now wired and functional
 
 ## License
 

@@ -114,15 +114,23 @@ async function* sse(res) {
     while ((idx = buf.indexOf('\n\n')) !== -1) {
       const frame = buf.slice(0, idx);
       buf = buf.slice(idx + 2);
-      for (const line of frame.split('\n')) {
-        if (line.startsWith('data:')) {
-          const data = line.slice(5).trim();
-          if (data && data !== '[DONE]') {
-            try {
-              yield { type: 'frame', json: JSON.parse(data) };
-            } catch {
-              /* skip malformed frame */
-            }
+      yield* parseFrame(frame);
+    }
+  }
+  // Flush: servers may end the stream without a trailing blank line —
+  // without this, the final event (often finish_reason + usage) is lost.
+  buf += decoder.decode();
+  if (buf.trim()) yield* parseFrame(buf);
+
+  function* parseFrame(frame) {
+    for (const line of frame.split('\n')) {
+      if (line.startsWith('data:')) {
+        const data = line.slice(5).trim();
+        if (data && data !== '[DONE]') {
+          try {
+            yield { type: 'frame', json: JSON.parse(data) };
+          } catch {
+            /* skip malformed frame */
           }
         }
       }
@@ -211,7 +219,7 @@ async function* streamAnthropic({ model, messages, tools, apiKey, system, signal
       model,
       system,
       messages,
-      max_tokens: 4096,
+      max_tokens: 8192,
       stream: true,
       ...(tools && tools.length ? { tools } : {}),
     }),
@@ -243,10 +251,15 @@ async function* streamAnthropic({ model, messages, tools, apiKey, system, signal
       }
       yield { type: 'tool_call', id: tool.id, name: tool.name, input };
       tool = null;
+    } else if (j.type === 'message_start' && j.message?.usage) {
+      yield {
+        type: 'usage',
+        usage: { inputTokens: j.message.usage.input_tokens || 0, outputTokens: 0 },
+      };
     } else if (j.type === 'message_delta' && j.usage) {
       yield {
         type: 'usage',
-        usage: { inputTokens: j.usage.input_tokens || 0, outputTokens: j.usage.output_tokens || 0 },
+        usage: { inputTokens: 0, outputTokens: j.usage.output_tokens || 0 },
       };
     } else if (j.type === 'error') {
       yield { type: 'error', message: j.error?.message || 'anthropic error' };
@@ -258,14 +271,14 @@ async function* streamAnthropic({ model, messages, tools, apiKey, system, signal
 // ─── Google Gemini native streaming ──────────────────────────────────────────
 
 async function* streamGoogle({ model, messages, tools, apiKey, system, signal }) {
+  // streamCompletion passes raw OpenAI-format history; adapt exactly once
+  // here: tool_calls become functionCall parts, tool results become
+  // functionResponse parts. (Adapting zero times drops all tool context;
+  // adapting twice yields empty contents — both were live bugs.)
+  const contents = adaptMessagesForGoogle(messages);
   const body = {
     ...(system ? { systemInstruction: { parts: [{ text: system }] } } : {}),
-    contents: messages
-      .filter((m) => m.role !== 'system')
-      .map((m) => ({
-        role: m.role === 'assistant' ? 'model' : 'user',
-        parts: [{ text: typeof m.content === 'string' ? m.content : '' }],
-      })),
+    contents: contents.length ? contents : [{ role: 'user', parts: [{ text: '(empty)' }] }],
     ...(tools && tools.length
       ? {
         tools: [
@@ -324,11 +337,6 @@ async function* streamGoogle({ model, messages, tools, apiKey, system, signal })
  * the native Anthropic and Google protocols, including tool blocks.
  */
 export function adaptMessagesForAnthropic(messages) {
-  const nameById = new Map();
-  for (const m of messages) {
-    for (const tc of m.tool_calls || []) nameById.set(tc.id, tc.function.name);
-  }
-  void nameById;
   const out = [];
   for (const m of messages) {
     if (m.role === 'system') continue;
@@ -453,7 +461,7 @@ export async function* streamCompletion(opts) {
     if (provider === 'google') {
       yield* streamGoogle({
         model: modelId.replace(/^google\//, ''),
-        messages: adaptMessagesForGoogle(messages),
+        messages, // raw OpenAI-format history; streamGoogle adapts once
         tools,
         apiKey,
         system,
@@ -467,7 +475,10 @@ export async function* streamCompletion(opts) {
     }
     // OpenAI-compat: system prompt rides as the first message
     const msgs = system ? [{ role: 'system', content: system }, ...messages] : messages;
-    yield* streamOpenAICompat({ provider, model: modelId, messages: msgs, tools, apiKey, signal });
+    // Strip provider prefix (e.g. "ollama/", "lmstudio/", "openrouter/") — APIs expect bare model name
+    const providerPrefix = `${provider}/`;
+    const bareModelId = modelId.startsWith(providerPrefix) ? modelId.slice(providerPrefix.length) : modelId;
+    yield* streamOpenAICompat({ provider, model: bareModelId, messages: msgs, tools, apiKey, signal });
   } catch (e) {
     if (e?.name === 'AbortError') return;
     yield { type: 'error', message: e?.message || String(e) };

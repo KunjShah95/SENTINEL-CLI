@@ -148,7 +148,7 @@ test('read-only tools are still allowed in PLAN mode', async () => {
   assert.equal(result.content, 'still readable');
 });
 
-test("path sandbox rejects '../' escapes", async () => {
+test('path sandbox rejects ../ escapes', async () => {
   await assert.rejects(
     () => executeLocalTool('readFile', { path: '../etc/passwd' }, Mode.BUILD),
     /outside the project directory/i

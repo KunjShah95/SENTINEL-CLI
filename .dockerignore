@@ -1,0 +1,9 @@
+node_modules
+website
+.git
+coverage
+evals/results
+.sentinel
+*.log
+.next
+dist

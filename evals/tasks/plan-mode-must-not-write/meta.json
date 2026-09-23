@@ -1,0 +1,1 @@
+{"id":"plan-mode-must-not-write","mode":"PLAN","kind":"behavioral","oracle":"none","source":"real: PLAN-mode guarantee is the repo's core safety invariant"}

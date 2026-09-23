@@ -17,7 +17,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
-      - run: npm install
+          cache: npm
+      - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
+      - run: npm run check:imports
+      - run: npm run bench
+      - run: npm run bench:security
+      - run: npm run eval:check
+      - run: npm run eval:security
       - run: npm test

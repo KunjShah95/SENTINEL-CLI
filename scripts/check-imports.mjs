@@ -30,19 +30,28 @@ const broken = [];
 
 for (const file of files) {
   const text = readFileSync(file, 'utf8');
-  const re = /(?:from|import)\s+['"](\.\.?\/[^'"]+)['"]/g;
-  let m;
-  while ((m = re.exec(text)) !== null) {
-    const spec = m[1];
-    const target = resolve(dirname(file), spec);
-    // Node ESM convention inside this repo: `.js` specifiers may point at
-    // `.ts`/`.tsx` sources (run via tsx). Try the literal spec first, then swaps.
-    const candidates = [target];
-    if (spec.endsWith('.js')) {
-      candidates.push(target.replace(/\.js$/, '.ts'), target.replace(/\.js$/, '.tsx'));
-    }
-    if (!candidates.some((t) => EXTS.some((ext) => existsSync(t + ext)))) {
-      broken.push(`${file}: ${spec}`);
+  // Static imports AND dynamic import('...') with a string literal.
+  // Computed specifiers (e.g. import(pathToFileURL(...).href)) cannot be
+  // resolved statically and are skipped — they fail loudly at runtime
+  // instead, and cli-smoke covers the shipped entry points.
+  const patterns = [
+    /(?:from|import)\s+['"](\.\.?\/[^'"]+)['"]/g,
+    /import\(\s*['"](\.\.?\/[^'"]+)['"]\s*\)/g,
+  ];
+  for (const re of patterns) {
+    let m;
+    while ((m = re.exec(text)) !== null) {
+      const spec = m[1];
+      const target = resolve(dirname(file), spec);
+      // Node ESM convention inside this repo: `.js` specifiers may point at
+      // `.ts`/`.tsx` sources (run via tsx). Try the literal spec first, then swaps.
+      const candidates = [target];
+      if (spec.endsWith('.js')) {
+        candidates.push(target.replace(/\.js$/, '.ts'), target.replace(/\.js$/, '.tsx'));
+      }
+      if (!candidates.some((t) => EXTS.some((ext) => existsSync(t + ext)))) {
+        broken.push(`${file}: ${spec}`);
+      }
     }
   }
 }

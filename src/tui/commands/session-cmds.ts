@@ -39,7 +39,7 @@ export async function handleExport(ctx: CommandContext) {
     const exportDir = process.cwd() + '/.sentinel/exports';
     const fs = await import('fs');
     fs.mkdirSync(exportDir, { recursive: true });
-    const exportPath = `${exportDir}/session-${sessionId || Date.now()}.md`;
+    const exportPath = `${exportDir}/session-${sessionId || 'unknown'}-export-${Date.now()}.md`;
     fs.writeFileSync(exportPath, lines.join('\n'), 'utf-8');
     toast.success(`Session exported to ${exportPath}`);
     appendMessage({ role: 'assistant', mode, model, parts: [{ type: 'text', text: `✅ Session exported to \`${exportPath}\`` }] });
@@ -64,7 +64,7 @@ export async function handleShare(ctx: CommandContext) {
     const exportDir = process.cwd() + '/.sentinel/exports';
     const fs = await import('fs');
     fs.mkdirSync(exportDir, { recursive: true });
-    const exportPath = `${exportDir}/session-${sid || Date.now()}.md`;
+    const exportPath = `${exportDir}/session-${sid || 'unknown'}-share-${Date.now()}.md`;
     fs.writeFileSync(exportPath, lines.join('\n'), 'utf-8');
     toast.success(`Session exported to ${exportPath}`);
     appendMessage({ role: 'assistant', mode, model, parts: [{ type: 'text', text: `📋 Session exported to \`${exportPath}\`` }] });

@@ -9,7 +9,9 @@
  * the user connects their subscription via API key.
  */
 
-import { discoverAllModels, getFallbackModels, inferProvider as discoverInferProvider } from './discovery.js';
+import { discoverAllModels, getFallbackModels, inferProvider as discoverInferProvider, getModelTier } from './discovery.js';
+
+export { getModelTier };
 
 export const USD_PER_CREDIT = 0.01;
 
@@ -53,8 +55,7 @@ export async function refreshModels() {
     } catch {
       // keep fallback
     }
-    _refreshPromise = null;
-  })();
+  })().finally(() => { _refreshPromise = null; });
   return _refreshPromise;
 }
 
@@ -68,13 +69,14 @@ export function findSupportedChatModel(modelId) {
 
 const CAPABILITY_RANK = {
   'claude-opus': 10, 'claude-sonnet': 8, 'claude-haiku': 5,
+  'gpt-6-astra': 10, 'gpt-6-sol': 9, 'gpt-6-luna': 7,
   'gpt-4o': 9, 'gpt-4': 7, 'gpt-4o-mini': 5,
   'o1': 10, 'o3': 10,
-  'deepseek-reasoner': 9, 'deepseek-chat': 7,
+  'deepseek-reasoner': 9, 'deepseek-chat': 7, 'deepseek-v4': 9,
   'qwen-qwq': 8, 'qwen': 6,
-  'llama-3.3': 8, 'llama-3.2': 6, 'llama-3.1': 7,
+  'llama-3.3': 8, 'llama-3.2': 6, 'llama-3.1': 7, 'muse-spark': 8,
   'mixtral': 7, 'mistral-large': 8, 'mistral-small': 5,
-  'gemma': 5, 'gemini-2.0': 9, 'gemini': 7,
+  'gemma': 5, 'gemini-3.8': 9, 'gemini-2.0': 9, 'gemini': 7,
   'grok': 7,
   'codestral': 6,
 };
@@ -152,7 +154,7 @@ export function isSupportedChatModel(modelId) {
 }
 
 export function getBareModelId(modelId) {
-  for (const prefix of ['ollama/', 'openrouter/', 'lmstudio/']) {
+  for (const prefix of ['ollama/', 'openrouter/', 'lmstudio/', 'copilot/']) {
     if (modelId.startsWith(prefix)) return modelId.slice(prefix.length);
   }
   return modelId;
@@ -239,7 +241,7 @@ export function calculateCreditsForUsage({ provider, model, usage }) {
 
 const SMALL_MODEL_FALLBACKS = [
   'openai/gpt-oss-20b', 'qwen/qwen3.8-27b', 'claude-haiku-4-5',
-  'gpt-4o-mini', 'mistral-small-latest',
+  'gpt-4o-mini', 'mistral-small-latest', 'gpt-6-luna',
 ];
 
 export async function resolveSmallModel(preferredId) {

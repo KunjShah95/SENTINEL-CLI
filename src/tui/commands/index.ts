@@ -15,6 +15,7 @@ export const registry: Record<string, CommandHandler> = {
   commit: handleCommit,
   diff: handleDiff,
   health: handleHealth,
+  help: handleHelp,
   mcp: handleMcp,
   models: handleModels,
   model: handleModel,
