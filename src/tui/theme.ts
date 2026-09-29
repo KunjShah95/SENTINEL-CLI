@@ -1,4 +1,7 @@
-export type ThemeColors = {
+import { loadOpencodeThemes } from "./themes/opencode-loader.js";
+
+/** Original Sentinel palette keys (still used across the TUI). */
+type LegacyColors = {
   primary: string;
   planMode: string;
   selection: string;
@@ -16,12 +19,106 @@ export type ThemeColors = {
   secure: string;
 };
 
+/**
+ * Full palette: legacy keys + opencode's semantic tokens (text, textMuted,
+ * backgroundPanel/Element, border*, diff*, markdown*). Legacy themes get the
+ * opencode tokens derived; opencode themes get the legacy keys mapped.
+ */
+export type ThemeColors = LegacyColors & {
+  text: string;
+  textMuted: string;
+  secondary: string;
+  accent: string;
+  border: string;
+  borderActive: string;
+  borderSubtle: string;
+  backgroundPanel: string;
+  backgroundElement: string;
+  diffAdded: string;
+  diffRemoved: string;
+  diffContext: string;
+  markdownHeading: string;
+  markdownCode: string;
+  markdownLink: string;
+  markdownBlockQuote: string;
+  markdownListItem: string;
+  markdownStrong: string;
+};
+
 export type Theme = {
   name: string;
   colors: ThemeColors;
+  source?: "sentinel" | "opencode";
 };
 
-export const THEMES: Theme[] = [
+type LegacyTheme = { name: string; colors: LegacyColors };
+
+function deriveFromLegacy(c: LegacyColors): ThemeColors {
+  return {
+    ...c,
+    text: "#E6E6E6",
+    textMuted: "#8B949E",
+    secondary: c.info,
+    accent: c.planMode,
+    border: c.dimSeparator,
+    borderActive: c.primary,
+    borderSubtle: c.dimSeparator,
+    backgroundPanel: c.surface,
+    backgroundElement: c.dialogSurface,
+    diffAdded: c.success,
+    diffRemoved: c.error,
+    diffContext: "#8B949E",
+    markdownHeading: c.primary,
+    markdownCode: c.success,
+    markdownLink: c.info,
+    markdownBlockQuote: c.thinking,
+    markdownListItem: c.primary,
+    markdownStrong: c.warning,
+  };
+}
+
+/** opencode tokens → full palette. Unknown/transparent tokens fall back sensibly. */
+export function fromOpencodeTokens(t: Record<string, string>): ThemeColors {
+  const pick = (...keys: string[]) => keys.map((k) => t[k]).find((v) => v) || "#808080";
+  const background = t.background || "#0a0a0a";
+  return {
+    primary: pick("primary"),
+    planMode: pick("accent", "secondary"),
+    selection: pick("primary"),
+    thinking: pick("textMuted"),
+    success: pick("success"),
+    error: pick("error"),
+    info: pick("info"),
+    background,
+    surface: pick("backgroundPanel", "background"),
+    dialogSurface: pick("backgroundElement", "backgroundPanel", "background"),
+    thinkingBorder: pick("borderSubtle", "border"),
+    dimSeparator: pick("border", "borderSubtle"),
+    warning: pick("warning"),
+    critical: pick("error"),
+    secure: pick("success"),
+    text: pick("text"),
+    textMuted: pick("textMuted"),
+    secondary: pick("secondary", "info"),
+    accent: pick("accent", "secondary"),
+    border: pick("border"),
+    borderActive: pick("borderActive", "primary"),
+    borderSubtle: pick("borderSubtle", "border"),
+    backgroundPanel: pick("backgroundPanel", "background"),
+    backgroundElement: pick("backgroundElement", "backgroundPanel", "background"),
+    diffAdded: pick("diffAdded", "success"),
+    diffRemoved: pick("diffRemoved", "error"),
+    diffContext: pick("diffContext", "textMuted"),
+    markdownHeading: pick("markdownHeading", "primary"),
+    markdownCode: pick("markdownCode", "success"),
+    markdownLink: pick("markdownLink", "info"),
+    markdownBlockQuote: pick("markdownBlockQuote", "textMuted"),
+    markdownListItem: pick("markdownListItem", "primary"),
+    markdownStrong: pick("markdownStrong", "warning"),
+  };
+}
+
+const LEGACY_THEMES: LegacyTheme[] = [
   {
     name: "Sentinel Dark",
     colors: {
@@ -224,4 +321,30 @@ export const THEMES: Theme[] = [
   },
 ];
 
+const LEGACY_NAMES = new Set(LEGACY_THEMES.map((t) => t.name.toLowerCase()));
+
+// Same-named themes exist in both sets (Dracula, Nord, ...): keep both,
+// mark the opencode one.
+const OPENCODE_THEMES: Theme[] = loadOpencodeThemes().map((t) => ({
+  name: LEGACY_NAMES.has(t.name.toLowerCase()) && !t.name.includes("(opencode)") ? `${t.name} (opencode)` : t.name,
+  colors: fromOpencodeTokens(t.tokens),
+  source: "opencode",
+}));
+
+export const THEMES: Theme[] = [
+  ...OPENCODE_THEMES.filter((t) => t.name === "OpenCode"),
+  ...LEGACY_THEMES.map((t) => ({ name: t.name, colors: deriveFromLegacy(t.colors), source: "sentinel" as const })),
+  ...OPENCODE_THEMES.filter((t) => t.name !== "OpenCode"),
+];
+
 export const DEFAULT_THEME = THEMES[0];
+
+/** Agent/mode accent, opencode style: build = secondary, plan = accent. */
+export function modeColor(colors: ThemeColors, mode: string | undefined): string {
+  switch (mode) {
+  case "PLAN": return colors.accent;
+  case "REVIEW": return colors.warning;
+  case "SWE": return colors.success;
+  default: return colors.secondary;
+  }
+}

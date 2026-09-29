@@ -1,20 +1,16 @@
 import React from 'react';
-import { Box, Text } from 'ink';
+import { Text } from 'ink';
 import { useTheme } from '../../providers/theme/index.js';
+import { LeftBar } from '../oc/primitives.js';
 
 type Props = { message: string };
 
+/** opencode assistant error: red left bar, muted message on the panel. */
 export function ErrorMessage({ message }: Props) {
   const { colors } = useTheme();
   return (
-    <Box flexDirection="column" marginY={1} paddingLeft={2}>
-      <Box flexDirection="row" gap={1} marginBottom={1}>
-        <Text bold color={colors.error}>{'✗'}</Text>
-        <Text bold color={colors.error}>{'Error'}</Text>
-      </Box>
-      <Box paddingLeft={4}>
-        <Text color={colors.error}>{message}</Text>
-      </Box>
-    </Box>
+    <LeftBar color={colors.error} background={colors.backgroundPanel}>
+      <Text color={colors.textMuted} wrap="wrap">{message}</Text>
+    </LeftBar>
   );
 }

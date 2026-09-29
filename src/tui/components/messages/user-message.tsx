@@ -1,31 +1,30 @@
 import React from 'react';
-import { Box, Text } from 'ink';
+import { Text } from 'ink';
 import { useTheme } from '../../providers/theme/index.js';
+import { modeColor } from '../../theme.js';
+import { LeftBar } from '../oc/primitives.js';
 
-type Mode = 'BUILD' | 'PLAN' | 'REVIEW' | 'SCAN' | 'FIX';
-type Props = { message: string; mode?: Mode };
+type Props = { message: string; mode?: string; queued?: boolean };
 
-const MODE_COLOR_KEY: Record<Mode, string> = {
-  BUILD: 'success', PLAN: 'planMode', REVIEW: 'critical', SCAN: 'warning', FIX: 'error',
-};
-
-export function UserMessage({ message, mode = 'BUILD' }: Props) {
+/**
+ * opencode UserMessage: a left "┃" bar in the agent color over the panel
+ * background. Steering messages (sent mid-turn, prefixed "↪") show a
+ * QUEUED-style badge like opencode's pending prompts.
+ */
+export function UserMessage({ message, mode = 'BUILD', queued }: Props) {
   const { colors } = useTheme();
-  const modeColor = (colors as any)[MODE_COLOR_KEY[mode]] ?? colors.primary;
-
+  const color = modeColor(colors, mode);
+  const steering = queued ?? message.startsWith('↪ ');
+  const text = steering ? message.replace(/^↪ /, '') : message;
   return (
-    <Box flexDirection="column" marginY={1} paddingLeft={2}>
-      {/* Header */}
-      <Box flexDirection="row" gap={1} marginBottom={1}>
-        <Text bold color={colors.primary}>{'▶'}</Text>
-        <Text bold color={colors.primary}>{'You'}</Text>
-        <Text dimColor>{'·'}</Text>
-        <Text bold color={modeColor}>{mode}</Text>
-      </Box>
-      {/* Content */}
-      <Box paddingLeft={4}>
-        <Text>{message}</Text>
-      </Box>
-    </Box>
+    <LeftBar color={color} background={colors.backgroundPanel}>
+      <Text color={colors.text} wrap="wrap">{text}</Text>
+      {steering ? (
+        <Text>
+          <Text backgroundColor={color} color={colors.background} bold>{' STEER '}</Text>
+          <Text color={colors.textMuted}>{' delivered to the running turn'}</Text>
+        </Text>
+      ) : null}
+    </LeftBar>
   );
 }
