@@ -11,17 +11,18 @@
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import { existsSync } from 'node:fs';
+import { getWorkdir } from './workdir.js';
 
 const CHECKPOINT_DIR = '.sentinel/checkpoints';
 const REDO_DIR = '.sentinel/redo';
 const MAX_CHECKPOINTS = 10;
 
 function getCheckpointRoot() {
-  return path.resolve(process.cwd(), CHECKPOINT_DIR);
+  return path.resolve(getWorkdir(), CHECKPOINT_DIR);
 }
 
 function getRedoRoot() {
-  return path.resolve(process.cwd(), REDO_DIR);
+  return path.resolve(getWorkdir(), REDO_DIR);
 }
 
 /**
@@ -57,7 +58,7 @@ export async function createCheckpoint(filePaths) {
 
   for (const absPath of filePaths) {
     try {
-      const relPath = path.relative(process.cwd(), absPath);
+      const relPath = path.relative(getWorkdir(), absPath);
       if (relPath.startsWith('..') || path.isAbsolute(relPath)) continue;
 
       // Only checkpoint files that already exist (creates get deleted on undo)
@@ -131,7 +132,7 @@ export async function restoreCheckpoint(id) {
   for (const file of manifest.files) {
     const safe = sanitizeManifestRelative(file.relative);
     if (!safe) continue;
-    const diskPath = path.resolve(process.cwd(), safe);
+    const diskPath = path.resolve(getWorkdir(), safe);
     if (existsSync(diskPath)) {
       const dest = path.join(redoDest, safe);
       await fs.mkdir(path.dirname(dest), { recursive: true });
@@ -147,7 +148,7 @@ export async function restoreCheckpoint(id) {
   for (const file of manifest.files) {
     const safe = sanitizeManifestRelative(file.relative);
     if (!safe) continue; // never let a bad manifest write outside the project
-    const target = path.resolve(process.cwd(), safe);
+    const target = path.resolve(getWorkdir(), safe);
 
     if (file.existed) {
       const src = path.join(checkpointDir, safe);
@@ -207,7 +208,7 @@ export async function redoCheckpoint() {
   for (const file of manifest.files) {
     const safe = sanitizeManifestRelative(file.relative);
     if (!safe) continue; // never let a bad manifest write outside the project
-    const target = path.resolve(process.cwd(), safe);
+    const target = path.resolve(getWorkdir(), safe);
 
     if (file.existed) {
       const src = path.join(redoDir, safe);

@@ -13,9 +13,12 @@ import fs from 'node:fs/promises';
 import { realpathSync } from 'node:fs';
 import { createPatch } from 'diff';
 import { Mode, isReadOnlyTool } from '../schemas/mode.js';
-import { runSandboxed } from './sandbox.js';
+import { runSandboxedAsync } from './sandbox.js';
 import { createCheckpoint, restoreCheckpoint, redoCheckpoint } from './checkpoint.js';
 import { toolInputSchemas, READ_ONLY_TOOL_NAMES, BUILD_TOOL_NAMES, isReadOnly } from './schemas.js';
+import { getWorkdir } from './workdir.js';
+import { withFileMutationQueues } from './mutation-queue.js';
+import { tailWithNotice } from './truncate.js';
 
 // Re-export so callers can import Mode and toolInputSchemas from this module directly.
 export {
@@ -34,7 +37,7 @@ export const MAX_OUTPUT = 20_000;
 export const DEFAULT_TIMEOUT = 30_000;
 
 export function resolveInsideCwd(inputPath) {
-  const cwd = process.cwd();
+  const cwd = getWorkdir();
   const target = path.isAbsolute(inputPath) ? inputPath : path.resolve(cwd, inputPath);
 
   if (process.platform === 'win32') {
@@ -60,6 +63,18 @@ export function resolveInsideCwd(inputPath) {
     throw new Error('Path is outside the project directory');
   }
   return { cwd: resolvedCwd, resolved: resolvedTarget, relative: rel || '.' };
+}
+
+/**
+ * Models routinely send `timeout: 60` meaning seconds. Found in a live run:
+ * 60 was read as ms and killed `node test.js` instantly (exit 124), twice.
+ * Values below 1000 are therefore seconds; anything else is ms. Clamped
+ * to [1s, 30min].
+ */
+export function normalizeTimeoutMs(value, fallback) {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return fallback;
+  const ms = value < 1000 ? value * 1000 : value;
+  return Math.min(30 * 60_000, Math.max(1000, Math.round(ms)));
 }
 
 export function truncate(value, limit) {
@@ -476,35 +491,23 @@ async function batchEditImpl(input) {
   }
 }
 
-function runBashImpl(input) {
+async function runBashImpl(input) {
   const command = input?.command;
-  const timeout = input?.timeout ?? DEFAULT_TIMEOUT;
+  const timeout = normalizeTimeoutMs(input?.timeout, DEFAULT_TIMEOUT);
   if (typeof command !== 'string' || command.length === 0) {
     throw new Error('command is required');
   }
-
-  return new Promise(resolve => {
-    try {
-      const stdout = runSandboxed(command, {
-        cwd: process.cwd(),
-        timeout,
-        env: { ...process.env, TERM: 'dumb' },
-      });
-      resolve({
-        stdout: truncate(stdout?.toString() || '', MAX_OUTPUT),
-        stderr: '',
-        exitCode: 0,
-        timedOut: false,
-      });
-    } catch (err) {
-      resolve({
-        stdout: truncate(err.stdout?.toString() || '', MAX_OUTPUT),
-        stderr: truncate(err.stderr?.toString() || '', MAX_OUTPUT),
-        exitCode: err.status || 1,
-        timedOut: false,
-      });
-    }
+  const r = await runSandboxedAsync(command, {
+    cwd: getWorkdir(),
+    timeout,
+    env: { ...process.env, TERM: 'dumb' },
   });
+  return {
+    stdout: tailWithNotice(r.stdout, MAX_OUTPUT),
+    stderr: tailWithNotice(r.stderr, MAX_OUTPUT),
+    exitCode: r.exitCode,
+    timedOut: r.timedOut,
+  };
 }
 
 async function searchWebImpl(input) {
@@ -617,6 +620,16 @@ async function todoReadImpl(_input) {
   return { todos, rendered: todos.length ? formatTodoList(todos) : '(no todos yet)' };
 }
 
+async function memoryWriteImpl(input) {
+  const { writeMemory } = await import('../../agent/memory.js');
+  return { success: true, ...writeMemory(input) };
+}
+
+async function memoryDeleteImpl(input) {
+  const { deleteMemory } = await import('../../agent/memory.js');
+  return deleteMemory(input.name);
+}
+
 async function skillImpl(input) {
   const { getSkillPrompt } = await import('../../agent/skills.js');
   const body = getSkillPrompt(input.name);
@@ -632,27 +645,18 @@ async function skillImpl(input) {
  */
 async function runTestsImpl(input) {
   const command = input?.command;
-  const timeout = input?.timeout ?? 120000;
+  const timeout = normalizeTimeoutMs(input?.timeout, 120000);
   if (typeof command !== 'string' || command.length === 0) {
     throw new Error('command is required');
   }
-  let stdout = '';
-  let stderr = '';
-  let exitCode = 0;
-  let timedOut = false;
-  try {
-    const out = runSandboxed(command, {
-      cwd: process.cwd(),
-      timeout,
-      env: { ...process.env, TERM: 'dumb', CI: '1' },
-    });
-    stdout = (out?.toString() || '').slice(0, MAX_OUTPUT);
-  } catch (err) {
-    stdout = (err.stdout?.toString() || '').slice(0, MAX_OUTPUT);
-    stderr = (err.stderr?.toString() || err.message || '').slice(0, MAX_OUTPUT);
-    exitCode = typeof err.status === 'number' ? err.status : 1;
-    timedOut = /timed out|ETIMEDOUT/i.test(err.message || '');
-  }
+  const r = await runSandboxedAsync(command, {
+    cwd: getWorkdir(),
+    timeout,
+    env: { ...process.env, TERM: 'dumb', CI: '1' },
+  });
+  const stdout = tailWithNotice(r.stdout, MAX_OUTPUT);
+  const stderr = tailWithNotice(r.stderr, MAX_OUTPUT);
+  const { exitCode, timedOut } = r;
   const combined = `${stdout}\n${stderr}`;
   const parsed = parseTestOutputLocal(combined);
   return {
@@ -819,6 +823,23 @@ function applyHunks(original, hunkLines, rel) {
   return out.join('\n') + (hasTrailingNewline ? '\n' : '');
 }
 
+/**
+ * Serialize mutations per target file (pi-mono file-mutation-queue): with
+ * teammates and background subagents, two writers can race on one file.
+ * Paths that fail to resolve fall through so the impl reports the error.
+ */
+function queued(impl, pathsOf) {
+  return async (input) => {
+    let paths = [];
+    try {
+      paths = pathsOf(input).map((p) => resolveInsideCwd(p).resolved);
+    } catch {
+      return impl(input);
+    }
+    return paths.length ? withFileMutationQueues(paths, () => impl(input)) : impl(input);
+  };
+}
+
 const TOOL_IMPLS = {
   readFile: readFileImpl,
   listDirectory: listDirectoryImpl,
@@ -826,18 +847,20 @@ const TOOL_IMPLS = {
   grep: grepImpl,
   codeMap: codeMapImpl,
   searchWeb: searchWebImpl,
-  writeFile: writeFileImpl,
-  editFile: editFileImpl,
-  batchEdit: batchEditImpl,
+  writeFile: queued(writeFileImpl, (i) => [i?.path]),
+  editFile: queued(editFileImpl, (i) => [i?.path]),
+  batchEdit: queued(batchEditImpl, (i) => (Array.isArray(i?.operations) ? i.operations.map((o) => o?.filePath) : [])),
   bash: runBashImpl,
   runTests: runTestsImpl,
-  applyPatch: applyPatchImpl,
+  applyPatch: queued(applyPatchImpl, (i) => (typeof i?.patch === 'string' ? splitPatchByFile(i.patch).map((f) => f.file) : [])),
   diffFile: diffFileImpl,
   undoLastChange: undoLastChangeImpl,
   redoLastUndo: redoLastUndoImpl,
   todoWrite: todoWriteImpl,
   todoRead: todoReadImpl,
   skill: skillImpl,
+  memoryWrite: memoryWriteImpl,
+  memoryDelete: memoryDeleteImpl,
 };
 
 export const readOnlyToolContracts = Object.freeze({
@@ -878,6 +901,14 @@ export const readOnlyToolContracts = Object.freeze({
   skill: {
     description: 'Load a skill workflow by name. Invoke BEFORE handling a matching request yourself.',
     inputSchema: toolInputSchemas.skill,
+  },
+  bgCheck: {
+    description: 'Show status/output of background commands (one id, or all). Results also arrive automatically as notifications.',
+    inputSchema: toolInputSchemas.bgCheck,
+  },
+  teamStatus: {
+    description: 'List teammates (status, worktree, branch) and background commands.',
+    inputSchema: toolInputSchemas.teamStatus,
   },
 });
 
@@ -930,6 +961,30 @@ export const buildToolContracts = Object.freeze({
   spawnAgent: {
     description: 'Delegate a bounded subtask to a fresh subagent. Returns its final summary text.',
     inputSchema: toolInputSchemas.spawnAgent,
+  },
+  memoryWrite: {
+    description: 'Save a durable memory record for future sessions (type: user|feedback|project|reference). Only non-obvious facts not derivable from the code.',
+    inputSchema: toolInputSchemas.memoryWrite,
+  },
+  memoryDelete: {
+    description: 'Delete a memory record that turned out to be wrong or stale.',
+    inputSchema: toolInputSchemas.memoryDelete,
+  },
+  bgRun: {
+    description: 'Start a long shell command (build, test suite, server) in the background; returns an id immediately. Its result is delivered as a notification.',
+    inputSchema: toolInputSchemas.bgRun,
+  },
+  spawnTeammate: {
+    description: 'Start a named teammate agent that works in parallel (optionally isolation="worktree" for its own git worktree/branch). Its summary arrives as a notification. Propose the team to the user first.',
+    inputSchema: toolInputSchemas.spawnTeammate,
+  },
+  sendMessage: {
+    description: 'Send a message to a teammate by name (or to "lead"). Delivered before its next model call.',
+    inputSchema: toolInputSchemas.sendMessage,
+  },
+  teamMerge: {
+    description: 'Bring a finished worktree teammate\'s work home: action "diff" to review its patch, "apply" to apply it to the main tree (undoable) and remove the worktree, "discard" to throw it away.',
+    inputSchema: toolInputSchemas.teamMerge,
   },
 });
 

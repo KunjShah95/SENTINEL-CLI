@@ -98,6 +98,47 @@ export const sessions = {
     await writeSession(session);
     return true;
   },
+
+  /**
+   * Branch a session (pi-mono session tree): copy history up to and
+   * including `atMessageId` (default: all) into a new session that records
+   * its parent, so an abandoned approach stays intact and replayable.
+   */
+  async fork({ id, atMessageId, title } = {}) {
+    const parent = await readSession(id);
+    if (!parent) throw new Error(`Unknown session: ${id}`);
+    const msgs = parent.messages || [];
+    let cut = msgs.length;
+    if (atMessageId != null) {
+      const i = msgs.findIndex((m) => m.id === atMessageId);
+      if (i < 0) throw new Error(`Message ${atMessageId} not in session ${id}`);
+      cut = i + 1;
+    }
+    const child = {
+      ...parent,
+      id: crypto.randomUUID(),
+      title: title || `${parent.title || 'Session'} (fork)`,
+      createdAt: Date.now(),
+      parentId: parent.id,
+      forkedAtMessageId: atMessageId ?? msgs[cut - 1]?.id ?? null,
+      messages: msgs.slice(0, cut),
+    };
+    await writeSession(child);
+    return { id: child.id, title: child.title, parentId: parent.id, messages: child.messages.length };
+  },
+
+  /** Ancestors of a session, root first (stops on cycles / missing parents). */
+  async lineage(id) {
+    const chain = [];
+    const seen = new Set();
+    let cur = await readSession(id);
+    while (cur && !seen.has(cur.id)) {
+      seen.add(cur.id);
+      chain.unshift({ id: cur.id, title: cur.title, forkedAtMessageId: cur.forkedAtMessageId ?? null });
+      cur = cur.parentId ? await readSession(cur.parentId) : null;
+    }
+    return chain;
+  },
 };
 
 export default sessions;

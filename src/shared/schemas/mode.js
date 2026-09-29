@@ -31,7 +31,7 @@ export function isMode(value) {
 }
 
 export function isReadOnlyTool(toolName) {
-  return ['readFile', 'listDirectory', 'glob', 'grep', 'codeMap', 'searchWeb', 'todoRead', 'skill'].includes(toolName);
+  return ['readFile', 'listDirectory', 'glob', 'grep', 'codeMap', 'searchWeb', 'todoRead', 'skill', 'bgCheck', 'teamStatus'].includes(toolName);
 }
 
 /**

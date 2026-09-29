@@ -59,7 +59,7 @@ sentinel                        # auto-discovers installed models
 
 ```
 bin/sentinel.js          entry point (TUI / ask / mcp / --version)
-src/cli/main.js          headless command surface (ask, version, help)
+src/cli/main.js          headless command surface (ask, goal, mini, race, onboard, help)
 src/agent/               the agent: loop, providers, tools glue, cost, sessions, prompt
 src/shared/tools/        sandboxed local tools: read, write, edit, glob, grep, bash…
 src/shared/models/       model registry + live discovery from provider APIs
@@ -96,6 +96,150 @@ CLI consume.
 | `REVIEW` | ✗ | ✗ | diff review with review-focused prompt |
 
 Toggle with `Ctrl+M` or `/mode` inside the TUI.
+
+## `sentinel outcome` — vague ask in, judgeable contract out
+
+A request like "the sync is flaky" is not a goal: nothing can verify it, so
+any agent working on it is guessing. `outcome` turns it into a contract:
+
+```
+CURRENT STATE   what happens today, with the file:line that proves it
+TARGET          one measurable delta, not a list of wishes
+VERIFICATION    the exact command, and what its exit code means
+BLAST RADIUS    what a rollback would touch
+ROLLBACK        the concrete undo
+UNKNOWNS        what the model had to assume — asked, not guessed
+```
+
+```bash
+sentinel outcome "the sync is flaky" --plan   # write the contract only
+sentinel outcome "the sync is flaky"           # write it, then work to it
+sentinel outcome "..." --no-save               # do not touch .sentinel/
+```
+
+The contract is persisted to `.sentinel/outcome.json`. The worker is briefed
+with the whole contract *including the unknowns it inherited*, so it knows which
+parts of the plan were shaky going in. Then `goal.js`'s tool-less evaluator
+judges the work against the contract rather than a sentence.
+
+The evaluator has a third verdict, `unknown`, for when the contract itself
+cannot be judged — an unmeasurable TARGET, or VERIFICATION never run. That
+verdict is terminal: retrying identical work cannot make an unjudgeable
+condition judgeable, so the turn ends and says which field is the problem.
+
+## `sentinel budget` — spend that outlives the process
+
+`maxCostUsd` guards a single turn and `cost.js` totals are in-memory, so neither
+can answer the only question a buyer asks: *what has this cost so far*. An
+engagement is the FDE-shaped unit — a budget, a deadline, a stop condition —
+persisted per project so a week's work is still measured on Friday.
+
+```bash
+sentinel budget --usd 25 --deadline 2h --condition "npm test exits 0"
+sentinel budget            # active  ░░░░░░░░  $12.40 of $25.00 (50%) · 1h 59m left
+sentinel budget --history  # recent turns and their spend
+sentinel budget --clear    # remove the ceiling; spend history is kept
+```
+
+Once set, `ask`, `goal`, and `outcome` all honour it — you set it once and every
+later run is gated. The loop checks after each model call and stops hard at the
+ceiling rather than letting one more call land first.
+
+State lives in two gitignored files: `.sentinel/budget.json` (the ceiling) and
+`.sentinel/spend.jsonl` (one append-only line per turn, so a crash mid-write
+loses one row, not the log).
+
+Two deliberate choices: spend recorded **before** the budget was set does not
+count against it, and a turn that finishes in the same millisecond the budget
+was created **does** — a ceiling should fail toward charging you, not away.
+
+## `sentinel handoff` — the runbook, not the diff
+
+Every turn is already recorded to `.sentinel/trajectories/*.jsonl`. That data
+has been write-only. `handoff` turns a recording into the artifact an
+engagement is actually judged on — something the customer's team can pick up:
+
+```bash
+sentinel handoff --list          # runs that can be handed off
+sentinel handoff <runId>         # write .sentinel/HANDOFF.md
+sentinel handoff <runId> --stdout
+sentinel handoff a b c --stdout  # several runs, merged
+```
+
+The runbook has five sections: what changed, **what was verified**, **what was
+tried and rejected**, claims to distrust, and what is still fragile.
+
+The second and third are the point. "A green test does not prove the fix is the
+right one" and "we tried patching the parser incrementally and it broke on
+nested arrays" are exactly what the next person needs and exactly what nobody
+writes down. Dead ends are derived mechanically: any command shape that failed,
+or that ran three or more times, plus any claim the receipts system could not
+back with a passing command.
+
+**No model, no API key.** The model already ran once; asking it to summarize
+its own run again is how confident, unverifiable prose gets into a runbook.
+A run where nothing exited 0 says so in bold.
+
+## Risk ledger — permission by novelty
+
+"Allow bash for this session" is one grant covering `git status` and
+`npm publish` alike, which is either uselessly strict or uselessly loose. The
+ledger records command **shapes** per repo in `.sentinel/risk.json` and grades
+each one:
+
+| Level | Meaning |
+| ----- | ------- |
+| `green` | provably read-only, or a shape already approved in this repo |
+| `yellow` | a new shape that is not destructive → asked, with the shape named |
+| `red` | destructive, or reaches outside the workspace → always asked, never remembered as safe |
+
+```bash
+sentinel risk                     # list approved shapes
+sentinel risk "npm publish"       # how would this grade here?
+sentinel risk --forget "npm publish"
+```
+
+Two properties matter more than the grading itself:
+
+- **Flags are kept, values are not.** `git commit -m "a"` and
+  `git commit -m "b"` are one shape, so the second does not ask. But
+  `git push --force` is a *different* shape from `git push`, and
+  `--force` is never collapsed into a placeholder.
+- **The subcommand is part of the verb.** `git commit` and `git push` never
+  share a shape, so approving a commit cannot authorize a push. Same for
+  `npm run` vs `npm publish`, `docker build` vs `docker push`.
+
+A missing or corrupt ledger is treated as empty, which grades everything novel
+as `yellow`. An approving ledger that does not exist is not consent.
+
+The lead still sees a shell command the first time — the ledger narrows what is
+asked, it does not remove asking.
+
+## `sentinel onboard` — the week-one survey
+
+A new engineer's first days go to comprehension, not commits. `onboard` answers
+the questions a new joiner actually asks, from files already on disk:
+
+```bash
+sentinel onboard                       # print the survey
+sentinel onboard --json                # raw structured data
+sentinel onboard --remember            # store a project memory record
+sentinel onboard --todos               # seed .sentinel/todos.json with the gaps
+sentinel onboard -o ONBOARDING.md      # write it to a file to commit
+```
+
+It reports entry points, what gates the merge (workflow names and triggers),
+test topology, churn hotspots from git history, ownership per directory, and
+**risk areas** — source files that change constantly with no test covering
+them. Generated files (lockfiles, bundles) are reported separately rather than
+crowding out real source, and deleted-but-churned files are shown as history
+rather than as places to go make changes.
+
+Exit code is non-zero when the survey finds anything a new engineer should know
+first, so it works as a CI check.
+
+**No model, no API key, no network.** The survey is deterministic filesystem and
+`git log` analysis, so it runs anywhere and gives the same answer twice.
 
 ## TUI commands
 

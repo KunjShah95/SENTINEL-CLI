@@ -47,7 +47,7 @@ export function newRunId() {
  * JSONL line, then passed through untouched. Never throws — logging must
  * not break the turn it observes.
  */
-export async function* withTrajectory(source, { runId = newRunId(), model, mode } = {}) {
+export async function* withTrajectory(source, { runId = newRunId(), model, mode, prompt, goal } = {}) {
   if (process.env.SENTINEL_NO_TRAJECTORY === '1') {
     yield* source;
     return;
@@ -63,6 +63,16 @@ export async function* withTrajectory(source, { runId = newRunId(), model, mode 
   }
 
   let seq = 0;
+  // Header: the task itself (untruncated up to 20k), so `sentinel replay`
+  // can re-run the same turn against another model or prompt version.
+  if (file && prompt) {
+    try {
+      appendFileSync(file, JSON.stringify({
+        ts: new Date().toISOString(), runId, seq: seq++, event: 'start',
+        data: JSON.stringify({ prompt: String(prompt).slice(0, 20_000), goal }), model, mode,
+      }) + '\n');
+    } catch { /* best-effort */ }
+  }
   let usage;
   let costUsd;
   for await (const ev of source) {

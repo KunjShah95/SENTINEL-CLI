@@ -174,8 +174,10 @@ describe('agent loop (mocked provider)', () => {
     assert.equal(existsSync(file), true);
     const lines = readFileSync(file, 'utf8').trim().split('\n').map((l) => JSON.parse(l));
     assert.ok(lines.every((l) => l.runId === 'run123'));
-    assert.deepEqual(lines.map((l) => l.event), ['text', 'finish', 'done']);
-    assert.ok(lines[1].usage, 'finish record carries usage');
+    // 'start' header carries the prompt so `sentinel replay` can re-run it.
+    assert.deepEqual(lines.map((l) => l.event), ['start', 'text', 'finish', 'done']);
+    assert.equal(JSON.parse(lines[0].data).prompt, 'hi');
+    assert.ok(lines[2].usage, 'finish record carries usage');
   });
 
   it('trajectory:false records nothing', async () => {
