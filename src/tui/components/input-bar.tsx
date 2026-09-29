@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Box, Text, useInput } from 'ink';
-import TextInput from 'ink-text-input';
+import { PromptInput } from './prompt-input.js';
 import { useTheme } from '../providers/theme/index.js';
 import { modeColor } from '../theme.js';
 import { SPLIT_BORDER, shortModelName, titlecase } from './oc/primitives.js';
@@ -182,10 +182,11 @@ export function InputBar({
   const handleSubmit = useCallback((submitted: string) => {
     // Complete autocomplete selection on Enter if suggestions are open
     if (hasSuggestions) { insertMentionSelected(); return; }
-    if (hasSlash && slashSuggestions.length === 1) {
-      // Single match — complete and execute immediately
-      const sel = slashSuggestions[0];
-      if (!sel.args) {
+    if (hasSlash) {
+      // Enter runs the highlighted command unless it has a REQUIRED
+      // argument (`<x>`); optional ones (`[x]`) run bare, like opencode.
+      const sel = slashSuggestions[Math.min(selectedIndex, slashSuggestions.length - 1)];
+      if (sel && (!sel.args || sel.args.startsWith('['))) {
         clearInput();
         onSubmit(`/${sel.name}`);
         return;
@@ -193,7 +194,6 @@ export function InputBar({
       insertSlashSelected();
       return;
     }
-    if (hasSlash) { insertSlashSelected(); return; }
 
     const trimmed = submitted.trim();
     if (!trimmed) return;
@@ -215,7 +215,7 @@ export function InputBar({
     }
 
     onSubmit(trimmed);
-  }, [onSubmit, onCommand, onShellCommand, hasSuggestions, hasSlash, slashSuggestions,
+  }, [onSubmit, onCommand, onShellCommand, hasSuggestions, hasSlash, slashSuggestions, selectedIndex,
       insertMentionSelected, insertSlashSelected, clearInput]);
 
   return (
@@ -287,7 +287,7 @@ export function InputBar({
         >
           <Box flexDirection="row">
             {isShell ? <Text color={colors.warning}>{'$ '}</Text> : null}
-            <TextInput
+            <PromptInput
               value={value}
               onChange={handleChange}
               onSubmit={handleSubmit}

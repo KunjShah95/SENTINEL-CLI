@@ -157,13 +157,16 @@ Shipped as `src/agent/budget.js` plus `sentinel budget`, with
 `runAgentTurn({ engagement: true })` checking the ceiling and deadline after
 every model call.
 
-## 9. Blast-radius gate before any change
+## 9. Blast-radius gate before any change — SHIPPED
 
 For systems the agent does not own, require a read-back before writing: name
 the file and line that justifies the change, and state the rollback. Cheap
 version is a pre-flight turn gated on `blast_radius > threshold`; expensive
 version is a second model call that must agree with the first. This is the
 mechanism that makes "safe" mean something.
+
+Shipped as `src/agent/blast-radius.js`, wired as a PreToolUse gate in
+`executeOneTool`. It blocks once per path per turn, then allows the retry.
 
 ## 10. Multi-repo workspace
 
@@ -185,7 +188,7 @@ memory layer scoped to the *customer* rather than the cwd, and makes cross-repo
 | 3 | Risk ledger | ~2 sessions | — | **shipped** — `src/agent/risk-ledger.js`, `sentinel risk` |
 | 4 | Handoff + replay | ~2 sessions | 1 | **shipped** — `src/agent/handoff.js`, `sentinel handoff` |
 | 8 | Engagement budget | ~1 session | — | **shipped** — `src/agent/budget.js`, `sentinel budget` |
-| 9 | Blast-radius gate | ~2 sessions | 3 | planned |
+| 9 | Blast-radius gate | ~2 sessions | 3 | **shipped** — `src/agent/blast-radius.js` |
 | 7 | Standing FDE loop | multi-week | 1, 2, 9 | planned |
 | 10 | Multi-repo workspace | multi-week | 1 | planned |
 
@@ -214,13 +217,45 @@ Verified end to end by recording a real turn through `withTrajectory` and
 generating a runbook from it: it correctly reported that *nothing* was verified
 and flagged the run's "All tests pass" claim as unsupported.
 
-**Next: #9, blast-radius gate.** The risk ledger knows whether a command is
-novel, but nothing knows whether a *change* is risky. `outcome.js` already
-records BLAST RADIUS and ROLLBACK in the contract and `handoff.js` already
-lists what was fragile — the missing piece is gating: before writing to a path
-the onboarding survey marked high-risk, the agent must state the file and line
-that justifies it and name the rollback. That makes "safe" mean something
-instead of relying on the model noticing.
+**Next: #7, the standing FDE loop**, or **#10, multi-repo**. Both are
+multi-week and both are honest answers to "what is a forward-deployed engineer,
+as opposed to a person running a few commands." #7 is the more valuable of the
+two: today FDE work is one-shot per session, and the roadmap's deferred items
+(#15 cron, #16 steering queue) are exactly the pieces that would make it a
+standing presence rather than a good one-shot. #10 assumes the customer runs
+several services, which is the less common case.
+
+## What the blast-radius gate actually shipped
+
+`src/agent/blast-radius.js` classifies a write target as a blast centre —
+migrations, CI workflows, lockfiles, schemas, deploy and infra definitions,
+auth and billing code, the project's own permission config — and blocks the
+first write to it per turn, demanding the file:line that justifies the change
+and the exact rollback. Wired into `executeOneTool` as a PreToolUse gate.
+
+One design decision worth defending: **it blocks once, not forever.** A gate
+that refuses the same path on every write trains people to disable it, which
+costs more safety than the gate bought. This mirrors the Stop hook's
+forced-verification pattern already in the codebase — block once, inject the
+requirement, let the agent satisfy it.
+
+Two bugs the tests caught:
+
+- **Directory segments were not matched.** The auth/billing pattern required the
+  sensitive name to be in the *filename*, so `src/billing/invoice.ts` sailed
+  through while `src/auth/session.js` was caught. Missing real billing code is
+  the expensive direction to fail in.
+- **A test asserted the wrong trade-off.** I originally wrote that
+  `lib/auth-utils.js` should *not* be challenged, on the grounds that it is a
+  utility rather than the payment gateway. It is challenged, and that is
+  correct: the cost of over-asking is one prompt, the cost of a false negative
+  is an outage. The test was corrected and the trade-off is now written down
+  rather than left implicit.
+
+The onboarding survey's risk areas can be fed into the gate via the optional
+`surveyed` set, but that is deliberately **not** wired into the loop:
+`analyzeRepo` shells out to git twice, and paying that on every write would be
+a performance regression to buy a marginal signal.
 
 ## What the engagement budget actually shipped
 

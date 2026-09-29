@@ -229,6 +229,46 @@ describe('parity scenarios (mock provider)', () => {
     assert.match(String(judge.messages[0].content), /VERIFICATION: none/);
   });
 
+  it('blast_radius: a risky write is challenged once, then allowed on retry', async () => {
+    const { createStream, calls } = mockProvider((c) => {
+      if (c.index === 0) return [tool('writeFile', { path: 'db/migrate/0042_add_index.sql', content: 'CREATE INDEX' })];
+      if (c.index === 1) {
+        // Read the block, state the justification, and repeat the call in the
+        // same response — a text-only turn here would just be a final answer.
+        return [
+          text('Justification: db/schema.sql:12 lacks the index.\nRollback: DROP INDEX idx_0042.'),
+          tool('writeFile', { path: 'db/migrate/0042_add_index.sql', content: 'CREATE INDEX' }),
+        ];
+      }
+      return [text('Index added.')];
+    });
+    const ev = await run({ history: user('add the index'), mode: 'BUILD', createStream });
+    // The block is delivered as a tool result the model can read and answer,
+    // not as a user turn — so search every message, not just role:user.
+    const sawRequirement = calls.some((c) => c.messages.some((m) => JSON.stringify(m.content || '').includes('JUSTIFICATION')));
+    assert.ok(sawRequirement, 'the agent must see the justification requirement');
+    const results = ev.filter((e) => e.event === 'tool_result');
+    assert.match(JSON.stringify(results[0].data), /JUSTIFICATION/, 'first write is challenged');
+    assert.doesNotMatch(JSON.stringify(results.at(-1).data), /JUSTIFICATION/, 'the retry lands');
+    assert.equal(ev.filter((e) => e.event === 'finish')[0].data.doomLoop, undefined, 'the turn completes normally');
+  });
+
+  it('blast_radius: an ordinary write is never challenged', async () => {
+    const { createStream, calls } = mockProvider((c) =>
+      (c.index === 0 ? [tool('writeFile', { path: 'src/agent/new.js', content: 'x' })] : [text('done')]));
+    await run({ history: user('add a module'), mode: 'BUILD', createStream });
+    assert.ok(!calls.some((c) => c.messages.some((m) => JSON.stringify(m.content || '').includes('JUSTIFICATION'))));
+  });
+
+  it('blast_radius: the builtin secret guard still wins over the gate', async () => {
+    const { createStream } = mockProvider((c) =>
+      (c.index === 0 ? [tool('writeFile', { path: '.env', content: 'SECRET=1' })] : [text('blocked')]));
+    const ev = await run({ history: user('write env'), mode: 'BUILD', createStream });
+    const res = ev.filter((e) => e.event === 'tool_result');
+    assert.ok(res.length, 'the write must return a result');
+    assert.doesNotMatch(JSON.stringify(res[0].data), /JUSTIFICATION/, 'secrets are refused outright, not asked about');
+  });
+
   it('engagement_budget: an exhausted engagement stops the turn and says why', async () => {
     const { writeBudget, recordSpend } = await import('../src/agent/budget.js');
     writeBudget({ budgetUsd: 1, startedAt: new Date(Date.now() - 1000).toISOString() }, dir);

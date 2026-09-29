@@ -10,7 +10,7 @@
  *                  and a rotating tip line (MiniMax shell/tips.ts).
  */
 import React, { useEffect, useState } from "react";
-import { Box, Text } from "ink";
+import { Box, Text, useStdout } from "ink";
 import os from "node:os";
 import { execFileSync } from "node:child_process";
 import { useTheme } from "../../providers/theme/index.js";
@@ -122,6 +122,14 @@ export function directoryLabel(cwd = process.cwd(), home = os.homedir()): string
   return dir;
 }
 
+/** "~/a/very/long/path" → "~/a/ve…/path" within `max` columns. */
+export function middleEllipsis(s: string, max: number): string {
+  if (s.length <= max) return s;
+  const keep = max - 1;
+  const head = Math.ceil(keep * 0.35);
+  return `${s.slice(0, head)}…${s.slice(s.length - (keep - head))}`;
+}
+
 function useDirectoryLabel(): string {
   // Computed once, synchronously, so the very first frame has it.
   const [label] = useState(() => directoryLabel());
@@ -143,9 +151,13 @@ export function Footer({
 }) {
   const { colors } = useTheme();
   const dir = useDirectoryLabel();
+  const { stdout } = useStdout();
+  const columns = stdout?.columns || 100;
   return (
     <Box flexDirection="row" justifyContent="space-between" paddingLeft={1} paddingRight={1} flexShrink={0}>
-      <Text color={colors.textMuted} wrap="truncate-middle">{dir}</Text>
+      <Box flexGrow={1} flexShrink={1} minWidth={0} marginRight={2}>
+        <Text color={colors.textMuted}>{middleEllipsis(dir, Math.max(12, Math.floor(columns * 0.45)))}</Text>
+      </Box>
       <Box flexDirection="row" gap={2} flexShrink={0}>
         {teammates > 0 ? <Text color={colors.text}><Text color={colors.accent}>◆</Text>{` ${teammates} teammate${teammates > 1 ? "s" : ""}`}</Text> : null}
         {background > 0 ? <Text color={colors.text}><Text color={colors.warning}>&</Text>{` ${background} bg`}</Text> : null}

@@ -127,6 +127,37 @@ cannot be judged — an unmeasurable TARGET, or VERIFICATION never run. That
 verdict is terminal: retrying identical work cannot make an unjudgeable
 condition judgeable, so the turn ends and says which field is the problem.
 
+## Blast-radius gate
+
+A forward-deployed engineer does not decide a change is safe because the tool
+said yes. On a path they do not own, they state the file and line that justifies
+the change and name the rollback before touching anything. Sentinel now does
+that automatically for the paths where being wrong is expensive:
+
+| Challenged | Why |
+| ---------- | --- |
+| `db/migrate/**`, `*.sql` | a migration is rarely undone by reverting it |
+| `.github/workflows/**` | this gates every merge |
+| `prisma/schema.*`, `*schema.json` | changing a schema changes everything under it |
+| `package-lock.json`, `yarn.lock`, … | a lockfile edit is invisible in review |
+| `src/auth/**`, `src/billing/**`, `**/rbac*` | the code you cannot roll back |
+| `Dockerfile`, `docker-compose*`, `Makefile` | build and deploy definitions |
+| `infra/`, `terraform/`, `k8s/` | infrastructure definition |
+| `.sentinel/config.yaml` | the project's own permission config |
+
+The gate **blocks once per path per turn**. The first write is refused with the
+requirement spelled out — the file:line that justifies it, and the exact
+rollback — and the agent's next move must include both before the write lands.
+After that the path is open for the rest of the turn.
+
+That is deliberate, and it matches the Stop hook's forced-verification pattern.
+A gate that blocks forever trains people to disable it; a gate that asks once
+and records the answer is a habit.
+
+The trade is explicitly toward over-asking: `lib/auth-utils.js` gets challenged
+even though it is a utility, because the cost of a false positive is one prompt
+and the cost of missing real billing code is not recoverable.
+
 ## `sentinel budget` — spend that outlives the process
 
 `maxCostUsd` guards a single turn and `cost.js` totals are in-memory, so neither

@@ -27,6 +27,7 @@ import { evaluateGoal, GOAL_MAX_CHECKS, GOAL_WORKER_RULE } from './goal.js';
 import { workerBrief, contractBrief } from './outcome.js';
 import { riskLevel, explainRisk, recordApproval } from './risk-ledger.js';
 import { budgetStatus, recordSpend } from './budget.js';
+import { checkBlastRadius, createGateState } from './blast-radius.js';
 import { ReceiptLedger, checkClaims, claimGateMessage } from './receipts.js';
 
 const MAX_ITERATIONS = 25;
@@ -405,6 +406,9 @@ export async function* runAgentTurnInner(opts = {}) {
   let ranTests = false;
   let stopRetries = 0;
   let goalChecks = 0;
+  // Blast-radius gate state is per-turn: a path challenged on Monday is not
+  // challenged again on Tuesday, but a new turn re-asks.
+  const gateState = createGateState();
   const callCounts = new Map(); // tool+input signature -> times called this turn
   const ledger = new ReceiptLedger(); // hashed tool evidence for claim checks
   let claimChecked = false;
@@ -649,6 +653,7 @@ export async function* runAgentTurnInner(opts = {}) {
       },
       subagentState: { disabled: subagentDepth >= 1 },
       editCounts,
+      gateState,
     });
 
     const batches = batchToolCalls(toolCalls);
@@ -792,7 +797,7 @@ export function loopHint(editCounts) {
  * Execute one tool call: hooks → permission → subagent-or-local → audit.
  * Extracted so batching shares one path. Returns { output, stopBlocked }.
  */
-async function executeOneTool({ tc, mode, opts, subagentState, editCounts }) {
+async function executeOneTool({ tc, mode, opts, subagentState, editCounts, gateState }) {
   const { onPermissionRequest, allowAll, createStream, model, subagentDepth = 0, agentName, workdir, headless } = opts;
 
   if (!isToolAllowedInMode(tc.name, mode)) {
@@ -804,6 +809,15 @@ async function executeOneTool({ tc, mode, opts, subagentState, editCounts }) {
   if (builtin?.block) return { output: { error: builtin.reason } };
   const hookBlock = await runHooks('preToolUse', { toolName: tc.name, input: tc.input, mode }).catch(() => null);
   if (hookBlock?.block) return { output: { error: hookBlock.reason || `Blocked by hook: ${tc.name}` } };
+
+  // Blast-radius gate: the first write to a migration, a CI workflow, a
+  // lockfile, auth code, and friends is refused once with the justification
+  // and rollback spelled out. Blocks per path per turn, so a legitimate
+  // multi-file change is challenged once rather than on every write.
+  if (gateState) {
+    const radius = checkBlastRadius({ toolName: tc.name, input: tc.input, state: gateState });
+    if (radius?.block) return { output: { error: radius.reason, blastRadius: true } };
+  }
 
   // claw-code bash validation: a session-wide "allow bash" never covers a
   // destructive command; those are re-asked every time.
