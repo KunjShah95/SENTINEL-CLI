@@ -135,7 +135,7 @@ customer can maintain. So `sentinel race "<task>" --check "<cmd>"` should end in
 a `verdict.md` that ranks candidates by *what passed and what the team can
 maintain*, not by raw success.
 
-## 7. Standing FDE — the persistent loop
+## 7. Standing FDE — the persistent loop — SHIPPED
 
 **FDE mechanic:** all of them, over time.
 
@@ -144,6 +144,10 @@ that reacts to PRs, issues, and failing checks, with a steering queue to accept
 interrupts. Right now FDE work is one-shot per session. This is the item that
 would make the FDE framing honest rather than metaphorical — and it is also the
 most expensive, which is why it belongs last.
+
+Shipped as `src/agent/watch.js` plus `sentinel watch` / `sentinel steer`. A
+foreground watcher, not a daemon: "no servers" is a promise the README makes
+and a background process would break it.
 
 ## 8. Engagement budget — SHIPPED
 
@@ -189,7 +193,7 @@ memory layer scoped to the *customer* rather than the cwd, and makes cross-repo
 | 4 | Handoff + replay | ~2 sessions | 1 | **shipped** — `src/agent/handoff.js`, `sentinel handoff` |
 | 8 | Engagement budget | ~1 session | — | **shipped** — `src/agent/budget.js`, `sentinel budget` |
 | 9 | Blast-radius gate | ~2 sessions | 3 | **shipped** — `src/agent/blast-radius.js` |
-| 7 | Standing FDE loop | multi-week | 1, 2, 9 | planned |
+| 7 | Standing FDE loop | multi-week | 1, 2, 9 | **shipped** — `src/agent/watch.js`, `sentinel watch` |
 | 10 | Multi-repo workspace | multi-week | 1 | planned |
 
 ## What handoff actually shipped
@@ -217,13 +221,42 @@ Verified end to end by recording a real turn through `withTrajectory` and
 generating a runbook from it: it correctly reported that *nothing* was verified
 and flagged the run's "All tests pass" claim as unsupported.
 
-**Next: #7, the standing FDE loop**, or **#10, multi-repo**. Both are
-multi-week and both are honest answers to "what is a forward-deployed engineer,
-as opposed to a person running a few commands." #7 is the more valuable of the
-two: today FDE work is one-shot per session, and the roadmap's deferred items
-(#15 cron, #16 steering queue) are exactly the pieces that would make it a
-standing presence rather than a good one-shot. #10 assumes the customer runs
-several services, which is the less common case.
+**Next: #10, multi-repo.** An FDE usually works across a customer's services,
+not one directory: `sentinel fde <workspace>` reading a
+`.sentinel/workspace.json` manifest, one memory layer scoped to the *customer*
+rather than the cwd, and cross-repo `grep` as a first-class tool. It is last
+because it needs `onboard` to be useful first, and `onboard` now exists.
+
+## What the standing FDE actually shipped
+
+`src/agent/watch.js` is a foreground watcher. Triggers are pure predicates over
+injected facts (`checkTriggers`), backoff is `nextDelay`, and the steering queue
+is a file rather than the in-process mailbox — which is what makes
+`sentinel steer` work from another terminal, and is roadmap item #16.
+
+The design decision that mattered most: **a foreground watcher, not a daemon.**
+"no servers, no telemetry" is a promise this project makes in its README, and a
+background process that survives your terminal closing would break it. The
+engagement budget then becomes the natural ceiling: it is checked before every
+single wakeup, because an unattended loop that ignores its budget is just a way
+to spend money quietly.
+
+Two bugs found while testing, both real:
+
+- **The idle path could hot-spin.** `sleep(Math.min(baseDelayMs, 30_000))` with
+  a small base delay is a 1 ms busy loop, so a watcher whose only trigger had
+  already fired once burned CPU forever. Floored at 1 s.
+- **"Once" plus `maxTicks > 1` never terminates.** A `once` trigger fires one
+  time, so every later iteration found no trigger and idled. That is correct
+  behavior, but it made the obvious test (`once` + `maxTicks: 3`) hang rather
+  than fail, which is a bad way to learn a design constraint. Tests now use a
+  re-firing trigger.
+
+One test asserted that an idle watcher would make no model call at all, on the
+assumption it waits first. The code fires one tick on start, which is the
+better behavior — a watcher that idles an hour before doing anything is not
+useful — so the test was corrected to assert the real contract: one tick on
+start, then silence until a trigger fires.
 
 ## What the blast-radius gate actually shipped
 

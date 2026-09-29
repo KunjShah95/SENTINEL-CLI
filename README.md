@@ -127,6 +127,46 @@ cannot be judged — an unmeasurable TARGET, or VERIFICATION never run. That
 verdict is terminal: retrying identical work cannot make an unjudgeable
 condition judgeable, so the turn ends and says which field is the problem.
 
+## `sentinel watch` — the standing FDE
+
+Everything else here runs once and ends. An FDE is there on Tuesday when the
+thing they shipped on Monday starts failing. `watch` is that difference:
+
+```bash
+sentinel watch "keep the sync green" \
+  -t "command:npm test" -t git --goal "npm test exits 0"
+
+# from another terminal, mid-run:
+sentinel steer "also check the retry path"
+```
+
+| Trigger | Fires when |
+| ------- | ---------- |
+| `command:<cmd>` | the command exits **non-zero** — you are woken by breakage, not by green |
+| `command:<cmd> --when always` | regardless of exit code |
+| `file:<path>` | its mtime moves |
+| `git` | HEAD moves |
+| `interval:<ms>` | time passes |
+| `once` | immediately, then never |
+
+**Steering** is the part that makes this a presence rather than a cron job. The
+queue is a file (`.sentinel/steer.jsonl`), so `sentinel steer` works from
+another terminal, in another process, and the instruction lands on the *next*
+tick as a priority over the original task. That is roadmap item #16.
+
+Three guards make an unattended loop safe to leave running:
+
+- **The engagement budget is checked before every single wakeup.** A standing
+  loop that ignores its ceiling is just a way to spend money quietly.
+- **Backoff.** A tick that does not make progress doubles its wait, up to 15
+  minutes, and five in a row stops the loop. "Progress" is deliberately weak:
+  the goal was met, or the agent said it wrote something. A tick that only
+  read files has not moved the engagement.
+- **Failures are recorded, not fatal.** A provider that throws ends that tick,
+  not the watch.
+
+State lives in `.sentinel/watch-state.json` (ticks, backoff, last trigger).
+
 ## Blast-radius gate
 
 A forward-deployed engineer does not decide a change is safe because the tool
