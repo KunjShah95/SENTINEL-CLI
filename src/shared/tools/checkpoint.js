@@ -33,6 +33,12 @@ function getRedoRoot() {
 export function sanitizeManifestRelative(rel) {
   if (typeof rel !== 'string' || rel.length === 0) return null;
   if (path.isAbsolute(rel)) return null;
+  // Drive-letter, UNC and backslash-rooted paths on EVERY OS: on Linux
+  // path.isAbsolute('C:\\Windows\\x') is false, so a manifest written on
+  // (or crafted for) Windows slipped through. Also treat "\" as a separator
+  // so "..\\evil" cannot hide a traversal from POSIX normalize().
+  if (/^[a-zA-Z]:/.test(rel) || /^[\\/]/.test(rel)) return null;
+  if (rel.split(/[\\/]/).includes('..')) return null;
   const normalized = path.normalize(rel);
   if (normalized.startsWith('..') || path.isAbsolute(normalized)) return null;
   if (normalized.split(path.sep).includes('..')) return null;
