@@ -1,7 +1,14 @@
 import type { Metadata } from "next";
 import { CodeBlock, Callout } from "@/components/CodeBlock";
+import { pageMeta } from "@/lib/seo";
 
-export const metadata: Metadata = { title: "Harness" };
+export const metadata: Metadata = pageMeta({
+  title: "Harness",
+  description:
+    "The Sentinel harness: reusable skills, a persistent todo list, bounded subagents, lifecycle hooks, and context compaction that keeps long sessions inside budget.",
+  path: "/docs/harness",
+  keywords: ["agent harness", "ai agent skills", "subagent orchestration"],
+});
 
 const items: { name: string; body: React.ReactNode }[] = [
   {

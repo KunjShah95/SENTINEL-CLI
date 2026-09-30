@@ -216,11 +216,22 @@ async function discoverGoogle() {
     }));
 }
 
+/**
+ * Embedding models (bge, nomic-embed, *-embedding) are installed alongside
+ * chat models but cannot hold a conversation; picking one fails the turn.
+ * The family alone is not enough: qwen3-embedding reports family "qwen3".
+ */
+export function isEmbeddingOnlyModel(m) {
+  const family = String(m?.details?.family || '');
+  if (/bert$/i.test(family)) return true;
+  return /embed|(^|[/:-])bge-|minilm/i.test(String(m?.name || ''));
+}
+
 async function discoverOllama() {
   const host = process.env.OLLAMA_HOST || 'http://localhost:11434';
   const data = await fetchJson(`${host}/api/tags`);
   if (!data?.models) return [];
-  return data.models.map((m) => ({
+  return data.models.filter((m) => !isEmbeddingOnlyModel(m)).map((m) => ({
     id: `ollama/${m.name}`,
     provider: 'ollama',
     label: `Ollama ${m.name}`,

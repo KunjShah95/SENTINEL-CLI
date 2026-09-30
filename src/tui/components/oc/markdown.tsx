@@ -1,7 +1,7 @@
 /**
  * Small streaming-safe Markdown renderer for Ink, colored with opencode's
- * markdown* theme tokens. Handles headings, lists, quotes, rules, fenced
- * code and inline `code` / **bold** / *emph* / [links](url). An unclosed
+ * markdown* theme tokens. Handles headings, lists, quotes, rules, tables,
+ * fenced code and inline `code` / **bold** / *emph* / [links](url). An unclosed
  * fence (mid-stream) renders as code until it closes.
  */
 import React from "react";
@@ -50,7 +50,28 @@ export type MdBlock =
   | { type: "quote"; text: string }
   | { type: "hr" }
   | { type: "code"; lang: string; lines: string[] }
+  | { type: "table"; header: string[]; rows: string[][] }
   | { type: "blank" };
+
+/** Split a `| a | b |` row into cells. Pipes inside `code` spans or escaped as `\|` stay in the cell. */
+export function splitRow(line: string): string[] {
+  const body = line.trim().replace(/^\|/, "").replace(/\|$/, "");
+  const cells: string[] = [];
+  let cur = "";
+  let inCode = false;
+  for (let i = 0; i < body.length; i++) {
+    const ch = body[i];
+    if (ch === "\\" && body[i + 1] === "|") { cur += "|"; i++; continue; }
+    if (ch === "`") inCode = !inCode;
+    if (ch === "|" && !inCode) { cells.push(cur.trim()); cur = ""; continue; }
+    cur += ch;
+  }
+  cells.push(cur.trim());
+  return cells;
+}
+
+const TABLE_ROW = /^\s*\|.*\|\s*$/;
+const TABLE_SEP = /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/;
 
 export function parseMarkdown(src: string): MdBlock[] {
   const blocks: MdBlock[] = [];
@@ -68,6 +89,16 @@ export function parseMarkdown(src: string): MdBlock[] {
       continue;
     }
     if (!line.trim()) { blocks.push({ type: "blank" }); continue; }
+    // A table needs its separator row; a lone header (still streaming) stays a paragraph.
+    if (TABLE_ROW.test(line) && i + 1 < lines.length && TABLE_SEP.test(lines[i + 1])) {
+      const header = splitRow(line);
+      const rows: string[][] = [];
+      i += 2;
+      while (i < lines.length && TABLE_ROW.test(lines[i])) rows.push(splitRow(lines[i++]));
+      i--;
+      blocks.push({ type: "table", header, rows });
+      continue;
+    }
     const h = /^(#{1,6})\s+(.*)$/.exec(line);
     if (h) { blocks.push({ type: "h", level: h[1].length, text: h[2] }); continue; }
     if (/^\s*([-*_])(\s*\1){2,}\s*$/.test(line)) { blocks.push({ type: "hr" }); continue; }
@@ -105,6 +136,7 @@ export function Markdown({ text }: { text: string }) {
               <Inline text={b.text} colors={colors} />
             </Box>
           );
+        case "table": return <Table key={i} header={b.header} rows={b.rows} colors={colors} />;
         case "code":
           return (
             <Box key={i} flexDirection="column" paddingLeft={2} paddingY={0} backgroundColor={colors.backgroundPanel}>
@@ -115,6 +147,41 @@ export function Markdown({ text }: { text: string }) {
         default: return <Inline key={i} text={b.text} colors={colors} />;
         }
       })}
+    </Box>
+  );
+}
+
+/** Display width of a cell once inline markers (`, **, *, link syntax) are stripped. */
+function cellWidth(text: string): number {
+  return parseInline(text).reduce((n, sp) => n + sp.text.length, 0);
+}
+
+function Table({ header, rows, colors }: { header: string[]; rows: string[][]; colors: ThemeColors }) {
+  const cols = header.length;
+  // Every column but the last is sized to its widest cell; the last one wraps.
+  const widths = header.map((h, c) =>
+    Math.min(40, Math.max(cellWidth(h), ...rows.map((r) => cellWidth(r[c] ?? "")))) + 2);
+  const row = (cells: string[], key: string, isHeader = false) => (
+    <Box key={key} flexDirection="row">
+      {Array.from({ length: cols }, (_, c) => {
+        const last = c === cols - 1;
+        const text = cells[c] ?? "";
+        return (
+          <Box key={c} width={last ? undefined : widths[c]} flexGrow={last ? 1 : 0} flexShrink={last ? 1 : 0}>
+            {isHeader
+              ? <Text bold color={colors.markdownHeading}>{text}</Text>
+              : <Inline text={text} colors={colors} base={c === 0 ? colors.text : colors.textMuted} />}
+          </Box>
+        );
+      })}
+    </Box>
+  );
+  const ruleWidth = widths.slice(0, -1).reduce((a, b) => a + b, 0) + widths[cols - 1];
+  return (
+    <Box flexDirection="column">
+      {row(header, "h", true)}
+      <Text color={colors.border}>{"─".repeat(Math.min(ruleWidth, 100))}</Text>
+      {rows.map((r, j) => row(r, String(j)))}
     </Box>
   );
 }

@@ -15,7 +15,7 @@ import { buildSystemPrompt } from './prompt.js';
 import { streamCompletion } from './providers.js';
 import { recordUsage, estimateTokensFromText } from './cost.js';
 import { withTrajectory, newRunId } from './trajectory.js';
-import { builtinPreToolUseGuard, runHooks, auditToolUse, checkStop, STOP_RETRIES } from './hooks.js';
+import { builtinPreToolUseGuard, runHooks, auditToolUse, checkStop, projectHasTests, STOP_RETRIES } from './hooks.js';
 import { isReadOnlyTool, isToolAllowedInMode } from '../shared/schemas/mode.js';
 import { SWE_MAX_ITERATIONS } from './swe.js';
 import { runInWorkdir, getWorkdir } from '../shared/tools/workdir.js';
@@ -545,7 +545,7 @@ export async function* runAgentTurnInner(opts = {}) {
     // ── No tool calls: final answer (Stop hooks may force more work) ───
     if (toolCalls.length === 0) {
       const block = stopRetries < STOP_RETRIES
-        ? checkStop({ wroteFiles, ranTests, mode })
+        ? checkStop({ wroteFiles, ranTests, mode, hasTests: !wroteFiles || ranTests || projectHasTests(workdir) })
         : null;
       if (block) {
         stopRetries++;
@@ -825,6 +825,13 @@ async function executeOneTool({ tc, mode, opts, subagentState, editCounts, gateS
   if (gateState) {
     const radius = checkBlastRadius({ toolName: tc.name, input: tc.input, state: gateState });
     if (radius?.block) return { output: { error: radius.reason, blastRadius: true } };
+  }
+
+  // A solo lead messaging "lead" is a no-op small models reach for instead of
+  // answering. Refuse it before the permission prompt so the user is never
+  // asked to approve a call that cannot succeed.
+  if (tc.name === 'sendMessage' && String(tc.input?.to || 'lead') === agentName) {
+    return { output: { error: `You are ${agentName}; there is no one to message. Reply to the user directly in your answer.` } };
   }
 
   // claw-code bash validation: a session-wide "allow bash" never covers a

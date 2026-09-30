@@ -91,6 +91,32 @@ function headersFor(provider, apiKey) {
   };
 }
 
+const HTTP_HINTS = {
+  401: 'Check the API key for this provider: run /setup.',
+  403: 'The key is valid but not allowed to use this model: run /setup or pick another with /model.',
+  402: 'The provider refused on billing or quota. Pick another model with /model (local Ollama models are free) or add credits.',
+  404: 'This model id is not served by the provider. /models lists what is available.',
+  429: 'Rate limited. Wait a moment, or switch with /model.',
+};
+
+/**
+ * Turn a failed provider response into one readable line plus a next step.
+ * Most providers wrap the reason as `{"error":{"message":...}}`; show just that.
+ */
+export function formatProviderError(status, detail, statusText) {
+  let reason = (detail || '').trim();
+  try {
+    const j = JSON.parse(reason);
+    const msg = j?.error?.message ?? j?.message ?? (typeof j?.error === 'string' ? j.error : null);
+    if (msg) reason = String(msg);
+  } catch {
+    /* not JSON: keep the raw text */
+  }
+  const hint = HTTP_HINTS[status];
+  return `Provider HTTP ${status}: ${reason || statusText}${hint ? `
+→ ${hint}` : ''}`;
+}
+
 /** Read an SSE response body, yielding parsed `{ type:'frame', json }` events. */
 async function* sse(res) {
   if (!res.ok || !res.body) {
@@ -100,7 +126,7 @@ async function* sse(res) {
     } catch {
       /* ignore */
     }
-    yield { type: 'error', message: `Provider HTTP ${res.status}: ${detail || res.statusText}` };
+    yield { type: 'error', message: formatProviderError(res.status, detail, res.statusText) };
     return;
   }
   const reader = res.body.getReader();
@@ -481,6 +507,36 @@ export async function* streamCompletion(opts) {
     yield* streamOpenAICompat({ provider, model: bareModelId, messages: msgs, tools, apiKey, signal });
   } catch (e) {
     if (e?.name === 'AbortError') return;
-    yield { type: 'error', message: e?.message || String(e) };
+    yield { type: 'error', message: isNetworkError(e) ? formatNetworkError(provider, e) : e?.message || String(e) };
   }
+}
+
+/** undici reports an unreachable host as `TypeError: fetch failed` with the socket error as `cause`. */
+function isNetworkError(e) {
+  return e?.name === 'TypeError' && (e.message === 'fetch failed' || !!e.cause?.code);
+}
+
+function providerHost(provider) {
+  if (provider === 'anthropic') return 'api.anthropic.com';
+  if (provider === 'google') return 'generativelanguage.googleapis.com';
+  try {
+    return new URL(OPENAI_COMPAT[provider]()).host;
+  } catch {
+    return provider;
+  }
+}
+
+/**
+ * A bare "fetch failed" says nothing. Name the host and the next step. Only
+ * the host is shown, never the URL: Gemini puts the API key in the query.
+ */
+export function formatNetworkError(provider, e) {
+  const code = e?.cause?.code ? ` (${e.cause.code})` : '';
+  const hint = provider === 'ollama'
+    ? 'Is Ollama running? Start it with `ollama serve`, or pick another model with /model.'
+    : provider === 'lmstudio'
+      ? 'Is the LM Studio server running? Start it from the Developer tab, or pick another model with /model.'
+      : 'Check your network connection, VPN or proxy, then try again.';
+  return `Could not reach ${provider} at ${providerHost(provider)}${code}.
+→ ${hint}`;
 }

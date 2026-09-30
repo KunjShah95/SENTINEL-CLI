@@ -1,4 +1,12 @@
+import path from 'node:path';
 import type { CommandContext } from './types.js';
+
+/** `.sentinel/exports/session-<id8>-<kind>-<ts>.md`, with native separators. */
+function exportFilePath(kind: 'export' | 'share', sessionId?: string | null) {
+  const dir = path.join(process.cwd(), '.sentinel', 'exports');
+  const id = sessionId ? `-${String(sessionId).slice(0, 8)}` : '';
+  return { dir, file: path.join(dir, `session${id}-${kind}-${Date.now()}.md`) };
+}
 
 export async function handleUndo(ctx: CommandContext) {
   const { toast, appendMessage, mode, model } = ctx;
@@ -36,10 +44,9 @@ export async function handleExport(ctx: CommandContext) {
       const toolCalls = msg.parts.filter(p => p.type === 'tool-call');
       for (const tc of toolCalls) { lines.push(`> _Tool: ${(tc as any).toolName}_`); }
     }
-    const exportDir = process.cwd() + '/.sentinel/exports';
+    const { dir: exportDir, file: exportPath } = exportFilePath('export', sessionId);
     const fs = await import('fs');
     fs.mkdirSync(exportDir, { recursive: true });
-    const exportPath = `${exportDir}/session-${sessionId || 'unknown'}-export-${Date.now()}.md`;
     fs.writeFileSync(exportPath, lines.join('\n'), 'utf-8');
     toast.success(`Session exported to ${exportPath}`);
     appendMessage({ role: 'assistant', mode, model, parts: [{ type: 'text', text: `✅ Session exported to \`${exportPath}\`` }] });
@@ -61,10 +68,9 @@ export async function handleShare(ctx: CommandContext) {
         lines.push(`### ${role}`, '', text, '');
       }
     }
-    const exportDir = process.cwd() + '/.sentinel/exports';
+    const { dir: exportDir, file: exportPath } = exportFilePath('share', sid);
     const fs = await import('fs');
     fs.mkdirSync(exportDir, { recursive: true });
-    const exportPath = `${exportDir}/session-${sid || 'unknown'}-share-${Date.now()}.md`;
     fs.writeFileSync(exportPath, lines.join('\n'), 'utf-8');
     toast.success(`Session exported to ${exportPath}`);
     appendMessage({ role: 'assistant', mode, model, parts: [{ type: 'text', text: `📋 Session exported to \`${exportPath}\`` }] });

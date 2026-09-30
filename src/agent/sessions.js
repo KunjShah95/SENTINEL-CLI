@@ -24,7 +24,11 @@ function fileFor(id) {
 
 async function readSession(id) {
   try {
-    return JSON.parse(await fs.readFile(fileFor(id), 'utf8'));
+    const s = JSON.parse(await fs.readFile(fileFor(id), 'utf8'));
+    // Only a real session object counts. A stray file from an older build
+    // (e.g. a bare message array) has no id and crashed the session panel.
+    if (!s || typeof s !== 'object' || Array.isArray(s) || typeof s.id !== 'string') return null;
+    return s;
   } catch {
     return null;
   }
@@ -46,7 +50,7 @@ export const sessions = {
         if (s) {
           out.push({
             id: s.id,
-            title: s.title,
+            title: typeof s.title === 'string' && s.title.trim() ? s.title : 'Untitled',
             createdAt: s.createdAt,
             mode: s.mode,
             model: s.model,

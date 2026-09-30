@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { CodeBlock } from "@/components/CodeBlock";
+import { JsonLd } from "@/components/JsonLd";
 import { DocsRow, Eyebrow, FdeRow, LoopDiagram, Principle, SectionHeading } from "@/components/Landing";
 import { ModeSwitcher } from "@/components/ModeSwitcher";
 import { TerminalReplay } from "@/components/TerminalReplay";
+import { organization } from "@/lib/seo";
 import { site } from "@/lib/site";
 
 const PROVIDERS = [
@@ -31,6 +33,45 @@ const STATS = [
 export default function Home() {
   return (
     <main id="main-content">
+      <JsonLd
+        data={[
+          {
+            "@context": "https://schema.org",
+            "@type": "WebSite",
+            name: site.name,
+            url: site.url,
+            inLanguage: "en",
+            description: organization.description,
+          },
+          { "@context": "https://schema.org", "@type": "Organization", ...organization },
+          {
+            "@context": "https://schema.org",
+            "@type": "SoftwareApplication",
+            name: site.name,
+            applicationCategory: "DeveloperApplication",
+            operatingSystem: "macOS, Linux, Windows",
+            softwareVersion: site.version,
+            description: organization.description,
+            url: site.url,
+            codeRepository: site.repo,
+            downloadUrl: site.repo,
+            license: "https://opensource.org/licenses/MIT",
+            isAccessibleForFree: true,
+            author: { "@type": "Person", name: site.author },
+            offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+            featureList: [
+              "12 LLM providers through one streaming client",
+              "19 sandboxed local tools with per-mode allowlists",
+              "Sessions stored as plain JSON on disk",
+              "MCP stdio server for Claude Desktop, Cursor and any MCP client",
+              "Per-turn token and USD receipts",
+              "Per-project cost budgets with a deadline",
+              "Blast-radius gate on migrations, CI workflows, lockfiles, auth and infra",
+              "Checkpoints with undo and redo across turns",
+            ],
+          },
+        ]}
+      />
       {/* Hero */}
       <section aria-labelledby="hero-title" className="relative overflow-hidden">
         <div aria-hidden="true" className="bg-grid pointer-events-none absolute inset-0" />
@@ -242,6 +283,45 @@ export default function Home() {
               }
             />
           </ul>
+        </div>
+      </section>
+
+      {/* Launch film */}
+      <section aria-labelledby="film-title" className="border-t border-ink-800 bg-ink-900/30">
+        <div className="mx-auto grid max-w-6xl gap-12 px-4 py-24 sm:px-6 lg:grid-cols-[minmax(0,4fr)_minmax(0,8fr)] lg:gap-16">
+          <div>
+            <SectionHeading id="film-title" eyebrow="Watch" title="It shows its work.">
+              The agent refuses a risky write, then answers with the line it read and the
+              command that undoes it. A real session, shot as it ran.
+            </SectionHeading>
+            <p className="mt-6 max-w-[60ch] text-[15px] leading-7 text-muted">
+              Sixty-nine seconds, no narration over the footage. The terminal output is
+              Sentinel&apos;s own, at its real speed.
+            </p>
+          </div>
+          <figure>
+            <div className="overflow-hidden rounded-lg border border-ink-800 bg-ink-950">
+              {/* eslint-disable-next-line jsx-a11y/media-has-caption -- a captions track is
+                  tracked separately; see the note in the PR body. */}
+              <video
+                className="aspect-video w-full"
+                src="/video/sentinel-launch.mp4"
+                controls
+                preload="metadata"
+                playsInline
+                aria-label="Sentinel launch film: the blast-radius gate refusing a risky write, then the agent citing the file and line and the rollback"
+              >
+                Your browser cannot play this video. The film is also available at{" "}
+                <a className="text-moss underline underline-offset-4" href="/video/sentinel-launch.mp4">
+                  /video/sentinel-launch.mp4
+                </a>
+                .
+              </video>
+            </div>
+            <figcaption className="mt-4 font-mono text-xs text-muted">
+              sentinel launch film · 1920×1080 · 69s
+            </figcaption>
+          </figure>
         </div>
       </section>
 

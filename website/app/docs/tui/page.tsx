@@ -1,6 +1,13 @@
 import type { Metadata } from "next";
+import { pageMeta } from "@/lib/seo";
 
-export const metadata: Metadata = { title: "TUI commands" };
+export const metadata: Metadata = pageMeta({
+  title: "TUI commands",
+  description:
+    "Every Sentinel slash command — model, session, diff, undo, redo, export, compact — plus shell passthrough with ! and agent personas with @agent.",
+  path: "/docs/tui",
+  keywords: ["terminal ui commands", "cli slash commands", "sentinel tui"],
+});
 
 const commands: { cmd: string; body: string }[] = [
   { cmd: "/help", body: "Show all commands." },

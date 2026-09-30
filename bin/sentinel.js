@@ -83,14 +83,16 @@ export async function launchTui() {
     process.exit(1);
   }
 
-  // Run in the USER's directory: every tool resolves paths against cwd.
-  // (This used to be `cwd: root`, which pointed the TUI's file and shell
-  // tools at Sentinel's own install directory instead of the project.)
+  // tsx starts from Sentinel's own directory: its preloaded loader is
+  // resolved against the cwd, and Node aborts on a malformed package.json
+  // there. The TUI still runs in the USER's directory, because every tool
+  // resolves paths against cwd: src/tui/enter-workdir.ts switches to
+  // SENTINEL_CWD before anything else loads.
   // Pin tsx to Sentinel's tsconfig so the project's tsconfig never applies.
   const child = spawn(process.execPath, [tsxEntry, '--tsconfig', resolve(root, 'src/tui/tsconfig.json'), tuiEntry], {
     stdio: 'inherit',
-    cwd: process.cwd(),
-    env: { ...process.env, SENTINEL_ROOT: root },
+    cwd: root,
+    env: { ...process.env, SENTINEL_ROOT: root, SENTINEL_CWD: process.cwd() },
   });
   child.on('exit', (code) => process.exit(code ?? 1));
 }

@@ -1,3 +1,4 @@
+import './enter-workdir.js';
 import React from 'react';
 import { render } from 'ink';
 import { Session } from './screens/session.js';

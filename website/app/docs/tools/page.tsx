@@ -1,7 +1,15 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Callout } from "@/components/CodeBlock";
+import { pageMeta } from "@/lib/seo";
 
-export const metadata: Metadata = { title: "Tools" };
+export const metadata: Metadata = pageMeta({
+  title: "Tools",
+  description:
+    "All 19 Sentinel tools, every one sandboxed to the project root: read, write, edit, batchEdit, grep, codeMap, bash, runTests, diffFile, undo and redo, with hard output caps.",
+  path: "/docs/tools",
+  keywords: ["ai agent tools", "sandboxed file tools", "agent tool allowlist"],
+});
 
 const readOnly: { name: string; body: string }[] = [
   { name: "readFile", body: "Read a file. Path must stay inside the project root." },
@@ -59,6 +67,16 @@ export default function Tools() {
       <div className="pt-2">
         <Callout title="Guards">
           Dangerous commands (<code className="font-mono text-[13px]">rm -rf /</code>, fork bombs, shutdown) and secret files (<code className="font-mono text-[13px]">.env</code>, <code className="font-mono text-[13px]">*.pem</code>) are refused before they execute — in every mode.
+        </Callout>
+      </div>
+      <div className="pt-2">
+        <Callout title="Blast-radius gate">
+          The first write to a migration, CI workflow, lockfile, schema, auth, billing or infra
+          path is refused once per turn, and opens only with a justifying{" "}
+          <code className="font-mono text-[13px]">file:line</code> and an exact rollback.{" "}
+          <Link href="/blog/ai-coding-agent-guardrails" className="text-moss underline-offset-4 hover:underline">
+            Why it is designed this way →
+          </Link>
         </Callout>
       </div>
     </>

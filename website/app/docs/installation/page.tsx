@@ -1,7 +1,14 @@
 import type { Metadata } from "next";
 import { CodeBlock, Callout } from "@/components/CodeBlock";
+import { pageMeta } from "@/lib/seo";
 
-export const metadata: Metadata = { title: "Installation" };
+export const metadata: Metadata = pageMeta({
+  title: "Installation",
+  description:
+    "Install Sentinel in four commands on Node 20+, add a provider key (or run Ollama and skip it entirely), and verify the install with your first one-shot ask.",
+  path: "/docs/installation",
+  keywords: ["install ai coding agent", "cli agent setup", "sentinel install"],
+});
 
 export default function Installation() {
   return (

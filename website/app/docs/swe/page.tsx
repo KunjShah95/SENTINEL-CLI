@@ -1,8 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CodeBlock, Callout } from "@/components/CodeBlock";
+import { pageMeta } from "@/lib/seo";
 
-export const metadata: Metadata = { title: "SWE workflow" };
+export const metadata: Metadata = pageMeta({
+  title: "SWE workflow",
+  description:
+    "The reproduce-first bug fixing loop: reproduce, localize, fix, verify, regress. With the offline capability bench and reproducible task evals for your own agent.",
+  path: "/docs/swe",
+  keywords: ["swe workflow", "reproduce first bug fixing", "evaluate coding agent"],
+});
 
 export default function Swe() {
   return (

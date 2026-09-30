@@ -1,5 +1,12 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
+
+export const metadata: Metadata = {
+  title: "Page not found",
+  description: "That page does not exist. Try the documentation overview or the blog index.",
+  robots: { index: false, follow: true },
+};
 
 export default function NotFound() {
   return (
@@ -21,6 +28,9 @@ export default function NotFound() {
         <div className="mt-8 flex flex-wrap items-center gap-2">
           <Link href="/docs" className="btn-primary">
             Docs overview <ArrowRight size={15} aria-hidden="true" />
+          </Link>
+          <Link href="/blog" className="btn-link">
+            Blog
           </Link>
           <Link href="/" className="btn-link">
             Home

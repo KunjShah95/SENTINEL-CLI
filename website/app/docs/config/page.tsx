@@ -1,7 +1,14 @@
 import type { Metadata } from "next";
 import { CodeBlock } from "@/components/CodeBlock";
+import { pageMeta } from "@/lib/seo";
 
-export const metadata: Metadata = { title: "Configuration" };
+export const metadata: Metadata = pageMeta({
+  title: "Configuration",
+  description:
+    "How Sentinel resolves configuration: environment variable, then ~/.sentinel.json, then the project file. Every provider key, local model host and path in one table.",
+  path: "/docs/config",
+  keywords: ["llm api key configuration", "multi provider config", "sentinel config"],
+});
 
 const rows: [string, string][] = [
   ["Groq (free tier)", "GROQ_API_KEY"],

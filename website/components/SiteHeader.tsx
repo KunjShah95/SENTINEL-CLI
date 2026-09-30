@@ -5,13 +5,9 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Menu, X } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { site } from "@/lib/site";
+import { mainNav, site } from "@/lib/site";
 
-const links = [
-  { href: "/docs", label: "Docs" },
-  { href: "/docs/installation", label: "Install" },
-  { href: "/docs/mcp", label: "MCP" },
-];
+const links = mainNav;
 
 export function SiteHeader() {
   const pathname = usePathname();

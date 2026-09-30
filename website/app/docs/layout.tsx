@@ -1,3 +1,4 @@
+import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { DocsSidebar } from "@/components/DocsSidebar";
 import { DocsPager } from "@/components/DocsPager";
 
@@ -15,14 +16,21 @@ export default function DocsLayout({
           </div>
         </aside>
         <div className="min-w-0">
-          <details className="mb-8 rounded-md border border-ink-800 bg-ink-900 lg:hidden">
-            <summary className="cursor-pointer px-4 py-3 font-mono text-sm text-muted">
-              Sections
-            </summary>
-            <div className="border-t border-ink-800 px-4 py-4">
-              <DocsSidebar />
-            </div>
-          </details>
+          <div className="lg:hidden">
+            <details className="mb-8 rounded-md border border-ink-800 bg-ink-900">
+              <summary className="cursor-pointer px-4 py-3 font-mono text-sm text-muted">
+                Sections
+              </summary>
+              <div className="border-t border-ink-800 px-4 py-4">
+                <DocsSidebar />
+              </div>
+            </details>
+          </div>
+          {/* Visible at every width: the trail is a navigation aid on mobile
+              and the JSON-LD source is rendered regardless of this wrapper. */}
+          <div className="mb-8">
+            <Breadcrumbs />
+          </div>
           <article className="prose-docs max-w-3xl space-y-5 text-[15px] leading-7 [&_h1]:text-4xl [&_h1]:sm:text-[2.6rem] [&_h1]:leading-[1.1]">
             {children}
           </article>

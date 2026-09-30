@@ -1,7 +1,14 @@
 import type { Metadata } from "next";
 import { CodeBlock } from "@/components/CodeBlock";
+import { pageMeta } from "@/lib/seo";
 
-export const metadata: Metadata = { title: "Development" };
+export const metadata: Metadata = pageMeta({
+  title: "Development",
+  description:
+    "Work on Sentinel: install, lint, typecheck, run the node:test and jest suites, and the release check that runs all three before a publish.",
+  path: "/docs/development",
+  keywords: ["contribute open source", "node cli project setup"],
+});
 
 export default function Development() {
   return (

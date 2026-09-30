@@ -23,3 +23,6 @@ tsconfig.tsbuildinfo
 # OS
 .DS_Store
 Thumbs.db
+
+# HyperFrames video projects (source, capture, snapshots and rendered MP4s)
+videos/

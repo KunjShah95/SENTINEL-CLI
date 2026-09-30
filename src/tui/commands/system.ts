@@ -7,6 +7,9 @@ export async function handleHealth(ctx: CommandContext) {
     const uptime = process.uptime();
     const heapMB = (mem.heapUsed / 1024 / 1024).toFixed(1);
     const rssMB = (mem.rss / 1024 / 1024).toFixed(1);
+    // Local daemons need no env var: they count when discovery found models.
+    const { SUPPORTED_CHAT_MODELS } = await import('../../shared/models/index.js');
+    const discovered = (p: string) => SUPPORTED_CHAT_MODELS.some((m: { provider: string }) => m.provider === p);
     const providerChecks: Array<[string, boolean]> = [
       ['Anthropic', !!process.env.ANTHROPIC_API_KEY],
       ['OpenAI', !!process.env.OPENAI_API_KEY],
@@ -19,8 +22,8 @@ export async function handleHealth(ctx: CommandContext) {
       ['Fireworks', !!process.env.FIREWORKS_API_KEY],
       ['Perplexity', !!process.env.PERPLEXITY_API_KEY],
       ['OpenRouter', !!process.env.OPENROUTER_API_KEY],
-      ['Ollama', !!process.env.OLLAMA_HOST],
-      ['LM Studio', !!process.env.LMSTUDIO_HOST],
+      ['Ollama', !!process.env.OLLAMA_HOST || discovered('ollama')],
+      ['LM Studio', !!process.env.LMSTUDIO_HOST || discovered('lmstudio')],
     ];
     const activeProviders = providerChecks.filter(([, ok]) => ok).map(([n]) => `${n} ✓`).join(' · ') || 'None configured';
     const healthText = [

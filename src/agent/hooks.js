@@ -8,7 +8,7 @@
  *   3. Stop verification: before the turn ends, remind the model to run
  *      tests (Ralph-Wiggum style, max STOP_RETRIES retries).
  */
-import { appendFileSync, mkdirSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const registry = { preToolUse: [], postToolUse: [], stop: [] };
@@ -83,9 +83,38 @@ export const STOP_RETRIES = 2;
  * to history when the turn changed files but never ran tests — forcing one
  * more iteration (Ralph-Wiggum loop). Pure function for testability.
  */
-export function checkStop({ wroteFiles, ranTests, mode }) {
+const TEST_DIRS = ['test', 'tests', '__tests__', 'spec'];
+const TEST_MARKERS = ['pytest.ini', 'tox.ini', 'go.mod', 'Cargo.toml', 'phpunit.xml', 'build.gradle', 'pom.xml'];
+const NPM_PLACEHOLDER = /no test specified/i;
+
+/**
+ * Whether the project has a test suite to run. Answers false only when it is
+ * clearly absent, so an unfamiliar layout still gets the Stop hook: the cost
+ * of a wrong "no" is an unverified edit, the cost of a wrong "yes" is one
+ * failing `npm test`.
+ */
+export function projectHasTests(dir) {
+  try {
+    if (TEST_DIRS.some((d) => existsSync(join(dir, d)))) return true;
+    if (TEST_MARKERS.some((f) => existsSync(join(dir, f)))) return true;
+    const pyproject = join(dir, 'pyproject.toml');
+    if (existsSync(pyproject) && /\[tool\.pytest/.test(readFileSync(pyproject, 'utf8'))) return true;
+    const makefile = join(dir, 'Makefile');
+    if (existsSync(makefile) && /^test\s*:/m.test(readFileSync(makefile, 'utf8'))) return true;
+    const pkg = join(dir, 'package.json');
+    if (existsSync(pkg)) {
+      const test = JSON.parse(readFileSync(pkg, 'utf8'))?.scripts?.test;
+      return typeof test === 'string' && test.trim() !== '' && !NPM_PLACEHOLDER.test(test);
+    }
+    return false;
+  } catch {
+    return true;
+  }
+}
+
+export function checkStop({ wroteFiles, ranTests, mode, hasTests = true }) {
   if (mode !== 'BUILD' && mode !== 'SWE') return null;
-  if (wroteFiles && !ranTests) {
+  if (wroteFiles && !ranTests && hasTests) {
     return 'Stop hook: files were changed but no tests were run. Run the relevant test command (runTests preferred) and report results before finishing.';
   }
   return null;
