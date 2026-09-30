@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { CodeBlock } from "@/components/CodeBlock";
+import { JsonLd } from "@/components/JsonLd";
 import { DocsRow, Eyebrow, FdeRow, LoopDiagram, Principle, SectionHeading } from "@/components/Landing";
 import { ModeSwitcher } from "@/components/ModeSwitcher";
 import { TerminalReplay } from "@/components/TerminalReplay";
+import { organization } from "@/lib/seo";
 import { site } from "@/lib/site";
 
 const PROVIDERS = [
@@ -31,6 +33,45 @@ const STATS = [
 export default function Home() {
   return (
     <main id="main-content">
+      <JsonLd
+        data={[
+          {
+            "@context": "https://schema.org",
+            "@type": "WebSite",
+            name: site.name,
+            url: site.url,
+            inLanguage: "en",
+            description: organization.description,
+          },
+          { "@context": "https://schema.org", "@type": "Organization", ...organization },
+          {
+            "@context": "https://schema.org",
+            "@type": "SoftwareApplication",
+            name: site.name,
+            applicationCategory: "DeveloperApplication",
+            operatingSystem: "macOS, Linux, Windows",
+            softwareVersion: site.version,
+            description: organization.description,
+            url: site.url,
+            codeRepository: site.repo,
+            downloadUrl: site.repo,
+            license: "https://opensource.org/licenses/MIT",
+            isAccessibleForFree: true,
+            author: { "@type": "Person", name: site.author },
+            offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+            featureList: [
+              "12 LLM providers through one streaming client",
+              "19 sandboxed local tools with per-mode allowlists",
+              "Sessions stored as plain JSON on disk",
+              "MCP stdio server for Claude Desktop, Cursor and any MCP client",
+              "Per-turn token and USD receipts",
+              "Per-project cost budgets with a deadline",
+              "Blast-radius gate on migrations, CI workflows, lockfiles, auth and infra",
+              "Checkpoints with undo and redo across turns",
+            ],
+          },
+        ]}
+      />
       {/* Hero */}
       <section aria-labelledby="hero-title" className="relative overflow-hidden">
         <div aria-hidden="true" className="bg-grid pointer-events-none absolute inset-0" />

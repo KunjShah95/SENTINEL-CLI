@@ -1,8 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CodeBlock } from "@/components/CodeBlock";
+import { pageMeta } from "@/lib/seo";
 
-export const metadata: Metadata = { title: "Modes" };
+export const metadata: Metadata = pageMeta({
+  title: "Modes",
+  description:
+    "Six permission modes — BUILD, PLAN, REVIEW, SCAN, FIX, SWE — each mapped to a fixed tool allowlist the model cannot argue its way out of. Switch with Ctrl+M or /mode.",
+  path: "/docs/modes",
+  keywords: ["ai agent permission modes", "read only ai coding agent", "agent sandbox modes"],
+});
 
 const rows: { mode: string; edits: string; shell: string; use: string; highlight?: boolean }[] = [
   { mode: "BUILD", edits: "Yes", shell: "Yes", use: "Actually making changes", highlight: true },

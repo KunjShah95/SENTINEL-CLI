@@ -2,7 +2,11 @@ export const site = {
   name: "Sentinel",
   tagline: "A minimalist AI coding assistant for the terminal.",
   version: "3.1.0",
+  /** Canonical origin. One place, so sitemap/robots/canonical/OG never drift. */
+  url: "https://sentinel-cli.dev",
   repo: "https://github.com/KunjShah95/SENTINEL-CLI",
+  author: "Kunj Shah",
+  license: "MIT",
   installCmd: "git clone https://github.com/KunjShah95/SENTINEL-CLI.git",
 } as const;
 
@@ -69,3 +73,36 @@ export function getDocPager(pathname: string): { prev: DocSection | null; next: 
 }
 
 export const allDocHrefs: string[] = docNav.flatMap((g) => g.items.map((s) => s.href));
+
+/** Nav sections, including the pages that are not docs. Order drives header and footer. */
+export const mainNav = [
+  { href: "/docs", label: "Docs" },
+  { href: "/docs/installation", label: "Install" },
+  { href: "/blog", label: "Blog" },
+  { href: "/compare", label: "Compare" },
+  { href: "/docs/mcp", label: "MCP" },
+] as const;
+
+export type Faq = { q: string; a: string };
+
+export type Post = {
+  /** URL segment. Never change one without a 301. */
+  slug: string;
+  /** H1. Written to read as a search result, not a clever title. */
+  title: string;
+  /** <title>. Kept <= 60 chars so it never truncates in the SERP. */
+  metaTitle: string;
+  /** Meta description. 140-158 chars, because that is the whole SERP budget. */
+  description: string;
+  /** ISO date. Publication date, never a rebuild date. */
+  date: string;
+  updated?: string;
+  readingMinutes: number;
+  tags: string[];
+  /** The one query this page is written to win. One page, one primary keyword. */
+  keyword: string;
+  /** Rendered into FAQPage structured data and shown on the page. */
+  faq: Faq[];
+  related: string[];
+  body: () => React.ReactNode;
+};

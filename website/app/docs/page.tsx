@@ -1,8 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CodeBlock } from "@/components/CodeBlock";
+import { pageMeta } from "@/lib/seo";
 
-export const metadata: Metadata = { title: "Overview" };
+export const metadata: Metadata = pageMeta({
+  title: "Overview",
+  description:
+    "Sentinel is an open source AI coding agent for the terminal: 12 LLM providers, 19 sandboxed tools, sessions as plain JSON, and an MCP server.",
+  path: "/docs",
+  keywords: ["ai coding agent", "cli coding agent", "terminal ai assistant", "open source coding agent"],
+});
 
 export default function DocsOverview() {
   return (

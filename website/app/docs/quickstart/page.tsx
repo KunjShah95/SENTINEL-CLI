@@ -1,7 +1,14 @@
 import type { Metadata } from "next";
 import { CodeBlock, Callout } from "@/components/CodeBlock";
+import { pageMeta } from "@/lib/seo";
 
-export const metadata: Metadata = { title: "Quickstart" };
+export const metadata: Metadata = pageMeta({
+  title: "Quickstart",
+  description:
+    "Run your first Sentinel chat, ask a one-shot question from a script, switch models, and point the agent at a local Ollama model in about two minutes.",
+  path: "/docs/quickstart",
+  keywords: ["ai coding agent quickstart", "terminal ai assistant tutorial"],
+});
 
 export default function Quickstart() {
   return (
