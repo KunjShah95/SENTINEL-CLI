@@ -3,14 +3,15 @@ import type { CommandContext } from './types.js';
 export async function handleModels(ctx: CommandContext) {
   const { toast, appendMessage, mode, model } = ctx;
   try {
-    const { getRankedModels } = await import('../../shared/models/index.js');
+    const { getRankedModels, isOllamaCloudModel, isLocalProvider } = await import('../../shared/models/index.js');
     const ranked = getRankedModels();
     const byProvider: Record<string, string[]> = {};
     for (const m of ranked) {
       if (!byProvider[m.provider]) byProvider[m.provider] = [];
       const price = m.inputUsdPerMillionTokens > 0
         ? ` (\$${m.inputUsdPerMillionTokens}/\$${m.outputUsdPerMillionTokens} per M)`
-        : ' (free/local)';
+        : isOllamaCloudModel(m) ? ' (cloud, metered by ollama.com)'
+          : isLocalProvider(m.provider) ? ' (free, local)' : ' (free tier)';
       const flag = m.thinking ? ' 🧠' : '';
       byProvider[m.provider].push(`  \`${m.id}\` — ${m.label}${flag}${price}`);
     }

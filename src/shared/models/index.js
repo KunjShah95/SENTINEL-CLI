@@ -92,8 +92,9 @@ function getModelCapability(model) {
 
 export function getRankedModels() {
   return [...SUPPORTED_CHAT_MODELS].sort((a, b) => {
-    const aFree = (a.inputUsdPerMillionTokens || 0) + (a.outputUsdPerMillionTokens || 0) === 0 ? 0 : 1;
-    const bFree = (b.inputUsdPerMillionTokens || 0) + (b.outputUsdPerMillionTokens || 0) === 0 ? 0 : 1;
+    // Ollama cloud models list at $0 but are metered, so they rank as paid.
+    const aFree = (a.inputUsdPerMillionTokens || 0) + (a.outputUsdPerMillionTokens || 0) === 0 && !isOllamaCloudModel(a) ? 0 : 1;
+    const bFree = (b.inputUsdPerMillionTokens || 0) + (b.outputUsdPerMillionTokens || 0) === 0 && !isOllamaCloudModel(b) ? 0 : 1;
     if (aFree !== bFree) return aFree - bFree;
     const aThinking = a.thinking ? 1 : 0;
     const bThinking = b.thinking ? 1 : 0;
@@ -124,13 +125,22 @@ export function isProviderAvailable(provider) {
   return !!process.env[getEnvKeyForProvider(provider)];
 }
 
+/**
+ * Ollama `:cloud` / `-cloud` tags are proxied to ollama.com and metered on the
+ * account, even though discovery lists them at $0 like a local model.
+ */
+export function isOllamaCloudModel(model) {
+  return model?.provider === 'ollama' && /[:-]cloud$/i.test(String(model.id || ''));
+}
+
 export function autoSelectBestModel() {
   const ranked = getRankedModels();
   if (ranked.length === 0) return DEFAULT_CHAT_MODEL_ID;
-  for (const m of ranked) {
-    if (isProviderAvailable(m.provider)) return m.id;
-  }
-  return ranked[0].id;
+  // Never auto-pick a metered cloud model while a truly local one is installed:
+  // on a free Ollama account the first turn would fail with HTTP 402.
+  const available = ranked.filter((m) => isProviderAvailable(m.provider));
+  const pick = available.find((m) => !isOllamaCloudModel(m)) || available[0];
+  return pick ? pick.id : ranked[0].id;
 }
 
 function getEnvKeyForProvider(provider) {

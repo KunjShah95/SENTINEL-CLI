@@ -122,7 +122,7 @@ export function SessionPanel({ currentSessionId, onSelect, onFork, onDelete, onC
                   bold={isActive || isSelected}
                   color={isActive ? colors.primary : isSelected ? colors.selection : undefined}
                 >
-                  {`${isSelected ? '> ' : '  '}${truncate(session.title, 22)}`}
+                  {`${isSelected ? '> ' : '  '}${truncate(session.title || 'Untitled', 22)}`}
                 </Text>
                 <Box flexDirection="row" gap={1} paddingLeft={2}>
                   <Text dimColor color={getModeColor(session.mode, colors)}>{session.mode}</Text>

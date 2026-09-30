@@ -4,6 +4,7 @@ import {
   streamCompletion,
   adaptMessagesForGoogle,
   adaptMessagesForAnthropic,
+  formatProviderError,
 } from '../src/agent/providers.js';
 
 // fetch is mocked below; streamCompletion still requires a key to exist
@@ -120,4 +121,60 @@ test('Google adapter keeps tool results; Anthropic adapter keeps tool_use blocks
   const a = JSON.stringify(adaptMessagesForAnthropic(messages));
   assert.match(a, /ABC/);
   assert.match(a, /tool_use/);
+});
+
+test('formatProviderError unwraps the JSON message and adds a next step', () => {
+  const body = '{"error":{"message":"this model is not included in your free usage","type":"api_error"}}';
+  const m = formatProviderError(402, body, 'Payment Required');
+  assert.match(m, /^Provider HTTP 402: this model is not included in your free usage/);
+  assert.match(m, /\/model/);
+  assert.doesNotMatch(m, /api_error/);
+});
+
+test('formatProviderError keeps non-JSON detail and hints auth on 401', () => {
+  const m = formatProviderError(401, 'Invalid API Key', 'Unauthorized');
+  assert.match(m, /^Provider HTTP 401: Invalid API Key/);
+  assert.match(m, /\/setup/);
+  assert.equal(formatProviderError(500, '', 'Server Error'), 'Provider HTTP 500: Server Error');
+});
+
+test('an unreachable local provider says which host and how to start it', async () => {
+  const restore = mockFetch(async () => {
+    throw new TypeError('fetch failed', { cause: Object.assign(new Error('connect'), { code: 'ECONNREFUSED' }) });
+  });
+  try {
+    const errors = [];
+    for await (const ev of streamCompletion({
+      modelId: 'ollama/qwen3:8b', provider: 'ollama', system: '',
+      messages: [{ role: 'user', content: 'hi' }], tools: [],
+    })) {
+      if (ev.type === 'error') errors.push(ev.message);
+    }
+    assert.equal(errors.length, 1);
+    assert.match(errors[0], /Could not reach ollama at localhost:11434 \(ECONNREFUSED\)/);
+    assert.match(errors[0], /ollama serve/);
+  } finally {
+    restore();
+  }
+});
+
+test('a remote network failure never leaks the request URL (it can carry a key)', async () => {
+  const prevKey = process.env.GEMINI_API_KEY;
+  process.env.GEMINI_API_KEY = 'secret-key-123';
+  const restore = mockFetch(async () => { throw new TypeError('fetch failed'); });
+  try {
+    const errors = [];
+    for await (const ev of streamCompletion({
+      modelId: 'gemini-2.0-flash', provider: 'google', system: '',
+      messages: [{ role: 'user', content: 'hi' }], tools: [],
+    })) {
+      if (ev.type === 'error') errors.push(ev.message);
+    }
+    assert.match(errors[0], /Could not reach google at generativelanguage\.googleapis\.com/);
+    assert.doesNotMatch(errors[0], /secret-key-123/);
+  } finally {
+    restore();
+    if (prevKey === undefined) delete process.env.GEMINI_API_KEY;
+    else process.env.GEMINI_API_KEY = prevKey;
+  }
 });

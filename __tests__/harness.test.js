@@ -20,7 +20,7 @@ import { loadContextFiles } from '../src/agent/context-files.js';
 import { listSkills, getSkillPrompt, formatSkillListing } from '../src/agent/skills.js';
 import { validateTodos, writeTodos, readTodos, formatTodoList } from '../src/agent/tasks.js';
 import { batchToolCalls, loopHint } from '../src/agent/loop.js';
-import { builtinPreToolUseGuard, checkStop, on, clearHooks, runHooks } from '../src/agent/hooks.js';
+import { builtinPreToolUseGuard, checkStop, projectHasTests, on, clearHooks, runHooks } from '../src/agent/hooks.js';
 
 let dir;
 let prevCwd;
@@ -159,6 +159,28 @@ describe('batching + loop guard + stop hook', () => {
     assert.equal(checkStop({ wroteFiles: true, ranTests: true, mode: 'BUILD' }), null);
     assert.equal(checkStop({ wroteFiles: false, ranTests: false, mode: 'BUILD' }), null);
     assert.equal(checkStop({ wroteFiles: true, ranTests: false, mode: 'PLAN' }), null);
+    // No test suite to run: forcing one only produces a failing `npm test`.
+    assert.equal(checkStop({ wroteFiles: true, ranTests: false, mode: 'BUILD', hasTests: false }), null);
+  });
+
+  it('projectHasTests only says no when there is clearly nothing to run', () => {
+    const mk = (files) => {
+      const d = mkdtempSync(join(tmpdir(), 'sentinel-hastests-'));
+      for (const [rel, body] of Object.entries(files)) {
+        if (rel.endsWith('/')) mkdirSync(join(d, rel), { recursive: true });
+        else writeFileSync(join(d, rel), body);
+      }
+      return d;
+    };
+    const placeholder = 'echo "Error: no test specified" && exit 1';
+    assert.equal(projectHasTests(mk({})), false);
+    assert.equal(projectHasTests(mk({ 'package.json': JSON.stringify({ name: 'x' }) })), false);
+    assert.equal(projectHasTests(mk({ 'package.json': JSON.stringify({ scripts: { test: placeholder } }) })), false);
+    assert.equal(projectHasTests(mk({ 'package.json': JSON.stringify({ scripts: { test: 'vitest' } }) })), true);
+    assert.equal(projectHasTests(mk({ 'tests/': '' })), true);
+    assert.equal(projectHasTests(mk({ 'go.mod': 'module x' })), true);
+    assert.equal(projectHasTests(mk({ 'Makefile': 'build:\n\tcc\ntest:\n\t./t' })), true);
+    assert.equal(projectHasTests(mk({ 'package.json': '{broken' })), true);
   });
 
   it('builtin guard blocks destructive commands and secret writes', () => {

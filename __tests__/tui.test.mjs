@@ -85,6 +85,17 @@ describe('markdown', () => {
   it('parses inline code, strong, emphasis and links', () => {
     assert.deepEqual(parseInline('a `b` **c** *d* [e](http://x)').map((s) => s.kind), ['plain', 'code', 'plain', 'strong', 'plain', 'emph', 'plain', 'link']);
   });
+
+  it('parses a GFM table, keeping pipes inside code spans in one cell', () => {
+    const b = parseMarkdown('| Cmd | What |\n|:----|-----:|\n| `/session [list|switch]` | Manage |\n| `/a` \\| `/b` | Both |\nafter');
+    assert.deepEqual(b.map((x) => x.type), ['table', 'p']);
+    assert.deepEqual(b[0].header, ['Cmd', 'What']);
+    assert.deepEqual(b[0].rows, [['`/session [list|switch]`', 'Manage'], ['`/a` | `/b`', 'Both']]);
+  });
+
+  it('leaves a header row without a separator (mid-stream) as a paragraph', () => {
+    assert.deepEqual(parseMarkdown('| a | b |').map((x) => x.type), ['p']);
+  });
 });
 
 describe('/context report (MiniMax capacity meter)', () => {

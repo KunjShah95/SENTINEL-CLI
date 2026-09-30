@@ -130,6 +130,25 @@ describe('agent loop (mocked provider)', () => {
     assert.match(result.data.error || '', /denied/i);
   });
 
+  it('a self-addressed sendMessage is refused without asking permission', async () => {
+    let asked = 0;
+    const events = await collect(
+      runAgentTurnInner({
+        history,
+        mode: 'BUILD',
+        model: MODEL,
+        onPermissionRequest: async () => { asked++; return 'allow'; },
+        createStream: canned([
+          [{ type: 'tool_call', id: 'c1', name: 'sendMessage', input: { to: 'lead', text: 'hi' } }],
+          [{ type: 'text', text: 'answered directly' }],
+        ]),
+      })
+    );
+    assert.equal(asked, 0);
+    const result = events.find((e) => e.event === 'tool_result');
+    assert.match(result.data.error || '', /reply to the user directly/i);
+  });
+
   it('provider error ends the turn with an error event', async () => {
     const events = await collect(
       runAgentTurnInner({
@@ -251,6 +270,29 @@ describe('agent loop (mocked provider)', () => {
     );
     const result = events.find((e) => e.event === 'tool_result');
     assert.match(result.data.error || '', /Blocked dangerous/);
+  });
+
+  it('stop hook only forces a test run when the project has tests', async () => {
+    const { writeFileSync } = await import('node:fs');
+    const run = async () => {
+      let calls = 0;
+      const script = [
+        [{ type: 'tool_call', id: 'c1', name: 'writeFile', input: { path: 'out.txt', content: 'y' } }],
+        [{ type: 'text', text: 'done' }],
+      ];
+      await collect(runAgentTurnInner({
+        history,
+        mode: 'BUILD',
+        model: MODEL,
+        createStream: async function* () { yield* script[Math.min(calls++, script.length - 1)]; },
+      }));
+      return calls;
+    };
+    // Empty workdir: nothing to run, so the answer after the write is final.
+    assert.equal(await run(), 2);
+    // A real test script: the hook pushes back at least once.
+    writeFileSync(join(workdir, 'package.json'), JSON.stringify({ scripts: { test: 'node --test' } }));
+    assert.ok(await run() > 2);
   });
 
   it('stop hook forces a test run after writes before finishing', async () => {

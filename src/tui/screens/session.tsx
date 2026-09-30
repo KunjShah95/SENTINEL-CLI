@@ -300,6 +300,7 @@ export function Session() {
     if (leaderKey === 'ctrl-x') {
       clearTimeout(leaderTimeoutRef.current);
       setLeaderKey('none');
+      if (key.escape) return; // Esc cancels the leader chord quietly
       const ch = input.toLowerCase();
       if (ch === 't')       { setShowThinking(v => !v); toast.info(`Thinking ${showThinking ? 'hidden' : 'shown'}`); return; }
       if (ch === 'd')       { setShowDetails(v => !v); toast.info(`Details ${showDetails ? 'hidden' : 'shown'}`); return; }
@@ -349,8 +350,14 @@ export function Session() {
       const { loadLastModel } = await import('../../shared/models/prefs.js');
       const saved = await loadLastModel();
       if (saved) {
-        const { findSupportedChatModel } = await import('../../shared/models/index.js');
-        if (findSupportedChatModel(saved)) {
+        const { findSupportedChatModel, refreshModels } = await import('../../shared/models/index.js');
+        // Local models (Ollama, LM Studio) only exist after discovery; without
+        // this a saved local pick was dropped and overwritten on every launch.
+        if (!findSupportedChatModel(saved)) await refreshModels();
+        // A local model that is missing only because its daemon is down stays
+        // selected: the first turn then says "start ollama serve" instead of
+        // silently switching to a provider the user never chose.
+        if (findSupportedChatModel(saved) || /^(ollama|lmstudio)\//.test(saved)) {
           setModel(saved);
           return;
         }
@@ -368,7 +375,12 @@ export function Session() {
       const hasLocalModels = getRankedModels().some(m => isLocalProvider(m.provider));
       if (configured.length > 0 || hasEnvKeys || hasLocalModels) {
         const best = autoSelectBestModel();
-        if (best) setModel(best);
+        if (best) {
+          // An automatic pick is not a preference: mark it seen so the save
+          // effect above does not overwrite the user's saved choice with it.
+          lastModelRef.current = best;
+          setModel(best);
+        }
         return;
       }
       dialog.open({

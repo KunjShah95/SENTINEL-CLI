@@ -10,8 +10,10 @@ import {
   getModelTier,
   getRankedModels,
   estimateCostUsd,
+  autoSelectBestModel,
+  SUPPORTED_CHAT_MODELS,
 } from '../src/shared/models/index.js';
-import { getFallbackModels } from '../src/shared/models/discovery.js';
+import { getFallbackModels, isEmbeddingOnlyModel } from '../src/shared/models/discovery.js';
 
 describe('model registry (Sep 2026 refresh)', () => {
   it('new releases resolve offline', () => {
@@ -60,6 +62,46 @@ describe('model registry (Sep 2026 refresh)', () => {
   it('fallback list carries tiers for the picker', () => {
     for (const m of getFallbackModels()) {
       assert.ok(['flagship', 'mid', 'budget'].includes(getModelTier(m)), `${m.id} classifies`);
+    }
+  });
+
+  it('auto-select skips metered Ollama cloud models for a local one', () => {
+    const saved = SUPPORTED_CHAT_MODELS.splice(0);
+    try {
+      const base = { provider: 'ollama', thinking: true, inputUsdPerMillionTokens: 0, outputUsdPerMillionTokens: 0 };
+      SUPPORTED_CHAT_MODELS.push(
+        { ...base, id: 'ollama/deepseek-v4-pro:cloud', label: 'deepseek-v4-pro:cloud' },
+        { ...base, id: 'ollama/gemma4:31b-cloud', label: 'gemma4:31b-cloud' },
+        { ...base, id: 'ollama/qwen3:8b', label: 'qwen3:8b' },
+      );
+      assert.equal(autoSelectBestModel(), 'ollama/qwen3:8b');
+      // Cloud models remain a last resort when nothing else exists.
+      SUPPORTED_CHAT_MODELS.pop();
+      assert.equal(autoSelectBestModel(), 'ollama/deepseek-v4-pro:cloud');
+    } finally {
+      SUPPORTED_CHAT_MODELS.splice(0, SUPPORTED_CHAT_MODELS.length, ...saved);
+    }
+  });
+
+  it('embedding-only Ollama models are not offered as chat models', () => {
+    assert.equal(isEmbeddingOnlyModel({ name: 'bge-m3:latest', details: { family: 'bert' } }), true);
+    assert.equal(isEmbeddingOnlyModel({ name: 'nomic-embed-text:latest', details: { family: 'nomic-bert' } }), true);
+    assert.equal(isEmbeddingOnlyModel({ name: 'qwen3-embedding:8b', details: { family: 'qwen3' } }), true);
+    assert.equal(isEmbeddingOnlyModel({ name: 'qwen3:8b', details: { family: 'qwen3' } }), false);
+    assert.equal(isEmbeddingOnlyModel({ name: 'deepseek-v4-pro:cloud' }), false);
+  });
+
+  it('ranking puts metered Ollama cloud models after local ones', () => {
+    const saved = SUPPORTED_CHAT_MODELS.splice(0);
+    try {
+      const base = { provider: 'ollama', thinking: true, inputUsdPerMillionTokens: 0, outputUsdPerMillionTokens: 0 };
+      SUPPORTED_CHAT_MODELS.push(
+        { ...base, id: 'ollama/deepseek-v4-pro:cloud', label: 'deepseek-v4-pro:cloud' },
+        { ...base, id: 'ollama/qwen3:8b', label: 'qwen3:8b' },
+      );
+      assert.deepEqual(getRankedModels().map((m) => m.id), ['ollama/qwen3:8b', 'ollama/deepseek-v4-pro:cloud']);
+    } finally {
+      SUPPORTED_CHAT_MODELS.splice(0, SUPPORTED_CHAT_MODELS.length, ...saved);
     }
   });
 });
