@@ -6,6 +6,8 @@
 import React from 'react';
 import { renderToString } from 'ink';
 import { ThemeProvider } from '../src/tui/providers/theme/index.js';
+import { DialogProvider } from '../src/tui/providers/dialog/index.js';
+import { PermissionDialog } from '../src/tui/components/dialogs/permission-dialog.js';
 import { UserMessage, BotMessage, ErrorMessage } from '../src/tui/components/messages/index.js';
 import { Home, ActivityLine, Footer, TodoPanel } from '../src/tui/components/oc/chrome.js';
 import { InputBar } from '../src/tui/components/input-bar.js';
@@ -46,7 +48,19 @@ export async function snapshot(themeName?: string, { home = false, columns = 100
   );
 }
 
-export const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, '');
+/** Render the permission prompt for one tool call. */
+export function snapshotPermission(toolName: string, input: unknown, themeName = 'OpenCode'): string {
+  return renderToString(
+    <ThemeProvider initialTheme={themeName}>
+      <DialogProvider>
+        <PermissionDialog request={{ toolName, toolCallId: 't1', input }} onResult={() => {}} />
+      </DialogProvider>
+    </ThemeProvider>,
+    { columns: 84 },
+  );
+}
+
+export const stripAnsi =(s: string) => s.replace(/\x1b\[[0-9;]*m/g, '');
 
 if (process.argv[1] && process.argv[1].includes('tui-snapshot')) {
   const args = process.argv.slice(2);

@@ -8,6 +8,8 @@
  *   sentinel mini "..."      bash-only mini-swe-agent style run (SWE-bench baseline)
  *   sentinel handoff [run]   turn a recorded run into a runbook the customer team can use
  *   sentinel budget           set/show the engagement budget, deadline, and spend
+ *   sentinel watch "task"     keep working when something breaks, steerable
+ *   sentinel steer "msg"      add an instruction for a running watcher
  *   sentinel risk "cmd"      grade a command against this repo's risk ledger
  *   sentinel outcome "..."   turn a vague ask into a verifiable contract, then work to it
  *   sentinel onboard         survey this repo: entry points, CI, ownership, risk
@@ -322,10 +324,11 @@ program
   .option('-m, --models <ids>', 'Comma-separated model ids, assigned round-robin (a model tournament)')
   .option('--allow-bash', 'Let candidates run non-destructive shell commands in their worktree')
   .option('--no-apply', 'Do not apply the winner; print its patch instead')
+  .option('--critique', 'Peer review: each passing diff is reviewed by another candidate\'s model; severity breaks ties')
   .action(async (taskParts, options) => {
     const task = (taskParts || []).join(' ').trim();
     if (!task) {
-      console.error('Usage: sentinel race "fix the failing date parser" --check "npm test" [-n 3] [-m a,b]');
+      console.error('Usage: sentinel race "fix the failing date parser" --check "npm test" [-n 3] [-m a,b] [--critique]');
       process.exit(1);
     }
     const { runRace } = await import('../agent/race.js');
@@ -341,7 +344,13 @@ program
         models,
         apply: options.apply !== false,
         allowBash: !!options.allowBash,
+        critique: !!options.critique,
         onEvent: (e) => {
+          if (e.type === 'critique') {
+            const color = e.severity >= 2 ? '\x1b[31m' : e.severity === 1 ? '\x1b[33m' : '\x1b[32m';
+            process.stderr.write(`${color}⚖ ${e.candidate} reviewed by ${e.reviewer}: severity ${e.severity}\x1b[0m${e.issues.length ? `\x1b[2m — ${e.issues.join('; ')}\x1b[0m` : ''}\n`);
+            return;
+          }
           if (e.type === 'start') process.stderr.write(`\x1b[2m▶ ${e.candidate} (${e.model})\x1b[0m\n`);
           else if (e.type === 'tool') process.stderr.write(`\x1b[2m  ${e.candidate} → ${e.tool}\x1b[0m\n`);
           else if (e.type === 'scored') {
@@ -357,7 +366,11 @@ program
     }
     console.log('\nRanking:');
     res.ranking.forEach((c, i) => {
-      console.log(`${i + 1}. ${c.name} [${c.model}] ${c.disqualified ? `disqualified: ${c.disqualified}` : `exit ${c.exitCode}`} · +${c.added}/-${c.removed} · ${formatUsd(c.costUsd)} · hint: ${c.hint}`);
+      const review = c.critique ? ` · review ${c.critique.severity}/3` : '';
+      console.log(`${i + 1}. ${c.name} [${c.model}] ${c.disqualified ? `disqualified: ${c.disqualified}` : `exit ${c.exitCode}`}${review} · +${c.added}/-${c.removed} · ${formatUsd(c.costUsd)} · hint: ${c.hint}`);
+      // Why a candidate produced nothing is the first question anyone asks.
+      if (c.error) console.log(`   \x1b[31merror: ${c.error}\x1b[0m`);
+      else if (c.disqualified && c.summary) console.log(`   \x1b[2mlast words: ${c.summary.replace(/\s+/g, ' ').slice(0, 200)}\x1b[0m`);
     });
     if (!res.winner) {
       console.log('\nNo candidate passed the check. Nothing applied.');
@@ -406,6 +419,109 @@ program
     process.stderr.write(`\x1b[2m${res.exitStatus} · ${res.apiCalls} calls · ${formatUsd(res.cost)}\x1b[0m\n`);
     if (res.submission) process.stdout.write(`${res.submission}\n`);
     process.exit(res.exitStatus === 'Submitted' ? 0 : 1);
+  });
+
+// ── watch: the standing FDE ────────────────────────────────────────────────
+program
+  .command('watch [task...]')
+  .description('Keep working on a task when something breaks: failing tests, a changed file, a new commit — steerable from another terminal')
+  .requiredOption('-t, --trigger <spec>', 'Repeatable. interval:<ms> | command:<cmd> | file:<path> | git | once')
+  .option('-m, --model <id>', 'Model id')
+  .option('-g, --goal <cond>', 'Stop when this condition is verified')
+  .option('--max-ticks <n>', 'Stop after this many ticks (0 = unlimited)', '0')
+  .option('--max-unproductive <n>', 'Give up after this many ticks with no progress', '5')
+  .option('--interval <ms>', 'Base wait between ticks, doubled on each unproductive tick', '60000')
+  .option('-y, --yes', 'Auto-approve tools incl. shell (destructive commands are still denied)')
+  .action(async (taskParts, options) => {
+    const { expandPromptTemplate } = await import('../agent/prompt-templates.js');
+    const task = expandPromptTemplate((taskParts || []).join(' ').trim()).text;
+    if (!task) {
+      console.error('Usage: sentinel watch "fix whatever breaks" -t "command:npm test" -t git');
+      process.exit(1);
+    }
+    const { parseTriggers } = await import('../agent/watch-cli.js');
+    let triggers;
+    try {
+      triggers = parseTriggers(options.trigger);
+    } catch (e) {
+      console.error(`\x1b[31m${e.message}\x1b[0m`);
+      process.exit(1);
+    }
+
+    const { runWatcher } = await import('../agent/watch.js');
+    const { runAgentTurn } = await import('../agent/loop.js');
+    const { DEFAULT_CHAT_MODEL_ID } = await import('../shared/models/index.js');
+    const { formatUsd } = await import('../agent/cost.js');
+
+    const controller = new AbortController();
+    const onSig = () => {
+      process.stderr.write('\n\x1b[2mstopping after the current step…\x1b[0m\n');
+      controller.abort();
+    };
+    process.on('SIGINT', onSig);
+    process.on('SIGTERM', onSig);
+
+    console.error(`\x1b[2mwatching: ${triggers.map((t) => t.type).join(', ')}\x1b[0m`);
+    console.error('\x1b[2msteer it from another terminal: sentinel steer "also check the retries"\x1b[0m\n');
+
+    const permissions = options.yes ? await autoApprove() : undefined;
+    let res;
+    try {
+      res = await runWatcher({
+        task,
+        triggers,
+        goal: options.goal || null,
+        cwd: process.cwd(),
+        runTurn: (opts) => runAgentTurn({
+          ...opts,
+          model: options.model || DEFAULT_CHAT_MODEL_ID,
+          onPermissionRequest: permissions,
+        }),
+        onPermissionRequest: permissions,
+        maxTicks: Number(options.maxTicks) || 0,
+        maxUnproductive: Number(options.maxUnproductive) || 5,
+        baseDelayMs: Number(options.interval) || 60_000,
+        signal: controller.signal,
+      });
+    } catch (e) {
+      process.off('SIGINT', onSig);
+      process.off('SIGTERM', onSig);
+      console.error(`\x1b[31m${e.message}\x1b[0m`);
+      process.exit(1);
+    }
+    process.off('SIGINT', onSig);
+    process.off('SIGTERM', onSig);
+
+    const spent = res.ticks.reduce((n, t) => n + (t.costUsd || 0), 0);
+    console.error(`\n${res.ticks.length} tick(s), ${formatUsd(spent)}, stopped: ${res.reason}`);
+    process.exit(0);
+  });
+
+// ── steer: interrupt a running watch from anywhere ─────────────────────────
+program
+  .command('steer [message...]')
+  .description('Add an instruction for a running `sentinel watch` to pick up on its next tick')
+  .option('-d, --dir <path>', 'Project the watcher is running in (default: cwd)')
+  .option('--pending', 'Show queued instructions without clearing them')
+  .action(async (msgParts, options) => {
+    const { steer, pendingSteering, drainSteering, STEER_PATH } = await import('../agent/watch.js');
+    const cwd = path.resolve(options.dir || process.cwd());
+    if (options.pending) {
+      const n = pendingSteering(cwd);
+      console.log(n ? `${n} instruction(s) queued in ${STEER_PATH}` : 'nothing queued');
+      process.exit(0);
+    }
+    const text = (msgParts || []).join(' ').trim();
+    if (!text) {
+      const queued = drainSteering(cwd);
+      for (const q of queued) console.log(`${q.ts}  ${q.text}`);
+      console.log(queued.length ? `\nCleared ${queued.length} instruction(s).` : 'nothing queued');
+      process.exit(0);
+    }
+    steer(text, cwd);
+    console.log(`Queued: ${text}`);
+    console.log('\x1b[2mThe next watcher tick will pick this up as a priority instruction.\x1b[0m');
+    process.exit(0);
   });
 
 // ── budget: an engagement ceiling that outlives the turn ──────────────────

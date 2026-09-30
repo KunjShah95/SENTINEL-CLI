@@ -101,7 +101,7 @@ export function SessionShell({
 
       {loading ? <TodoPanel todos={todos} /> : null}
 
-      <Box flexShrink={0} marginTop={1}>
+      <Box flexShrink={0} marginTop={1} width="100%">
         <ActivityLine phase={phase} startedAt={startedAt.current} outputChars={streamedChars} />
       </Box>
 
@@ -120,7 +120,7 @@ export function SessionShell({
         />
       </Box>
 
-      <Box flexShrink={0} marginTop={1}>
+      <Box flexShrink={0} marginTop={1} width="100%">
         <Footer
           contextRatio={ratio}
           costUsd={costUsd}

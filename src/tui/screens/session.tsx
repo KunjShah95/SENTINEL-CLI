@@ -48,7 +48,7 @@ export function Session() {
     }, [toast]),
   });
 
-  const [showThinking, setShowThinking] = useState(true);
+  const [showThinking, setShowThinking] = useState(false); // opencode: one collapsed "Thinking:" line; /thinking expands
   const [showDetails, setShowDetails] = useState(true);
 
   const tokenUsage = {
@@ -446,7 +446,7 @@ export function Session() {
         <SessionShell
           onSubmit={wrappedSubmit}
           onShellCommand={handleShell}
-          inputDisabled={compacting}
+          inputDisabled={compacting || dialog.isOpen || showCommands}
           loading={isLoading}
           mode={mode}
           onModeToggle={handleModeToggle}
@@ -484,6 +484,8 @@ export function Session() {
                   model={msg.model || model}
                   mode={msg.mode || mode}
                   done={!inFlight}
+                  duration={msg.durationMs}
+                  interrupted={msg.interrupted}
                   showThinking={showThinking}
                   showDetails={showDetails}
                 />

@@ -6,4 +6,6 @@ export type DialogConfig = {
   onClose?: () => void;
   width?: number;
   height?: number;
+  /** Default true. Dialogs that must resolve a result on Esc (permission) handle it themselves. */
+  closeOnEscape?: boolean;
 };

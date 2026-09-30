@@ -67,6 +67,9 @@ export type AgentMessage = {
   mode?: AgentMode;
   model?: string;
   timestamp: number;
+  /** Wall time of the assistant turn, set on finish (opencode "▣ … · 8.4s"). */
+  durationMs?: number;
+  interrupted?: boolean;
 };
 
 let idCounter = 0;
@@ -168,21 +171,35 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
     setMessages((prev) => [...prev, { ...m, id: nextId(), timestamp: Date.now() }]);
   }, []);
 
+  // Patches the latest ASSISTANT message. (It used to patch the last message
+  // of any role — once a steering message was appended mid-turn, every
+  // later stream update hit the user message and was silently dropped.)
   const updateLastMessage = useCallback((updater: (msg: AgentMessage) => AgentMessage) => {
     setMessages((prev) => {
-      if (prev.length === 0) return prev;
-      const next = prev.slice();
-      next[next.length - 1] = updater(next[next.length - 1]);
-      return next;
+      for (let i = prev.length - 1; i >= 0; i--) {
+        if (prev[i].role !== "assistant") continue;
+        const updated = updater(prev[i]);
+        if (updated === prev[i]) return prev;
+        const next = prev.slice();
+        next[i] = updated;
+        return next;
+      }
+      return prev;
     });
   }, []);
 
   const stop = useCallback(() => {
+    if (abortRef.current) {
+      // opencode: the turn footer reads "▣ Build · model · interrupted".
+      updateLastMessage((msg) => (msg.durationMs === undefined
+        ? { ...msg, interrupted: true, durationMs: Date.now() - msg.timestamp }
+        : msg));
+    }
     abortRef.current?.abort();
     abortRef.current = null;
     setStatus("idle");
     setLoading(false);
-  }, []);
+  }, [updateLastMessage]);
 
   /**
    * Fire-and-collect chat request used exclusively by the context compactor.
@@ -547,6 +564,9 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
               percentage: Math.round(((usageData?.totalTokens ?? 0) / 40000) * 100),
               costUsd: data.costUsd ?? prev.costUsd,
             }));
+          }
+          if (ev.event === "finish") {
+            updateLastMessage((msg) => (msg.id === assistantId ? { ...msg, durationMs: Date.now() - msg.timestamp } : msg));
           }
           break;
         }

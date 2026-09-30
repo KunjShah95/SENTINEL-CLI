@@ -15,7 +15,7 @@ import { resetTotals } from '../src/agent/cost.js';
 import { resetMailboxes, post } from '../src/agent/mailbox.js';
 import { resetBackground } from '../src/agent/background.js';
 import { resetTeam, mergeTeammate } from '../src/agent/team.js';
-import { rankCandidates, runRace } from '../src/agent/race.js';
+import { rankCandidates, runRace, parseCritique } from '../src/agent/race.js';
 import { executeLocalTool, normalizeTimeoutMs } from '../src/shared/tools/index.js';
 
 const MODEL = 'openai/gpt-oss-20b';
@@ -231,6 +231,39 @@ describe('race (best-of-N)', () => {
     assert.equal(readValue(), 'right\n');
     assert.equal(execFileSync('git', ['worktree', 'list'], { cwd: dir, encoding: 'utf8' }).trim().split('\n').length, 1, 'all worktrees removed');
     assert.equal(events.filter((e) => e.type === 'scored').length, 3);
+  });
+
+  it('critique: reviewer severity breaks ties between passing candidates; a model never reviews itself', async () => {
+    if (!gitRepo(dir)) return;
+    const reviewed = [];
+    const { createStream } = mockProvider((c) => {
+      if (c.purpose === 'race-critic') {
+        const diff = String(c.messages[0].content);
+        reviewed.push({ reviewer: c.modelId, bloated: diff.includes('bloat') });
+        return [text(diff.includes('bloat') ? '{"severity":2,"issues":["unrelated edit"],"verdict":"no"}' : '{"severity":0,"issues":[],"verdict":"ok"}')];
+      }
+      if (c.messages.some((m) => m.role === 'tool')) return [text('done')];
+      const brief = firstUserText(c);
+      // Candidate 1 passes but adds an unrelated line; candidate 2 passes cleanly.
+      return brief.includes('smallest possible change')
+        ? [tool('writeFile', { path: 'value.txt', content: 'right\n' })]
+        : [tool('writeFile', { path: 'value.txt', content: 'right\n// bloat\n' })];
+    });
+    const check = 'node -e "process.exit(require(\'fs\').readFileSync(\'value.txt\',\'utf8\').startsWith(\'right\')?0:1)"';
+    const res = await runRace({
+      task: 't', check, n: 2, models: ['openai/gpt-oss-20b', 'openai/gpt-oss-120b'],
+      cwd: dir, createStream, critique: true,
+    });
+    assert.equal(reviewed.length, 2);
+    assert.equal(res.ranking[0].critique.severity, 0);
+    assert.equal(res.ranking[1].critique.severity, 2);
+    for (const c of res.ranking) assert.notEqual(c.critique.reviewer, c.model, 'no self-review');
+    assert.equal(readValue(), 'right\n');
+  });
+
+  it('parseCritique clamps and never gives an unparseable review a free win', () => {
+    assert.deepEqual(parseCritique('{"severity": 9, "issues": ["a"], "verdict": "x"}'), { severity: 3, issues: ['a'], verdict: 'x' });
+    assert.equal(parseCritique('garbage').severity, 1);
   });
 
   it('applies nothing when no candidate passes', async () => {

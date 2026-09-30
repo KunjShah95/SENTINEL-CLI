@@ -165,7 +165,7 @@ export function InputBar({
       if (key.tab)                   { onModeToggle?.(); return; }
       if (key.ctrl && input === 'p') { onCommandPalette?.(); return; }
     }
-  });
+  }, { isActive: !disabled });
 
   const handleChange = useCallback((next: string) => {
     setValue(next);
@@ -291,7 +291,7 @@ export function InputBar({
               value={value}
               onChange={handleChange}
               onSubmit={handleSubmit}
-              placeholder={disabled ? 'Compacting…' : (busy ? 'Type to steer the running turn…' : placeholder)}
+              placeholder={disabled ? '…' : (busy ? 'Type to steer the running turn…' : placeholder)}
               focus={!disabled}
             />
           </Box>

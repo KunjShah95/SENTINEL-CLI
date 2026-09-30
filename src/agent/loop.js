@@ -689,6 +689,14 @@ export async function* runAgentTurnInner(opts = {}) {
     if (hint) messages.push({ role: 'user', content: hint });
   }
 
+  // Aborted (Esc / timeout) — not the iteration cap. Found in a live
+  // benchmark: a 240s timeout after 4 tool calls was reported as
+  // "Stopped after 25 tool iterations".
+  if (signal?.aborted) {
+    yield { event: 'error', data: { message: 'Interrupted.', interrupted: true } };
+    yield* finishEvents({ interrupted: true });
+    return;
+  }
   // Hit the iteration cap
   yield {
     event: 'error',
@@ -830,7 +838,10 @@ async function executeOneTool({ tc, mode, opts, subagentState, editCounts, gateS
   const risk = shellish ? riskLevel(tc.input?.command, workdir) : null;
   const sessionGrantsShape = shellish ? allowAll.has(tc.name) && risk?.level === 'green' : allowAll.has(tc.name);
   let permission = sessionGrantsShape ? 'allow' : null;
-  if (!permission && onPermissionRequest) {
+  // Read-only tools never prompt (opencode behavior): a dialog per readFile
+  // stalled a live TUI turn for minutes. The config policy still applies
+  // in executeLocalTool, so `permissions.tools.readFile: deny` still denies.
+  if (!permission && onPermissionRequest && !isReadOnlyTool(tc.name)) {
     permission = await onPermissionRequest(tc.name, tc.id, { ...(tc.input || {}), __risk: risk ? explainRisk(risk) : undefined });
   }
   if (permission === 'deny') return { output: { error: 'User denied permission' } };

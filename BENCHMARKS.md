@@ -83,3 +83,34 @@ will be updated with the run log when it does.
   are a proxy, not a substitute.
 - Do not present SWE-mini 15/15 as "beats Claude Code". Present it as
   "has the tool prerequisites to be benchmarked fairly".
+
+## 6. Live bench: local models on the real agent loop (2026-09-30)
+
+Five planted-bug JavaScript tasks (`avg`, `sort`, `nullsafe`, `async`,
+`slug`), one BUILD-mode agent turn per model × task, tools auto-approved
+except destructive shell. **Graded by the harness re-running each task's
+`node test.js`** after the turn; editing `test.js` counts as a failure.
+Models served by Ollama on one Windows laptop; 240 s cap per run.
+
+| Model | avg | sort | nullsafe | async | slug | Solved | Median s | Tool calls | False "tests pass" |
+|---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
+| `qwen3.5-coder` | ✅ | ✅ | ✅ | ✅ | ✅ | 5/5 | 111.8 | 37 | 0 |
+| `qwen3:8b` | ✅ | ✅ | ✅ | ✅ | ✅ | 5/5 | 175.6 | 18 | 0 |
+| `ornith-1.5:9b` | ✅ | ✅ | ✅ | ✅ | ✅ | 5/5 | 30 | 27 | 0 |
+| `bonsai-q1` (26.9B, Q1) | ✅ | ✅ | ✅ | ✅ | ✅ | 5/5 | 33.2 | 30 | 0 |
+| `llama3.2` (3B) | ❌ | ❌ | ❌ | ❌ | ❌ | 0/5 | 5.5 | 22 | 0 |
+| `qwen2.5:0.5b` | ❌ | ❌ | ❌ | ❌ | ❌ | 0/5 | 0.4 | 3 | 0 |
+
+Read before citing:
+- A smoke test of agent + model on tiny bugs, not a coding-ability ranking
+  and not SWE-bench. One run per cell; local models are nondeterministic.
+- The two failing models mostly answered in prose instead of calling tools
+  (median 0–1 tool calls), so their zeros measure tool calling.
+- Two passing cells (`qwen3.5-coder` avg, `qwen3:8b` nullsafe) fixed the bug
+  but hit the 240 s cap; they were graded on the final repo state.
+- Hosted models were not run: the Groq key was rejected and the Ollama cloud
+  models hit account limits.
+
+Reproduce: `node scripts/bench-live.mjs --models ollama/<a>,ollama/<b> --timeout 240`,
+then `node scripts/bench-report.mjs` renders the HTML page. Raw results:
+`evals/results/bench-live-1790732842367.json` (gitignored runtime output).

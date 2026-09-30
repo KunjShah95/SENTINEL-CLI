@@ -12,7 +12,7 @@ import { THEMES, DEFAULT_THEME, modeColor } from '../src/tui/theme.ts';
 import { toolView } from '../src/tui/components/oc/tool-display.ts';
 import { parseMarkdown, parseInline } from '../src/tui/components/oc/markdown.tsx';
 import { formatContextReport, measureContext, bar } from '../src/tui/lib/context-report.ts';
-import { snapshot, stripAnsi } from '../scripts/tui-snapshot.tsx';
+import { snapshot, snapshotPermission, stripAnsi } from '../scripts/tui-snapshot.tsx';
 
 const THEME_DIR = join(import.meta.dirname, '..', 'src', 'tui', 'themes', 'opencode');
 
@@ -100,6 +100,23 @@ describe('/context report (MiniMax capacity meter)', () => {
     const report = formatContextReport(msgs, 2000);
     assert.match(report, /## Context/);
     assert.match(report, /Heaviest tools/);
+  });
+});
+
+describe('permission prompt (opencode style)', () => {
+  it('shows the edit as a mini diff with allow once / always / reject', () => {
+    const out = stripAnsi(snapshotPermission('editFile', { path: 'src/a.js', oldString: 'let x = 1;', newString: 'const x = 2;' }));
+    assert.match(out, /△ Permission required/);
+    assert.match(out, /← Edit src\/a\.js/);
+    assert.match(out, /- let x = 1;/);
+    assert.match(out, /\+ const x = 2;/);
+    assert.match(out, /Allow once .* Allow always .* Reject/);
+  });
+
+  it('shows shell commands with their risk explanation', () => {
+    const out = stripAnsi(snapshotPermission('bash', { command: 'npm publish', __risk: 'High risk.\npublishes a package' }));
+    assert.match(out, /\$ npm publish/);
+    assert.match(out, /High risk\./);
   });
 });
 

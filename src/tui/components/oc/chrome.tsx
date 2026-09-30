@@ -54,7 +54,7 @@ export function ActivityLine({
   const secs = elapsed / 1000;
   const tps = secs > 1 && outputChars > 0 ? Math.round(outputChars / 4 / secs) : 0;
   return (
-    <Box flexDirection="row" justifyContent="space-between" paddingLeft={1} paddingRight={1}>
+    <Box flexDirection="row" justifyContent="space-between" paddingLeft={1} paddingRight={1} width="100%">
       <Text>
         <Text color={colors.primary}>{FRAMES[frame]} </Text>
         <Text color={colors.text}>{PHASE_LABEL[phase]}</Text>
@@ -154,7 +154,7 @@ export function Footer({
   const { stdout } = useStdout();
   const columns = stdout?.columns || 100;
   return (
-    <Box flexDirection="row" justifyContent="space-between" paddingLeft={1} paddingRight={1} flexShrink={0}>
+    <Box flexDirection="row" justifyContent="space-between" paddingLeft={1} paddingRight={1} flexShrink={0} width="100%">
       <Box flexGrow={1} flexShrink={1} minWidth={0} marginRight={2}>
         <Text color={colors.textMuted}>{middleEllipsis(dir, Math.max(12, Math.floor(columns * 0.45)))}</Text>
       </Box>
