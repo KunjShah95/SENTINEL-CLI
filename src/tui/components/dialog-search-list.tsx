@@ -52,20 +52,21 @@ export function DialogSearchList<T>({
       setSelectedIndex(prev => Math.min(filtered.length - 1, prev + 1));
       return;
     }
-    if (input === 'k' && !key.ctrl) {
-      setSelectedIndex(prev => Math.max(0, prev - 1));
-      return;
-    }
-    if (input === 'j' && !key.ctrl) {
-      setSelectedIndex(prev => Math.min(filtered.length - 1, prev + 1));
-      return;
-    }
+    // (j/k navigation removed: it swallowed those letters from the search box.)
     if (key.escape) {
       setSearchValue('');
     }
   });
 
-  const visible = filtered.slice(0, MAX_VISIBLE_ITEMS);
+  // Keep the highlighted item previewed (theme picker) and on screen.
+  const highlighted = filtered[selectedIndex];
+  React.useEffect(() => {
+    if (highlighted && onHighlight) onHighlight(highlighted);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [highlighted]);
+
+  const windowStart = Math.max(0, Math.min(selectedIndex - Math.floor(MAX_VISIBLE_ITEMS / 2), filtered.length - MAX_VISIBLE_ITEMS));
+  const visible = filtered.slice(windowStart, windowStart + MAX_VISIBLE_ITEMS);
 
   return (
     <Box flexDirection="column" gap={1}>
@@ -83,7 +84,7 @@ export function DialogSearchList<T>({
       ) : (
         <Box flexDirection="column">
           {visible.map((item, i) => {
-            const isSelected = i === selectedIndex;
+            const isSelected = windowStart + i === selectedIndex;
             return (
               <Box key={getKey(item)} flexDirection="row">
                 {renderItem(item, isSelected)}
@@ -91,7 +92,7 @@ export function DialogSearchList<T>({
             );
           })}
           {filtered.length > MAX_VISIBLE_ITEMS ? (
-            <Text dimColor>{`...${filtered.length - MAX_VISIBLE_ITEMS} more`}</Text>
+            <Text dimColor>{`${selectedIndex + 1}/${filtered.length}`}</Text>
           ) : null}
         </Box>
       )}

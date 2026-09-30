@@ -1,9 +1,7 @@
-import React, { type ReactNode } from 'react';
-import { Box, Text, useInput } from 'ink';
+import React, { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Box, useInput } from 'ink';
 import { InputBar } from './input-bar.js';
-import { Spinner } from './spinner.js';
-import { StatusBar } from './status-bar.js';
-import { useTheme } from '../providers/theme/index.js';
+import { ActivityLine, Footer, TodoPanel, useTodos, type ActivityPhase } from './oc/chrome.js';
 
 type Mode = 'BUILD' | 'PLAN' | 'REVIEW' | 'SCAN' | 'FIX';
 type Props = {
@@ -28,8 +26,40 @@ type Props = {
   showThinking?: boolean;
   showDetails?: boolean;
   onStop?: () => void;
+  /** Characters streamed this turn (drives the tok/s estimate). */
+  streamedChars?: number;
+  /** Loop is blocked on background work / teammates. */
+  waiting?: boolean;
 };
 
+/** Poll team + background counts from the in-process harness while busy. */
+function useHarnessCounts(active: boolean) {
+  const [counts, setCounts] = useState({ teammates: 0, background: 0 });
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const [{ listTeam }, { listBackground }] = await Promise.all([
+          import('../../agent/team.js'),
+          import('../../agent/background.js'),
+        ]);
+        const teammates = listTeam().filter((m: { status: string }) => m.status === 'running').length;
+        const background = listBackground().filter((t: { status: string }) => t.status === 'running').length;
+        if (!cancelled) setCounts({ teammates, background });
+      } catch { /* harness modules unavailable */ }
+    };
+    load();
+    const t = setInterval(load, active ? 1000 : 5000);
+    return () => { cancelled = true; clearInterval(t); };
+  }, [active]);
+  return counts;
+}
+
+/**
+ * Session layout, opencode-style: transcript, (todo panel), activity line,
+ * prompt box, footer. No header row — the prompt carries mode + model and
+ * the footer carries directory, context meter and cost.
+ */
 export function SessionShell({
   children,
   onSubmit,
@@ -42,70 +72,43 @@ export function SessionShell({
   onModeToggle,
   onCommandPalette,
   model,
-  statusText,
-  sessionId,
   tokenUsage,
   microcompactSaved,
   compacting,
-  serverStatus,
   costUsd,
-  showThinking = true,
-  showDetails = true,
   onStop,
+  streamedChars = 0,
+  waiting = false,
 }: Props) {
-  const { colors } = useTheme();
-
   useInput((_input, key) => {
     if (key.escape && loading && onStop) onStop();
   });
 
-  const modeColor =
-    mode === 'BUILD'  ? colors.success   :
-    mode === 'PLAN'   ? colors.planMode  :
-    mode === 'REVIEW' ? colors.critical  :
-    mode === 'SCAN'   ? colors.warning   : colors.error;
+  const startedAt = useRef<number | undefined>(undefined);
+  if (loading && startedAt.current === undefined) startedAt.current = Date.now();
+  if (!loading) startedAt.current = undefined;
 
-  const shortModel = model
-    ? model.replace('claude-', '').replace('gpt-4', 'gpt4').replace('-latest', '')
-    : null;
+  const todos = useTodos(loading);
+  const { teammates, background } = useHarnessCounts(loading);
+  const phase: ActivityPhase = compacting ? 'compacting' : waiting ? 'waiting' : loading ? 'running' : 'idle';
+  const ratio = tokenUsage && tokenUsage.limit > 0 ? tokenUsage.estimated / tokenUsage.limit : undefined;
 
   return (
     <Box flexDirection="column" flexGrow={1} width="100%">
-      {/* Header */}
-      <Box
-        flexDirection="row"
-        paddingX={2}
-        paddingY={0}
-        alignItems="center"
-        gap={2}
-      >
-        <Text color={colors.dimSeparator}>{'◈'}</Text>
-        {shortModel ? <Text dimColor>{shortModel}</Text> : null}
-        <Text bold color={modeColor}>{mode}</Text>
-        {compacting && <Text color={colors.warning}>{'⟳ compacting…'}</Text>}
-        {statusText && <Text dimColor>{statusText}</Text>}
-        {serverStatus === 'connected' && <Text color={colors.success}>{'⬤'}</Text>}
-        <Box flexGrow={1} />
-      </Box>
-
-      <Box flexShrink={0}><Text color={colors.dimSeparator}>{'─'.repeat(80)}</Text></Box>
-
-      {/* Message area */}
       <Box flexDirection="column" flexGrow={1} paddingX={1}>
         {children}
       </Box>
 
-      {/* Spinner shown while loading */}
-      {loading ? (
-        <Box flexShrink={0} flexDirection="row" alignItems="center" gap={1}>
-          <Spinner mode={mode} />
-          {onStop ? <Text dimColor>{'Esc to stop'}</Text> : null}
-        </Box>
-      ) : null}
+      {loading ? <TodoPanel todos={todos} /> : null}
 
-      {/* Input bar */}
+      <Box flexShrink={0} marginTop={1} width="100%">
+        <ActivityLine phase={phase} startedAt={startedAt.current} outputChars={streamedChars} />
+      </Box>
+
       <Box flexShrink={0} paddingX={1}>
         <InputBar
+          model={model}
+          busy={loading}
           onSubmit={onSubmit}
           onCommand={onCommand}
           onSlashCommand={onSlashCommand}
@@ -117,20 +120,13 @@ export function SessionShell({
         />
       </Box>
 
-      {/* Status bar */}
-      <Box flexShrink={0}>
-        <StatusBar
-          mode={mode}
-          model={model}
-          statusText={statusText}
-          sessionId={sessionId}
-          tokenUsage={tokenUsage}
-          microcompactSaved={microcompactSaved}
-          compacting={compacting}
-          serverStatus={serverStatus}
+      <Box flexShrink={0} marginTop={1} width="100%">
+        <Footer
+          contextRatio={ratio}
           costUsd={costUsd}
-          showThinking={showThinking}
-          showDetails={showDetails}
+          teammates={teammates}
+          background={background}
+          microSaved={microcompactSaved}
         />
       </Box>
     </Box>

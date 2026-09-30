@@ -1,177 +1,145 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import { useTheme } from '../../providers/theme/index.js';
+import { modeColor } from '../../theme.js';
+import { InlineTool, BlockTool, formatDuration, shortModelName, titlecase, type ToolState } from '../oc/primitives.js';
+import { toolView } from '../oc/tool-display.js';
+import { Markdown } from '../oc/markdown.js';
 
-type ToolCall = { name: string; args?: Record<string, unknown>; result?: string };
 type MessagePart = {
   type: 'text' | 'reasoning' | 'tool-call' | 'tool-result';
   text?: string;
-  toolCall?: ToolCall;
   toolName?: string;
   toolCallId?: string;
   input?: unknown;
-  state?: 'pending' | 'output-available' | 'output-error';
+  state?: ToolState;
   output?: unknown;
   errorText?: string;
 };
-type Props = { parts: MessagePart[]; model?: string; duration?: number; showThinking?: boolean; showDetails?: boolean };
 
-function ToolRow({ part }: { part: MessagePart }) {
+type Props = {
+  parts: MessagePart[];
+  model?: string;
+  mode?: string;
+  duration?: number;
+  /** Turn finished: show the "▣ Build · model · 3.2s" footer. */
+  done?: boolean;
+  interrupted?: boolean;
+  showThinking?: boolean;
+  showDetails?: boolean;
+};
+
+function isDenied(err?: string) {
+  return !!err && /denied permission|User denied|rejected/i.test(err);
+}
+
+function ToolPart({ part, showDetails }: { part: MessagePart; showDetails: boolean }) {
   const { colors } = useTheme();
-
-  if (part.toolCall) {
-    const done = !!part.toolCall.result;
+  const view = toolView(part.toolName || 'tool', part.input, part.output);
+  const failed = part.state === 'output-error';
+  if (view.kind === 'block' && showDetails && part.state !== 'pending') {
     return (
-      <Box flexDirection="column" paddingLeft={4} marginY={0}>
-        <Box flexDirection="row" gap={1}>
-          <Text color={colors.dimSeparator}>{'↳'}</Text>
-          <Text color={colors.info}>{part.toolCall.name}</Text>
-          {part.toolCall.args
-            ? <Text dimColor>{Object.values(part.toolCall.args).slice(0, 2).map(String).join(' ')}</Text>
-            : null}
-          {done
-            ? <Text color={colors.success}>{'✓'}</Text>
-            : <Text color={colors.info}>{'…'}</Text>}
-        </Box>
-        {done && part.toolCall.result
-          ? <Box paddingLeft={3}><Text dimColor>{String(part.toolCall.result).slice(0, 200)}</Text></Box>
-          : null}
+      <BlockTool title={view.title} failed={failed}>
+        {view.body.map((line, i) => (
+          <Text key={i} color={i === 0 && line.startsWith('$ ') ? colors.text : colors.textMuted} wrap="truncate-end">{line}</Text>
+        ))}
+        {failed && part.errorText ? <Text color={colors.error} wrap="wrap">{part.errorText}</Text> : null}
+      </BlockTool>
+    );
+  }
+  return (
+    <InlineTool
+      icon={view.icon}
+      state={part.state}
+      pending={view.pending}
+      error={part.errorText}
+      denied={isDenied(part.errorText)}
+    >
+      {view.label}
+    </InlineTool>
+  );
+}
+
+/** opencode ReasoningPart in "hide" mode: one muted line, never shifts layout. */
+function ReasoningPart({ text, expanded }: { text: string; expanded: boolean }) {
+  const { colors } = useTheme();
+  const clean = text.replace('[REDACTED]', '').trim();
+  if (!clean) return null;
+  // Harness notices (✉ / ⏳ / goal) arrive as reasoning parts too.
+  const notice = /^(✉|⏳|⇄|⚖|✓ goal|✗ goal|… goal)/.test(clean);
+  if (notice) {
+    return (
+      <Box paddingLeft={3} marginTop={1} flexDirection="column">
+        {clean.split('\n').map((l, i) => <Text key={i} color={colors.accent}>{l}</Text>)}
       </Box>
     );
   }
-
-  const isPending = part.state === 'pending';
-  const isDone    = part.state === 'output-available';
-  const isError   = part.state === 'output-error';
-  const name      = part.toolName || 'tool';
-  const inputStr  = part.input
-    ? (typeof part.input === 'string' ? part.input : JSON.stringify(part.input)).slice(0, 120)
-    : '';
-  const outputStr = isDone && part.output !== undefined
-    ? (typeof part.output === 'string' ? part.output : JSON.stringify(part.output)).slice(0, 300)
-    : '';
-
+  const firstLine = clean.split('\n').find((l) => l.trim()) || '';
   return (
-    <Box flexDirection="column" paddingLeft={4} marginY={0}>
-      <Box flexDirection="row" gap={1} alignItems="center">
-        <Text color={colors.dimSeparator}>{'↳'}</Text>
-        <Text color={colors.info}>{name}</Text>
-        {inputStr ? <Text dimColor>{inputStr}</Text> : null}
-        {isPending ? <Text color={colors.info}>{'…'}</Text> : null}
-        {isDone    ? <Text color={colors.success}>{'✓'}</Text> : null}
-        {isError   ? <Text color={colors.error}>{'✗'}</Text>  : null}
-      </Box>
-      {outputStr ? <Box paddingLeft={3}><Text dimColor>{outputStr}</Text></Box> : null}
-      {isError && part.errorText
-        ? <Box paddingLeft={3}><Text color={colors.error}>{part.errorText}</Text></Box>
-        : null}
+    <Box paddingLeft={3} marginTop={1} flexDirection="column">
+      <Text color={colors.textMuted} italic wrap="truncate-end">
+        <Text color={colors.textMuted}>{'Thinking: '}</Text>
+        {expanded ? '' : firstLine.slice(0, 120)}
+      </Text>
+      {expanded ? <Box paddingLeft={2}><Text color={colors.textMuted} wrap="wrap">{clean}</Text></Box> : null}
     </Box>
   );
 }
 
-function ReasoningRow({ text }: { text: string }) {
-  const { colors } = useTheme();
-  return (
-    <Box paddingLeft={4} marginY={0}>
-      <Box flexDirection="row" gap={1}>
-        <Text color={colors.dimSeparator}>{'⊹'}</Text>
-        <Text dimColor color={colors.thinking}>{text.trim()}</Text>
-      </Box>
-    </Box>
-  );
-}
-
-function renderLine(line: string, colors: Record<string, string>, key: number) {
-  if (!line.trim()) return <Text key={key}>{''}</Text>;
-
-  if (line.startsWith('```'))
-    return <Box key={key} paddingLeft={3}><Text dimColor>{line}</Text></Box>;
-
-  const headingM = line.match(/^(#{1,3})\s+(.+)/);
-  if (headingM)
-    return <Box key={key} marginTop={1} paddingLeft={2}><Text bold color={colors.primary}>{headingM[2]}</Text></Box>;
-
-  const bulletM = line.match(/^(\s*[-*•])\s+(.+)/);
-  if (bulletM)
-    return (
-      <Box key={key} flexDirection="row" gap={1} paddingLeft={4}>
-        <Text color={colors.dimSeparator}>{'•'}</Text>
-        <Text>{bulletM[2]}</Text>
-      </Box>
-    );
-
-  if (/^🔴/.test(line)) return <Box key={key} paddingLeft={2}><Text bold color={colors.critical}>{line}</Text></Box>;
-  if (/^🟠/.test(line)) return <Box key={key} paddingLeft={2}><Text bold color={colors.error}>{line}</Text></Box>;
-  if (/^🟡/.test(line)) return <Box key={key} paddingLeft={2}><Text bold color={colors.warning}>{line}</Text></Box>;
-  if (/^🟢/.test(line)) return <Box key={key} paddingLeft={2}><Text bold color={colors.success}>{line}</Text></Box>;
-  if (/^(Score|Grade|Security Score):/i.test(line))
-    return <Box key={key} paddingLeft={2}><Text bold color={colors.info}>{line}</Text></Box>;
-
-  return <Box key={key} paddingLeft={2}><Text>{line}</Text></Box>;
-}
-
-export function BotMessage({ parts, model, duration, showThinking = true, showDetails = true }: Props) {
+/**
+ * opencode AssistantMessage: parts in order — text (markdown, indented 3),
+ * reasoning (one muted line), tools (inline rows or blocks) — then the
+ * "▣ Mode · model · duration" footer once the turn completes.
+ */
+export function BotMessage({ parts, model, mode = 'BUILD', duration, done = true, interrupted, showThinking = true, showDetails = true }: Props) {
   const { colors } = useTheme();
   if (parts.length === 0) return null;
+  const { name } = shortModelName(model);
+  const visible = parts.filter((p) => showDetails || (p.type !== 'tool-call' && p.type !== 'tool-result'));
 
-  const filtered = parts.filter(p => {
-    if (!showThinking && p.type === 'reasoning') return false;
-    if (!showDetails && (p.type === 'tool-call' || p.type === 'tool-result')) return false;
-    return true;
-  });
-
-  const shortModel = model
-    ? model.replace('claude-', '').replace('gpt-4', 'gpt4').replace('-latest', '')
-    : null;
-
-  if (filtered.length === 0) {
-    return (
-      <Box flexDirection="column" marginY={1}>
-        <Box paddingLeft={2}><Text bold color={colors.primary}>{'Sentinel'}</Text></Box>
-        <Box paddingLeft={2}><Text dimColor>{'[content filtered — use /thinking or /details to toggle]'}</Text></Box>
-      </Box>
-    );
+  // Merge consecutive text/reasoning parts (streaming emits many deltas).
+  const merged: MessagePart[] = [];
+  for (const p of visible) {
+    const last = merged[merged.length - 1];
+    if (last && (p.type === 'text' || p.type === 'reasoning') && last.type === p.type) {
+      merged[merged.length - 1] = { ...last, text: (last.text ?? '') + (p.text ?? '') };
+    } else merged.push(p);
   }
 
-  const groups = filtered.reduce<MessagePart[][]>((acc, p) => {
-    const last = acc[acc.length - 1];
-    if (last && last[0].type === p.type) { last.push(p); } else { acc.push([p]); }
-    return acc;
-  }, []);
-
+  let prevWasInline = false;
   return (
-    <Box flexDirection="column" marginY={1}>
-      <Box flexDirection="row" gap={1} paddingLeft={2} marginBottom={1}>
-        <Text bold color={colors.primary}>{'Sentinel'}</Text>
-        {shortModel ? <Text dimColor>{shortModel}</Text> : null}
-        {duration ? <Text dimColor>{`${(duration / 1000).toFixed(1)}s`}</Text> : null}
-      </Box>
-
-      {groups.map((group, gi) => {
-        const type = group[0].type;
-
-        if (type === 'reasoning') {
-          const text = group.map(p => p.text ?? '').join('');
-          return <ReasoningRow key={gi} text={text} />;
+    <Box flexDirection="column">
+      {merged.map((p, i) => {
+        if (p.type === 'text') {
+          prevWasInline = false;
+          if (!p.text?.trim()) return null;
+          return <Box key={i} paddingLeft={3} marginTop={1}><Markdown text={p.text} /></Box>;
         }
-
-        if (type === 'tool-call') {
-          return (
-            <Box key={gi} flexDirection="column">
-              {group.map((p, pi) => <ToolRow key={pi} part={p} />)}
-            </Box>
-          );
+        if (p.type === 'reasoning') {
+          prevWasInline = false;
+          return <ReasoningPart key={i} text={p.text ?? ''} expanded={showThinking} />;
         }
-
-        const text = group.map(p => p.text ?? '').join('');
-        if (!text.trim()) return null;
-        const lines = text.split('\n');
-        return (
-          <Box key={gi} flexDirection="column">
-            {lines.map((line, li) => renderLine(line, colors as any, li))}
-          </Box>
-        );
+        if (p.type === 'tool-call') {
+          const view = toolView(p.toolName || 'tool', p.input, p.output);
+          const block = view.kind === 'block' && showDetails && p.state !== 'pending';
+          // opencode: consecutive one-line tools stack without gaps.
+          const margin = block || !prevWasInline ? 1 : 0;
+          prevWasInline = !block;
+          return <Box key={i} marginTop={block ? 0 : margin}><ToolPart part={p} showDetails={showDetails} /></Box>;
+        }
+        return null;
       })}
+      {done ? (
+        <Box paddingLeft={3} marginTop={1}>
+          <Text>
+            <Text color={interrupted ? colors.textMuted : modeColor(colors, mode)}>{'▣ '}</Text>
+            <Text color={colors.text}>{titlecase(mode)}</Text>
+            {name ? <Text color={colors.textMuted}>{` · ${name}`}</Text> : null}
+            {duration ? <Text color={colors.textMuted}>{` · ${formatDuration(duration)}`}</Text> : null}
+            {interrupted ? <Text color={colors.textMuted}>{' · interrupted'}</Text> : null}
+          </Text>
+        </Box>
+      ) : null}
     </Box>
   );
 }

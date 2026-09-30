@@ -13,6 +13,7 @@ import { Mode } from '../shared/schemas/mode.js';
 import { buildSweSystemPrompt } from './swe.js';
 import { loadContextFiles, buildContextInjection } from './context-files.js';
 import { formatSkillListing } from './skills.js';
+import { buildMemorySection } from './memory.js';
 
 export function buildEnvironmentSection(dir = process.cwd()) {
   let git = 'not a git repo';
@@ -75,11 +76,15 @@ function buildModeSection(mode) {
     toolsLine:
       'Available tools: readFile, listDirectory, glob, grep, codeMap, writeFile, editFile, ' +
       'batchEdit, bash, runTests, applyPatch, searchWeb, diffFile, undoLastChange, redoLastUndo, ' +
-      'todoWrite, todoRead, skill, spawnAgent.',
+      'todoWrite, todoRead, skill, spawnAgent, memoryWrite, memoryDelete, bgRun, bgCheck, ' +
+      'spawnTeammate, sendMessage, teamStatus, teamMerge.',
     rules: [
       'If a bash command fails due to a missing package, install it and retry.',
       'For multi-step work, track progress with todoWrite (send the FULL list every call).',
       'Delegate bounded research subtasks with spawnAgent; it returns a summary, not a transcript.',
+      'Run long commands (full test suites, builds, servers) with bgRun and keep working; results arrive as <notifications>.',
+      'For large parallelizable work, propose a small team and wait for the user to confirm before spawnTeammate; use isolation="worktree" when teammates edit overlapping areas, then review with teamMerge action="diff" and apply or discard.',
+      'Save only durable, non-obvious facts with memoryWrite (user preferences, feedback, project constraints).',
     ],
   };
 }
@@ -108,5 +113,7 @@ export function buildSystemPrompt({ mode = Mode.BUILD, dir = process.cwd() } = {
   if (context) sections.splice(2, 0, context);
   const skills = buildSkillListingSection(dir);
   if (skills) sections.push(skills);
+  const memory = buildMemorySection(dir);
+  if (memory) sections.push(memory);
   return sections.join('\n\n');
 }

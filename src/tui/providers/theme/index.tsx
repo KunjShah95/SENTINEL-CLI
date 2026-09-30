@@ -48,8 +48,10 @@ function saveTheme(name: string) {
   } catch {}
 }
 
-export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>(loadSavedTheme);
+export function ThemeProvider({ children, initialTheme }: { children: ReactNode; initialTheme?: string }) {
+  const [theme, setThemeState] = useState<Theme>(
+    () => (initialTheme && THEMES.find((t) => t.name.toLowerCase() === initialTheme.toLowerCase())) || loadSavedTheme()
+  );
 
   const setTheme = useCallback((name: string) => {
     const found = THEMES.find((t) => t.name === name);

@@ -45,10 +45,10 @@ export default function Tools() {
       <h1 className="text-3xl font-semibold tracking-tight">Tools</h1>
       <p className="text-muted">Nineteen tools, all sandboxed to the project root. Path traversal is rejected, bash has a timeout and output cap, and tool results are truncated hard (20k chars, 30k in SWE mode) before they hit context. Consecutive read-only calls run concurrently; writes run serially.</p>
 
-      <h2 className="pt-4 text-xl font-semibold">Read-only — every mode</h2>
+      <h2 className="pt-4 text-xl font-semibold">Read-only: every mode</h2>
       <ToolGrid items={readOnly} />
 
-      <h2 className="pt-4 text-xl font-semibold">Build — BUILD, FIX (no shell), SWE</h2>
+      <h2 className="pt-4 text-xl font-semibold">Build: BUILD, FIX (no shell), SWE</h2>
       <ToolGrid items={build} />
 
       <div className="pt-2">

@@ -6,6 +6,10 @@ import {
   adaptMessagesForAnthropic,
 } from '../src/agent/providers.js';
 
+// fetch is mocked below; streamCompletion still requires a key to exist
+// (CI has none, a dev machine usually does — that hid this failure locally).
+process.env.OPENAI_API_KEY = process.env.OPENAI_API_KEY || 'test-key-not-real';
+
 function mockFetch(handler) {
   const prev = globalThis.fetch;
   globalThis.fetch = handler;

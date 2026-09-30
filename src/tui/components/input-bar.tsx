@@ -1,15 +1,16 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Box, Text, useInput } from 'ink';
-import TextInput from 'ink-text-input';
+import { PromptInput } from './prompt-input.js';
 import { useTheme } from '../providers/theme/index.js';
+import { modeColor } from '../theme.js';
+import { SPLIT_BORDER, shortModelName, titlecase } from './oc/primitives.js';
 
 type Mode = 'BUILD' | 'PLAN' | 'REVIEW' | 'SCAN' | 'FIX';
 
-const MODE_COLOR_KEY: Record<Mode, string> = {
-  BUILD: 'success', PLAN: 'planMode', REVIEW: 'critical', SCAN: 'warning', FIX: 'error',
-};
-
 type Props = {
+  model?: string;
+  /** A turn is running: Enter steers it. */
+  busy?: boolean;
   onSubmit: (value: string) => void;
   onCommand?: (command: string) => void;
   onSlashCommand?: () => void;
@@ -46,6 +47,12 @@ const SLASH_COMMANDS: Array<{ name: string; description: string; args?: string }
   { name: 'thinking', description: 'Toggle reasoning block display' },
   { name: 'details',  description: 'Toggle tool detail display' },
   { name: 'mcp',      description: 'MCP server info and usage' },
+  { name: 'goal',     description: 'Work until an evaluator confirms a condition', args: '<condition>' },
+  { name: 'steer',    description: 'Redirect the running turn', args: '<message>' },
+  { name: 'fork',     description: 'Branch this session' },
+  { name: 'theme',    description: 'Pick a theme (40+, incl. all opencode themes)', args: '[name]' },
+  { name: 'context',  description: 'Show the context budget' },
+  { name: 'sessions', description: 'Toggle the session panel' },
 ];
 
 function extractMentionToken(text: string): string | null {
@@ -62,6 +69,8 @@ function getSlashSuggestions(text: string): typeof SLASH_COMMANDS {
 }
 
 export function InputBar({
+  model,
+  busy = false,
   onSubmit,
   onCommand,
   onSlashCommand,
@@ -79,7 +88,10 @@ export function InputBar({
   const [selectedIndex, setSelectedIndex] = useState(0);
   const { colors } = useTheme();
 
-  const activeColor = (colors as any)[MODE_COLOR_KEY[mode]] ?? colors.primary;
+  const activeColor = modeColor(colors, mode);
+  const barColor = activeColor;
+  const modeLabel = titlecase(mode);
+  const { name: modelName, provider } = shortModelName(model);
   const isShell = value.startsWith('!');
 
   // Update slash suggestions as user types
@@ -153,7 +165,7 @@ export function InputBar({
       if (key.tab)                   { onModeToggle?.(); return; }
       if (key.ctrl && input === 'p') { onCommandPalette?.(); return; }
     }
-  });
+  }, { isActive: !disabled });
 
   const handleChange = useCallback((next: string) => {
     setValue(next);
@@ -170,10 +182,11 @@ export function InputBar({
   const handleSubmit = useCallback((submitted: string) => {
     // Complete autocomplete selection on Enter if suggestions are open
     if (hasSuggestions) { insertMentionSelected(); return; }
-    if (hasSlash && slashSuggestions.length === 1) {
-      // Single match — complete and execute immediately
-      const sel = slashSuggestions[0];
-      if (!sel.args) {
+    if (hasSlash) {
+      // Enter runs the highlighted command unless it has a REQUIRED
+      // argument (`<x>`); optional ones (`[x]`) run bare, like opencode.
+      const sel = slashSuggestions[Math.min(selectedIndex, slashSuggestions.length - 1)];
+      if (sel && (!sel.args || sel.args.startsWith('['))) {
         clearInput();
         onSubmit(`/${sel.name}`);
         return;
@@ -181,7 +194,6 @@ export function InputBar({
       insertSlashSelected();
       return;
     }
-    if (hasSlash) { insertSlashSelected(); return; }
 
     const trimmed = submitted.trim();
     if (!trimmed) return;
@@ -203,7 +215,7 @@ export function InputBar({
     }
 
     onSubmit(trimmed);
-  }, [onSubmit, onCommand, onShellCommand, hasSuggestions, hasSlash, slashSuggestions,
+  }, [onSubmit, onCommand, onShellCommand, hasSuggestions, hasSlash, slashSuggestions, selectedIndex,
       insertMentionSelected, insertSlashSelected, clearInput]);
 
   return (
@@ -255,24 +267,47 @@ export function InputBar({
         </Box>
       ) : null}
 
+      {/* opencode prompt: left bar in the agent color, element background,
+          then a meta row "Build · model provider". */}
       <Box
-        flexDirection="row"
-        borderStyle="round"
-        borderColor={disabled ? colors.dimSeparator : activeColor}
-        paddingX={1}
+        borderStyle={SPLIT_BORDER}
+        borderTop={false}
+        borderRight={false}
+        borderBottom={false}
+        borderLeftColor={disabled ? colors.border : (isShell ? colors.warning : barColor)}
         width="100%"
-        alignItems="center"
       >
-        <Text bold color={isShell ? colors.warning : activeColor}>
-          {isShell ? '$' : mode.slice(0, 1)}
-        </Text>
-        <TextInput
-          value={value}
-          onChange={handleChange}
-          onSubmit={handleSubmit}
-          placeholder={disabled ? 'Processing...' : placeholder}
-          focus={!disabled}
-        />
+        <Box
+          flexDirection="column"
+          paddingLeft={2}
+          paddingRight={2}
+          paddingTop={1}
+          flexGrow={1}
+          backgroundColor={colors.backgroundElement}
+        >
+          <Box flexDirection="row">
+            {isShell ? <Text color={colors.warning}>{'$ '}</Text> : null}
+            <PromptInput
+              value={value}
+              onChange={handleChange}
+              onSubmit={handleSubmit}
+              placeholder={disabled ? '…' : (busy ? 'Type to steer the running turn…' : placeholder)}
+              focus={!disabled}
+            />
+          </Box>
+          <Box flexDirection="row" justifyContent="space-between" paddingTop={1}>
+            <Text>
+              <Text color={isShell ? colors.warning : barColor}>{isShell ? 'Shell' : modeLabel}</Text>
+              {modelName && !isShell ? <Text color={colors.textMuted}>{' · '}</Text> : null}
+              {modelName && !isShell ? <Text color={colors.text}>{modelName}</Text> : null}
+              {provider && !isShell ? <Text color={colors.textMuted}>{` ${provider}`}</Text> : null}
+            </Text>
+            <Text color={colors.textMuted}>
+              <Text color={colors.text}>tab</Text>{' mode  '}
+              <Text color={colors.text}>ctrl+p</Text>{' commands'}
+            </Text>
+          </Box>
+        </Box>
       </Box>
     </Box>
   );

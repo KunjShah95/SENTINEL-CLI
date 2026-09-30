@@ -190,9 +190,51 @@ export const toolInputSchemas = {
     }
     return { ok: true, value: { patch: input.patch } };
   }),
+  memoryWrite: validator(input => {
+    for (const f of ['name', 'type', 'description', 'body']) {
+      if (typeof input[f] !== 'string' || input[f].length === 0) {
+        return { ok: false, error: `${f} is required` };
+      }
+    }
+    return { ok: true, value: { name: input.name, type: input.type, description: input.description, body: input.body } };
+  }),
+  memoryDelete: str('name'),
+  bgRun: validator(input => {
+    if (typeof input.command !== 'string' || input.command.length === 0) {
+      return { ok: false, error: 'command is required' };
+    }
+    return { ok: true, value: { command: input.command, timeout: typeof input.timeout === 'number' ? input.timeout : undefined } };
+  }),
+  bgCheck: validator(input => ({ ok: true, value: { id: typeof input.id === 'string' ? input.id : undefined } })),
+  spawnTeammate: validator(input => {
+    if (typeof input.name !== 'string' || typeof input.prompt !== 'string' || !input.prompt) {
+      return { ok: false, error: 'name and prompt are required' };
+    }
+    return {
+      ok: true,
+      value: {
+        name: input.name,
+        prompt: input.prompt,
+        mode: input.mode === 'PLAN' ? 'PLAN' : 'BUILD',
+        isolation: input.isolation === 'worktree' ? 'worktree' : 'none',
+      },
+    };
+  }),
+  sendMessage: validator(input => {
+    if (typeof input.to !== 'string' || typeof input.text !== 'string' || !input.text) {
+      return { ok: false, error: 'to and text are required' };
+    }
+    return { ok: true, value: { to: input.to, text: input.text } };
+  }),
+  teamStatus: validator(_input => ({ ok: true, value: {} })),
+  teamMerge: validator(input => {
+    if (typeof input.name !== 'string' || !input.name) return { ok: false, error: 'name is required' };
+    const action = ['diff', 'apply', 'discard'].includes(input.action) ? input.action : 'apply';
+    return { ok: true, value: { name: input.name, action } };
+  }),
 };
 
-export const READ_ONLY_TOOL_NAMES = ['readFile', 'listDirectory', 'glob', 'grep', 'codeMap', 'searchWeb', 'todoRead', 'skill'];
+export const READ_ONLY_TOOL_NAMES = ['readFile', 'listDirectory', 'glob', 'grep', 'codeMap', 'searchWeb', 'todoRead', 'skill', 'bgCheck', 'teamStatus'];
 export const BUILD_TOOL_NAMES = [
   ...READ_ONLY_TOOL_NAMES,
   'writeFile',
@@ -206,6 +248,12 @@ export const BUILD_TOOL_NAMES = [
   'redoLastUndo',
   'todoWrite',
   'spawnAgent',
+  'memoryWrite',
+  'memoryDelete',
+  'bgRun',
+  'spawnTeammate',
+  'sendMessage',
+  'teamMerge',
 ];
 
 export function isReadOnly(toolName) {

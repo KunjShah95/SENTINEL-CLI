@@ -20,7 +20,35 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { randomUUID } from "node:crypto";
-import { streamChat, Sessions, type ChatEvent } from "../lib/api-client.js";
+import { streamChat, Sessions, steer, type ChatEvent } from "../lib/api-client.js";
+import { expandPromptTemplate } from "../../agent/prompt-templates.js";
+
+/** One-line text for loop events that are not model output. */
+export function formatHarnessNotice(ev: ChatEvent): string | null {
+  if (ev.event === "waiting") return "⏳ waiting for background work / teammates…";
+  if (ev.event === "route") return `⇄ ${ev.data.model} (${ev.data.reason})`;
+  if (ev.event === "receipts") {
+    const mark: Record<string, string> = { supported: "✓", stale: "~", contradicted: "✗", unsupported: "?" };
+    const head = ev.data.blocking ? "⚖ receipts: unbacked claims — asking the model to verify" : "⚖ receipts";
+    return [head, ...ev.data.claims.map((c) =>
+      `  ${mark[c.status] ?? "?"} ${c.kind}: ${c.status}${c.receipt ? ` · ${c.receipt.id} \`${c.receipt.command}\` exit ${c.receipt.exitCode} · sha ${c.receipt.sha}` : ""}`)].join("\n");
+  }
+  if (ev.event === "goal") {
+    const d = ev.data;
+    const tag = d.ok ? "✓ goal met" : d.impossible ? "✗ goal impossible" : "… goal not met";
+    return `${tag} (check ${d.check}): ${d.reason}`;
+  }
+  if (ev.event === "notification") {
+    return ev.data.messages
+      .map((m: Record<string, unknown>) => {
+        if (m.type === "background") return `✉ background ${m.id} ${m.status} (exit ${m.exitCode})`;
+        if (m.type === "teammate_result") return `✉ teammate ${m.from} ${m.status}${m.branch ? ` on ${m.branch}` : ""}`;
+        return `✉ ${m.from}: ${String(m.text).slice(0, 120)}`;
+      })
+      .join("\n");
+  }
+  return null;
+}
 import { Mode, isReadOnlyTool } from "../lib/local-tools.js";
 import { shouldCompact, compactMessages, estimateTokens, getCompactionState, microcompactMessages } from "../lib/context-compactor.js";
 import { DEFAULT_CHAT_MODEL_ID, resolveSmallModel } from "../../shared/models/index.js";
@@ -39,6 +67,9 @@ export type AgentMessage = {
   mode?: AgentMode;
   model?: string;
   timestamp: number;
+  /** Wall time of the assistant turn, set on finish (opencode "▣ … · 8.4s"). */
+  durationMs?: number;
+  interrupted?: boolean;
 };
 
 let idCounter = 0;
@@ -69,6 +100,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
   const [mode, setMode] = useState<AgentMode>(options.initialMode || "BUILD");
   const [model, setModel] = useState<string>(options.initialModel || DEFAULT_CHAT_MODEL_ID);
   const [streamedText, setStreamedText] = useState<string>("");
+  const [waiting, setWaiting] = useState(false);
   const [compacting, setCompacting] = useState(false);
   const [compactionState, setCompactionState] = useState<{ estimatedTokens: number; percentage: number; atAsyncThreshold: boolean; atSyncThreshold: boolean }>({
     estimatedTokens: 0,
@@ -139,21 +171,35 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
     setMessages((prev) => [...prev, { ...m, id: nextId(), timestamp: Date.now() }]);
   }, []);
 
+  // Patches the latest ASSISTANT message. (It used to patch the last message
+  // of any role — once a steering message was appended mid-turn, every
+  // later stream update hit the user message and was silently dropped.)
   const updateLastMessage = useCallback((updater: (msg: AgentMessage) => AgentMessage) => {
     setMessages((prev) => {
-      if (prev.length === 0) return prev;
-      const next = prev.slice();
-      next[next.length - 1] = updater(next[next.length - 1]);
-      return next;
+      for (let i = prev.length - 1; i >= 0; i--) {
+        if (prev[i].role !== "assistant") continue;
+        const updated = updater(prev[i]);
+        if (updated === prev[i]) return prev;
+        const next = prev.slice();
+        next[i] = updated;
+        return next;
+      }
+      return prev;
     });
   }, []);
 
   const stop = useCallback(() => {
+    if (abortRef.current) {
+      // opencode: the turn footer reads "▣ Build · model · interrupted".
+      updateLastMessage((msg) => (msg.durationMs === undefined
+        ? { ...msg, interrupted: true, durationMs: Date.now() - msg.timestamp }
+        : msg));
+    }
     abortRef.current?.abort();
     abortRef.current = null;
     setStatus("idle");
     setLoading(false);
-  }, []);
+  }, [updateLastMessage]);
 
   /**
    * Fire-and-collect chat request used exclusively by the context compactor.
@@ -260,9 +306,22 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
   }, [messages, compacting, submitAndWaitForCompaction]);
 
   const submit = useCallback(
-    async (userText: string) => {
-      if (!userText.trim()) return;
+    async (rawText: string, submitOptions: { goal?: string } = {}) => {
+      if (!rawText.trim()) return;
       setError(null);
+      const userText = expandPromptTemplate(rawText).text;
+
+      // A turn is already running: steer it instead of starting another.
+      if (abortRef.current) {
+        steer(userText);
+        appendMessage({
+          role: "user",
+          mode: modeRef.current,
+          model: modelRef.current,
+          parts: [{ type: "text", text: `↪ ${userText}` }],
+        });
+        return;
+      }
 
       // Build a session if needed.
       let sid: string = sessionIdRef.current || '';
@@ -344,6 +403,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
             })),
             mode: modeRef.current,
             model: modelRef.current,
+            goal: submitOptions.goal,
           },
           {
             signal: ctrl.signal,
@@ -365,6 +425,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
       } finally {
         setStatus("idle");
         setLoading(false);
+        setWaiting(false);
         abortRef.current = null;
 
         // Update token usage after each response completes.
@@ -384,6 +445,9 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
 
   const handleEvent = useCallback(
     (ev: ChatEvent, assistantId: string) => {
+      // The loop blocks on pending background work after a "waiting" event;
+      // anything else means it is moving again.
+      setWaiting(ev.event === "waiting");
       switch (ev.event) {
         case "text": {
           const delta = ev.data?.delta || "";
@@ -474,6 +538,21 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
           });
           break;
         }
+        case "notification":
+        case "waiting":
+        case "receipts":
+        case "route":
+        case "goal": {
+          // Harness notices render as dim reasoning parts: visible to the
+          // user, excluded from the history sent back to the model.
+          const notice = formatHarnessNotice(ev);
+          if (!notice) break;
+          updateLastMessage((msg) => {
+            if (msg.id !== assistantId) return msg;
+            return { ...msg, parts: [...msg.parts, { type: "reasoning", text: notice }] };
+          });
+          break;
+        }
         case "finish":
         case "done": {
           const data = (ev as any).data || {};
@@ -485,6 +564,9 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
               percentage: Math.round(((usageData?.totalTokens ?? 0) / 40000) * 100),
               costUsd: data.costUsd ?? prev.costUsd,
             }));
+          }
+          if (ev.event === "finish") {
+            updateLastMessage((msg) => (msg.id === assistantId ? { ...msg, durationMs: Date.now() - msg.timestamp } : msg));
           }
           break;
         }
@@ -518,6 +600,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
     clear,
     appendMessage,
     streamedText,
+    waiting,
     useServer,
     setUseServer,
     serverStatus,

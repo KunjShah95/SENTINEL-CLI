@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text, useInput } from 'ink';
 import { useTheme } from '../theme/index.js';
 import type { DialogConfig } from './types.js';
 
@@ -16,8 +16,15 @@ export function DialogProvider({ children }: { children: ReactNode }) {
   const { colors } = useTheme();
 
   const close = useCallback(() => {
-    setDialog(null);
+    setDialog((d) => {
+      d?.onClose?.();
+      return null;
+    });
   }, []);
+
+  useInput((_input, key) => {
+    if (key.escape && dialog && dialog.closeOnEscape !== false) close();
+  }, { isActive: !!dialog });
 
   const open = useCallback(
     (config: DialogConfig) => {
@@ -30,16 +37,18 @@ export function DialogProvider({ children }: { children: ReactNode }) {
     <DialogContext.Provider value={{ open, close, isOpen: !!dialog }}>
       {children}
       {dialog ? (
+        // opencode ui/dialog: a panel-colored sheet, bold title left, "esc" right.
         <Box flexDirection="column" paddingX={2} paddingY={1}>
           <Box
             flexDirection="column"
-            borderStyle="single"
-            borderColor={colors.dimSeparator}
             width={dialog.width ?? 60}
-            padding={1}
+            paddingX={2}
+            paddingY={1}
+            backgroundColor={colors.backgroundPanel}
           >
-            <Box paddingBottom={1}>
-              <Text bold>{dialog.title}</Text>
+            <Box paddingBottom={1} flexDirection="row" justifyContent="space-between" width="100%">
+              <Text bold color={colors.text}>{dialog.title}</Text>
+              <Text color={colors.textMuted}>esc</Text>
             </Box>
             {dialog.children}
           </Box>

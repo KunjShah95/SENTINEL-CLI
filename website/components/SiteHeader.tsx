@@ -42,18 +42,18 @@ export function SiteHeader() {
   }, [open ]);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-ink-800 bg-ink-950/95 backdrop-blur">
+    <header className="sticky top-0 z-40 border-b border-ink-800/80 bg-ink-950/75 backdrop-blur-xl backdrop-saturate-150">
       <nav
         aria-label="Primary"
-        className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6"
+        className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6"
       >
-        <Link href="/" className="flex items-center gap-2" aria-label="Sentinel home">
-          <span aria-hidden="true" className="grid h-7 w-7 place-items-center rounded border border-ink-700 bg-ink-900 text-sm font-bold text-moss">
+        <Link href="/" className="group flex items-center gap-2.5" aria-label="Sentinel home">
+          <span aria-hidden="true" className="grid h-7 w-7 place-items-center rounded-md bg-moss text-sm font-bold text-ink-950 shadow-[inset_0_1px_0_rgb(255_255_255/0.35)] transition-transform duration-300 group-hover:rotate-45">
             ◈
           </span>
-          <span className="text-sm font-semibold tracking-tight">
+          <span className="text-[15px] font-semibold tracking-tight">
             Sentinel
-            <span className="ml-2 rounded border border-ink-800 bg-ink-900 px-1.5 py-0.5 font-mono text-[11px] font-normal text-muted">
+            <span className="ml-2 font-mono text-[11px] font-normal text-muted">
               v{site.version}
             </span>
           </span>
@@ -61,18 +61,21 @@ export function SiteHeader() {
 
         <ul className="hidden items-center gap-1 md:flex">
           {links.map((l) => {
-            const active =
-              pathname === l.href || pathname.startsWith(l.href + "/");
+            // Longest matching prefix wins, so /docs/mcp lights "MCP", not "Docs".
+            const match = links
+              .filter((x) => pathname === x.href || pathname.startsWith(x.href + "/"))
+              .sort((x, y) => y.href.length - x.href.length)[0];
+            const active = match?.href === l.href;
             return (
               <li key={l.href}>
                 <Link
                   href={l.href}
                   aria-current={active ? "page" : undefined}
                   className={cn(
-                    "rounded px-3 py-2 text-sm",
+                    "relative rounded px-3 py-2 text-sm transition-colors duration-200",
                     active
-                      ? "bg-ink-900 text-paper"
-                      : "text-muted hover:bg-ink-900 hover:text-paper"
+                      ? "text-paper after:absolute after:inset-x-3 after:-bottom-[15px] after:h-px after:bg-moss"
+                      : "text-muted hover:text-paper"
                   )}
                 >
                   {l.label}
@@ -83,7 +86,7 @@ export function SiteHeader() {
           <li className="ml-2">
             <a
               href={site.repo}
-              className="rounded border border-ink-700 bg-ink-900 px-3 py-2 text-sm text-paper hover:border-ink-700 hover:bg-ink-850"
+              className="inline-flex items-center gap-2 rounded-md border border-ink-700 bg-ink-900 px-3 py-1.5 text-sm text-paper transition-colors duration-200 hover:border-ink-600 hover:bg-ink-850 active:scale-[0.98]"
             >
               GitHub
             </a>
@@ -105,7 +108,7 @@ export function SiteHeader() {
       {open && (
         <div id="mobile-nav" className="border-t border-ink-800 bg-ink-950 md:hidden">
           <div className="flex items-center justify-between px-4 py-2">
-            <p className="text-xs uppercase tracking-wide text-muted">Menu</p>
+            <p className="font-mono text-xs text-muted">menu</p>
             <button
               ref={closeRef}
               type="button"

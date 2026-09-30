@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useRef, type ReactNode } from 'react';
 import { Box, Text } from 'ink';
 import { useTheme } from '../theme/index.js';
+import { SPLIT_BORDER } from '../../components/oc/primitives.js';
 import type { ToastOptions, ToastVariant } from './types.js';
 
 type ToastItem = {
@@ -52,15 +53,19 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         {children}
         {toasts.length > 0 ? (
           <Box flexDirection="column" gap={1} paddingX={1} paddingY={1}>
+            {/* opencode ui/toast: variant-colored left bar on the panel. */}
             {toasts.map((toast) => (
               <Box
                 key={toast.id}
-                borderStyle="single"
-                borderColor={getBorderColor(toast.variant)}
-                paddingX={2}
-                paddingY={0}
+                borderStyle={SPLIT_BORDER}
+                borderTop={false}
+                borderRight={false}
+                borderBottom={false}
+                borderLeftColor={getBorderColor(toast.variant)}
               >
-                <Text dimColor>{toast.message}</Text>
+                <Box paddingX={2} backgroundColor={colors.backgroundPanel} flexGrow={1}>
+                  <Text color={colors.text} wrap="wrap">{toast.message}</Text>
+                </Box>
               </Box>
             ))}
           </Box>

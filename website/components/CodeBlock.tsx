@@ -25,8 +25,8 @@ export function CodeBlock({
   }
 
   return (
-    <figure className="overflow-hidden rounded border border-ink-800 bg-ink-900">
-      <div className="flex items-center justify-between border-b border-ink-800 px-3 py-2">
+    <figure className="surface overflow-hidden rounded-md">
+      <div className="flex items-center justify-between border-b border-ink-800 py-1.5 pl-4 pr-1.5">
         <figcaption className="font-mono text-xs text-muted">
           {label ?? language}
         </figcaption>
@@ -35,7 +35,7 @@ export function CodeBlock({
           onClick={onCopy}
           aria-live="polite"
           aria-label={copied ? "Copied to clipboard" : "Copy code to clipboard"}
-          className="inline-flex items-center gap-1.5 rounded border border-ink-700 bg-ink-850 px-2 py-1 font-mono text-xs text-paper hover:border-moss/60"
+          className={`inline-flex items-center gap-1.5 rounded px-2 py-1 font-mono text-xs transition-colors duration-200 hover:bg-ink-850 active:scale-[0.97] ${copied ? "text-moss" : "text-muted hover:text-paper"}`}
         >
           {copied ? (
             <>
@@ -48,7 +48,7 @@ export function CodeBlock({
           )}
         </button>
       </div>
-      <pre className="overflow-x-auto p-3 font-mono text-[13px] leading-6 text-paper">
+      <pre className="overflow-x-auto px-4 py-3.5 font-mono text-[13px] leading-6 text-paper">
         <code>{code}</code>
       </pre>
     </figure>
@@ -72,9 +72,9 @@ export function Callout({
   children: React.ReactNode;
   tone?: "info" | "warn";
 }) {
-  const accent = tone === "warn" ? "border-amberish/50" : "border-moss/40";
+  const accent = tone === "warn" ? "border-amberish/70" : "border-moss/60";
   return (
-    <div role="note" aria-label={title} className={`rounded border ${accent} bg-ink-900 p-4`}>
+    <div role="note" aria-label={title} className={`rounded-md border-l-2 ${accent} bg-ink-900 px-4 py-3.5`}>
       <p className="text-sm font-semibold">{title}</p>
       <div className="mt-1 text-sm leading-6 text-muted">{children}</div>
     </div>

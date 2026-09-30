@@ -17,6 +17,12 @@ import { Sessions } from '../lib/api-client.js';
 import { executeCommand } from '../commands/index.js';
 import { executeCustomCommand } from '../lib/custom-commands.js';
 import { parseMentions, buildAgentPrompt } from '../../shared/tools/agent-mentions.js';
+import { expandPromptTemplate } from '../../agent/prompt-templates.js';
+import { getTotals as getCostTotals } from '../../agent/cost.js';
+import { Home } from '../components/oc/chrome.js';
+import { ThemePickerDialog } from '../components/dialogs/theme-picker.js';
+import { formatContextReport } from '../lib/context-report.js';
+import { getVersion } from '../lib/version.js';
 import type { CommandContext } from '../commands/types.js';
 import type { CommandContext as PaletteCommandContext } from '../components/command-menu/types.js';
 import type { AgentMode, AgentMessage, AgentMessagePart } from '../hooks/use-agent-chat.js';
@@ -28,8 +34,9 @@ export function Session() {
 
   const {
     messages, loading, mode, setMode, toggleMode,
-    submit, stop, clear, appendMessage, model, setModel, status, sessionId,
+    submit, stop, clear, appendMessage, model, setModel, status, sessionId, setSessionId,
     serverStatus, compacting, submitAndWaitForCompaction, microcompactSaved,
+    streamedText, waiting,
   } = useAgentChat({
     onPermissionRequest: useCallback(async (toolName: string, toolCallId: string, input: unknown) => {
       return requestPermission({ toolName, toolCallId, input });
@@ -41,7 +48,7 @@ export function Session() {
     }, [toast]),
   });
 
-  const [showThinking, setShowThinking] = useState(true);
+  const [showThinking, setShowThinking] = useState(false); // opencode: one collapsed "Thinking:" line; /thinking expands
   const [showDetails, setShowDetails] = useState(true);
 
   const tokenUsage = {
@@ -52,9 +59,8 @@ export function Session() {
     get percentage() { return Math.min(100, Math.round(this.estimated / this.limit * 100)); },
   };
 
-  const costUsd = tokenUsage.estimated > 0
-    ? (tokenUsage.estimated / 1_000_000) * 3.0 // ~$3/M tokens blended rate (Claude Sonnet)
-    : 0;
+  // Real spend: cumulative provider-reported usage × registry price.
+  const costUsd = getCostTotals().usd;
   const [showCommands, setShowCommands] = useState(false);
   const [showSessionPanel, setShowSessionPanel] = useState(false);
 
@@ -92,7 +98,7 @@ export function Session() {
     }
   }, [submit, toast]);
 
-  const { theme } = useTheme();
+  const { theme, themes, setTheme } = useTheme();
 
   const appendMessageSafe = useCallback(
     (msg: Omit<AgentMessage, 'id' | 'timestamp'>) => {
@@ -135,9 +141,11 @@ export function Session() {
       }
       if (session.mode === 'BUILD' || session.mode === 'PLAN' || session.mode === 'REVIEW') setMode(session.mode as AgentMode);
       if (session.model) setModel(session.model);
+      // Continue IN the selected session: new turns persist there.
+      setSessionId(id);
       setShowSessionPanel(false);
     } catch { toast.error('Failed to load session'); }
-  }, [clear, appendMessage, setMode, setModel, toast]);
+  }, [clear, appendMessage, setMode, setModel, setSessionId, toast]);
 
   const handleDeleteSession = useCallback(async (id: string) => {
     try {
@@ -152,6 +160,17 @@ export function Session() {
       toast.error('Failed to delete session');
     }
   }, [clear, toast]);
+
+  /** Branch the session (pi-mono session tree): the original stays intact. */
+  const handleForkSession = useCallback(async (id: string) => {
+    try {
+      const fork = await Sessions.fork(id);
+      toast.success(`Forked → ${fork.title} (${fork.messages} msgs)`);
+      await handleSelectSession(fork.id);
+    } catch (e) {
+      toast.error(`Fork failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }, [handleSelectSession, toast]);
 
   const wrappedSubmit = useCallback(
     async (value: string) => {
@@ -174,6 +193,38 @@ export function Session() {
         });
         if (handled) return;
 
+        if (cmd === 'goal') {
+          if (!args) { toast.error('Usage: /goal <completion condition>, e.g. /goal npm test exits 0'); return; }
+          toast.info(`Goal set: ${args}`);
+          submit(`Make this true: ${args}`, { goal: args });
+          return;
+        }
+        if (cmd === 'fork') {
+          if (!sessionId) { toast.error('No session to fork yet'); return; }
+          await handleForkSession(sessionId);
+          return;
+        }
+        if (cmd === 'theme' || cmd === 'themes') {
+          if (args) {
+            const found = themes.find((t) => t.name.toLowerCase() === args.toLowerCase());
+            if (found) { setTheme(found.name); toast.success(`Theme: ${found.name}`); } else toast.error(`Unknown theme "${args}"`);
+            return;
+          }
+          dialog.open({
+            title: `Themes (${themes.length})`, width: 60, height: 24,
+            children: <ThemePickerDialog onClose={() => dialog.close()} />,
+          });
+          return;
+        }
+        if (cmd === 'context') {
+          appendMessage({ role: 'assistant', mode, model, parts: [{ type: 'text', text: formatContextReport(messages, tokenUsage.limit) }] });
+          return;
+        }
+        if (cmd === 'steer') {
+          if (!args) { toast.error('Usage: /steer <message> (or just type while a turn is running)'); return; }
+          submit(args);
+          return;
+        }
         if (cmd === 'clear') { clear(); return; }
         if (cmd === 'new') { clear(); toast.info('New session'); return; }
         if (cmd === 'mode') { toggleMode(); return; }
@@ -214,6 +265,12 @@ export function Session() {
           submit(customPrompt);
           return;
         }
+        // Prompt templates (.sentinel/prompts/<name>.md) — expanded in submit().
+        if (expandPromptTemplate(value).template) {
+          toast.info(`Prompt template: /${cmd}`);
+          submit(value);
+          return;
+        }
         toast.error(`Unknown command "${cmd}". Type /help for commands.`);
         return;
       }
@@ -233,7 +290,7 @@ export function Session() {
       }
       submit(value);
     },
-    [clear, dialog, appendMessage, mode, model, toggleMode, toast, submit, setMode, handleExternalEditor, appendMessageSafe, messages, showThinking, showDetails, loading, compacting, sessionId, setModel, submitAndWaitForCompaction, handleSelectSession]
+    [clear, dialog, appendMessage, mode, model, toggleMode, toast, submit, setMode, handleExternalEditor, appendMessageSafe, messages, showThinking, showDetails, loading, compacting, sessionId, setModel, submitAndWaitForCompaction, handleSelectSession, handleForkSession]
   );
 
   const [leaderKey, setLeaderKey] = useState<'none' | 'ctrl-x'>('none');
@@ -380,7 +437,7 @@ export function Session() {
         <SessionPanel
           currentSessionId={sessionId}
           onSelect={handleSelectSession}
-          onFork={async () => { toast.info('Fork: start a new session and /export for history'); }}
+          onFork={handleForkSession}
           onDelete={handleDeleteSession}
           onClose={() => setShowSessionPanel(false)}
         />
@@ -389,7 +446,7 @@ export function Session() {
         <SessionShell
           onSubmit={wrappedSubmit}
           onShellCommand={handleShell}
-          inputDisabled={isLoading}
+          inputDisabled={compacting || dialog.isOpen || showCommands}
           loading={isLoading}
           mode={mode}
           onModeToggle={handleModeToggle}
@@ -405,13 +462,11 @@ export function Session() {
           showDetails={showDetails}
           compacting={compacting}
           onStop={stop}
+          streamedChars={streamedText.length}
+          waiting={waiting}
         >
-          {messages.length === 0 ? (
-            <Box padding={2} alignItems="center" justifyContent="center">
-              <Text dimColor>{'Start a conversation or type /help for commands'}</Text>
-            </Box>
-          ) : null}
-          {messages.map(msg => {
+          {messages.length === 0 ? <Home version={getVersion()} /> : null}
+          {messages.map((msg, idx) => {
             if (msg.role === 'error') {
               const textPart = msg.parts.find((p): p is { type: 'text'; text: string } => p.type === 'text');
               return <ErrorMessage key={msg.id} message={textPart?.text || 'Unknown error'} />;
@@ -421,7 +476,20 @@ export function Session() {
               return <UserMessage key={msg.id} message={textPart?.text || ''} mode={msg.mode || mode} />;
             }
             if (msg.role === 'assistant') {
-              return <BotMessage key={msg.id} parts={msg.parts} model={msg.model || model} showThinking={showThinking} showDetails={showDetails} />;
+              const inFlight = isLoading && idx === messages.length - 1;
+              return (
+                <BotMessage
+                  key={msg.id}
+                  parts={msg.parts as any}
+                  model={msg.model || model}
+                  mode={msg.mode || mode}
+                  done={!inFlight}
+                  duration={msg.durationMs}
+                  interrupted={msg.interrupted}
+                  showThinking={showThinking}
+                  showDetails={showDetails}
+                />
+              );
             }
             return null;
           })}

@@ -6,6 +6,7 @@
  */
 import { sessions as store } from '../../agent/sessions.js';
 import { runAgentTurn } from '../../agent/loop.js';
+import { post as postMail } from '../../agent/mailbox.js';
 
 export type ChatEvent =
   | { event: 'text'; data: { delta: string } }
@@ -21,6 +22,11 @@ export type ChatEvent =
       };
     }
   | { event: 'error'; data: { message: string } }
+  | { event: 'notification'; data: { count: number; messages: Array<Record<string, unknown>> } }
+  | { event: 'waiting'; data: { agentName: string } }
+  | { event: 'goal'; data: { ok: boolean; reason: string; impossible: boolean; check: number } }
+  | { event: 'receipts'; data: { ok: boolean; blocking: boolean; claims: Array<{ kind: string; status: string; text: string; receipt?: { id: string; command: string; exitCode?: number; sha: string } }> } }
+  | { event: 'route'; data: { model: string; reason: string } }
   | { event: 'done'; data: Record<string, unknown> };
 
 export const Sessions = {
@@ -29,7 +35,17 @@ export const Sessions = {
   create: (body: { title: string; mode?: string; model?: string; projectPath?: string }) =>
     store.create(body),
   delete: (id: string) => store.delete(id),
+  fork: (id: string, atMessageId?: string) => store.fork({ id, atMessageId }),
 };
+
+/**
+ * Steering: a message typed while a turn is running is not queued behind
+ * it — it goes to the lead's mailbox and is injected before the loop's
+ * next model call, so the user can redirect work mid-turn.
+ */
+export function steer(text: string): void {
+  postMail('lead', { type: 'message', from: 'user', text });
+}
 
 /** Local identity — no accounts, no billing (kept for API compatibility). */
 export const Auth = {
@@ -60,6 +76,7 @@ type StreamChatBody = {
   }>;
   mode: string;
   model: string;
+  goal?: string;
 };
 
 type StreamChatOptions = {
@@ -91,6 +108,7 @@ export async function* streamChat(
     history: uiMessages,
     mode: body.mode,
     model: body.model,
+    goal: body.goal,
     signal: options.signal,
     onPermissionRequest: options.onPermissionRequest,
   })) {

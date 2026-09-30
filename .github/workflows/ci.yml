@@ -14,6 +14,10 @@ jobs:
         node: [20, 22]
     steps:
       - uses: actions/checkout@v4
+        with:
+          # onboard.test.js surveys this repo's own git history (owners,
+          # hot files); a depth-1 clone has none.
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}

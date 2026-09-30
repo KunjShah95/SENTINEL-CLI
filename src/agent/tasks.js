@@ -9,10 +9,11 @@
  */
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { getWorkdir } from '../shared/tools/workdir.js';
 
 const VALID_STATUS = new Set(['pending', 'in_progress', 'completed']);
 
-export function todosFile(cwd = process.cwd()) {
+export function todosFile(cwd = getWorkdir()) {
   return join(resolve(cwd), '.sentinel', 'todos.json');
 }
 
@@ -40,7 +41,7 @@ export function validateTodos(todos) {
   return todos.map((t) => ({ id: t.id, title: t.title, status: t.status }));
 }
 
-export function readTodos(cwd = process.cwd()) {
+export function readTodos(cwd = getWorkdir()) {
   const file = todosFile(cwd);
   if (!existsSync(file)) return [];
   try {
@@ -51,7 +52,7 @@ export function readTodos(cwd = process.cwd()) {
   }
 }
 
-export function writeTodos(todos, cwd = process.cwd()) {
+export function writeTodos(todos, cwd = getWorkdir()) {
   const clean = validateTodos(todos);
   const file = todosFile(cwd);
   mkdirSync(join(resolve(cwd), '.sentinel'), { recursive: true });

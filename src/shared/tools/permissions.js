@@ -47,6 +47,21 @@ const TOOL_CATEGORIES = Object.freeze({
   // Shell execution (high risk)
   bash: 'shell',
   runTests: 'shell',
+  bgRun: 'shell',
+
+  todoRead: 'read',
+  skill: 'read',
+  bgCheck: 'read',
+  teamStatus: 'read',
+
+  todoWrite: 'write',
+  memoryWrite: 'write',
+  memoryDelete: 'write',
+
+  spawnAgent: 'agent',
+  spawnTeammate: 'agent',
+  sendMessage: 'agent',
+  teamMerge: 'write',
 
   // Network tools
   searchWeb: 'network',
@@ -64,6 +79,7 @@ const DEFAULT_CATEGORY_POLICIES = Object.freeze({
   shell: 'ask',
   network: 'allow',
   undo: 'allow',
+  agent: 'allow',
 });
 
 // ── Default policies per specific tool (override category) ───────────
@@ -71,6 +87,7 @@ const DEFAULT_CATEGORY_POLICIES = Object.freeze({
 const DEFAULT_TOOL_POLICIES = Object.freeze({
   bash: 'ask',
   runTests: 'ask',
+  bgRun: 'ask',
 });
 
 // ── Permission check ─────────────────────────────────────────────────

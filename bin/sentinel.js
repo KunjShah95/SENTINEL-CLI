@@ -83,9 +83,13 @@ export async function launchTui() {
     process.exit(1);
   }
 
-  const child = spawn(process.execPath, [tsxEntry, tuiEntry], {
+  // Run in the USER's directory: every tool resolves paths against cwd.
+  // (This used to be `cwd: root`, which pointed the TUI's file and shell
+  // tools at Sentinel's own install directory instead of the project.)
+  // Pin tsx to Sentinel's tsconfig so the project's tsconfig never applies.
+  const child = spawn(process.execPath, [tsxEntry, '--tsconfig', resolve(root, 'src/tui/tsconfig.json'), tuiEntry], {
     stdio: 'inherit',
-    cwd: root,
+    cwd: process.cwd(),
     env: { ...process.env, SENTINEL_ROOT: root },
   });
   child.on('exit', (code) => process.exit(code ?? 1));
