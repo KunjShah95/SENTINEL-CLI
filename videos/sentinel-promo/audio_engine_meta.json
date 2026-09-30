@@ -1,0 +1,170 @@
+{
+  "tts_provider": "kokoro",
+  "voice_id": "am_michael",
+  "bgm": {
+    "path": "assets/bgm/track.wav",
+    "volume": 0.12,
+    "mode": "detached-seed-loop",
+    "duration_s": null
+  },
+  "bgm_pending": true,
+  "bgm_provider": "musicgen",
+  "bgm_pid": 26960,
+  "bgm_log": "C:\\mp\\SENTINEL-CLI\\videos\\sentinel-promo\\assets\\bgm\\bgm-1790738375464.log",
+  "bgm_mode": "detached-seed-loop",
+  "bgm_target_duration_s": 28.85,
+  "bgm_seed_duration_s": 28,
+  "bgm_loop_count": 2,
+  "voices": [
+    {
+      "id": "01",
+      "path": "assets/voice/01-2.wav",
+      "duration_s": 1.39,
+      "words": []
+    },
+    {
+      "id": "02",
+      "path": "assets/voice/02-2.wav",
+      "duration_s": 2.94,
+      "words": []
+    },
+    {
+      "id": "03",
+      "path": "assets/voice/03-2.wav",
+      "duration_s": 5.16,
+      "words": []
+    },
+    {
+      "id": "04",
+      "path": "assets/voice/04-2.wav",
+      "duration_s": 4.97,
+      "words": []
+    },
+    {
+      "id": "05",
+      "path": "assets/voice/05-2.wav",
+      "duration_s": 4.82,
+      "words": []
+    },
+    {
+      "id": "06",
+      "path": "assets/voice/06-2.wav",
+      "duration_s": 3.69,
+      "words": []
+    },
+    {
+      "id": "07",
+      "path": "assets/voice/07-2.wav",
+      "duration_s": 3.75,
+      "words": []
+    },
+    {
+      "id": "08",
+      "path": "assets/voice/08-2.wav",
+      "duration_s": 2.13,
+      "words": []
+    }
+  ],
+  "sfx": [
+    {
+      "id": "01",
+      "name": "impact-bass-1",
+      "file": "assets/sfx/impact-bass-1.mp3",
+      "source": "local",
+      "offset_s": 0,
+      "duration_s": 2.12,
+      "volume": 0.35
+    },
+    {
+      "id": "02",
+      "name": "ping",
+      "file": "assets/sfx/ping.mp3",
+      "source": "local",
+      "offset_s": 0,
+      "duration_s": 1.32,
+      "volume": 0.35
+    },
+    {
+      "id": "03",
+      "name": "typing",
+      "file": "assets/sfx/typing.mp3",
+      "source": "local",
+      "offset_s": 0,
+      "duration_s": 1.5,
+      "volume": 0.35
+    },
+    {
+      "id": "03",
+      "name": "impact-bass-2",
+      "file": "assets/sfx/impact-bass-2.mp3",
+      "source": "local",
+      "offset_s": 0,
+      "duration_s": 2.59,
+      "volume": 0.35
+    },
+    {
+      "id": "04",
+      "name": "click-soft",
+      "file": "assets/sfx/click-soft.mp3",
+      "source": "local",
+      "offset_s": 0,
+      "duration_s": 0.37,
+      "volume": 0.35
+    },
+    {
+      "id": "05",
+      "name": "click-soft",
+      "file": "assets/sfx/click-soft.mp3",
+      "source": "local",
+      "offset_s": 0,
+      "duration_s": 0.37,
+      "volume": 0.35
+    },
+    {
+      "id": "06",
+      "name": "key-press",
+      "file": "assets/sfx/key-press.mp3",
+      "source": "local",
+      "offset_s": 0,
+      "duration_s": 0.4,
+      "volume": 0.35
+    },
+    {
+      "id": "06",
+      "name": "ping",
+      "file": "assets/sfx/ping.mp3",
+      "source": "local",
+      "offset_s": 0,
+      "duration_s": 1.32,
+      "volume": 0.35
+    },
+    {
+      "id": "07",
+      "name": "pop",
+      "file": "assets/sfx/pop.mp3",
+      "source": "local",
+      "offset_s": 0,
+      "duration_s": 0.72,
+      "volume": 0.35
+    },
+    {
+      "id": "08",
+      "name": "typing",
+      "file": "assets/sfx/typing.mp3",
+      "source": "local",
+      "offset_s": 0,
+      "duration_s": 1.5,
+      "volume": 0.35
+    },
+    {
+      "id": "08",
+      "name": "chime",
+      "file": "assets/sfx/chime.mp3",
+      "source": "local",
+      "offset_s": 0,
+      "duration_s": 2.5,
+      "volume": 0.35
+    }
+  ],
+  "total_duration_s": 28.85
+}

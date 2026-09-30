@@ -1,0 +1,348 @@
+<template>
+  <div id="root" data-composition-id="03-one-ask" data-width="1920" data-height="1080">
+    <!-- ===== track 0 · full-bleed ground (#0A0B0A) ===== -->
+    <div class="clip f03-ground" data-start="0" data-duration="9" data-track-index="0"></div>
+
+    <!-- ===== track 1 · terminal chrome (Scene 1) ===== -->
+    <div class="clip f03-chrome" data-start="0" data-duration="9" data-track-index="1">
+      <div class="f03-hair f03-hair-a" id="f03-hair-a"></div>
+      <div class="f03-hair f03-hair-b" id="f03-hair-b"></div>
+      <div class="f03-title" id="f03-title">
+        <span class="f03-cwd" id="f03-cwd">~/ledgerline</span>
+        <span class="f03-build" id="f03-build">BUILD · idle</span>
+      </div>
+    </div>
+
+    <!-- ===== track 2 · the ask, typed on (Scene 2) ===== -->
+    <div class="clip f03-cmdclip" data-start="0" data-duration="9" data-track-index="2">
+      <div class="f03-row f03-cmd" id="f03-cmd">
+        <span class="f03-wrap">
+          <span class="f03-typed" id="f03-typed"></span><span class="f03-caret" id="f03-caret"></span>
+        </span>
+      </div>
+    </div>
+
+    <!-- ===== track 3 · tool line 1 (Scene 3) ===== -->
+    <div class="clip f03-t1clip" data-start="0" data-duration="9" data-track-index="3">
+      <div class="f03-row f03-t1" id="f03-t1">
+        <span class="f03-line"><span class="f03-arrow">→</span> grep "MAX_RETRIES" src/</span>
+        <span class="f03-meta" id="f03-meta1">2 matches</span>
+      </div>
+    </div>
+
+    <!-- ===== track 4 · tool line 2 (Scene 3) ===== -->
+    <div class="clip f03-t2clip" data-start="0" data-duration="9" data-track-index="4">
+      <div class="f03-row f03-t2" id="f03-t2">
+        <span class="f03-line"><span class="f03-arrow">→</span> readFile src/billing/retry.js:40-72</span>
+        <span class="f03-meta" id="f03-meta2">33 lines</span>
+      </div>
+    </div>
+
+    <!-- ===== track 5 · the block. The last line. Amber, and amber only. (Scene 4) ===== -->
+    <div class="clip f03-bclip" data-start="0" data-duration="9" data-track-index="5">
+      <div class="f03-block" id="f03-block">
+        <div class="f03-stub" id="f03-stub"></div>
+        <div class="f03-blockline" id="f03-blockline">
+          <span class="f03-line"><span class="f03-arrow-amber">→</span> blast-radius src/billing/retry.js</span>
+        </div>
+        <div class="f03-restate" id="f03-restate">blocked · cite file:line + rollback</div>
+      </div>
+    </div>
+
+    <!-- ===== track 6 · closing hairline (Scene 5 hold) ===== -->
+    <div class="clip f03-footclip" data-start="0" data-duration="9" data-track-index="6">
+      <div class="f03-hair f03-hair-c" id="f03-hair-c"></div>
+    </div>
+  </div>
+
+  <style>
+    /* --- Sentinel brand fonts (local files, project-root relative) --- */
+    @font-face{font-family:Geist;font-style:normal;font-weight:100 900;font-display:swap;src:url("assets/fonts/captured-f639721981034f88-s.woff2") format("woff2");unicode-range:u+0460-052f,u+1c80-1c8a,u+20b4,u+2de0-2dff,u+a640-a69f,u+fe2e-fe2f}
+    @font-face{font-family:Geist;font-style:normal;font-weight:100 900;font-display:swap;src:url("assets/fonts/captured-9766a7e9e2e0ad5a-s.woff2") format("woff2");unicode-range:u+0301,u+0400-045f,u+0490-0491,u+04b0-u+04b1,u+2116}
+    @font-face{font-family:Geist;font-style:normal;font-weight:100 900;font-display:swap;src:url("assets/fonts/captured-b66cf8e69499582a-s.woff2") format("woff2");unicode-range:u+0102-0103,u+0110-0111,u+0128-u+0129,u+0168-u+0169,u+01a0-u+01a1,u+1af-u+01b0,u+0300-u+0301,u+0308,u+0329,u+1e00-u+1e9f,u+1ef2-u+1eff,u+2020,u+20a0-u+20ab,u+20ad-u+20c0,u+2113,u+2c60-u+2c7f,u+a720-u+a7ff}
+    @font-face{font-family:Geist;font-style:normal;font-weight:100 900;font-display:swap;src:url("assets/fonts/captured-aa016aab0e6d1295-s.woff2") format("woff2");unicode-range:u+0100-02ba,u+02bd-u+02c5,u+02c7-u+02cc,u+02ce-u+02d7,u+02dd-u+02ff,u+0304,u+0308,u+0329,u+1d00-u+1dbf,u+1e00-u+1e9f,u+1ef2-u+1eff,u+2020,u+20a0-u+20ab,u+20ad-u+20c0,u+2113,u+2c60-u+2c7f,u+a720-u+a7ff}
+    @font-face{font-family:Geist;font-style:normal;font-weight:100 900;font-display:swap;src:url("assets/fonts/captured-22a5144ee8d83bca-s.p.woff2") format("woff2");unicode-range:u+00??,u+0131,u+0152-u+0153,u+02bb,u+02bc,u+02c6,u+02da,u+02dc,u+0304,u+0308,u+0329,u+2000-206f,u+20ac,u+2122,u+2191,u+2193,u+2212,u+2215,u+feff,u+fffd}
+    @font-face{font-family:Geist Mono;font-style:normal;font-weight:100 900;font-display:swap;src:url("assets/fonts/captured-013b72fa676f92e0-s.woff2") format("woff2");unicode-range:u+0460-052f,u+1c80-1c8a,u+20b4,u+2de0-2dff,u+a640-a69f,u+fe2e-fe2f}
+    @font-face{font-family:Geist Mono;font-style:normal;font-weight:100 900;font-display:swap;src:url("assets/fonts/captured-b9408752a0c24fb9-s.woff2") format("woff2");unicode-range:u+0301,u+0400-045f,u+0490-0491,u+04b0-u+04b1,u+2116}
+    @font-face{font-family:Geist Mono;font-style:normal;font-weight:100 900;font-display:swap;src:url("assets/fonts/captured-65f03d54ccadf4a8-s.woff2") format("woff2");unicode-range:u+2000-2001,u+2004-2008,u+200a,u+20ac,u+20b2,u+2113,u+2c60-u+2c7f}
+    @font-face{font-family:Geist Mono;font-style:normal;font-weight:100 900;font-display:swap;src:url("assets/fonts/captured-e038a29029a234f2-s.woff2") format("woff2");unicode-range:u+0102-0103,u+0110-0111,u+0128-u+0129,u+0168-u+0169,u+01a0-u+01a1,u+1af-u+01b0,u+0300-u+0301,u+0308,u+0329,u+1d00-u+1dbf,u+1e00-u+1e9f,u+1ef2-u+1eff,u+2020,u+20a0-u+20ab,u+20ad-u+20c0,u+2113,u+2c60-u+2c7f,u+a720-u+a7ff}
+    @font-face{font-family:Geist Mono;font-style:normal;font-weight:100 900;font-display:swap;src:url("assets/fonts/captured-2b5b02fc7e511755-s.woff2") format("woff2");unicode-range:u+0100-02ba,u+02bd-u+02c5,u+02c7-u+02cc,u+02ce-u+02d7,u+02dd-u+02ff,u+0304,u+0308,u+0329,u+1d00-u+1dbf,u+1e00-u+1e9f,u+1ef2-u+1eff,u+2020,u+20a0-u+20ab,u+20ad-u+20c0,u+2113,u+2c60-u+2c7f,u+a720-u+a7ff}
+    @font-face{font-family:Geist Mono;font-style:normal;font-weight:100 900;font-display:swap;src:url("assets/fonts/captured-7d4881bb7e1bf84d-s.p.woff2") format("woff2");unicode-range:u+00??,u+0131,u+0152-u+0153,u+02bb,u+02bc,u+02c6,u+02da,u+02dc,u+2000-206f,u+20ac,u+2122,u+2191,u+2193,u+2212,u+2215,u+feff,u+fffd}
+
+    /* --- frame root: the container law. ALL cqw below resolve against 1920x1080. --- */
+    #root{
+      position:relative;
+      width:100%;
+      height:100%;
+      overflow:hidden;
+      container-type:size;
+      font-family:"Geist Mono",monospace;
+      font-weight:400;
+      -webkit-font-smoothing:antialiased;
+    }
+    #root .clip{position:absolute;inset:0;}
+
+    /* --- L0 · full-bleed ground. key 'cream' = near-black GROUND. --- */
+    .f03-ground{background:#0A0B0A;}
+
+    /* --- L1 · terminal chrome: 1px hairlines + the title row --- */
+    .f03-hair{
+      position:absolute;left:5.5cqw;right:5.5cqw;height:1px;
+      background:#222622;
+      transform-origin:0% 50%;
+      will-change:transform,opacity;
+    }
+    .f03-hair-a{top:118px;}
+    .f03-hair-b{top:194px;transform-origin:100% 50%;}
+    .f03-hair-c{top:818px;}
+
+    .f03-title{
+      position:absolute;left:5.5cqw;right:5.5cqw;top:142px;
+      display:flex;align-items:baseline;justify-content:space-between;
+      font-family:"Geist Mono",monospace;font-weight:400;
+      font-size:1.0cqw;line-height:1.2;letter-spacing:0.14em;
+      white-space:nowrap;
+      will-change:transform,opacity;
+    }
+    .f03-cwd{color:#ECEEE9;}      /* key 'ink-black' = off-white TEXT */
+    .f03-build{color:#8BD99A;}     /* the machine's own accent */
+
+    /* --- L2-L4 · transcript rows. Shared geometry: content field + a right status column. --- */
+    .f03-row{
+      position:absolute;left:5.5cqw;right:5.5cqw;
+      display:flex;align-items:baseline;justify-content:space-between;
+      font-family:"Geist Mono",monospace;font-weight:400;
+      font-size:1.55cqw;line-height:1.5;letter-spacing:0;
+      color:#AFB7B1;
+      white-space:nowrap;
+      will-change:transform,opacity;
+    }
+    /* NB: .f03-line must NOT set colour — it is the row container that owns the
+       colour, otherwise the block line renders off-white instead of amber. */
+    .f03-line{white-space:pre;}
+    .f03-arrow{color:#ECEEE9;}
+    .f03-meta{
+      color:#959C94;
+      font-size:1.2cqw;letter-spacing:0.06em;
+      will-change:transform,opacity;
+    }
+
+    /* the ask — the one off-white command line, set larger than the tool stream */
+    .f03-cmd{top:258px;font-size:1.75cqw;color:#ECEEE9;}
+
+    /* the two tool lines land on their own beats */
+    .f03-t1{top:360px;}
+    .f03-t2{top:458px;}
+
+    /* --- L5 · the blocked block. Amber, and amber only. --- */
+    .f03-block{
+      position:absolute;left:5.5cqw;right:5.5cqw;top:590px;
+      will-change:transform;
+    }
+    .f03-stub{
+      position:absolute;left:0;top:0;width:36px;height:2px;
+      background:#E8B35A;
+      transform-origin:0% 50%;
+      will-change:transform,opacity;
+    }
+    .f03-blockline{
+      position:absolute;left:0;right:0;top:40px;
+      font-family:"Geist Mono",monospace;font-weight:400;
+      font-size:2.1cqw;line-height:1.45;letter-spacing:-0.01em;
+      color:#E8B35A;white-space:nowrap;
+      will-change:transform,opacity;
+    }
+    .f03-restate{
+      position:absolute;left:0;right:0;top:122px;
+      font-family:"Geist Mono",monospace;font-weight:400;
+      font-size:1.75cqw;line-height:1.45;letter-spacing:0;
+      color:#E8B35A;white-space:nowrap;
+      will-change:transform,opacity;
+    }
+    .f03-arrow-amber{color:#E8B35A;}
+
+    /* --- discrete-text-sequence: mono wrap + block caret --- */
+    .f03-wrap{display:inline-flex;align-items:baseline;min-width:56ch;white-space:nowrap;}
+    .f03-typed{white-space:pre;}
+    .f03-caret{
+      display:inline-block;
+      width:0.3em;height:1.02em;
+      margin-left:0.14em;
+      background:#8BD99A;
+      vertical-align:-0.17em;
+      opacity:0;
+    }
+  </style>
+
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+  <script>
+  (function () {
+    if (typeof gsap === "undefined") return;
+
+    /* Scope every lookup to THIS frame's root. getElementById is unsafe here —
+       every sub-composition on the page authors its root as id="root", so a global
+       id lookup can land on a sibling frame's node. */
+    var host = null;
+    var cur = document.currentScript;
+    if (cur && cur.parentNode) {
+      host = cur.parentNode.querySelector('[data-composition-id="03-one-ask"]');
+    }
+    if (!host) {
+      var found = document.querySelectorAll('[data-composition-id="03-one-ask"]');
+      host = found.length ? found[found.length - 1] : null;
+    }
+    if (!host) return;
+
+    function $(sel) { return host.querySelector(sel); }
+
+    var DURATION = 9;
+
+    window.__timelines = window.__timelines || {};
+    var tl = (window.__timelines["03-one-ask"] = gsap.timeline({ paused: true }));
+
+    /* ================= SCENE 1 · 0.00-0.30 · bare ground, terminal chrome ============ */
+    tl.fromTo($("#f03-hair-a"), { scaleX: 0 },
+      { scaleX: 1, duration: 0.26, ease: "power3.out" }, 0.0);
+    tl.fromTo($("#f03-hair-b"), { scaleX: 0 },
+      { scaleX: 1, duration: 0.30, ease: "power3.out" }, 0.10);
+    tl.fromTo($("#f03-cwd"), { opacity: 0, y: 10 },
+      { opacity: 1, y: 0, duration: 0.22, ease: "power2.out" }, 0.12);
+    tl.fromTo($("#f03-build"), { opacity: 0, x: 10 },
+      { opacity: 1, x: 0, duration: 0.26, ease: "power2.out" }, 0.18);
+
+    /* =============== SCENE 2 · 0.32-1.80 · the ask types on, with a caret ===============
+       discrete-text-sequence: a sparse {t,text} table reverse-searched every frame.
+       Instant jumps, a 0.23s thinking pause before the final word, no easing on the
+       text itself. min-width on the wrap stops the right edge jittering. */
+    var T0 = 0.32;
+    var TYPE_DUR = 1.28;
+    var typedEl = $("#f03-typed");
+    var caretEl = $("#f03-caret");
+
+    tl.fromTo($("#f03-cmd"), { opacity: 0 }, { opacity: 1, duration: 0.1, ease: "none" }, T0);
+
+    var SEQUENCE = [
+      { t: 0.00, text: "" },
+      { t: 0.08, text: "$ s" },
+      { t: 0.16, text: "$ sentinel" },
+      { t: 0.23, text: "$ sentinel a" },
+      { t: 0.31, text: "$ sentinel ask" },
+      { t: 0.38, text: "$ sentinel ask " },
+      { t: 0.46, text: "$ sentinel ask -b" },
+      { t: 0.56, text: "$ sentinel ask -b \"raise" },
+      { t: 0.63, text: "$ sentinel ask -b \"raise the" },
+      { t: 0.70, text: "$ sentinel ask -b \"raise the retry" },
+      { t: 0.80, text: "$ sentinel ask -b \"raise the retry limit" },
+      { t: 0.88, text: "$ sentinel ask -b \"raise the retry limit for" },
+      { t: 0.95, text: "$ sentinel ask -b \"raise the retry limit for failed" },
+      { t: 1.18, text: "$ sentinel ask -b \"raise the retry limit for failed charges" },
+      { t: 1.28, text: "$ sentinel ask -b \"raise the retry limit for failed charges\"" }
+    ];
+
+    function textAt(time) {
+      for (var i = SEQUENCE.length - 1; i >= 0; i--) {
+        if (time >= SEQUENCE[i].t) return SEQUENCE[i].text;
+      }
+      return "";
+    }
+
+    var typeDriver = { t: 0 };
+    var lastTyped = null;
+    tl.to(typeDriver, {
+      t: TYPE_DUR, duration: TYPE_DUR, ease: "none",
+      onUpdate: function () {
+        var s = textAt(typeDriver.t);
+        if (s !== lastTyped) { typedEl.textContent = s; lastTyped = s; }
+      }
+    }, T0);
+
+    /* deterministic sin square-wave caret — a pure function of timeline time.
+       It dies the instant the line submits. */
+    var blink = { p: 0 };
+    tl.to(blink, {
+      p: Math.PI * 4, duration: TYPE_DUR, ease: "none",
+      onUpdate: function () { caretEl.style.opacity = Math.sin(blink.p) > 0 ? "1" : "0"; }
+    }, T0);
+    tl.set(caretEl, { opacity: 0 }, T0 + TYPE_DUR + 0.06);
+
+    /* ====== SCENES 3-4 · 1.80-5.16 · the tool stream lands line by line =================
+       dynamic-content-sequencing: one reduction, precomputed ONCE at build. Each entry's
+       window comes from its own content length plus a hold, then the sequence is anchored
+       to the voiceover beats (1.80 / 2.70) and the block's own 3.60. Nothing is recomputed
+       per frame. Everything above holds dead still while these land. */
+    var BASE_DURATION = 0.18;   /* s    — minimum per entry */
+    var SEC_PER_CHAR  = 0.0030; /* s/ch — terminal cadence */
+    var META_DELAY    = 0.14;   /* s    — the count trails its own command */
+
+    var CONTENT = [
+      { text: 'grep "MAX_RETRIES" src/',              meta: "2 matches" },
+      { text: "readFile src/billing/retry.js:40-72",  meta: "33 lines"  }
+    ];
+
+    /* Each entry's own content length sets its enter + meta timing; its start is then
+       anchored to the voiceover beat the packet names (1.80 / 2.70). Precomputed
+       once here — the per-frame cost is nothing, and nothing is re-derived. */
+    var BEATS = [1.80, 2.70];
+    var PLAN = [];
+    for (var i = 0; i < CONTENT.length; i++) {
+      var e = CONTENT[i];
+      PLAN.push({
+        start: BEATS[i],
+        enter: BASE_DURATION + e.text.length * SEC_PER_CHAR,
+        metaAt: META_DELAY + e.text.length * 0.0012
+      });
+    }
+
+    var rowSel = ["#f03-t1", "#f03-t2"];
+    var metaSel = ["#f03-meta1", "#f03-meta2"];
+    for (var n = 0; n < PLAN.length; n++) {
+      var p = PLAN[n];
+      tl.fromTo($(rowSel[n]), { opacity: 0, y: 16 },
+        { opacity: 1, y: 0, duration: p.enter, ease: "power3.out" }, p.start);
+      tl.fromTo($(metaSel[n]), { opacity: 0, x: 14 },
+        { opacity: 1, x: 0, duration: 0.22, ease: "power2.out" }, p.start + p.metaAt);
+    }
+
+    /* ============= SCENE 4 · 3.60-5.16 · the block lands alone and hard ================
+       Amber only. Every other line is already at its final value and does not move. */
+    var BLOCK_AT = 3.60;
+    var stub = $("#f03-stub");
+    var blockline = $("#f03-blockline");
+    var restate = $("#f03-restate");
+
+    tl.fromTo(stub, { scaleX: 0 }, { scaleX: 1, duration: 0.24, ease: "power4.out" }, BLOCK_AT);
+    tl.fromTo(blockline, { opacity: 0, y: 20, scale: 0.96 },
+      { opacity: 1, y: 0, scale: 1, duration: 0.34, ease: "power4.out" }, BLOCK_AT);
+    tl.fromTo(restate, { opacity: 0, y: 24, scale: 0.985 },
+      { opacity: 1, y: 0, scale: 1, duration: 0.40, ease: "power4.out" }, 4.05);
+
+    /* ============ SCENE 5 · 5.16-9.00 · the dramatic comma. 3.84s of silence. ===========
+       A decaying shock, then dead still. Finite, timeline-driven, seek-safe, and the
+       envelope reaches exactly 0 at t=9.00. It runs on the block wrapper, which carries
+       no other transform, so the quickSetters can never clobber a GSAP tween. */
+    var blockEl = $("#f03-block");
+    var jitX = gsap.quickSetter(blockEl, "x", "px");
+    var jitY = gsap.quickSetter(blockEl, "y", "px");
+    var JIT_T0 = 5.16;
+    var JIT_DUR = DURATION - JIT_T0;   /* runs out exactly on the frame's last frame */
+    var J = { t: 0 };
+
+    tl.to(J, {
+      t: JIT_DUR, duration: JIT_DUR, ease: "none",
+      onUpdate: function () {
+        var prog = J.t / JIT_DUR;
+        var ramp = Math.min(1, J.t / 0.07);
+        var u = Math.max(0, Math.min(1, (prog - 0.42) / 0.58));
+        var env = ramp * Math.pow(1 - u, 1.6);
+        var w = Math.PI * 2 * 9 * prog;
+        jitX((Math.sin(w) * 2.6 + Math.sin(w * 2.3 + 0.9) * 1.0) * env);
+        jitY((Math.cos(w * 1.6 + 0.5) * 1.8 + Math.sin(w * 3.1) * 0.6) * env);
+      }
+    }, JIT_T0);
+
+    /* the closing hairline settles in with the hold */
+    tl.fromTo($("#f03-hair-c"), { scaleX: 0, opacity: 0 },
+      { scaleX: 1, opacity: 1, duration: 0.5, ease: "power3.out" }, JIT_T0);
+  })();
+  </script>
+</template>

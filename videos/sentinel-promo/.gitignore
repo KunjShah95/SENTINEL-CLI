@@ -1,0 +1,13 @@
+# Regenerable from the source URL — re-run `npx hyperframes capture <url> -o ./capture` to recreate.
+capture/
+
+# Verification scratch from `npx hyperframes snapshot`. Not source.
+snapshots/
+
+# Regenerable frame-worker packets, rebuilt by scripts/frame-packets.mjs.
+.hyperframes/frame-packets/
+
+# Generated engine scratch.
+audio_request.json
+
+# NOTE: renders/video.mp4 is intentionally tracked — it is this project's deliverable.
