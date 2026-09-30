@@ -11,10 +11,10 @@ export function DocsSidebar() {
     <nav aria-label="Documentation sections" className="space-y-6">
       {docNav.map((group) => (
         <div key={group.title}>
-          <p className="px-3 text-xs font-semibold uppercase tracking-wide text-muted">
+          <p className="px-3 font-mono text-xs text-ink-600">
             {group.title}
           </p>
-          <ul className="mt-2 space-y-0.5">
+          <ul className="mt-2 space-y-px border-l border-ink-800">
             {group.items.map((item) => {
               const active = pathname === item.href;
               return (
@@ -23,10 +23,10 @@ export function DocsSidebar() {
                     href={item.href}
                     aria-current={active ? "page" : undefined}
                     className={cn(
-                      "block rounded px-3 py-2 text-sm leading-5",
+                      "-ml-px block border-l px-3 py-1.5 text-sm leading-5 transition-colors duration-150",
                       active
-                        ? "bg-ink-900 text-paper outline outline-1 outline-ink-700"
-                        : "text-muted hover:bg-ink-900 hover:text-paper"
+                        ? "border-moss font-medium text-paper"
+                        : "border-transparent text-muted hover:border-ink-600 hover:text-paper"
                     )}
                   >
                     {item.label}

@@ -18,9 +18,9 @@ export function DocsPager() {
         {prev && (
           <Link
             href={prev.href}
-            className="group flex items-center gap-2 rounded border border-ink-800 bg-ink-900 p-4 hover:border-ink-700"
+            className="group flex items-center gap-2 rounded-md border border-ink-800 p-4 transition-colors duration-200 hover:border-ink-700 hover:bg-ink-900"
           >
-            <ArrowLeft size={16} aria-hidden="true" className="shrink-0 text-muted" />
+            <ArrowLeft size={16} aria-hidden="true" className="shrink-0 text-muted transition-transform duration-200 group-hover:text-moss" />
             <span>
               <span className="block text-xs text-muted">Previous</span>
               <span className="block text-sm font-medium group-hover:text-moss">
@@ -42,7 +42,7 @@ export function DocsPager() {
                 {next.label}
               </span>
             </span>
-            <ArrowRight size={16} aria-hidden="true" className="shrink-0 text-muted" />
+            <ArrowRight size={16} aria-hidden="true" className="shrink-0 text-muted transition-transform duration-200 group-hover:text-moss" />
           </Link>
         )}
       </div>

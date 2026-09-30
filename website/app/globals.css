@@ -4,6 +4,7 @@
 
 :root {
   color-scheme: dark;
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E");
 }
 
 html {
@@ -11,15 +12,37 @@ html {
 }
 
 body {
-  background-color: #0b0c0e;
-  color: #edeef0;
-  font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  background-color: #0a0b0a;
+  color: #eceee9;
+  font-family: var(--font-geist-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
+  font-feature-settings: "ss01", "cv11";
+}
+
+/* Fixed film grain — breaks the flatness of large dark fields. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+  background-image: var(--grain);
+  opacity: 0.045;
+  mix-blend-mode: overlay;
+}
+
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+p {
+  text-wrap: pretty;
 }
 
 /* Visible keyboard focus everywhere (WCAG 2.4.7) */
 :focus-visible {
-  outline: 2px solid #4ade80;
+  outline: 2px solid #8bd99a;
   outline-offset: 2px;
   border-radius: 4px;
 }
@@ -29,10 +52,10 @@ body {
   position: absolute;
   left: 1rem;
   top: -4rem;
-  z-index: 50;
-  background: #131518;
-  color: #edeef0;
-  border: 1px solid #26292f;
+  z-index: 70;
+  background: #111311;
+  color: #eceee9;
+  border: 1px solid #222622;
   padding: 0.5rem 0.75rem;
   border-radius: 6px;
   transition: top 0.15s ease;
@@ -42,15 +65,80 @@ body {
 }
 
 ::selection {
-  background: #4ade80;
-  color: #0b0c0e;
+  background: #8bd99a;
+  color: #0a0b0a;
 }
 
+@layer components {
+  /* Faint engineering grid, masked so it fades out toward the edges. */
+  .bg-grid {
+    background-image:
+      linear-gradient(to right, rgb(236 238 233 / 0.045) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(236 238 233 / 0.045) 1px, transparent 1px);
+    background-size: 56px 56px;
+    mask-image: radial-gradient(ellipse 70% 60% at 50% 0%, #000 30%, transparent 75%);
+  }
+
+  /* Surface with a lit top edge — one light source, from above. */
+  .surface {
+    background: linear-gradient(180deg, #151815 0%, #111311 100%);
+    box-shadow:
+      inset 0 1px 0 0 rgb(236 238 233 / 0.06),
+      0 0 0 1px #222622,
+      0 24px 48px -24px rgb(0 8 2 / 0.7);
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center gap-2 rounded bg-moss px-4 py-2.5 text-sm font-semibold text-ink-950 transition duration-200;
+    box-shadow: inset 0 1px 0 0 rgb(255 255 255 / 0.35), 0 8px 24px -10px rgb(139 217 154 / 0.55);
+  }
+  .btn-primary:hover {
+    @apply -translate-y-px brightness-105;
+  }
+  .btn-primary:active {
+    @apply translate-y-0 scale-[0.98];
+  }
+
+  .btn-link {
+    @apply inline-flex items-center gap-1.5 rounded px-2 py-2.5 text-sm font-medium text-paper transition-colors duration-200 hover:text-moss;
+  }
+
+  .kbd {
+    @apply rounded border border-ink-700 bg-ink-900 px-1.5 py-0.5 font-mono text-xs text-paper;
+    box-shadow: inset 0 -1px 0 0 #323732;
+  }
+}
+
+/* Docs typography — the pages set their own classes; this tunes rhythm. */
+.prose-docs h1 {
+  letter-spacing: -0.03em;
+}
 .prose-docs h2 {
   scroll-margin-top: 5.5rem;
+  letter-spacing: -0.02em;
 }
 .prose-docs h3 {
   scroll-margin-top: 5.5rem;
+}
+.prose-docs > p,
+.prose-docs li {
+  max-width: 68ch;
+}
+.prose-docs a:not([class*="rounded"]) {
+  color: #8bd99a;
+  text-underline-offset: 4px;
+}
+.prose-docs a:not([class*="rounded"]):hover {
+  text-decoration: underline;
+}
+.prose-docs table {
+  font-variant-numeric: tabular-nums;
+}
+.prose-docs tbody tr {
+  transition: background-color 0.15s ease;
+}
+.prose-docs tbody tr:hover {
+  background-color: rgb(236 238 233 / 0.025);
 }
 
 /* Respect reduced motion */
@@ -62,6 +150,7 @@ body {
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
 }

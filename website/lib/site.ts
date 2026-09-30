@@ -1,7 +1,7 @@
 export const site = {
   name: "Sentinel",
   tagline: "A minimalist AI coding assistant for the terminal.",
-  version: "3.0.0",
+  version: "3.1.0",
   repo: "https://github.com/KunjShah95/SENTINEL-CLI",
   installCmd: "git clone https://github.com/KunjShah95/SENTINEL-CLI.git",
 } as const;
