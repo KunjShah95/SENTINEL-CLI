@@ -286,6 +286,45 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Launch film */}
+      <section aria-labelledby="film-title" className="border-t border-ink-800 bg-ink-900/30">
+        <div className="mx-auto grid max-w-6xl gap-12 px-4 py-24 sm:px-6 lg:grid-cols-[minmax(0,4fr)_minmax(0,8fr)] lg:gap-16">
+          <div>
+            <SectionHeading id="film-title" eyebrow="Watch" title="It shows its work.">
+              The agent refuses a risky write, then answers with the line it read and the
+              command that undoes it. A real session, shot as it ran.
+            </SectionHeading>
+            <p className="mt-6 max-w-[60ch] text-[15px] leading-7 text-muted">
+              Sixty-nine seconds, no narration over the footage. The terminal output is
+              Sentinel&apos;s own, at its real speed.
+            </p>
+          </div>
+          <figure>
+            <div className="overflow-hidden rounded-lg border border-ink-800 bg-ink-950">
+              {/* eslint-disable-next-line jsx-a11y/media-has-caption -- a captions track is
+                  tracked separately; see the note in the PR body. */}
+              <video
+                className="aspect-video w-full"
+                src="/video/sentinel-launch.mp4"
+                controls
+                preload="metadata"
+                playsInline
+                aria-label="Sentinel launch film: the blast-radius gate refusing a risky write, then the agent citing the file and line and the rollback"
+              >
+                Your browser cannot play this video. The film is also available at{" "}
+                <a className="text-moss underline underline-offset-4" href="/video/sentinel-launch.mp4">
+                  /video/sentinel-launch.mp4
+                </a>
+                .
+              </video>
+            </div>
+            <figcaption className="mt-4 font-mono text-xs text-muted">
+              sentinel launch film · 1920×1080 · 69s
+            </figcaption>
+          </figure>
+        </div>
+      </section>
+
       {/* Docs */}
       <section aria-labelledby="docs-title" className="border-t border-ink-800">
         <div className="mx-auto grid max-w-6xl gap-12 px-4 py-24 sm:px-6 lg:grid-cols-[minmax(0,4fr)_minmax(0,8fr)] lg:gap-16">
