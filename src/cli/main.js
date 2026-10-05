@@ -11,6 +11,7 @@
  *   sentinel watch "task"     keep working when something breaks, steerable
  *   sentinel steer "msg"      add an instruction for a running watcher
  *   sentinel risk "cmd"      grade a command against this repo's risk ledger
+ *   sentinel doctor          pre-flight: runtime, data dir, provider keys, tool layer
  *   sentinel outcome "..."   turn a vague ask into a verifiable contract, then work to it
  *   sentinel onboard         survey this repo: entry points, CI, ownership, risk
  *   sentinel prompts         list prompt templates (/name args in ask/goal)
@@ -807,6 +808,33 @@ program
     }
     process.stdout.write('\n');
     process.exit(met && !sawError ? 0 : 1);
+  });
+
+// ── doctor: pre-flight checks before the first turn ─────────────────────────
+program
+  .command('doctor')
+  .description('Check the runtime, data directory, provider keys and tool layer before starting a turn')
+  .option('-d, --dir <path>', 'Project to check (default: cwd)')
+  .option('--network', 'Also probe local model servers over HTTP (Ollama, LM Studio)')
+  .option('--json', 'Print the report as JSON')
+  .action(async (options) => {
+    const { runDoctor, renderDoctor } = await import('../agent/doctor.js');
+    const cwd = path.resolve(options.dir || process.cwd());
+
+    let report;
+    try {
+      report = await runDoctor({ cwd, probeNetwork: !!options.network });
+    } catch (e) {
+      console.error(`\x1b[31mdoctor failed: ${e?.message || e}\x1b[0m`);
+      process.exit(1);
+    }
+
+    if (options.json) {
+      process.stdout.write(JSON.stringify(report, null, 2) + '\n');
+    } else {
+      console.log(renderDoctor(report));
+    }
+    process.exit(report.ok ? 0 : 1);
   });
 
 // ── onboard: the forward-deployed engineer's week one ──────────────────────
