@@ -377,6 +377,36 @@ npm run release:check  # all three
 
 ## Changelog
 
+### v3.2.0 — The forward-deployed engineer
+
+**New commands**
+- `race` — best-of-N: N agents solve the task in parallel git worktrees; your `--check` command picks the winner
+- `watch` / `steer` — a standing agent that keeps working when tests fail, a file changes or a commit lands, steerable from another terminal
+- `goal` — work in BUILD mode until a shell condition is verified (e.g. "npm test exits 0")
+- `outcome` — turn a vague ask into a verifiable contract (CURRENT / TARGET / VERIFICATION / BLAST RADIUS / ROLLBACK)
+- `replay` — re-run recorded turns against the current harness and model, then diff behavior
+- `handoff` — generate a runbook from recorded runs: what changed, what was verified, what was rejected
+- `budget` — set the engagement budget, deadline and stop condition
+- `risk` — grade a command against this repo, backed by a ledger that learns
+- `onboard` — deterministic repo survey: entry points, what gates the merge, churn, ownership, risk
+- `mini` — one-tool bash-only agent for small, scriptable tasks
+
+**Agent**
+- Blast-radius gate: a risky write is blocked or re-asked based on measured impact
+- Harness ports: skills, todos, subagents and hooks
+- Stop hook fires only when the project actually has tests (no more "run the tests" in a repo with none)
+- A solo lead can no longer message itself; it answers the user directly
+
+**TUI**
+- Theme picker, shared chat components and a render-snapshot harness
+- GFM tables render correctly in markdown
+- Provider errors are one readable line with a next step (401 → `/setup`, 429 → wait or `/model`, …)
+- Working-directory recovery: the TUI runs its tools in your project even when its own package.json is malformed
+- Session files written by older builds no longer crash the session panel
+
+**Website**
+- Docs refresh, SEO foundation and a keyword-mapped blog
+
 ### v3.1.0 — Bug-fix release
 
 **Provider fixes**

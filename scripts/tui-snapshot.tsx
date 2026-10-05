@@ -27,7 +27,7 @@ export async function snapshot(themeName?: string, { home = false, columns = 100
   const App = () => {
     return (
       <Box flexDirection="column" width={100}>
-        {home ? <Home version="3.1.0" /> : (
+        {home ? <Home version="3.2.0" /> : (
           <>
             <UserMessage message="fix the failing date parser test" mode="BUILD" />
             <BotMessage parts={FIXTURE_PARTS as any} model="groq/openai/gpt-oss-20b" mode="BUILD" duration={8400} done />
