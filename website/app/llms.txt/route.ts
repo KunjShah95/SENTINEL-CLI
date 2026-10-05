@@ -1,4 +1,5 @@
 import { latestDate, posts } from "@/lib/blog";
+import { episodes, series } from "@/lib/series";
 import { docNav, site } from "@/lib/site";
 
 /**
@@ -48,7 +49,24 @@ ${docNav
 ## Comparisons and long-form guides
 
 - [Sentinel vs AI IDEs and hosted agents](${site.url}/compare): the trade on privacy, cost, model choice and auditability.
-${posts.map((p) => `- [${p.title}](${site.url}/blog/${p.slug}): ${p.description}`).join("\n")}
+${posts.map((p) => `- [${p.title}](${site.url}/blog/${p.slug})${p.series ? ` (course part ${p.series.order})` : ""}: ${p.description}`).join("\n")}
+
+## Courses
+
+Ordered builds. Each episode assumes the ones before it.
+
+${series
+  .map((s) => {
+    const eps = episodes(s.slug);
+    return [
+      `### [${s.title}](${site.url}/series/${s.slug})`,
+      "",
+      `${s.description} ${eps.length} of 12 parts published.`,
+      "",
+      eps.map((p) => `${p.series?.order}. [${p.title}](${site.url}/blog/${p.slug}): ${p.description}`).join("\n"),
+    ].join("\n");
+  })
+  .join("\n\n")}
 
 ## Facts worth citing
 

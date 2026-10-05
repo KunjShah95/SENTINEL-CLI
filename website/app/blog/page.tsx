@@ -4,6 +4,7 @@ import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { JsonLd } from "@/components/JsonLd";
 import { posts, formatDate } from "@/lib/blog";
 import { pageMeta } from "@/lib/seo";
+import { series, seriesOf } from "@/lib/series";
 import { site } from "@/lib/site";
 
 export const metadata: Metadata = pageMeta({
@@ -53,14 +54,53 @@ export default function BlogIndex() {
           they care about.
         </p>
 
-        <ul className="mt-14 space-y-px overflow-hidden rounded-lg border border-ink-800 bg-ink-800">
-          {posts.map((p) => (
+        {series.length > 0 && (
+          <section aria-labelledby="courses-heading" className="mt-14">
+            <h2 id="courses-heading" className="font-mono text-xs uppercase tracking-wide text-moss">
+              Courses
+            </h2>
+            <ul className="mt-4 grid gap-3 sm:grid-cols-2">
+              {series.map((s) => (
+                <li key={s.slug}>
+                  <Link
+                    href={`/series/${s.slug}`}
+                    className="block h-full rounded-md border border-ink-800 bg-ink-900 p-4 transition-colors duration-200 hover:border-ink-700"
+                  >
+                    <span className="font-mono text-[11px] uppercase tracking-wide text-moss">
+                      {s.kicker}
+                    </span>
+                    <span className="mt-1.5 block text-sm font-semibold leading-5">{s.title}</span>
+                    <span className="mt-1.5 block text-sm leading-6 text-muted">
+                      {s.description}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        <h2 className="mt-16 font-mono text-xs uppercase tracking-wide text-moss">
+          All writing
+        </h2>
+        <ul className="mt-4 space-y-px overflow-hidden rounded-lg border border-ink-800 bg-ink-800">
+          {posts.map((p) => {
+            const course = seriesOf(p);
+            return (
             <li key={p.slug} className="bg-ink-950">
               <Link
                 href={`/blog/${p.slug}`}
                 className="group block px-5 py-6 transition-colors duration-200 hover:bg-ink-900"
               >
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-xs text-muted">
+                  {course && (
+                    <>
+                      <span className="text-moss">
+                        Part {p.series?.order}
+                      </span>
+                      <span aria-hidden="true">·</span>
+                    </>
+                  )}
                   <time dateTime={p.date}>{formatDate(p.date)}</time>
                   <span aria-hidden="true">·</span>
                   <span>{p.readingMinutes} min read</span>
@@ -89,7 +129,8 @@ export default function BlogIndex() {
                 </ul>
               </Link>
             </li>
-          ))}
+            );
+          })}
         </ul>
       </div>
     </main>

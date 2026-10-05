@@ -2,10 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { EpisodePager } from "@/components/EpisodePager";
 import { JsonLd } from "@/components/JsonLd";
 import { collectHeadings } from "@/components/Post";
 import { formatDate, getPost, getRelated, postSlugs } from "@/lib/blog";
 import { abs, pageMeta } from "@/lib/seo";
+import { episodeNeighbours, getSeries } from "@/lib/series";
 import { site } from "@/lib/site";
 
 export function generateStaticParams() {
@@ -43,6 +45,13 @@ export default async function PostPage({ params }: { params: Promise<{ slug: str
   const related = getRelated(post.related).filter((r) => r.slug !== post.slug);
   const url = abs(`/blog/${post.slug}`);
 
+  // Course membership is optional. When a post declares a series, the page gains a
+  // "Part n of m" eyebrow and a prev/next pager that walks the curriculum order.
+  const course = post.series ? getSeries(post.series.slug) : undefined;
+  const neighbours =
+    post.series && course ? episodeNeighbours(post.series.slug, post.series.order) : null;
+  const total = neighbours?.total ?? 12;
+
   return (
     <main className="relative">
       <JsonLd
@@ -58,6 +67,17 @@ export default async function PostPage({ params }: { params: Promise<{ slug: str
           inLanguage: "en",
           timeRequired: `PT${post.readingMinutes}M`,
           keywords: [post.keyword, ...post.tags].join(", "),
+          // Course episodes declare their position so Google can show the series
+          // breadcrumb. Omitted on standalone posts rather than emitted empty.
+          ...(post.series && getSeries(post.series.slug)
+            ? {
+                isPartOf: {
+                  "@type": "Course",
+                  name: getSeries(post.series.slug)!.title,
+                  url: abs(`/series/${post.series.slug}`),
+                },
+              }
+            : {}),
           author: {
             "@type": "Person",
             name: site.author,
@@ -80,7 +100,15 @@ export default async function PostPage({ params }: { params: Promise<{ slug: str
         <Breadcrumbs current={{ name: post.title }} />
 
         <header className="mt-6">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-xs text-muted">
+          {course && neighbours && (
+            <p className="font-mono text-xs uppercase tracking-wide text-moss">
+              Part {post.series?.order} of {total} ·{" "}
+              <Link href={`/series/${course.slug}`} className="no-underline hover:text-paper">
+                {course.title}
+              </Link>
+            </p>
+          )}
+          <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-xs text-muted">
             <time dateTime={post.date}>{formatDate(post.date)}</time>
             <span aria-hidden="true">·</span>
             <span>{post.readingMinutes} min read</span>
@@ -91,7 +119,7 @@ export default async function PostPage({ params }: { params: Promise<{ slug: str
               </>
             )}
           </div>
-          <h1 className="mt-4 text-4xl font-semibold leading-[1.05] tracking-[-0.04em] sm:text-[3rem]">
+          <h1 className="mt-2 text-4xl font-semibold leading-[1.05] tracking-[-0.04em] sm:text-[3rem]">
             {post.title}
           </h1>
           <p className="mt-5 text-[17px] leading-8 text-muted">{post.description}</p>
@@ -128,6 +156,17 @@ export default async function PostPage({ params }: { params: Promise<{ slug: str
         )}
 
         <div className="prose-docs mt-12 max-w-3xl space-y-5 text-[15px] leading-7">{body}</div>
+
+        {course && neighbours && (
+          <EpisodePager
+            seriesTitle={course.title}
+            seriesSlug={course.slug}
+            part={post.series!.order}
+            total={total}
+            prev={neighbours.prev}
+            next={neighbours.next}
+          />
+        )}
 
         <section aria-labelledby="author-heading" className="mt-20 rounded-md border border-ink-800 bg-ink-900 p-5">
           <h2 id="author-heading" className="text-sm font-semibold">

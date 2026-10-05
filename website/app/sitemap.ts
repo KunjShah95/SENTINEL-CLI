@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 import { allDocHrefs } from "@/lib/site";
 import { latestDate, posts } from "@/lib/blog";
+import { episodes, series } from "@/lib/series";
 import { site } from "@/lib/site";
 
 export default function sitemap(): MetadataRoute.Sitemap {
@@ -26,6 +27,22 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "monthly",
       priority: 0.8,
     },
+    // The course index is how a reader finds the whole curriculum; individual
+    // episodes stay in the list below like any other post.
+    {
+      url: `${site.url}/series`,
+      lastModified: new Date(lastPost),
+      changeFrequency: "weekly",
+      priority: 0.8,
+    },
+    ...series.map((s) => ({
+      url: `${site.url}/series/${s.slug}`,
+      lastModified: new Date(
+        episodes(s.slug).reduce((d, p) => (p.date > d ? p.date : d), "1970-01-01"),
+      ),
+      changeFrequency: "weekly" as const,
+      priority: 0.8,
+    })),
     ...posts.map((p) => ({
       url: `${site.url}/blog/${p.slug}`,
       lastModified: new Date(p.updated ?? p.date),

@@ -56,6 +56,17 @@ function buildTrail(pathname: string, current?: { name: string }): Crumb[] {
   if (pathname === "/blog") return [home, { name: "Blog", path: "/blog" }];
   if (pathname === "/compare") return [home, { name: "Compare", path: "/compare" }];
 
+  if (pathname === "/series") {
+    return [home, { name: "Courses", path: "/series" }];
+  }
+
+  if (pathname.startsWith("/series/")) {
+    // Course titles are resolved from the page's own props rather than imported
+    // here: the breadcrumb is a client component, and importing the series
+    // registry would pull every post body into the client bundle for one string.
+    return [home, { name: "Courses", path: "/series" }, { name: current?.name ?? "Course", path: pathname }];
+  }
+
   if (pathname.startsWith("/blog/")) {
     return [
       home,

@@ -80,6 +80,7 @@ export const mainNav = [
   { href: "/docs/installation", label: "Install" },
   { href: "/blog", label: "Blog" },
   { href: "/compare", label: "Compare" },
+  { href: "/series", label: "Courses" },
   { href: "/docs/mcp", label: "MCP" },
 ] as const;
 
@@ -101,6 +102,12 @@ export type Post = {
   tags: string[];
   /** The one query this page is written to win. One page, one primary keyword. */
   keyword: string;
+  /**
+   * Optional course membership. Set on both halves deliberately: `slug` must match
+   * a key in `series`, and `order` is the position within it. Omit on standalone
+   * posts. See lib/series.ts.
+   */
+  series?: { slug: string; order: number };
   /** Rendered into FAQPage structured data and shown on the page. */
   faq: Faq[];
   related: string[];
