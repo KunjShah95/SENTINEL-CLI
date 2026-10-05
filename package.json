@@ -1,6 +1,6 @@
 {
   "name": "sentinel-cli",
-  "version": "3.2.0",
+  "version": "3.2.1",
   "description": "Minimalist AI coding assistant for the terminal (Pi-style). Multi-LLM, local tools, sessions, MCP — no servers, no telemetry.",
   "main": "src/cli/main.js",
   "type": "module",
@@ -32,8 +32,9 @@
     "typecheck": "tsc -p src/tui/tsconfig.json --noEmit",
     "check:imports": "node scripts/check-imports.mjs",
     "release:check": "npm run lint && npm run typecheck && npm run check:imports && npm test",
-    "test:tui": "node --import tsx --test __tests__/tui.test.mjs",
-    "tui:snapshot": "tsx scripts/tui-snapshot.tsx"
+    "test:tui": "node --import tsx --test __tests__/tui.test.mjs __tests__/tui-overlay.test.mjs",
+    "tui:snapshot": "tsx scripts/tui-snapshot.tsx",
+    "tui:probe": "tsx --tsconfig src/tui/tsconfig.json scripts/tui-probe.tsx"
   },
   "keywords": [
     "cli",

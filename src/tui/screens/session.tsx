@@ -20,6 +20,7 @@ import { parseMentions, buildAgentPrompt } from '../../shared/tools/agent-mentio
 import { expandPromptTemplate } from '../../agent/prompt-templates.js';
 import { getTotals as getCostTotals } from '../../agent/cost.js';
 import { Home } from '../components/oc/chrome.js';
+import { Overlay } from '../components/oc/overlay.js';
 import { ThemePickerDialog } from '../components/dialogs/theme-picker.js';
 import { formatContextReport } from '../lib/context-report.js';
 import { getVersion } from '../lib/version.js';
@@ -333,7 +334,7 @@ export function Session() {
       handleHelp();
       return;
     }
-  });
+  }, { isActive: !dialog.isOpen && !showCommands });
 
   const lastModelRef = useRef(model);
   useEffect(() => {
@@ -476,6 +477,7 @@ export function Session() {
           onStop={stop}
           streamedChars={streamedText.length}
           waiting={waiting}
+          modalOpen={dialog.isOpen || showCommands}
         >
           {messages.length === 0 ? <Home version={getVersion()} /> : null}
           {messages.map((msg, idx) => {
@@ -508,7 +510,9 @@ export function Session() {
         </SessionShell>
 
         {showCommands ? (
-          <CommandMenu onClose={() => setShowCommands(false)} ctx={commandCtx} />
+          <Overlay title="Command Palette" width={80} hint="↑↓ navigate · Enter run · Esc close">
+            <CommandMenu onClose={() => setShowCommands(false)} ctx={commandCtx} />
+          </Overlay>
         ) : null}
       </Box>
     </Box>

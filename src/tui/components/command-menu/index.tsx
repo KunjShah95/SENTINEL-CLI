@@ -63,21 +63,7 @@ export function CommandMenu({ onClose, ctx }: Props) {
   }
 
   return (
-    <Box
-      flexDirection="column"
-      borderStyle="round"
-      borderColor={colors.primary}
-      paddingX={1}
-      paddingY={0}
-      width="100%"
-    >
-      {/* Header */}
-      <Box flexDirection="row" gap={2} paddingY={0}>
-        <Text bold color={colors.primary}>{'◆ Command Palette'}</Text>
-        <Text dimColor>{'↑↓ navigate · Enter run · Esc close'}</Text>
-        {filtered.length > 0 && <Text dimColor>{`${filtered.length} commands`}</Text>}
-      </Box>
-
+    <Box flexDirection="column" width="100%">
       {/* Search input */}
       <Box borderStyle="single" borderColor={colors.dimSeparator} paddingX={1} marginBottom={1}>
         <Text color={colors.dimSeparator}>{'/'}</Text>
@@ -92,7 +78,7 @@ export function CommandMenu({ onClose, ctx }: Props) {
 
       {/* Results */}
       {visible.length === 0 ? (
-        <Box paddingX={2} paddingY={1}>
+        <Box paddingX={1} paddingY={1}>
           <Text dimColor>{'No commands match. Try: review, scan, loop, fix...'}</Text>
         </Box>
       ) : (
@@ -129,7 +115,7 @@ export function CommandMenu({ onClose, ctx }: Props) {
                 </Text>
 
                 {/* Description */}
-                <Text dimColor>{cmd.description}</Text>
+                <Text dimColor wrap="truncate-end">{cmd.description}</Text>
               </Box>
             );
           })}

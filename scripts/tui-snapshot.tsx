@@ -4,6 +4,7 @@
  * Used to eyeball layout changes and in __tests__/tui-snapshot.test.js.
  */
 import React from 'react';
+import { readFileSync } from 'node:fs';
 import { renderToString } from 'ink';
 import { ThemeProvider } from '../src/tui/providers/theme/index.js';
 import { DialogProvider } from '../src/tui/providers/dialog/index.js';
@@ -23,11 +24,16 @@ export const FIXTURE_PARTS = [
   { type: 'text', text: 'Fixed the **timezone** bug in `parseDate`:\n\n- normalize to UTC before comparing\n- added a regression test\n\n```ts\nreturn new Date(Date.UTC(y, m - 1, d));\n```' },
 ];
 
+/** One source of truth for the version, so the fixture cannot drift from it. */
+const VERSION: string = JSON.parse(
+  readFileSync(new URL('../package.json', import.meta.url), 'utf8')
+).version;
+
 export async function snapshot(themeName?: string, { home = false, columns = 100 } = {}): Promise<string> {
   const App = () => {
     return (
       <Box flexDirection="column" width={100}>
-        {home ? <Home version="3.2.0" /> : (
+        {home ? <Home version={VERSION} /> : (
           <>
             <UserMessage message="fix the failing date parser test" mode="BUILD" />
             <BotMessage parts={FIXTURE_PARTS as any} model="groq/openai/gpt-oss-20b" mode="BUILD" duration={8400} done />

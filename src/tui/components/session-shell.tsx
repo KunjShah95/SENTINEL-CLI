@@ -30,6 +30,8 @@ type Props = {
   streamedChars?: number;
   /** Loop is blocked on background work / teammates. */
   waiting?: boolean;
+  /** A dialog or the command palette is open: Esc belongs to the modal. */
+  modalOpen?: boolean;
 };
 
 /** Poll team + background counts from the in-process harness while busy. */
@@ -79,10 +81,11 @@ export function SessionShell({
   onStop,
   streamedChars = 0,
   waiting = false,
+  modalOpen = false,
 }: Props) {
   useInput((_input, key) => {
     if (key.escape && loading && onStop) onStop();
-  });
+  }, { isActive: !modalOpen });
 
   const startedAt = useRef<number | undefined>(undefined);
   if (loading && startedAt.current === undefined) startedAt.current = Date.now();
@@ -95,7 +98,7 @@ export function SessionShell({
 
   return (
     <Box flexDirection="column" flexGrow={1} width="100%">
-      <Box flexDirection="column" flexGrow={1} paddingX={1}>
+      <Box flexDirection="column" flexGrow={1} paddingX={1} overflow="hidden">
         {children}
       </Box>
 

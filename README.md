@@ -377,6 +377,30 @@ npm run release:check  # all three
 
 ## Changelog
 
+### v3.2.1 — TUI overlays were broken
+
+**The bug:** dialogs (provider setup, model picker, theme picker, logs, help, permission) and the
+command palette were rendered as a normal-flow sibling *after* the session. The session filled the
+terminal, so every one of them was pushed off the bottom of the screen. Worst case was first run:
+with no provider key set, the setup dialog opened invisibly while the prompt was already disabled,
+so the app looked completely frozen — nothing you typed did anything.
+
+**Fixed**
+- Dialogs and the command palette are now absolutely positioned overlays sized to the terminal,
+  painted over the session (opencode's modal behaviour) instead of below it
+- The root is pinned to the terminal size, so the prompt and footer stay put instead of being
+  pushed off by a long conversation
+- Toasts render as a pinned strip; previously every success and error message was drawn
+  underneath the app and never seen
+- The provider picker and model picker window their lists to what fits, so entries are no longer
+  squeezed or clipped out of a short terminal
+- `Esc` no longer stops the running turn while a dialog or the palette is open
+- Dialog context value is memoized; a fresh identity every render drove a `setState` loop
+  ("Maximum update depth exceeded")
+- Removed the duplicated dialog title (the overlay already frames it)
+- Added `npm run tui:probe`, a headless harness that renders the real TUI and prints the frame a
+  user sees — this is what caught the above, since the snapshot tests only render a fixture
+
 ### v3.2.0 — The forward-deployed engineer
 
 **New commands**

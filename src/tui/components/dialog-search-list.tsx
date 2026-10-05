@@ -2,6 +2,7 @@ import React, { useCallback, useState, type ReactNode } from 'react';
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import { useTheme } from '../providers/theme/index.js';
+import { windowRange } from './oc/overlay.js';
 
 const MAX_VISIBLE_ITEMS = 6;
 
@@ -65,8 +66,8 @@ export function DialogSearchList<T>({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [highlighted]);
 
-  const windowStart = Math.max(0, Math.min(selectedIndex - Math.floor(MAX_VISIBLE_ITEMS / 2), filtered.length - MAX_VISIBLE_ITEMS));
-  const visible = filtered.slice(windowStart, windowStart + MAX_VISIBLE_ITEMS);
+  const { start: windowStart, count } = windowRange(filtered.length, selectedIndex, MAX_VISIBLE_ITEMS);
+  const visible = filtered.slice(windowStart, windowStart + count);
 
   return (
     <Box flexDirection="column" gap={1}>
@@ -91,7 +92,7 @@ export function DialogSearchList<T>({
               </Box>
             );
           })}
-          {filtered.length > MAX_VISIBLE_ITEMS ? (
+          {filtered.length > count ? (
             <Text dimColor>{`${selectedIndex + 1}/${filtered.length}`}</Text>
           ) : null}
         </Box>

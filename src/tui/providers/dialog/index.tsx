@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
-import { Box, Text, useInput } from 'ink';
-import { useTheme } from '../theme/index.js';
+import React, { createContext, useContext, useMemo, useState, useCallback, type ReactNode } from 'react';
+import { Box, useInput } from 'ink';
+import { Overlay } from '../../components/oc/overlay.js';
 import type { DialogConfig } from './types.js';
 
 type DialogContextValue = {
@@ -13,7 +13,6 @@ const DialogContext = createContext<DialogContextValue | null>(null);
 
 export function DialogProvider({ children }: { children: ReactNode }) {
   const [dialog, setDialog] = useState<DialogConfig | null>(null);
-  const { colors } = useTheme();
 
   const close = useCallback(() => {
     setDialog((d) => {
@@ -33,26 +32,23 @@ export function DialogProvider({ children }: { children: ReactNode }) {
     []
   );
 
+  // Memoized: a fresh object literal on every render gave every consumer a new
+  // `dialog` identity, so any effect or callback keyed on it re-ran on every
+  // render and drove a setState loop ("Maximum update depth exceeded").
+  const value = useMemo(
+    () => ({ open, close, isOpen: !!dialog }),
+    [open, close, dialog]
+  );
+
   return (
-    <DialogContext.Provider value={{ open, close, isOpen: !!dialog }}>
+    <DialogContext.Provider value={value}>
       {children}
+      {/* Rendered AFTER children so the absolute overlay paints on top of the
+          session instead of being pushed below it, off-screen. */}
       {dialog ? (
-        // opencode ui/dialog: a panel-colored sheet, bold title left, "esc" right.
-        <Box flexDirection="column" paddingX={2} paddingY={1}>
-          <Box
-            flexDirection="column"
-            width={dialog.width ?? 60}
-            paddingX={2}
-            paddingY={1}
-            backgroundColor={colors.backgroundPanel}
-          >
-            <Box paddingBottom={1} flexDirection="row" justifyContent="space-between" width="100%">
-              <Text bold color={colors.text}>{dialog.title}</Text>
-              <Text color={colors.textMuted}>esc</Text>
-            </Box>
-            {dialog.children}
-          </Box>
-        </Box>
+        <Overlay title={dialog.title} width={dialog.width} hint={dialog.closeOnEscape === false ? '' : 'esc'}>
+          <Box flexDirection="column" width="100%">{dialog.children}</Box>
+        </Overlay>
       ) : null}
     </DialogContext.Provider>
   );

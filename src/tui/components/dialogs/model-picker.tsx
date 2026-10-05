@@ -3,6 +3,7 @@ import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import { useTheme } from '../../providers/theme/index.js';
 import { useDialog } from '../../providers/dialog/index.js';
+import { useViewport } from '../oc/overlay.js';
 
 type ModelEntry = {
   id: string;
@@ -64,7 +65,10 @@ export function ModelPickerDialog({ currentModel, onSelect }: ModelPickerDialogP
     close();
   }, [onSelect, close]);
 
-  const PAGE = 18;
+  // A fixed page of 18 overflowed a short terminal, clipping the list and hiding
+  // the footer hints. Size the page to the viewport instead.
+  const { rows } = useViewport();
+  const PAGE = Math.max(5, Math.min(18, rows - 12));
   const visible = filtered.slice(scrollOffset, scrollOffset + PAGE);
 
   useInput((input, key) => {
@@ -79,7 +83,7 @@ export function ModelPickerDialog({ currentModel, onSelect }: ModelPickerDialogP
     if (key.downArrow || (!query && input === 'j')) {
       setSelectedIdx(i => {
         const next = Math.min(filtered.length - 1, i + 1);
-        setScrollOffset(o => next >= o + 18 ? next - 17 : o);
+        setScrollOffset(o => next >= o + PAGE ? next - (PAGE - 1) : o);
         return next;
       });
       return;
@@ -128,7 +132,6 @@ export function ModelPickerDialog({ currentModel, onSelect }: ModelPickerDialogP
 
   return (
     <Box flexDirection="column" gap={1} width="100%">
-      <Text bold>Select Model</Text>
       <Text dimColor>
         Current: {currentModel}
       </Text>

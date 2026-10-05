@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useCallback, useRef, type R
 import { Box, Text } from 'ink';
 import { useTheme } from '../theme/index.js';
 import { SPLIT_BORDER } from '../../components/oc/primitives.js';
+import { ToastOverlay } from '../../components/oc/overlay.js';
 import type { ToastOptions, ToastVariant } from './types.js';
 
 type ToastItem = {
@@ -52,23 +53,30 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       <Box flexGrow={1} width="100%" flexDirection="column">
         {children}
         {toasts.length > 0 ? (
-          <Box flexDirection="column" gap={1} paddingX={1} paddingY={1}>
-            {/* opencode ui/toast: variant-colored left bar on the panel. */}
-            {toasts.map((toast) => (
-              <Box
-                key={toast.id}
-                borderStyle={SPLIT_BORDER}
-                borderTop={false}
-                borderRight={false}
-                borderBottom={false}
-                borderLeftColor={getBorderColor(toast.variant)}
-              >
-                <Box paddingX={2} backgroundColor={colors.backgroundPanel} flexGrow={1}>
-                  <Text color={colors.text} wrap="wrap">{toast.message}</Text>
-                </Box>
+          // Absolutely positioned: as a normal-flow sibling this rendered
+          // under a full-height body, so no error or success message was ever
+          // actually visible on screen.
+          <ToastOverlay
+            toasts={
+              <Box flexDirection="column" gap={1} paddingY={1}>
+                {/* opencode ui/toast: variant-colored left bar on the panel. */}
+                {toasts.map((toast) => (
+                  <Box
+                    key={toast.id}
+                    borderStyle={SPLIT_BORDER}
+                    borderTop={false}
+                    borderRight={false}
+                    borderBottom={false}
+                    borderLeftColor={getBorderColor(toast.variant)}
+                  >
+                    <Box paddingX={2} backgroundColor={colors.backgroundPanel} flexGrow={1}>
+                      <Text color={colors.text} wrap="wrap">{toast.message}</Text>
+                    </Box>
+                  </Box>
+                ))}
               </Box>
-            ))}
-          </Box>
+            }
+          />
         ) : null}
       </Box>
     </ToastContext.Provider>

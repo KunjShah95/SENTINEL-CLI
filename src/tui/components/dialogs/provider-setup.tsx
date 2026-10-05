@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { useTheme } from '../../providers/theme/index.js';
 import { useDialog } from '../../providers/dialog/index.js';
+import { useViewport, windowRange } from '../oc/overlay.js';
 
 type ProviderDef = {
   id: string;
@@ -159,6 +160,16 @@ export function ProviderSetupDialog({ onComplete }: ProviderSetupDialogProps) {
   const configuredCount = Object.values(statusMap).filter(s => s === 'configured').length;
   const missingCount = Object.values(statusMap).filter(s => s === 'missing').length;
 
+  // The provider list is two lines per entry. Without a window the panel is
+  // taller than the terminal, so the extra lines were clipped and the names
+  // squeezed out of view — a first-run user could not see what they were
+  // picking. Window the list to what actually fits.
+  const { rows } = useViewport();
+  const ROWS_PER_PROVIDER = 2;
+  const maxVisible = Math.max(3, Math.floor((rows - 12) / ROWS_PER_PROVIDER));
+  const { start: windowStart, count } = windowRange(PROVIDERS.length, selectedIdx, maxVisible);
+  const visible = PROVIDERS.slice(windowStart, windowStart + count);
+
   if (step === 'key' && selected) {
     return (
       <Box flexDirection="column" gap={1} width="100%">
@@ -193,7 +204,6 @@ export function ProviderSetupDialog({ onComplete }: ProviderSetupDialogProps) {
 
   return (
     <Box flexDirection="column" gap={1} width="100%">
-      <Text bold>AI Provider Setup</Text>
       <Text dimColor>
         {configuredCount > 0
           ? `${configuredCount} configured, ${missingCount} need keys`
@@ -203,13 +213,14 @@ export function ProviderSetupDialog({ onComplete }: ProviderSetupDialogProps) {
         <Text color={colors.success}>✓ {PROVIDERS.find(p => p.id === keySaved)?.name} configured</Text>
       )}
       <Box flexDirection="column" marginTop={1}>
-        {PROVIDERS.map((p, i) => {
+        {visible.map((p) => {
+          const i = PROVIDERS.indexOf(p);
           const status = statusMap[p.id];
           const isSelected = i === selectedIdx && step === 'list';
           const statusChar = status === 'configured' ? '✓' : status === 'local' ? '🔗' : ' ';
           const statusColor = status === 'configured' ? colors.success : status === 'local' ? colors.info : colors.dimSeparator;
           return (
-            <Box key={p.id} flexDirection="row" gap={1} paddingX={1}>
+            <Box key={p.id} flexDirection="row" gap={1} paddingX={1} flexShrink={0}>
               <Text color={isSelected ? colors.selection : statusColor}>
                 {isSelected ? '▶' : ' '}
               </Text>
@@ -228,6 +239,7 @@ export function ProviderSetupDialog({ onComplete }: ProviderSetupDialogProps) {
       </Box>
       <Box flexDirection="row" gap={2} marginTop={1}>
         <Text dimColor>↑↓ navigate  Enter select  Esc close</Text>
+        <Text dimColor>{`${selectedIdx + 1}/${PROVIDERS.length}`}</Text>
       </Box>
     </Box>
   );
