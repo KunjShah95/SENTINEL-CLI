@@ -142,12 +142,15 @@ export function Footer({
   teammates = 0,
   background = 0,
   microSaved = 0,
+  scroll = 0,
 }: {
   contextRatio?: number;
   costUsd?: number;
   teammates?: number;
   background?: number;
   microSaved?: number;
+  /** Lines the transcript is scrolled up from the live edge. */
+  scroll?: number;
 }) {
   const { colors } = useTheme();
   const dir = useDirectoryLabel();
@@ -160,6 +163,7 @@ export function Footer({
       </Box>
       <Box flexDirection="row" gap={2} flexShrink={0}>
         {teammates > 0 ? <Text color={colors.text}><Text color={colors.accent}>◆</Text>{` ${teammates} teammate${teammates > 1 ? "s" : ""}`}</Text> : null}
+        {scroll > 0 ? <Text color={colors.warning}>{`⇅ ${scroll}↑`}</Text> : null}
         {background > 0 ? <Text color={colors.text}><Text color={colors.warning}>&</Text>{` ${background} bg`}</Text> : null}
         {microSaved > 0 ? <Text color={colors.textMuted}>{`⌫ ${(microSaved / 1000).toFixed(1)}k`}</Text> : null}
         {contextRatio !== undefined ? (

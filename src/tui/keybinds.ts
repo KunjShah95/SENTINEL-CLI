@@ -69,6 +69,18 @@ export const DEFAULT_KEYBINDS = Object.freeze({
   'session.toggle.thinking': '<leader>t',
   'session.toggle.details': '<leader>d',
 
+  // Transcript scrolling. opencode also binds home/end to first/last, but this
+  // prompt is a real text field where Home/End belong to the caret, so those two
+  // chords stay with the editor and ctrl+g / ctrl+alt+g do the jumping.
+  'session.page.up': 'pageup',
+  'session.page.down': 'pagedown',
+  'session.line.up': 'ctrl+alt+y',
+  'session.line.down': 'ctrl+alt+e',
+  'session.half.page.up': 'ctrl+alt+u',
+  'session.half.page.down': 'ctrl+alt+d',
+  'session.first': 'ctrl+g',
+  'session.last': 'ctrl+alt+g',
+
   // Prompt
   'prompt.editor': '<leader>e,<leader>i',
   'prompt.clear': 'ctrl+c',

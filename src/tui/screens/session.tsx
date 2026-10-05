@@ -319,8 +319,25 @@ export function Session() {
     return () => { cancelled = true; };
   }, []);
 
+  const [scrollFromBottom, setScrollFromBottom] = useState(0);
+  const [maxScroll, setMaxScroll] = useState(0);
+  const useViewportRowsRef = useRef(0);
+
+  // Sending a message returns to the live edge: nobody wants to stay parked on
+  // history while their own turn starts.
+  const jumpToBottom = useCallback(() => setScrollFromBottom(0), []);
+
   const runAction = useCallback((action: string) => {
+    const page = Math.max(1, Math.floor((useViewportRowsRef.current || 20) / 2));
     switch (action) {
+      case 'session.page.up': setScrollFromBottom((s) => Math.min(maxScroll, s + page)); return true;
+      case 'session.page.down': setScrollFromBottom((s) => Math.max(0, s - page)); return true;
+      case 'session.half.page.up': setScrollFromBottom((s) => Math.min(maxScroll, s + Math.floor(page / 2))); return true;
+      case 'session.half.page.down': setScrollFromBottom((s) => Math.max(0, s - Math.floor(page / 2))); return true;
+      case 'session.line.up': setScrollFromBottom((s) => Math.min(maxScroll, s + 1)); return true;
+      case 'session.line.down': setScrollFromBottom((s) => Math.max(0, s - 1)); return true;
+      case 'session.first': setScrollFromBottom(maxScroll); return true;
+      case 'session.last': jumpToBottom(); return true;
       case 'session.toggle.thinking': setShowThinking((v) => !v); return true;
       case 'session.toggle.details': setShowDetails((v) => !v); return true;
       case 'sentinel.mode.toggle': toggleMode(); return true;
@@ -344,7 +361,7 @@ export function Session() {
       case 'app.exit': process.exit(0);
       default: return false;
     }
-  }, [clear, dialog, handleExternalEditor, handleHelp, handleLogs, model, setModel, toast, toggleMode, wrappedSubmit]);
+  }, [clear, dialog, handleExternalEditor, handleHelp, handleLogs, jumpToBottom, maxScroll, model, setModel, toast, toggleMode, wrappedSubmit]);
 
   useInput((input, key) => {
     const { leader, app } = keybinds();
@@ -517,6 +534,10 @@ export function Session() {
           streamedChars={streamedText.length}
           waiting={waiting}
           modalOpen={dialog.isOpen || showCommands}
+          scrollFromBottom={scrollFromBottom}
+          onMaxScroll={setMaxScroll}
+          onViewportRows={(rows) => { useViewportRowsRef.current = rows; }}
+          onSubmitScrollReset={jumpToBottom}
         >
           {messages.length === 0 ? <Home version={getVersion()} /> : null}
           {messages.map((msg, idx) => {

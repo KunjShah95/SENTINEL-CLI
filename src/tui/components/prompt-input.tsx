@@ -97,9 +97,11 @@ type Props = {
   placeholder?: string;
   focus?: boolean;
   busy?: boolean;
+  /** Height cap for the prompt box; it scrolls around the caret past this. */
+  maxVisibleLines?: number;
 };
 
-export function PromptInput({ value, onChange, onSubmit, onHistory, placeholder = '', focus = true, busy = false }: Props) {
+export function PromptInput({ value, onChange, onSubmit, onHistory, placeholder = '', focus = true, busy = false, maxVisibleLines = 8 }: Props) {
   const { colors } = useTheme();
   const state = useRef<EditState>({ value, cursor: value.length });
   const [, force] = useState(0);
@@ -163,12 +165,26 @@ export function PromptInput({ value, onChange, onSubmit, onHistory, placeholder 
     );
   }
 
-  // Render each line with the caret on the right row.
+  // Render each line with the caret on the right row. Past the cap the box
+  // stops growing and scrolls around the caret instead, so a long pasted diff
+  // cannot push the transcript and footer off the screen.
   const lines = v.split('\n');
   const caret = lineCol(v, cursor);
+  const maxLines = Math.max(1, maxVisibleLines);
+  const start = lines.length > maxLines
+    ? Math.max(0, Math.min(caret.row - Math.floor(maxLines / 2), lines.length - maxLines))
+    : 0;
+  const end = Math.min(lines.length, start + maxLines);
+  const hiddenAbove = start;
+  const hiddenBelow = lines.length - end;
+
   return (
     <Box flexDirection="column">
-      {lines.map((line, row) => {
+      {hiddenAbove > 0 ? (
+        <Text color={colors.textMuted}>{`  ↑ ${hiddenAbove} more line${hiddenAbove === 1 ? '' : 's'}`}</Text>
+      ) : null}
+      {lines.slice(start, end).map((line, i) => {
+        const row = start + i;
         const isCaretRow = row === caret.row;
         const before = line.slice(0, caret.col);
         const at = line[caret.col] ?? ' ';
@@ -181,6 +197,9 @@ export function PromptInput({ value, onChange, onSubmit, onHistory, placeholder 
           </Text>
         );
       })}
+      {hiddenBelow > 0 ? (
+        <Text color={colors.textMuted}>{`  ↓ ${hiddenBelow} more line${hiddenBelow === 1 ? '' : 's'}`}</Text>
+      ) : null}
     </Box>
   );
 }

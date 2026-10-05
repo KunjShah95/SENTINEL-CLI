@@ -108,12 +108,17 @@ so muscle memory carries over: leader is `Ctrl+X`, the palette is `Ctrl+P`, `Esc
 | `↑` `↓` | Walk prompt history |
 | `Ctrl+A` `Ctrl+E` | Start / end of line (`Ctrl+U` / `Ctrl+K` delete to them, `Ctrl+W` a word) |
 | `Ctrl+P` | Command palette |
+| `PageUp` / `PageDown` | Scroll the transcript a page (`Ctrl+Alt+U`/`D` half a page, `Ctrl+Alt+Y`/`E` a line) |
+| `Ctrl+G` / `Ctrl+Alt+G` | Jump to the first message / back to the live edge |
 | `Ctrl+M` | Toggle mode |
 | `Ctrl+L` | Session log viewer |
 | `Ctrl+/` | Help |
 | `Ctrl+X` then… | `m` models · `n` new session · `b` sidebar · `l` sessions · `s` status · `c` compact · `u`/`r` undo/redo · `x` export · `e` editor · `t`/`d` thinking/details · `q` quit |
 
 Press `Ctrl+X` on its own for a live cheat sheet of whatever is currently bound.
+The transcript scrolls and follows the live edge: streaming fills the view on its own,
+a message that arrives while you are reading history leaves your place, and sending a
+message returns you to the bottom. The footer shows `⇅ N` when you are N lines up.
 Overrides go in `cli.keybinds` in `~/.sentinel.json`; see `src/tui/keybinds.ts` for the
 full action list and `src/tui/components/dialogs/help-dialog.tsx` for the in-app reference.
 

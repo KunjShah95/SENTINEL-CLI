@@ -49,6 +49,17 @@ const SECTIONS: Array<{ title: string; bindings: Array<{ keys: string; desc: str
     ],
   },
   {
+    title: 'Scrolling the transcript',
+    bindings: [
+      { keys: 'PageUp / PageDown', desc: 'Scroll a page' },
+      { keys: 'Ctrl+Alt+U / Ctrl+Alt+D', desc: 'Scroll half a page' },
+      { keys: 'Ctrl+Alt+Y / Ctrl+Alt+E', desc: 'Scroll one line' },
+      { keys: 'Ctrl+G', desc: 'Jump to the first message' },
+      { keys: 'Ctrl+Alt+G', desc: 'Jump to the newest (follow the tail)' },
+      { keys: '⇅ N in the footer', desc: 'You are N lines up from the live edge' },
+    ],
+  },
+  {
     title: 'Slash Commands',
     bindings: [
       { keys: '/model [id]', desc: 'Switch model (or open picker)' },

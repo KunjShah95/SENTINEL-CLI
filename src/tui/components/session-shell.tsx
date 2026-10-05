@@ -1,6 +1,7 @@
-import React, { useEffect, useRef, useState, type ReactNode } from 'react';
+import React, { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Box, useInput } from 'ink';
 import { InputBar } from './input-bar.js';
+import { TranscriptViewport } from './transcript-viewport.js';
 import { ActivityLine, Footer, TodoPanel, useTodos, type ActivityPhase } from './oc/chrome.js';
 
 type Mode = 'BUILD' | 'PLAN' | 'REVIEW' | 'SCAN' | 'FIX';
@@ -32,6 +33,12 @@ type Props = {
   waiting?: boolean;
   /** A dialog or the command palette is open: Esc belongs to the modal. */
   modalOpen?: boolean;
+  /** Lines the transcript is scrolled up from the live edge. 0 = following. */
+  scrollFromBottom?: number;
+  onMaxScroll?: (max: number) => void;
+  onViewportRows?: (rows: number) => void;
+  /** Called when the user sends a message, to return to the live edge. */
+  onSubmitScrollReset?: () => void;
 };
 
 /** Poll team + background counts from the in-process harness while busy. */
@@ -82,10 +89,19 @@ export function SessionShell({
   streamedChars = 0,
   waiting = false,
   modalOpen = false,
+  scrollFromBottom = 0,
+  onMaxScroll,
+  onViewportRows,
+  onSubmitScrollReset,
 }: Props) {
   useInput((_input, key) => {
     if (key.escape && loading && onStop) onStop();
   }, { isActive: !modalOpen });
+
+  const submitAndReset = useCallback((value: string) => {
+    onSubmitScrollReset?.();
+    onSubmit(value);
+  }, [onSubmit, onSubmitScrollReset]);
 
   const startedAt = useRef<number | undefined>(undefined);
   if (loading && startedAt.current === undefined) startedAt.current = Date.now();
@@ -98,8 +114,14 @@ export function SessionShell({
 
   return (
     <Box flexDirection="column" flexGrow={1} width="100%">
-      <Box flexDirection="column" flexGrow={1} paddingX={1} overflow="hidden">
-        {children}
+      <Box flexDirection="column" flexGrow={1} paddingX={1} width="100%">
+        <TranscriptViewport
+          scrollFromBottom={scrollFromBottom}
+          onMaxOffset={onMaxScroll}
+          onRows={onViewportRows}
+        >
+          {children}
+        </TranscriptViewport>
       </Box>
 
       {loading ? <TodoPanel todos={todos} /> : null}
@@ -112,7 +134,7 @@ export function SessionShell({
         <InputBar
           model={model}
           busy={loading}
-          onSubmit={onSubmit}
+          onSubmit={submitAndReset}
           onCommand={onCommand}
           onSlashCommand={onSlashCommand}
           onShellCommand={onShellCommand}
@@ -130,6 +152,7 @@ export function SessionShell({
           teammates={teammates}
           background={background}
           microSaved={microcompactSaved}
+          scroll={scrollFromBottom}
         />
       </Box>
     </Box>
