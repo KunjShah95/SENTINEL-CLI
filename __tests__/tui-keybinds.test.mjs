@@ -46,7 +46,7 @@ describe('chordOf', () => {
     assert.equal(chordOf('ab', {}), null, 'multi-character input is not a chord');
   });
 
-  it("maps Ink's ctrl+letter encoding, which is what arrives at runtime", () => {
+  it('maps Ink\'s ctrl+letter encoding, which is what arrives at runtime', () => {
     // Regression: Ink decodes ctrl+p into the bare letter plus key.ctrl, so a
     // parser that only understood the control byte left ctrl+p dead — and the
     // hand-built events in this file did not catch it.

@@ -146,6 +146,8 @@ describe('render snapshot', () => {
     assert.match(out, /enter steer · esc stop/);
     assert.match(out, /Build · openai\/gpt-oss-20b groq/);
     assert.match(out, /\[████░░░░░░\] 42%/);
+    // Scroll indicator: how many lines up from the live edge the view is parked.
+    assert.match(out, /⇅ 3↑/);
   });
 
   it('home frame shows the logo and a tip', async () => {

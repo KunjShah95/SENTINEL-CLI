@@ -44,7 +44,7 @@ export async function snapshot(themeName?: string, { home = false, columns = 100
           </>
         )}
         <InputBar onSubmit={() => {}} model="groq/openai/gpt-oss-20b" mode="BUILD" />
-        <Footer contextRatio={0.42} costUsd={0.0031} teammates={2} background={1} />
+        <Footer contextRatio={0.42} costUsd={0.0031} teammates={2} background={1} scroll={3} />
       </Box>
     );
   };
