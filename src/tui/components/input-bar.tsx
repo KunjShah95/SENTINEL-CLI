@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { PromptInput } from './prompt-input.js';
 import { useTheme } from '../providers/theme/index.js';
@@ -78,8 +78,6 @@ export function InputBar({
   disabled = false,
   placeholder = 'Ask anything · /command · !shell',
   mode = 'BUILD',
-  onModeToggle,
-  onCommandPalette,
 }: Props) {
   const [value, setValue] = useState('');
   const [mentionToken, setMentionToken] = useState<string | null>(null);
@@ -87,6 +85,12 @@ export function InputBar({
   const [slashSuggestions, setSlashSuggestions] = useState<typeof SLASH_COMMANDS>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const { colors } = useTheme();
+
+  // Prompt history: up/down walk submitted prompts, like opencode. Held in refs
+  // so walking it never re-renders this component on every arrow press.
+  const historyRef = useRef<string[]>([]);
+  const historyIdxRef = useRef(-1);
+  const draftRef = useRef('');
 
   const activeColor = modeColor(colors, mode);
   const barColor = activeColor;
@@ -161,10 +165,9 @@ export function InputBar({
       }
       // Only swallow navigation keys — let other keys fall through to text input
     }
-    if (!hasSuggestions && !hasSlash) {
-      if (key.tab)                   { onModeToggle?.(); return; }
-      if (key.ctrl && input === 'p') { onCommandPalette?.(); return; }
-    }
+    // Mode, palette and the other app-level chords are owned by Session through
+    // the shared keybind table. Handling ctrl+p here as well made it toggle the
+    // palette twice per press, i.e. not at all.
   }, { isActive: !disabled });
 
   const handleChange = useCallback((next: string) => {
@@ -177,6 +180,37 @@ export function InputBar({
     setMentionToken(null);
     setSuggestions([]);
     setSlashSuggestions([]);
+    historyIdxRef.current = -1;
+    draftRef.current = '';
+  }, []);
+
+  /** Walk submitted prompts. Returns null when there is nothing to restore. */
+  const handleHistory = useCallback((direction: 'prev' | 'next'): string | null => {
+    const history = historyRef.current;
+    if (history.length === 0) return null;
+    let idx = historyIdxRef.current;
+    if (direction === 'prev') {
+      if (idx === -1) draftRef.current = '';
+      idx = idx === -1 ? history.length - 1 : Math.max(0, idx - 1);
+    } else {
+      if (idx === -1) return null;
+      idx = idx + 1;
+      if (idx >= history.length) {
+        historyIdxRef.current = -1;
+        return draftRef.current || null;
+      }
+    }
+    historyIdxRef.current = idx;
+    return history[idx];
+  }, []);
+
+  const pushHistory = useCallback((entry: string) => {
+    const trimmed = entry.trim();
+    if (!trimmed) return;
+    const history = historyRef.current;
+    if (history[history.length - 1] !== trimmed) history.push(trimmed);
+    // Bound it: this lives for the lifetime of the process.
+    if (history.length > 200) history.splice(0, history.length - 200);
   }, []);
 
   const handleSubmit = useCallback((submitted: string) => {
@@ -200,6 +234,7 @@ export function InputBar({
 
     // Always clear input first, regardless of routing path
     clearInput();
+    pushHistory(trimmed);
 
     if (trimmed.startsWith('!')) {
       const shellCmd = trimmed.slice(1).trim();
@@ -216,7 +251,7 @@ export function InputBar({
 
     onSubmit(trimmed);
   }, [onSubmit, onCommand, onShellCommand, hasSuggestions, hasSlash, slashSuggestions, selectedIndex,
-      insertMentionSelected, insertSlashSelected, clearInput]);
+      insertMentionSelected, insertSlashSelected, clearInput, pushHistory]);
 
   return (
     <Box flexDirection="column" width="100%">
@@ -291,6 +326,8 @@ export function InputBar({
               value={value}
               onChange={handleChange}
               onSubmit={handleSubmit}
+              onHistory={handleHistory}
+              busy={busy}
               placeholder={disabled ? '…' : (busy ? 'Type to steer the running turn…' : placeholder)}
               focus={!disabled}
             />
@@ -303,8 +340,9 @@ export function InputBar({
               {provider && !isShell ? <Text color={colors.textMuted}>{` ${provider}`}</Text> : null}
             </Text>
             <Text color={colors.textMuted}>
-              <Text color={colors.text}>tab</Text>{' mode  '}
-              <Text color={colors.text}>ctrl+p</Text>{' commands'}
+              <Text color={colors.text}>ctrl+m</Text>{' mode  '}
+              <Text color={colors.text}>ctrl+p</Text>{' commands  '}
+              <Text color={colors.text}>shift+enter</Text>{' newline'}
             </Text>
           </Box>
         </Box>

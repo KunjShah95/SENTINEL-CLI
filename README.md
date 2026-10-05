@@ -97,6 +97,26 @@ CLI consume.
 
 Toggle with `Ctrl+M` or `/mode` inside the TUI.
 
+### Keybinds — opencode-compatible
+
+Action IDs and default chords mirror [opencode v2](https://opencode.ai/v2/docs/cli/keybinds),
+so muscle memory carries over: leader is `Ctrl+X`, the palette is `Ctrl+P`, `Esc` interrupts.
+
+| Chord | Action |
+| ----- | ------ |
+| `Enter` | Send. `Shift+Enter` / `Ctrl+J` insert a newline — the prompt is multi-line |
+| `↑` `↓` | Walk prompt history |
+| `Ctrl+A` `Ctrl+E` | Start / end of line (`Ctrl+U` / `Ctrl+K` delete to them, `Ctrl+W` a word) |
+| `Ctrl+P` | Command palette |
+| `Ctrl+M` | Toggle mode |
+| `Ctrl+L` | Session log viewer |
+| `Ctrl+/` | Help |
+| `Ctrl+X` then… | `m` models · `n` new session · `b` sidebar · `l` sessions · `s` status · `c` compact · `u`/`r` undo/redo · `x` export · `e` editor · `t`/`d` thinking/details · `q` quit |
+
+Press `Ctrl+X` on its own for a live cheat sheet of whatever is currently bound.
+Overrides go in `cli.keybinds` in `~/.sentinel.json`; see `src/tui/keybinds.ts` for the
+full action list and `src/tui/components/dialogs/help-dialog.tsx` for the in-app reference.
+
 ## `sentinel outcome` — vague ask in, judgeable contract out
 
 A request like "the sync is flaky" is not a goal: nothing can verify it, so

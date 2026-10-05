@@ -3,7 +3,7 @@ import type { Command, CommandContext } from './types.js';
 export const COMMANDS: Command[] = [
   {
     name: 'session',
-    description: 'Browse, fork or delete chat sessions (Ctrl+S)',
+    description: 'Browse, fork or delete chat sessions (Ctrl+X B)',
     value: '/sessions',
     category: 'general',
     action: (ctx: CommandContext) => ctx.toggleSessionPanel(),

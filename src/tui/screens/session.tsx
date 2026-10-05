@@ -21,6 +21,15 @@ import { expandPromptTemplate } from '../../agent/prompt-templates.js';
 import { getTotals as getCostTotals } from '../../agent/cost.js';
 import { Home } from '../components/oc/chrome.js';
 import { Overlay } from '../components/oc/overlay.js';
+import {
+  chordOf,
+  isInputAction,
+  keybinds,
+  leaderHints,
+  LEADER_TIMEOUT_DEFAULT,
+  loadKeybindOverrides,
+  setKeybindOverrides,
+} from '../keybinds.js';
 import { ThemePickerDialog } from '../components/dialogs/theme-picker.js';
 import { formatContextReport } from '../lib/context-report.js';
 import { getVersion } from '../lib/version.js';
@@ -294,46 +303,76 @@ export function Session() {
     [clear, dialog, appendMessage, mode, model, toggleMode, toast, submit, setMode, handleExternalEditor, appendMessageSafe, messages, showThinking, showDetails, loading, compacting, sessionId, setModel, submitAndWaitForCompaction, handleSelectSession, handleForkSession]
   );
 
-  const [leaderKey, setLeaderKey] = useState<'none' | 'ctrl-x'>('none');
+  const [leaderPending, setLeaderPending] = useState(false);
   const leaderTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const [leaderTimeout, setLeaderTimeout] = useState(LEADER_TIMEOUT_DEFAULT);
+
+  // Compile the bindings once the config is readable, so a user's keybinds take
+  // effect everywhere at the same time rather than per-component.
+  useEffect(() => {
+    let cancelled = false;
+    loadKeybindOverrides().then(({ keybinds: overrides, leaderTimeout: ms }) => {
+      if (cancelled) return;
+      setKeybindOverrides(overrides);
+      setLeaderTimeout(ms);
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  const runAction = useCallback((action: string) => {
+    switch (action) {
+      case 'session.toggle.thinking': setShowThinking((v) => !v); return true;
+      case 'session.toggle.details': setShowDetails((v) => !v); return true;
+      case 'sentinel.mode.toggle': toggleMode(); return true;
+      case 'model.list':
+        dialog.open({ title: 'Model Picker', width: 60, height: 25, children: <ModelPickerDialog currentModel={model} onSelect={(m) => { setModel(m); dialog.close(); }} /> });
+        return true;
+      case 'command.palette.show': setShowCommands((v) => !v); return true;
+      case 'session.new': clear(); toast.info('New session'); return true;
+      case 'session.list': setShowSessionPanel(true); return true;
+      case 'session.sidebar.toggle': setShowSessionPanel((v) => !v); return true;
+      case 'session.status': wrappedSubmit('/health'); return true;
+      case 'session.compact': wrappedSubmit('/compact'); return true;
+      case 'session.undo': wrappedSubmit('/undo'); return true;
+      case 'session.redo': wrappedSubmit('/redo'); return true;
+      case 'session.export': wrappedSubmit('/export'); return true;
+      case 'session.background': wrappedSubmit('/background'); return true;
+      case 'agent.list': wrappedSubmit('/agents'); return true;
+      case 'prompt.editor': handleExternalEditor(); return true;
+      case 'help.show': handleHelp(); return true;
+      case 'sentinel.logs': handleLogs(); return true;
+      case 'app.exit': process.exit(0);
+      default: return false;
+    }
+  }, [clear, dialog, handleExternalEditor, handleHelp, handleLogs, model, setModel, toast, toggleMode, wrappedSubmit]);
 
   useInput((input, key) => {
-    if (leaderKey === 'ctrl-x') {
+    const { leader, app } = keybinds();
+    const chord = chordOf(input, key as any);
+    if (!chord) return;
+
+    // Leader is a prefix, not an action: swallow it and read the next chord.
+    if (leaderPending) {
       clearTimeout(leaderTimeoutRef.current);
-      setLeaderKey('none');
-      if (key.escape) return; // Esc cancels the leader chord quietly
-      const ch = input.toLowerCase();
-      if (ch === 't')       { setShowThinking(v => !v); toast.info(`Thinking ${showThinking ? 'hidden' : 'shown'}`); return; }
-      if (ch === 'd')       { setShowDetails(v => !v); toast.info(`Details ${showDetails ? 'hidden' : 'shown'}`); return; }
-      if (ch === 'm')       { dialog.open({ title: 'Model Picker', width: 60, height: 25, children: <ModelPickerDialog currentModel={model} onSelect={(m) => { setModel(m); dialog.close(); }} /> }); return; }
-      if (ch === 'p')       { setShowCommands(v => !v); return; }
-      if (ch === 'c')       { clear(); return; }
-      if (ch === 'n')       { clear(); toast.info('New session'); return; }
-      if (ch === 's')       { setShowSessionPanel(v => !v); return; }
-      if (ch === 'e' || ch === 'i') { handleExternalEditor(); return; }
-      if (ch === 'l')       { handleLogs(); return; }
-      if (ch === '/' || ch === '?') { handleHelp(); return; }
-      if (input === 'x')    { return; }
-      toast.info(`Unknown leader key: ${ch}`);
+      setLeaderPending(false);
+      if (chord === 'escape') return;
+      const action = app.get(leader + chord);
+      if (action && runAction(action)) return;
+      toast.info(`Unknown leader key: ${chord}`);
       return;
     }
 
-    if (key.ctrl && input === 's') {
-      setShowSessionPanel(v => !v);
+    if (chord === leader) {
+      setLeaderPending(true);
+      leaderTimeoutRef.current = setTimeout(() => setLeaderPending(false), leaderTimeout);
+      const hints = leaderHints(leader, app);
+      if (hints) toast.info(`Leader — ${hints}`);
       return;
     }
 
-    if (key.ctrl && input === 'x') {
-      setLeaderKey('ctrl-x');
-      toast.info('Leader: T(thinking) D(details) M(model) P(palette) C(clear) N(new) S(session) E(editor) L(logs) ?(help)');
-      leaderTimeoutRef.current = setTimeout(() => { setLeaderKey('none'); }, 3000);
-      return;
-    }
-
-    if (key.ctrl && input === '/') {
-      handleHelp();
-      return;
-    }
+    const action = app.get(chord);
+    // Prompt-owned actions are PromptInput's business; ignore them here.
+    if (action && !isInputAction(action) && runAction(action)) return;
   }, { isActive: !dialog.isOpen && !showCommands });
 
   const lastModelRef = useRef(model);
