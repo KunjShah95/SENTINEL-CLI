@@ -1,7 +1,7 @@
 export const site = {
   name: "Sentinel",
   tagline: "A minimalist AI coding assistant for the terminal.",
-  version: "3.2.1",
+  version: "3.3.0",
   /** Canonical origin. One place, so sitemap/robots/canonical/OG never drift. */
   url: "https://sentinel-cli.dev",
   repo: "https://github.com/KunjShah95/SENTINEL-CLI",

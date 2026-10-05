@@ -377,6 +377,23 @@ npm run release:check  # all three
 
 ## Changelog
 
+### v3.3.0 — `sentinel doctor`
+
+- `sentinel doctor` — pre-flight checks before the first turn: Node runtime (against the Node 20
+  floor), working directory, data-dir writability, provider credentials, host memory, and the shell
+  tool layer (including that destructive patterns are still classified)
+- Exits non-zero only on a real failure; warnings are information for a human, so the Windows PATH
+  note does not make the command useless
+- Offline by default — `--network` opts into probing local model servers, because a health check
+  that needs the internet to tell you the internet is down is useless
+- `--json` for scripting
+- Provider check counts the config store as well as the environment, since that is what the runtime
+  actually reads; key values are never printed, only provider and variable names
+- `engines.node >= 20` is now declared in the package manifest
+
+**Website**
+- `/series` courses with an episode pager, plus a batch of keyword-mapped posts
+
 ### v3.2.1 — TUI overlays were broken
 
 **The bug:** dialogs (provider setup, model picker, theme picker, logs, help, permission) and the

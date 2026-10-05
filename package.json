@@ -1,6 +1,6 @@
 {
   "name": "sentinel-cli",
-  "version": "3.2.1",
+  "version": "3.3.0",
   "description": "Minimalist AI coding assistant for the terminal (Pi-style). Multi-LLM, local tools, sessions, MCP — no servers, no telemetry.",
   "main": "src/cli/main.js",
   "type": "module",
