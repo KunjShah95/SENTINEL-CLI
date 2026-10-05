@@ -1,5 +1,7 @@
 import { ImageResponse } from "next/og";
 
+import { site } from "@/lib/site";
+
 // Route handlers only accept the documented segment config keys. `size`,
 // `contentType` and `alt` are file-convention-only exports, so the dimensions
 // and headers are set on the response instead.
@@ -69,7 +71,7 @@ export async function GET(req: Request) {
           <div style={{ display: "flex", fontSize: 30, color: "#ECEEE9", fontWeight: 600 }}>
             Sentinel
           </div>
-          <div style={{ display: "flex", fontSize: 24, color: "#959C94" }}>v3.1.0</div>
+          <div style={{ display: "flex", fontSize: 24, color: "#959C94" }}>v{site.version}</div>
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
