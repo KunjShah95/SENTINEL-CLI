@@ -356,8 +356,7 @@ approved, which is the finding this is for.
 Read-only over recorded JSONL: no model, no network, no credentials. `Semantic`
 is named in the taxonomy with a count of zero because those divergences leave
 every recorded field unchanged — the tool states the limit of its own coverage
-rather than implying a clean result it cannot support. See
-`docs/market-brief.md` §8.
+rather than implying a clean result it cannot support.
 
 ## `sentinel onboard` — the week-one survey
 

@@ -397,8 +397,8 @@ npm run release:check
 
 Fully green across all four suites.
 
-Website (`cd website && npm run build`): exit 0, 32 posts, both series pages
-static-render with all twelve PR Owl episodes linked.
+Website (`cd website && npm run build`): exit 0, 20 posts, the series page
+static-renders.
 
 ## Also built on the primitive
 
@@ -420,11 +420,11 @@ bug this document warns about**, in the two places that matter most.
 
 ### Two diff parsers
 
-`pr-owl/lib/diff.ts` was 273 lines of parser. `sentinel review` grew its own in
-`src/agent/review-diff.js` when the capability moved into the CLI. For a while
-there were two answers to "what line is this?":
+An earlier version of the reviewer had its own 273-line parser alongside
+`src/agent/review-diff.js`, written separately to serve a GitHub App rather than
+the CLI. For a while there were two answers to "what line is this?":
 
-- PR Owl's copy had no `fileText`, and returned `truncated` differently.
+- The app's copy had no `fileText`, and returned `truncated` differently.
 - `validateFindings` existed twice, differing on the cap (12 versus configurable)
   and on the wording of a dropped reason.
 
@@ -518,62 +518,47 @@ longer sleep, and it is not urgent enough to defer everything else for.
 
 ## 12. Inverting the dependency
 
-§9 fixed the duplication by making PR Owl re-export three of Sentinel's modules.
-That was the right fix and the wrong direction. PR Owl still *owned* the queue,
-the policy and the trust rules, so Sentinel was the thing importing from an
-example application — and the moment a rule changed, there was a question about
-which copy was authoritative that no longer had an answer.
+§9 fixed the duplication by making one copy re-export three of Sentinel's
+modules. That was the right fix and the wrong direction: the example application
+still *owned* the queue, the policy and the trust rules, so the library was the
+thing importing from an example — and the moment a rule changed there was a
+question about which copy was authoritative that no longer had an answer.
 
-The move was to invert it. What PR Owl needed in order to be an app, and what did
-not need GitHub:
+Inverting it produced the current layout. The reviewer is four modules, split by
+what each one actually answers:
 
-| was | now |
+| module | question |
 | --- | --- |
-| `pr-owl/lib/queue.ts` | `src/agent/review-queue.js` |
-| `pr-owl/lib/policy.ts` | `src/agent/review-policy.js` |
-| *(in `policy.ts`)* | `src/agent/review-trust.js` |
-| `reviewPullRequest` | `runReview` in `src/agent/review.js` |
-
-What stayed, because it is transport: `github.ts` (REST), `checkout.ts` (git),
-`webhook.ts` (GitHub's headers), and `owl.ts` as the composition root. Every
-import in `pr-owl/lib/` now points one way, at `src/`.
+| `review-queue.js` | when does this run, and what gets dropped when it is superseded? |
+| `review-policy.js` | is this worth reviewing, and under what authority? |
+| `review-trust.js` | is this origin ours? |
+| `review.js` | run it, and throw away anything unplaceable |
 
 Three things changed shape rather than just location.
 
-**The queue's key became opaque.** `repo#prNumber` was PR Owl's; the queue only
-ever used it as an identity, so it now takes a caller-supplied `key` plus a
-`payload`, and `pullRequestKey()`/`jobId()` are the two-line helpers that build
-one. A queue that cannot tell a pull request from a build is a queue.
+**The queue's key became opaque.** A pull-request key used to be `repo#prNumber`,
+because that was the only caller. The queue only ever used it as an identity, so
+it now takes a caller-supplied `key` plus a `payload`, and
+`pullRequestKey()`/`jobId()` are the two-line helpers that build one. A queue
+that cannot tell a pull request from a build is a queue.
 
 **Trust got a documented asymmetry.** `isTrustedOrigin(a, b)` — "are these the
 same?" — defaults `true` when there is nothing to compare, because a local
 working copy has no origin and refusing to review it would be useless.
 `isUntrustedOrigin(a, b)` — "is this foreign?" — defaults `true`, because an
-absent ref is a deleted fork and that is the case where you know least. Both
+absent ref means a deleted fork, which is the case where you know least. Both
 answers are correct to their own question, and writing that down is what stops
 the pair looking like a bug and being "fixed" into one. `isUntrusted` is an alias
 for the second, so `review-policy.js` reads as prose rather than as a branch on a
 double negative.
 
-**`buildBrief` was already a duplicate.** `review.js` and `policy.ts` each had
-one. The one in `review.js` is now a re-export of `buildPolicyBrief`, so the
-twelve-finding cap and the wording of a dropped reason cannot diverge.
+**`buildBrief` was already a duplicate.** Two modules each had one. `review.js` is
+now a re-export of `buildPolicyBrief`, so the twelve-finding cap and the wording of
+a dropped reason cannot diverge.
 
-Delegating `reviewPullRequest` to `runReview` was worth more than the file count
-suggests. The old copy had drifted on three things that are not cosmetic: it did
-not pass `subagentDepth: 1`, so a review of a stranger's patch could spawn
-teammates; it did not pass the `rung`, so every call the reviewer made was
-recorded as *not assessable* rather than as clean; and it lost the model's prose
-when no structured summary came back, which is the whole text the reviewer spent
-a second pass writing.
-
-One deletion worth recording. `pr-owl/lib/review.ts` exported a `cancelReview()`
-that called `cancelTask("pr-owl:<prKey>")` — an id no `createTask` call ever
-returns, so it could not have cancelled anything. It was also never called. Dead
-and wrong is worth deleting rather than documenting, so the comment explaining
-why there is no cancel path says what the queue actually does instead: finish the
-review you paid for, then review the newer head.
-
-
-After both fixes: `release:check` was run three consecutive times end to end,
-exit 0 every time.
+One deletion worth recording. There was a `cancelReview()` that called
+`cancelTask("<owner>:<prKey>")` — an id no `createTask` call ever returns, so it
+could not have cancelled anything. It was also never called. Dead and wrong is
+worth deleting rather than documenting, so the comment explaining why there is no
+cancel path says what the queue actually does instead: finish the review you paid
+for, then review the newer head.

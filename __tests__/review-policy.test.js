@@ -1,9 +1,9 @@
 /**
  * Review policy and trust classification.
  *
- * Lives in Sentinel rather than `pr-owl/`: "should this be reviewed, and under
- * what authority" is not a GitHub question. The pull-request-shaped adapter stays
- * in the app; the decision does not.
+ * "Should this be reviewed, and under what authority" is a question about code
+ * and trust, not about which forge a change came from. The transport that fetches
+ * a change is separable; the decision is not.
  *
  * The tests are weighted towards what is NOT reviewed, because that is how an
  * autonomous reviewer actually fails — quietly, and in the direction of spending

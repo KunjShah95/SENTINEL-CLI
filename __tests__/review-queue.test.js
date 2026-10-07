@@ -1,9 +1,9 @@
 /**
  * The coalescing queue.
  *
- * Lives here rather than in `pr-owl/` because the queue is now
- * `src/agent/review-queue.js` — it is not GitHub-specific and not
- * reviewer-specific, and its tests belong next to the code they cover.
+ * These cover `src/agent/review-queue.js`, which is deliberately not tied to any
+ * one caller: the queue takes an opaque `key`, so a build, a deploy or a review
+ * can all use it.
  *
  * Coalescing is the part worth testing hard. It is the difference between a
  * reviewer and a spam bot: ten branches rebased after a rename should produce
