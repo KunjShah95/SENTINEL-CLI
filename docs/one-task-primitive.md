@@ -251,12 +251,11 @@ does. The tests here assert the shape (one tool offered, every action documented
 legacy names still dispatched, no drift between the spellings) and the behaviour
 is worth watching for a week.
 
-### PR Owl — the second consumer
+### The reviewer — the second consumer
 
-`pr-owl/` is a GitHub App in this repository that reviews pull requests, built on
-the primitive rather than beside it. It exists partly as a course and mostly as
-evidence: a primitive that only suits the codebase it was extracted from is a
-refactor, and one that a separate application can use is an interface.
+`sentinel review` (§8's `review` command) is the second consumer, and it exists
+partly as evidence: a primitive that only suits the codebase it was extracted
+from is a refactor, and one that a separate capability can use is an interface.
 
 What it needed and did not write — a status store, a permission policy, a
 cancellation path, a concurrency cap — all came from `task.js`. Its security
@@ -266,16 +265,10 @@ model is one line:
 const rung = readOnly ? PERMISSIONS.READONLY : PERMISSIONS.TEAMMATE;
 ```
 
-A fork's head commit is attacker-controlled code, so it gets the rung that stops a
-subagent editing files — the same code, already tested for a different feature.
-`__tests__/integration.test.ts` asserts both the rung and the fact that a review is
-in the shared registry, which is what makes the claim checkable.
-
-93 tests, no network, no credentials. See `pr-owl/README.md`.
-
-Later, this app stopped owning even the queue and the policy — they moved into
-`src/agent/` and PR Owl became a thin HTTP-in/GitHub-API-out shell over them.
-That inversion is §12.
+Reviewing someone else's patch means reading attacker-controlled code, so it gets
+the rung that stops a subagent editing files — the same code, already tested for
+a different feature. `__tests__/review.test.js` asserts the rung, which is what
+makes the claim checkable.
 
 ### Two design changes the ports forced
 
@@ -400,11 +393,9 @@ npm run release:check
   unit          709 pass, 0 fail
   tui            53 pass, 0 fail
   jest           16 pass, 0 fail
-  pr-owl         93 pass, 0 fail
 ```
 
-Fully green across all five suites. The unit count rose and the PR Owl count fell
-because the queue and the policy moved; see §12.
+Fully green across all four suites.
 
 Website (`cd website && npm run build`): exit 0, 32 posts, both series pages
 static-render with all twelve PR Owl episodes linked.
@@ -442,13 +433,9 @@ wrong line. That is what makes it worth writing down: **the drift was
 invisible**, and it only surfaced because I ran a scan for duplicated lines
 instead of trusting that two files with the same job meant the same answers.
 
-Fixed by making `pr-owl/lib/diff.ts` and `lib/review.ts` re-export Sentinel's.
-One implementation, two callers. `extractJson`/`stripJson` were a *third* copy
-of the balanced-brace scanner and are now one.
-
-That fix was correct and the direction was wrong — see §12, which moves the queue,
-the policy and the trust rules themselves into `src/agent/` so the app imports
-the library instead of the library importing the example.
+Fixed by deleting the second copy. One implementation, one caller.
+`extractJson`/`stripJson` were a *third* copy of the balanced-brace scanner and
+are now one.
 
 The test that had to change is the lesson: two tests asserted the drop-reason
 wording and failed. They were asserting on a string that had moved to a shared

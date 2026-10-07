@@ -62,7 +62,10 @@ export const DEFAULT_KEYBINDS = Object.freeze({
   'session.undo': '<leader>u',
   'session.redo': '<leader>r',
   'session.export': '<leader>x',
-  'session.background': 'ctrl+b',
+  // `session.background` (was ctrl+b) and `agent.list` (was <leader>a) removed:
+  // both submitted slash commands that no handler dispatches, so the keys did
+  // nothing but raise an error toast. An unbound key is honest; a key that
+  // pretends to work is worse than neither.
   'session.rename': 'ctrl+r',
   'session.delete': 'ctrl+d',
   'session.toggle.thinking': '<leader>t',
@@ -108,7 +111,6 @@ export const DEFAULT_KEYBINDS = Object.freeze({
 
   // Models and agents
   'model.list': '<leader>m',
-  'agent.list': '<leader>a',
   'agent.cycle': 'shift+tab',
   'variant.cycle': 'ctrl+t',
 });

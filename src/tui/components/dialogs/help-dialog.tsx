@@ -133,7 +133,7 @@ export function HelpDialog() {
           {section.bindings.map(({ keys, desc }) => (
             <Box key={keys} flexDirection="row" gap={2} marginLeft={1}>
               <Text color={colors.info} bold>{keys.padEnd(28)}</Text>
-              <Text color={colors.textSecondary} dimColor>{desc}</Text>
+              <Text color={colors.secondary} dimColor>{desc}</Text>
             </Box>
           ))}
         </Box>

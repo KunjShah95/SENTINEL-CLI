@@ -31,8 +31,7 @@
     "lint": "eslint bin/ src/ mcp/ __tests__/ scripts/ \"evals/**/*.mjs\"",
     "typecheck": "tsc -p src/tui/tsconfig.json --noEmit",
     "check:imports": "node scripts/check-imports.mjs",
-    "test:pr-owl": "node --import tsx --test pr-owl/__tests__/*.test.ts",
-    "release:check": "npm run lint && npm run typecheck && npm run check:imports && npm test && npm run test:pr-owl",
+    "release:check": "npm run lint && npm run typecheck && npm run check:imports && npm test",
     "test:tui": "node --import tsx --test __tests__/tui.test.mjs __tests__/tui-overlay.test.mjs __tests__/tui-keybinds.test.mjs __tests__/tui-scroll.test.mjs",
     "tui:snapshot": "tsx scripts/tui-snapshot.tsx",
     "tui:probe": "tsx --tsconfig src/tui/tsconfig.json scripts/tui-probe.tsx"

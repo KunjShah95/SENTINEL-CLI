@@ -581,4 +581,11 @@ export function Session() {
         </SessionShell>
 
         {showCommands ? (
-          <O
+          <Overlay title="Command Palette" width={80} hint="↑↓ navigate · Enter run · Esc close">
+            <CommandMenu onClose={() => setShowCommands(false)} ctx={commandCtx} />
+          </Overlay>
+        ) : null}
+      </Box>
+    </Box>
+  );
+}

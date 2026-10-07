@@ -38,18 +38,7 @@ export const series: Series[] = [
       "By the end you have a globally installed CLI that streams an agent turn, gates writes by mode, and prints what the turn cost.",
     keyword: "cursor style cli coding agent",
   },
-  {
-    slug: "pr-owl-course",
-    title: "PR Owl: an autonomous AI code reviewer for GitHub",
-    metaTitle: "PR Owl: Autonomous AI Code Reviewer",
-    description:
-      "A twelve-part build of a GitHub App that reviews pull requests autonomously — verified webhooks, a coalescing queue, an agent that reads the repo, and inline comments on real line numbers.",
-    kicker: "Course · 12 parts",
-    outcome:
-      "By the end you have an installed GitHub App that receives a pull request, reviews the diff with repo context, and posts inline comments.",
-    keyword: "ai code reviewer github app",
-  },
-];
+  ];
 
 export const seriesSlugs: string[] = series.map((s) => s.slug);
 
