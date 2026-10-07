@@ -18,7 +18,11 @@
  */
 import { createHash } from 'node:crypto';
 
-const WRITE_TOOLS = new Set(['writeFile', 'editFile', 'batchEdit', 'applyPatch', 'undoLastChange', 'redoLastUndo', 'teamMerge']);
+// The write set lives in tool-taxonomy.js. This was a byte-identical copy of
+// the audit trail's, and two identical arrays is the state right before they
+// disagree: one gains a tool, the other does not, and "the code changed after
+// the tests passed" silently stops being detected.
+import { isWriteTool, exitCodeOf as resolveExitCode } from '../shared/tool-taxonomy.js';
 
 /** Claim kinds: how they are phrased, and which commands count as evidence. */
 export const CLAIM_KINDS = Object.freeze([
@@ -54,13 +58,10 @@ export function hashOutput(output) {
   return createHash('sha256').update(s).digest('hex').slice(0, 12);
 }
 
-function exitCodeOf(tool, output) {
-  if (!output || typeof output !== 'object') return undefined;
-  if (output.error) return 1;
-  if (typeof output.exitCode === 'number') return output.exitCode;
-  if (tool === 'runTests' && Array.isArray(output.failed)) return output.failed.length ? 1 : 0;
-  return undefined;
-}
+// A second, identical copy of this function lived here and in audit-trail.js.
+// Divergence would be invisible: a tool counted as succeeding when it exited
+// non-zero invalidates every receipt downstream of it, and nothing throws.
+const exitCodeOf = resolveExitCode;
 
 /** Ledger kept by the loop. */
 export class ReceiptLedger {
@@ -81,7 +82,7 @@ export class ReceiptLedger {
       sha: hashOutput(output),
       writesAfter: false,
     };
-    if (WRITE_TOOLS.has(tool) && entry.ok) {
+    if (isWriteTool(tool) && entry.ok) {
       for (const e of this.entries) e.writesAfter = true;
     }
     this.entries.push(entry);

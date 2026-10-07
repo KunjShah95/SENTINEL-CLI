@@ -50,7 +50,16 @@ function useHarnessCounts(active: boolean) {
         ]);
         const teammates = listTeam().filter((m: { status: string }) => m.status === 'running').length;
         const background = listBackground().filter((t: { status: string }) => t.status === 'running').length;
-        if (!cancelled) setCounts({ teammates, background });
+        // Keep the previous object when nothing moved: this polls forever, and a
+        // fresh object every tick re-rendered the whole session (and therefore
+        // repainted the screen) on a timer, even with an idle prompt.
+        if (!cancelled) {
+          setCounts((prev) =>
+            prev.teammates === teammates && prev.background === background
+              ? prev
+              : { teammates, background }
+          );
+        }
       } catch { /* harness modules unavailable */ }
     };
     load();

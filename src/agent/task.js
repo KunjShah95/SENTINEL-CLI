@@ -30,6 +30,7 @@
 import { randomUUID } from 'node:crypto';
 import { createWorktree, removeWorktree, worktreePatch, applyPatchToRoot } from './worktree.js';
 import { isReadOnlyTool } from '../shared/schemas/mode.js';
+import { isShellTool, isFileTool } from '../shared/tool-taxonomy.js';
 import { classifyBashCommand } from './bash-validation.js';
 import { getWorkdir } from '../shared/tools/workdir.js';
 
@@ -66,8 +67,9 @@ export const MAX_CONCURRENT = 6;
 /** Default nesting depth. 1 means "a task may not spawn a task". */
 export const MAX_DEPTH = 1;
 
-const SHELL_TOOLS = new Set(['bash', 'runTests', 'bgRun']);
-const FILE_TOOLS = new Set(['writeFile', 'editFile', 'batchEdit', 'applyPatch']);
+// Classification lives in tool-taxonomy.js. These were local copies, and a
+// local copy of "which tools write files" is how the permission ladder ends up
+// disagreeing with the receipt ledger about whether a turn mutated anything.
 
 /** Name of the rung a task holds, after clamping to its parent. */
 export function resolvePermission(requested, parentTask) {
@@ -103,7 +105,7 @@ export function taskPermission(policy, { isolated = false, leadAllowAll = null, 
       return 'allow';
     }
 
-    if (SHELL_TOOLS.has(toolName)) {
+    if (isShellTool(toolName)) {
       const c = classifyBashCommand(input?.command);
       // Destructive is denied at every rung, even under an explicit grant.
       // Approving one once is what turns a repo's history into a list of
@@ -120,7 +122,7 @@ export function taskPermission(policy, { isolated = false, leadAllowAll = null, 
 
     // Isolation first: a teammate with a worktree can edit safely without
     // anyone having granted it, because its bytes land on a branch.
-    if (isolated && FILE_TOOLS.has(toolName)) return 'allow';
+    if (isolated && isFileTool(toolName)) return 'allow';
 
     // Then inheritance. A teammate must never exceed its lead, but it need not
     // be weaker: if the lead was granted editFile for the session, a teammate

@@ -42,7 +42,7 @@ function buildModeSection(mode) {
       modeLine:
         'You are in PLAN mode (read-only). Analyse the request, gather context, ' +
         'and respond with a clear plan. Do NOT modify anything.',
-      toolsLine: 'Available tools: readFile, listDirectory, glob, grep, codeMap, searchWeb, todoRead, skill.',
+      toolsLine: 'Available tools: readFile, listDirectory, glob, grep, codeMap, searchWeb, fetchUrl, todoRead, skill.',
       rules: ['If you would need writeFile, editFile or bash, say so and stop.'],
     };
   }
@@ -65,7 +65,7 @@ function buildModeSection(mode) {
         '## Score: [A/B/C/D/F]',
         'Omit empty sections. Be specific with file:line references.',
       ].join('\n'),
-      toolsLine: 'Available tools: readFile, listDirectory, glob, grep, searchWeb, todoRead, skill.',
+      toolsLine: 'Available tools: readFile, listDirectory, glob, grep, searchWeb, fetchUrl, todoRead, skill.',
       rules: [],
     };
   }
@@ -75,8 +75,8 @@ function buildModeSection(mode) {
       'Make changes decisively.',
     toolsLine:
       'Available tools: readFile, listDirectory, glob, grep, codeMap, writeFile, editFile, ' +
-      'batchEdit, bash, runTests, applyPatch, searchWeb, diffFile, undoLastChange, redoLastUndo, ' +
-      'todoWrite, todoRead, skill, task, memoryWrite, memoryDelete.',
+      'batchEdit, bash, runTests, applyPatch, searchWeb, fetchUrl, diffFile, undoLastChange, ' +
+      'redoLastUndo, todoWrite, todoRead, skill, task, memoryWrite, memoryDelete.',
     rules: [
       'If a bash command fails due to a missing package, install it and retry.',
       'For multi-step work, track progress with todoWrite (send the FULL list every call).',

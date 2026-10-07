@@ -511,65 +511,20 @@ async function runBashImpl(input) {
 }
 
 async function searchWebImpl(input) {
-  const query = input?.query;
-  const count = input?.count ?? 5;
-  if (typeof query !== 'string' || query.length === 0) {
-    throw new Error('query is required');
+  // Multi-provider chain (Exa → Tavily → Brave → DuckDuckGo) lives in
+  // web-search.js. This remains the tool entry point so the tool contract,
+  // permissions, and modes are unchanged.
+  const { search, formatSearchResults } = await import('../web-search.js');
+  const outcome = await search({ query: input?.query, count: input?.count });
+  if (!outcome.results.length && outcome.errors.length) {
+    return { error: formatSearchResults(outcome) };
   }
-  const endpoint =
-    (process.env.SEARCH_WEB_ENDPOINT || 'https://html.duckduckgo.com/html/').replace(/\/+$/, '') +
-    '/';
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 10_000);
-  try {
-    const url = `${endpoint}?q=${encodeURIComponent(query)}`;
-    const res = await fetch(url, { signal: controller.signal });
-    clearTimeout(timer);
-    const html = await res.text();
-    const results = [];
-    const linkRe = /<a[^>]+class="result__a"[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/gi;
-    const snippetRe = /<a[^>]+class="result__snippet"[^>]*>([\s\S]*?)<\/a>/gi;
-    const linkMatches = [];
-    let m;
-    while ((m = linkRe.exec(html)) !== null && linkMatches.length < count) {
-      linkMatches.push({ url: m[1], title: m[2].replace(/<[^>]+>/g, '').trim() });
-    }
-    const snippetMatches = [];
-    while ((m = snippetRe.exec(html)) !== null && snippetMatches.length < count) {
-      snippetMatches.push(m[1].replace(/<[^>]+>/g, '').trim());
-    }
-    for (let i = 0; i < Math.min(linkMatches.length, count); i++) {
-      results.push({
-        title: linkMatches[i].title,
-        snippet: snippetMatches[i] || '',
-        url: linkMatches[i].url,
-      });
-    }
-    if (results.length === 0) {
-      const fallbackUrl = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json`;
-      const fallbackRes = await fetch(fallbackUrl, { signal: AbortSignal.timeout(10_000) });
-      const data = await fallbackRes.json();
-      if (data.AbstractText) {
-        results.push({
-          title: data.Heading || query,
-          snippet: data.AbstractText,
-          url: data.AbstractURL || '',
-        });
-      }
-      if (data.Results) {
-        for (const r of data.Results.slice(0, count)) {
-          results.push({ title: r.Text || '', snippet: r.Text || '', url: r.FirstURL || '' });
-        }
-      }
-    }
-    return { results };
-  } catch (err) {
-    clearTimeout(timer);
-    if (err.name === 'AbortError') {
-      return { error: 'Search request timed out' };
-    }
-    return { error: err.message };
-  }
+  return { provider: outcome.provider, results: outcome.results };
+}
+
+async function fetchUrlImpl(input) {
+  const { fetchUrl } = await import('../fetch-url.js');
+  return fetchUrl({ url: input?.url, maxChars: input?.maxChars });
 }
 
 async function diffFileImpl(input) {
@@ -847,6 +802,7 @@ const TOOL_IMPLS = {
   grep: grepImpl,
   codeMap: codeMapImpl,
   searchWeb: searchWebImpl,
+  fetchUrl: fetchUrlImpl,
   writeFile: queued(writeFileImpl, (i) => [i?.path]),
   editFile: queued(editFileImpl, (i) => [i?.path]),
   batchEdit: queued(batchEditImpl, (i) => (Array.isArray(i?.operations) ? i.operations.map((o) => o?.filePath) : [])),
@@ -887,8 +843,14 @@ export const readOnlyToolContracts = Object.freeze({
     inputSchema: toolInputSchemas.codeMap,
   },
   searchWeb: {
-    description: 'Search the web and return relevant results (titles, snippets, URLs).',
+    description:
+      'Search the web and return titles, URLs, and short snippets. Use for current facts, library/framework docs, and error-message lookups. Pair with fetchUrl when a snippet is not enough.',
     inputSchema: toolInputSchemas.searchWeb,
+  },
+  fetchUrl: {
+    description:
+      'Fetch a web page and return its readable text content (scripts/styles/nav stripped). Use after searchWeb to read the actual page. Avoid when a snippet suffices.',
+    inputSchema: toolInputSchemas.fetchUrl,
   },
   diffFile: {
     description: 'Preview a unified diff of proposed changes to a file without applying them.',

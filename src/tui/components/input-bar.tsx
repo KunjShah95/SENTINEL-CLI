@@ -65,6 +65,19 @@ function getSlashSuggestions(text: string): typeof SLASH_COMMANDS {
   return SLASH_COMMANDS.filter(c => c.name.startsWith(query));
 }
 
+/**
+ * Are two suggestion lists the same set of commands?
+ *
+ * Comparing by identity is not enough: `getSlashSuggestions` builds a fresh
+ * array on every keystroke, so passing it straight to `setSlashSuggestions`
+ * always looks like a change to React and re-renders. That doubled the repaints
+ * per character — two full-screen writes for one keystroke. `SLASH_COMMANDS` is
+ * a module constant, so matching elements are the same entries.
+ */
+function sameCommands(a: typeof SLASH_COMMANDS, b: typeof SLASH_COMMANDS): boolean {
+  return a.length === b.length && a.every((c, i) => c === b[i]);
+}
+
 export function InputBar({
   model,
   busy = false,
@@ -93,16 +106,18 @@ export function InputBar({
   const { name: modelName, provider } = shortModelName(model);
   const isShell = value.startsWith('!');
 
-  // Update slash suggestions as user types
+  // Slash suggestions follow the command word. The comparison matters: this
+  // effect runs on every keystroke, and without it each one re-rendered the
+  // composer a second time with an empty list that was never actually new.
   useEffect(() => {
     const slash = getSlashSuggestions(value);
-    setSlashSuggestions(slash);
+    setSlashSuggestions((prev) => (sameCommands(prev, slash) ? prev : slash));
     if (slash.length > 0) setSelectedIndex(0);
   }, [value]);
 
   // File/agent mention suggestions
   useEffect(() => {
-    if (mentionToken === null) { setSuggestions([]); return; }
+    if (mentionToken === null) { setSuggestions((prev) => (prev.length === 0 ? prev : [])); return; }
     let cancelled = false;
     (async () => {
       try {
@@ -118,7 +133,8 @@ export function InputBar({
         const result = await executeLocalTool('glob', { pattern });
         if (cancelled) return;
         const files: string[] = Array.isArray((result as any)?.files) ? (result as any).files : [];
-        setSuggestions(files.slice(0, MAX_SUGGESTIONS));
+        const next = files.slice(0, MAX_SUGGESTIONS);
+        setSuggestions((prev) => (prev.length === next.length && prev.every((f, i) => f === next[i]) ? prev : next));
         setSelectedIndex(0);
       } catch { if (!cancelled) setSuggestions([]); }
     })();

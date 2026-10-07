@@ -20,6 +20,7 @@ import { isReadOnlyTool, isToolAllowedInMode } from '../shared/schemas/mode.js';
 import { SWE_MAX_ITERATIONS } from './swe.js';
 import { runInWorkdir, getWorkdir } from '../shared/tools/workdir.js';
 import { classifyBashCommand } from './bash-validation.js';
+import { isFileTool } from '../shared/tool-taxonomy.js';
 import { recordGrant, recordDispatch } from './audit-trail.js';
 import { drain, hasPending, waitForMail, formatNotifications } from './mailbox.js';
 import { startBackground, checkBackground, listBackground } from './background.js';
@@ -55,8 +56,19 @@ export const TOOL_PARAM_SCHEMAS = {
   },
   searchWeb: {
     type: 'object',
-    properties: { query: { type: 'string' }, count: { type: 'integer' } },
+    properties: {
+      query: { type: 'string', description: 'Search query. Prefer natural-language questions over keyword soup.' },
+      count: { type: 'integer', description: 'Results to return (1-20, default 5).' },
+    },
     required: ['query'],
+  },
+  fetchUrl: {
+    type: 'object',
+    properties: {
+      url: { type: 'string', description: 'Absolute http(s) URL to fetch.' },
+      maxChars: { type: 'integer', description: 'Truncate the extracted text to this many characters (default 8000).' },
+    },
+    required: ['url'],
   },
   writeFile: {
     type: 'object',
@@ -291,9 +303,9 @@ export const LEGACY_TASK_TOOLS = Object.freeze([
   'spawnAgent', 'bgRun', 'bgCheck', 'spawnTeammate', 'sendMessage', 'teamStatus', 'teamMerge',
 ]);
 
-export function buildProviderTools(mode) {
+export function buildProviderTools(mode, externalTools = []) {
   const contracts = getToolContracts(mode);
-  return Object.entries(contracts)
+  const local = Object.entries(contracts)
     .filter(([name]) => TOOL_PARAM_SCHEMAS[name])
     .filter(([name]) => !LEGACY_TASK_TOOLS.includes(name))
     .map(([name, contract]) => ({
@@ -304,6 +316,18 @@ export function buildProviderTools(mode) {
         parameters: TOOL_PARAM_SCHEMAS[name],
       },
     }));
+  // External MCP tools are appended after local ones so a third-party server
+  // can never shadow a Sentinel builtin (its namespaced name can't collide,
+  // but ordering also keeps the local block cache-stable).
+  const external = (externalTools || []).map((t) => ({
+    type: 'function',
+    function: {
+      name: t.namespacedName,
+      description: t.description,
+      parameters: t.inputSchema,
+    },
+  }));
+  return [...local, ...external];
 }
 
 export const LOOP_REQUEST_CHAR_BUDGET = 200_000; // ~50k tokens: safe for all providers
@@ -486,7 +510,27 @@ export async function* runAgentTurnInner(opts = {}) {
       ? `\n\n# Outcome contract\n${workerBrief(outcome)}\n${GOAL_WORKER_RULE}`
       : `\n\n# Goal\nWork until this completion condition holds: ${goal}\n${GOAL_WORKER_RULE}`;
   }
-  const tools = buildProviderTools(mode);
+  // External MCP servers are discovered once per turn, before the first model
+  // call, so their tools are declared on every request. A server that fails to
+  // connect contributes zero tools and never fails the turn.
+  let externalTools = [];
+  let mcpServers = {};
+  try {
+    const { configManager } = await import('../config/configManager.js');
+    await configManager.load();
+    mcpServers = configManager.get('mcpServers', {}) || {};
+    if (Object.keys(mcpServers).length) {
+      const { getToolRegistry } = await import('./mcp-client.js');
+      const registry = await getToolRegistry(mcpServers);
+      externalTools = registry.tools;
+      for (const err of registry.errors) {
+        yield { event: 'warning', data: { message: `MCP server "${err.server}" unavailable: ${err.error}` } };
+      }
+    }
+  } catch {
+    // MCP is optional — never block a turn on config or transport problems.
+  }
+  const tools = buildProviderTools(mode, externalTools);
   const isSwe = mode === 'SWE';
   const maxIterations = isSwe ? SWE_ITERATIONS : MAX_ITERATIONS;
   const resultCap = isSwe ? SWE_TOOL_RESULT_CAP : TOOL_RESULT_CAP;
@@ -505,6 +549,8 @@ export async function* runAgentTurnInner(opts = {}) {
   let claimChecked = false;
 
   let inputTokens = 0;
+  let cacheReadTokens = 0;
+  let cacheWriteTokens = 0;
   let outputTokens = 0;
   const finishEvents = function* (extra = {}) {
     const usage = {
@@ -512,6 +558,14 @@ export async function* runAgentTurnInner(opts = {}) {
       outputTokens: outputTokens + cheapUsage.outputTokens,
     };
     usage.totalTokens = usage.inputTokens + usage.outputTokens;
+    // Cache savings made explicit so the benefit is measurable per turn.
+    if (cacheReadTokens || cacheWriteTokens) {
+      usage.cacheReadTokens = cacheReadTokens;
+      usage.cacheWriteTokens = cacheWriteTokens;
+      usage.cacheSavingsPct = cacheWriteTokens
+        ? Math.round((cacheReadTokens / (cacheReadTokens + cacheWriteTokens)) * 100)
+        : 100;
+    }
     let { usd } = recordUsage(resolved.modelId, { inputTokens, outputTokens });
     if (cheap) usd += recordUsage(cheap.modelId, cheapUsage).usd || 0;
     const routed = cheap ? { routed: { model: cheap.modelId, ...cheapUsage } } : {};
@@ -579,7 +633,13 @@ export async function* runAgentTurnInner(opts = {}) {
       } else if (ev.type === 'usage') {
         if (ev.usage) {
           turnUsage = ev.usage;
-          // usage tracked via turnUsage
+          // Prompt-cache accounting (Anthropic). Cache reads are ~10% of the
+          // input price, so tracking them separately is what makes the saving
+          // visible instead of silently inflating reported input tokens.
+          if (useModel === resolved) {
+            cacheReadTokens += turnUsage.cacheReadTokens || 0;
+            cacheWriteTokens += turnUsage.cacheWriteTokens || 0;
+          }
         }
       } else if (ev.type === 'error') {
         yield { event: 'error', data: { message: ev.message } };
@@ -748,6 +808,8 @@ export async function* runAgentTurnInner(opts = {}) {
       subagentState: { disabled: subagentDepth >= 1 },
       editCounts,
       gateState,
+      externalToolNames: new Set(externalTools.map((t) => t.namespacedName)),
+      mcpServers,
     });
 
     const batches = batchToolCalls(toolCalls);
@@ -763,7 +825,7 @@ export async function* runAgentTurnInner(opts = {}) {
         const serialized = JSON.stringify(output ?? null).slice(0, resultCap);
         ledger.record(tc.name, tc.input, output);
         if (tc.name === 'runTests' && !output?.error) ranTests = true;
-        if (['writeFile', 'editFile', 'batchEdit', 'applyPatch'].includes(tc.name) && !output?.error) {
+        if (isFileTool(tc.name) && !output?.error) {
           wroteFiles = true;
         }
         yield {
@@ -899,7 +961,7 @@ export function loopHint(editCounts) {
  * Execute one tool call: hooks → permission → subagent-or-local → audit.
  * Extracted so batching shares one path. Returns { output, stopBlocked }.
  */
-async function executeOneTool({ tc: rawTc, mode, opts, subagentState, editCounts, gateState }) {
+async function executeOneTool({ tc: rawTc, mode, opts, subagentState, editCounts, gateState, externalToolNames, mcpServers }) {
   // `let`, because the unified `task` tool is rewritten into its legacy
   // equivalent below and the rest of this function reads `tc` throughout.
   let tc = rawTc;
@@ -922,7 +984,12 @@ async function executeOneTool({ tc: rawTc, mode, opts, subagentState, editCounts
   const requestedTool = tc.name;
   let granted = false;
 
-  if (!isToolAllowedInMode(tc.name, mode)) {
+  // External MCP tools are read-only by assumption (they are third-party
+  // servers, not Sentinel builtins), so they pass the mode gate in every mode
+  // including PLAN/REVIEW/SCAN, where unknown tool names would otherwise be
+  // blocked. They never receive a write grant.
+  const isExternal = Boolean(externalToolNames && externalToolNames.has(tc.name));
+  if (!isExternal && !isToolAllowedInMode(tc.name, mode)) {
     return { output: { error: `Tool ${tc.name} is not available in ${mode} mode` } };
   }
 
@@ -1047,6 +1114,32 @@ async function executeOneTool({ tc: rawTc, mode, opts, subagentState, editCounts
     const out = await spawnSubagentTask(tc.input, { agentName, workdir, model, createStream, subagentDepth, subagentState, parentTaskId });
     if (granted) recordDispatch({ ...auditCtx, toolCallId: rawTc.id, tool: tc.name, input: tc.input, ok: !out?.output?.error });
     return out;
+  }
+
+  // External MCP tool (namespaced `<server>__<tool>`): dispatch through the
+  // client instead of the local registry. External tools are read-only by
+  // default — a third-party server is not silently granted write access.
+  if (externalToolNames && externalToolNames.has(tc.name)) {
+    const { callExternalTool } = await import('./mcp-client.js');
+    let output;
+    try {
+      output = await callExternalTool(tc.name, tc.input, { mcpServers });
+    } catch (e) {
+      output = { error: e?.message || String(e) };
+    }
+    auditToolUse({ toolName: tc.name, ok: !output?.error, cwd: workdir });
+    if (granted) {
+      recordDispatch({
+        ...auditCtx,
+        toolCallId: rawTc.id,
+        tool: tc.name,
+        input: tc.input,
+        ok: !output?.error,
+        error: output?.error ?? null,
+      });
+    }
+    runHooks('postToolUse', { toolName: tc.name, output, mode }).catch(() => {});
+    return { output };
   }
 
   let output;

@@ -238,12 +238,24 @@ function makeToolCall(slot, i) {
 // ─── Anthropic native streaming ───────────────────────────────────────────────
 
 async function* streamAnthropic({ model, messages, tools, apiKey, system, signal }) {
+  // Explicit prompt caching. The system prompt is the stable prefix: it is
+  // rebuilt from the same sections every turn and only varies when the project
+  // context files, skills, or memory change. Marking it ephemeral makes Anthropic
+  // cache it (90% input discount, 5-min TTL) instead of re-billing the full
+  // prompt on each of the up-to-25 iterations in a turn.
+  //
+  // Cache breakpoint placement matters: it must be the LAST content block, so
+  // everything before it (the whole system prompt) is what gets cached.
+  const systemBlocks =
+    typeof system === 'string' && system
+      ? [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }]
+      : undefined;
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: headersFor('anthropic', apiKey),
     body: JSON.stringify({
       model,
-      system,
+      ...(systemBlocks ? { system: systemBlocks } : system ? { system } : {}),
       messages,
       max_tokens: 8192,
       stream: true,
@@ -278,9 +290,18 @@ async function* streamAnthropic({ model, messages, tools, apiKey, system, signal
       yield { type: 'tool_call', id: tool.id, name: tool.name, input };
       tool = null;
     } else if (j.type === 'message_start' && j.message?.usage) {
+      const u = j.message.usage;
       yield {
         type: 'usage',
-        usage: { inputTokens: j.message.usage.input_tokens || 0, outputTokens: 0 },
+        usage: {
+          // cache_read_input_tokens are already billed but were NOT re-read;
+          // report them separately so cost accounting can discount them
+          // instead of charging full input price.
+          inputTokens: u.input_tokens || 0,
+          cacheReadTokens: u.cache_read_input_tokens || 0,
+          cacheWriteTokens: u.cache_creation_input_tokens || 0,
+          outputTokens: 0,
+        },
       };
     } else if (j.type === 'message_delta' && j.usage) {
       yield {

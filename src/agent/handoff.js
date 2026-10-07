@@ -20,11 +20,15 @@ import { join } from 'node:path';
 import { loadTrajectory, listTrajectories } from './replay.js';
 import { commandShape } from './risk-ledger.js';
 import { getWorkdir } from '../shared/tools/workdir.js';
+import { FILE_TOOLS, SHELL_TOOLS } from '../shared/tool-taxonomy.js';
+
+// Local sets, so the hot loops below do not rebuild one per call. The arrays
+// themselves come from the taxonomy — the copies are derived, not authored.
+const WRITE_SET = new Set(FILE_TOOLS);
+const SHELL_SET = new Set(SHELL_TOOLS);
 
 export const HANDOFF_VERSION = '1';
 
-const WRITE_TOOLS = new Set(['writeFile', 'editFile', 'batchEdit', 'applyPatch']);
-const SHELL_TOOLS = new Set(['bash', 'runTests', 'bgRun']);
 /** A tool call repeated more than this is a dead end, not a strategy. */
 export const PERSISTENCE_LIMIT = 3;
 
@@ -50,7 +54,7 @@ function readCalls(events) {
         id: data?.toolCallId,
         name: data?.toolName,
         input: data?.input,
-        shape: SHELL_TOOLS.has(data?.toolName) ? commandShape(data?.input?.command) : null,
+        shape: SHELL_SET.has(data?.toolName) ? commandShape(data?.input?.command) : null,
         ok: null,
         output: null,
       };
@@ -101,7 +105,7 @@ function aggregateAttempts(calls) {
     const g = groups.get(key) || { name: c.name, shape: c.shape, total: 0, failed: 0, files: new Set(), example: textOf(c.input) };
     g.total++;
     if (c.ok === false) g.failed++;
-    if (WRITE_TOOLS.has(c.name) && c.ok) {
+    if (WRITE_SET.has(c.name) && c.ok) {
       const p = c.input?.path || (c.input?.operations || []).map((o) => o?.filePath).find(Boolean);
       if (p) g.files.add(String(p));
     }
@@ -116,7 +120,7 @@ function aggregateAttempts(calls) {
 function verifiedCommands(calls) {
   const out = [];
   for (const c of calls) {
-    if (!SHELL_TOOLS.has(c.name) || c.ok !== true) continue;
+    if (!SHELL_SET.has(c.name) || c.ok !== true) continue;
     const cmd = textOf(c.input);
     if (!cmd) continue;
     if (!out.some((v) => v.command === cmd)) out.push({ command: cmd, tool: c.name });

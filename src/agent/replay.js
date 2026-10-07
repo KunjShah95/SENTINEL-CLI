@@ -20,8 +20,13 @@ import { join, basename } from 'node:path';
 import { runAgentTurnInner } from './loop.js';
 import { createWorktree, removeWorktree } from './worktree.js';
 import { teammatePermission } from './team.js';
+import { FILE_TOOLS, SHELL_TOOLS } from '../shared/tool-taxonomy.js';
 
-const WRITE_TOOLS = new Set(['writeFile', 'editFile', 'batchEdit', 'applyPatch']);
+// A fourth local copy of the file-write set. It now comes from the taxonomy so
+// that "which tools changed the tree" has one answer: a replay that disagreed
+// with the receipts it is replaying would report different files for the same
+// run depending on which module it asked.
+const WRITE_SET = new Set(FILE_TOOLS);
 
 export function trajectoryDir(cwd = process.cwd()) {
   return process.env.SENTINEL_TRAJECTORY_DIR || join(cwd, '.sentinel', 'trajectories');
@@ -33,7 +38,7 @@ const parseData = (d) => {
 };
 
 function writtenPaths(toolName, input) {
-  if (!WRITE_TOOLS.has(toolName) || !input) return [];
+  if (!WRITE_SET.has(toolName) || !input) return [];
   if (toolName === 'batchEdit') return (input.operations || []).map((o) => o?.filePath).filter(Boolean);
   if (toolName === 'applyPatch') return [...String(input.patch || '').matchAll(/^\+\+\+ b\/(.+)$/gm)].map((m) => m[1]);
   return input.path ? [input.path] : [];
@@ -165,7 +170,7 @@ export async function replayTrajectory(fileOrId, { model, createStream, cwd = pr
       // Same policy as an isolated teammate: reads + worktree edits allowed,
       // destructive shell denied, other shell only with --allow-bash.
       onPermissionRequest: teammatePermission({
-        leadAllowAll: new Set(allowBash ? ['bash', 'runTests', 'bgRun'] : []),
+        leadAllowAll: new Set(allowBash ? SHELL_TOOLS : []),
         leadHeadless: false,
         isolated: !!wt,
       }),

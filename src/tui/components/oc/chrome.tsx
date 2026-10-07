@@ -78,7 +78,18 @@ export function useTodos(active: boolean): Todo[] {
       try {
         const { readTodos } = await import("../../../agent/tasks.js");
         const list = readTodos() as Todo[];
-        if (!cancelled) setTodos(Array.isArray(list) ? list : []);
+        // Same reasoning as the harness counts: this polls once a second while a
+        // turn runs, and a new array every tick re-rendered the session — and so
+        // repainted the screen — once a second for nothing.
+        if (cancelled) return;
+        setTodos((prev) => {
+          const next = Array.isArray(list) ? list : [];
+          // `readTodos` re-reads the file, so these are fresh objects: compare by
+          // value, not identity.
+          const same = prev.length === next.length
+            && prev.every((t, i) => t.id === next[i].id && t.status === next[i].status && t.title === next[i].title);
+          return same ? prev : next;
+        });
       } catch { /* no todos file */ }
     };
     load();

@@ -13,10 +13,30 @@ import React, { type ReactNode } from "react";
 import { Box, Text, useStdout } from "ink";
 import { useTheme } from "../../providers/theme/index.js";
 
-/** Terminal size, with sane fallbacks for non-TTY renders and tests. */
+/**
+ * Usable frame size: the terminal minus its bottom row.
+ *
+ * That last row is deliberately left to the terminal, and it is not cosmetic.
+ * Ink calls a frame "fullscreen" once it is at least as tall as the terminal,
+ * and its fullscreen path on Windows repaints by wiping the screen first —
+ * `clearTerminal` = `ESC[2J ESC[3J ESC[H` — before *every* frame. With the app
+ * root pinned to the full terminal height that fired on every keystroke, which
+ * is the composer's flicker: two full-screen wipes and two full repaints per
+ * character. `ESC[3J` also wiped the terminal scrollback every time.
+ *
+ * One row short of fullscreen keeps Ink on its diff path, which rewrites only
+ * the lines that actually changed.
+ */
+export function frameSize(rows?: number, columns?: number): { rows: number; columns: number } {
+  // `rows` is undefined on a non-TTY stream; 24 is the classic terminal default.
+  const height = rows && rows > 1 ? rows : 24;
+  return { rows: Math.max(1, height - 1), columns: columns || 80 };
+}
+
+/** Usable frame size for this terminal, with sane fallbacks for tests. */
 export function useViewport(): { rows: number; columns: number } {
   const { stdout } = useStdout();
-  return { rows: stdout?.rows || 24, columns: stdout?.columns || 80 };
+  return frameSize(stdout?.rows, stdout?.columns);
 }
 
 /**

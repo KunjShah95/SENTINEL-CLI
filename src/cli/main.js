@@ -61,8 +61,9 @@ const CLI_VERSION = (() => {
  */
 async function autoApprove() {
   const { classifyBashCommand } = await import('../agent/bash-validation.js');
+  const { isShellTool } = await import('../shared/tool-taxonomy.js');
   return async (toolName, _id, input) => {
-    if (['bash', 'runTests', 'bgRun'].includes(toolName) && classifyBashCommand(input?.command).destructive) {
+    if (isShellTool(toolName) && classifyBashCommand(input?.command).destructive) {
       process.stderr.write(`\x1b[31m✗ denied destructive command: ${input?.command}\x1b[0m\n`);
       return 'deny';
     }
@@ -1062,6 +1063,181 @@ program
       console.log(renderDoctor(report));
     }
     process.exit(report.ok ? 0 : 1);
+  });
+
+// ── connect: wire SENTINEL into installed coding assistants ─────────────────
+program
+  .command('connect')
+  .description('Detect installed coding assistants and register the SENTINEL MCP server with them')
+  .option('-t, --target <id>', 'Assistant id to target (default: all detected)')
+  .option('-s, --scope <scope>', 'Config scope: user | project (default: user)')
+  .option('--list', 'List detected assistants and exit')
+  .option('--skills', 'Show skill directories SENTINEL can read')
+  .option('--remove', 'Remove the SENTINEL entry instead of adding it')
+  .option('--dry-run', 'Show what would change without writing')
+  .option('--json', 'Print the result as JSON')
+  .action(async (options) => {
+    const { detectTargets, registerWithAssistant, unregisterFromAssistant, skillDiscovery, ASSISTANT_TARGETS } =
+      await import('./connect.js');
+
+    const cwd = path.resolve(options.dir || process.cwd());
+    const scope = options.scope === 'project' ? 'project' : 'user';
+
+    if (options.skills) {
+      const dirs = skillDiscovery(cwd);
+      if (options.json) {
+        process.stdout.write(JSON.stringify({ skills: dirs }, null, 2) + '\n');
+      } else if (dirs.length === 0) {
+        console.log('No skill directories found. Install one with: npx skills add <owner/repo>');
+      } else {
+        console.log('Skill directories SENTINEL reads (no copy needed):');
+        for (const d of dirs) {
+          console.log(`  ${d.count ? '✓' : '·'} ${d.path}  [${d.owner}, ${d.scope}]`);
+        }
+        console.log('\nInstall more: npx skills add <owner/repo>');
+      }
+      return;
+    }
+
+    const detected = detectTargets({ cwd });
+    if (options.list) {
+      if (options.json) {
+        process.stdout.write(JSON.stringify({ detected, known: ASSISTANT_TARGETS.map((t) => ({ id: t.id, label: t.label })) }, null, 2) + '\n');
+        return;
+      }
+      if (detected.length === 0) {
+        console.log('No coding assistants detected. Target one explicitly with --target <id>.');
+        console.log(`Known ids: ${ASSISTANT_TARGETS.map((t) => t.id).join(', ')}`);
+        return;
+      }
+      console.log('Detected assistants:');
+      for (const t of detected) {
+        console.log(`  ${t.id.padEnd(18)} ${t.label}  (${t.evidence.length} marker${t.evidence.length === 1 ? '' : 's'})`);
+      }
+      console.log(`\nKnown ids: ${ASSISTANT_TARGETS.map((t) => t.id).join(', ')}`);
+      return;
+    }
+
+    const targets = options.target
+      ? [{ id: options.target, label: options.target }]
+      : detected;
+    if (targets.length === 0) {
+      console.log('\x1b[33mNo coding assistants detected — nothing to configure.\x1b[0m');
+      console.log('Use --target <id> to configure one anyway.');
+      return;
+    }
+
+    const results = targets.map((t) =>
+      options.remove
+        ? unregisterFromAssistant({ targetId: t.id, scope, cwd, dryRun: options.dryRun })
+        : registerWithAssistant({ targetId: t.id, scope, cwd, dryRun: options.dryRun }),
+    );
+
+    if (options.json) {
+      process.stdout.write(JSON.stringify({ results }, null, 2) + '\n');
+    } else {
+      for (const r of results) {
+        const mark = r.ok ? (r.action === 'unchanged' ? '·' : '✓') : '✗';
+        const color = r.ok ? (r.action === 'unchanged' ? '90' : '32') : '31';
+        console.log(`\x1b[${color}m${mark}\x1b[0m ${r.message}`);
+        if (options.dryRun && r.preview) console.log(r.preview);
+      }
+      if (!options.remove && !options.dryRun) {
+        console.log('\nRestart the affected assistant(s) to pick up the MCP server.');
+      }
+    }
+    process.exit(results.some((r) => !r.ok) ? 1 : 0);
+  });
+
+// ── mcp-status: what external MCP servers are reachable ─────────────────────
+program
+  .command('mcp-status')
+  .description('Connect to configured external MCP servers and list the tools they expose')
+  .option('-d, --dir <path>', 'Project directory (default: cwd)')
+  .option('--json', 'Print the result as JSON')
+  .option('--refresh', 'Reconnect instead of using the cached registry')
+  .action(async (options) => {
+    const { configManager } = await import('../config/configManager.js');
+    await configManager.load();
+    const mcpServers = configManager.get('mcpServers', {}) || {};
+    const { buildToolRegistry, closeAll } = await import('../agent/mcp-client.js');
+
+    if (!Object.keys(mcpServers).length) {
+      const payload = { configured: 0, servers: [], tools: [], errors: [] };
+      if (options.json) {
+        process.stdout.write(JSON.stringify(payload, null, 2) + '\n');
+      } else {
+        console.log('No external MCP servers configured.');
+        console.log('Add them under `mcpServers:` in ~/.sentinel.yaml, e.g.');
+        console.log('  mcpServers:');
+        console.log('    github:');
+        console.log('      command: npx');
+        console.log('      args: ["-y", "@modelcontextprotocol/server-github"]');
+        console.log('    filesystem:');
+        console.log('      url: https://example.com/mcp');
+      }
+      return;
+    }
+
+    const registry = await buildToolRegistry(mcpServers, { refresh: options.refresh });
+    if (options.json) {
+      process.stdout.write(JSON.stringify(registry, null, 2) + '\n');
+    } else {
+      console.log(`Configured servers: ${Object.keys(mcpServers).length}`);
+      for (const s of registry.servers) {
+        console.log(`  ✓ ${s.name} [${s.kind}] — ${s.toolCount} tool${s.toolCount === 1 ? '' : 's'}`);
+      }
+      for (const e of registry.errors) {
+        console.log(`  ✗ ${e.server} — ${e.error}`);
+      }
+      if (registry.tools.length) {
+        console.log(`\nTools (${registry.tools.length}):`);
+        for (const t of registry.tools) console.log(`  ${t.namespacedName}`);
+      }
+    }
+    await closeAll();
+    process.exit(registry.errors.length && !registry.servers.length ? 1 : 0);
+  });
+
+// ── skills: install from skills.sh via the official CLI ─────────────────────
+program
+  .command('skills')
+  .description('Install or list skills via the skills.sh CLI (npx skills)')
+  .argument('[action]', 'install | list | find', 'list')
+  .argument('[pkg]', 'Skill package, e.g. mattpocock/skills')
+  .option('-s, --skill <name>', 'Specific skill name (default: all in the package)')
+  .option('-a, --agent <agent>', 'Target agent for the install (default: auto-detect)')
+  .option('-g, --global', 'Install globally instead of project-level')
+  .option('--json', 'Print skill directories as JSON')
+  .action(async (action, pkg, options) => {
+    const { skillDiscovery } = await import('./connect.js');
+    const cwd = path.resolve(options.dir || process.cwd());
+
+    if (action === 'list' || !pkg) {
+      const dirs = skillDiscovery(cwd);
+      if (options.json) {
+        process.stdout.write(JSON.stringify({ skills: dirs }, null, 2) + '\n');
+      } else if (!dirs.length) {
+        console.log('No skills installed. Try: sentinel skills install mattpocock/skills');
+      } else {
+        for (const d of dirs) console.log(`${d.count ? '✓' : '·'} ${d.path} [${d.owner}, ${d.scope}]`);
+      }
+      return;
+    }
+
+    // Delegating to the official CLI rather than reimplementing the install is
+    // deliberate: it owns agent detection, symlink layout, and its own lockfile.
+    // SENTINEL reads the resulting directories via skills.js.
+    const args = ['--yes', 'skills', action === 'install' ? 'add' : action];
+    if (pkg) args.push(pkg);
+    if (options.skill) args.push('--skill', options.skill);
+    if (options.agent) args.push('--agent', options.agent);
+    if (options.global) args.push('--global');
+
+    console.log(`Running: npx ${args.join(' ')}`);
+    const { spawnSync } = await import('node:child_process');
+    const r = spawnSync('npx', args, { stdio: 'inherit', cwd, shell: process.platform === 'win32' });
+    process.exit(r.status === 0 ? 0 : 1);
   });
 
 // ── onboard: the forward-deployed engineer's week one ──────────────────────

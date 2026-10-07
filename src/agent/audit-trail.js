@@ -38,10 +38,9 @@ import { classifyBashCommand } from './bash-validation.js';
 export const AUDIT_VERSION = '1';
 
 /** Commands whose input names a file. Everything else is classified, not located. */
-const SHELL_TOOLS = new Set(['bash', 'runTests', 'bgRun']);
+import { WRITE_TOOLS, isShellTool } from '../shared/tool-taxonomy.js';
 
-/** Files written by these tools count as intervening mutation for Temporal. */
-export const WRITE_TOOLS = Object.freeze(['writeFile', 'editFile', 'batchEdit', 'applyPatch', 'undoLastChange', 'redoLastUndo', 'teamMerge']);
+export { WRITE_TOOLS };
 
 /** Guard against a model sending a megabyte of patch into the log. */
 const INPUT_CHAR_CAP = 2000;
@@ -76,7 +75,7 @@ function clip(value) {
  */
 export function summarizeCall(tool, input = {}) {
   const summary = { shape: null, intent: null, destructive: false, paths: [] };
-  if (SHELL_TOOLS.has(tool)) {
+  if (isShellTool(tool)) {
     const command = typeof input?.command === 'string' ? input.command : '';
     if (command) {
       summary.shape = commandShape(command);

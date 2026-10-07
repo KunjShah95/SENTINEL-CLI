@@ -65,6 +65,7 @@ const TOOL_CATEGORIES = Object.freeze({
 
   // Network tools
   searchWeb: 'network',
+  fetchUrl: 'network',
 
   // Undo/redo (safe, operates on checkpoints)
   undoLastChange: 'undo',

@@ -112,6 +112,21 @@ export const toolInputSchemas = {
       },
     };
   }),
+  fetchUrl: validator(input => {
+    if (typeof input.url !== 'string' || input.url.length === 0) {
+      return { ok: false, error: 'url is required' };
+    }
+    return {
+      ok: true,
+      value: {
+        url: input.url,
+        maxChars:
+          typeof input.maxChars === 'number' && input.maxChars >= 500 && input.maxChars <= 40000
+            ? input.maxChars
+            : undefined,
+      },
+    };
+  }),
   batchEdit: validator(input => {
     const operations = input.operations;
     if (!Array.isArray(operations) || operations.length < 1 || operations.length > 10) {
@@ -234,7 +249,7 @@ export const toolInputSchemas = {
   }),
 };
 
-export const READ_ONLY_TOOL_NAMES = ['readFile', 'listDirectory', 'glob', 'grep', 'codeMap', 'searchWeb', 'todoRead', 'skill', 'bgCheck', 'teamStatus'];
+export const READ_ONLY_TOOL_NAMES = ['readFile', 'listDirectory', 'glob', 'grep', 'codeMap', 'searchWeb', 'fetchUrl', 'todoRead', 'skill', 'bgCheck', 'teamStatus'];
 export const BUILD_TOOL_NAMES = [
   ...READ_ONLY_TOOL_NAMES,
   'writeFile',
