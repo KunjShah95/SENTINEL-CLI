@@ -78,10 +78,19 @@ async function listTools() {
 }
 
 describe('mcp server (stdio)', () => {
-  it('lists exactly the three documented tools', async () => {
+  it('lists the documented tools', async () => {
     const tools = await listTools();
     const names = tools.map((t) => t.name).sort();
-    assert.deepEqual(names, ['sentinel_ask', 'sentinel_health', 'sentinel_review_diff']);
+    // The set grew from three to six as Sentinel became a full participant:
+    // web search/fetch, skills discovery, and external MCP server introspection.
+    assert.deepEqual(names, [
+      'sentinel_ask',
+      'sentinel_health',
+      'sentinel_mcp_servers',
+      'sentinel_review_diff',
+      'sentinel_search',
+      'sentinel_skills',
+    ]);
     for (const t of tools) {
       assert.match(t.name, /^sentinel_/);
       assert.ok(t.description && t.description.length > 0, `${t.name} has a description`);
@@ -94,5 +103,13 @@ describe('mcp server (stdio)', () => {
     const props = ask.inputSchema?.properties ?? {};
     assert.ok(props.question, 'question param declared');
     assert.ok('allowBuild' in props, 'allowBuild param declared');
+  });
+
+  it('sentinel_search accepts both a query and a url', async () => {
+    const tools = await listTools();
+    const search = tools.find((t) => t.name === 'sentinel_search');
+    const props = search.inputSchema?.properties ?? {};
+    assert.ok('query' in props, 'query param declared');
+    assert.ok('url' in props, 'url param declared');
   });
 });

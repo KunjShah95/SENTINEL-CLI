@@ -42,7 +42,7 @@ import { PERMISSIONS } from './task.js';
 // audit" — which looks exactly like a clean run.
 
 export const GAP_CLASSES = Object.freeze([
-  'Scope', 'Argument', 'Temporal', 'Tool', 'Delegation', 'Semantic',
+  'Scope', 'Argument', 'Temporal', 'Tool', 'Delegation', 'Effect', 'Semantic',
 ]);
 
 /**
@@ -171,6 +171,54 @@ function comparePair(grant, dispatch, ctx) {
       approvedPaths: [...approvedPaths], extraPaths,
     }));
     return gaps;
+  }
+
+  // ── Effect: a browser action's descriptor changed between grant and dispatch ──
+  //
+  // Checked before the generic Scope/Argument branches, and only when at least
+  // one side carries an effect. A browser action has no `workdir` and no
+  // meaningful command shape, so without this the origin and resource would fall
+  // through to the `paths` comparison and be reported as a file-scope gap with
+  // no indication of what they were.
+  //
+  // This is the class that `Semantic` was standing in for. Those divergences left
+  // every recorded field unchanged; now the fields are recorded before the
+  // effect, so "it acted somewhere other than where it was approved to act" is
+  // a finding rather than a gap in the taxonomy.
+  if (grant.effect || dispatch.effect) {
+    if (!grant.effect || !dispatch.effect) {
+      gaps.push(gap('Effect', id, 'one side of the pair carries no effect descriptor', {
+        approvedEffect: grant.effect ?? null,
+        executedEffect: dispatch.effect ?? null,
+      }));
+      return gaps;
+    }
+    const fields = ['origin', 'resourceId', 'reversibility', 'recipient', 'compensatingAction'];
+    const changed = fields.filter((f) => {
+      const a = grant.effect?.[f];
+      const b = dispatch.effect?.[f];
+      const aHas = a !== undefined && a !== null && a !== '';
+      const bHas = b !== undefined && b !== null && b !== '';
+      // Present-vs-absent counts as a change: silence in the grant is exactly
+      // what a broadened dispatch would look like.
+      if (aHas !== bHas) return true;
+      return aHas && String(a) !== String(b);
+    });
+    if (changed.length) {
+      gaps.push(gap('Effect', id, `effect descriptor changed: ${changed.join(', ')}`, {
+        changedFields: changed,
+        approvedEffect: grant.effect,
+        executedEffect: dispatch.effect,
+      }));
+      return gaps;
+    }
+    if (dispatch.drifted && !grant.drifted) {
+      gaps.push(gap('Effect', id, 'an action flagged as drifted was dispatched', {
+        approvedEffect: grant.effect,
+        executedEffect: dispatch.effect,
+      }));
+      return gaps;
+    }
   }
 
   // ── Argument: same shape, different values ──────────────────────────

@@ -1,10 +1,11 @@
 /**
  * Web search — multi-provider grounding with automatic fallback.
  *
- * Chain: Exa (semantic, code/docs retrieval) → Tavily (agent-tuned) →
- * Brave → DuckDuckGo (no key required). Providers are tried in order of
- * preference and the first healthy one wins. A provider that throws or
- * returns nothing is skipped, so search degrades rather than fails.
+ * Chain: Context.dev (JS rendering, anti-bot, one key for search+scrape) →
+ * Exa (semantic, code/docs retrieval) → Tavily (agent-tuned) → Brave →
+ * DuckDuckGo (no key required). Providers are tried in order of preference and
+ * the first healthy one wins. A provider that throws or returns nothing is
+ * skipped, so search degrades rather than fails.
  *
  * Everything is opt-in: with no keys configured, search falls back to
  * DuckDuckGo, which needs no account. That preserves the previous behavior
@@ -14,6 +15,7 @@ const DEFAULT_TIMEOUT_MS = 12_000;
 
 function envKeys() {
   return {
+    contextdev: process.env.CONTEXT_DEV_API_KEY,
     exa: process.env.EXA_API_KEY,
     tavily: process.env.TAVILY_API_KEY,
     brave: process.env.BRAVE_API_KEY,
@@ -21,18 +23,39 @@ function envKeys() {
 }
 
 /**
+ * Canonical provider key for whatever spelling was configured.
+ *
+ * The obvious spelling does not work: Context.dev is a dotted domain, so
+ * `context.dev` and `context-dev` are both plausible in a config file, and
+ * matching on either one alone means the other silently falls through to
+ * "unknown provider" and the user concludes the integration is broken.
+ */
+function canonicalProvider(name) {
+  const key = String(name).toLowerCase().trim().replace(/[\s._-]/g, '');
+  return PROVIDER_ALIASES[key] || key;
+}
+
+const PROVIDER_ALIASES = { contextdev: 'contextdev', ctxdev: 'contextdev' };
+
+/**
  * Resolve the provider order. Explicit config wins; otherwise the chain is
  * ordered so any configured key is preferred over the keyless fallback.
+ *
+ * Context.dev leads by default when it is configured: it is the only provider
+ * here that renders JavaScript, so it is the one most likely to return real
+ * page content rather than an app shell.
  */
 export function providerOrder(configured = []) {
-  const order = Array.isArray(configured) && configured.length ? configured : ['exa', 'tavily', 'brave', 'duckduckgo'];
+  const order = Array.isArray(configured) && configured.length
+    ? configured
+    : ['contextdev', 'exa', 'tavily', 'brave', 'duckduckgo'];
   const seen = new Set();
   return order.filter((p) => {
-    const key = String(p).toLowerCase();
-    if (seen.has(key)) return false;
+    const key = canonicalProvider(p);
+    if (!key || seen.has(key)) return false;
     seen.add(key);
     return true;
-  });
+  }).map(canonicalProvider);
 }
 
 /** Providers that can run given the current environment. */
@@ -40,8 +63,24 @@ export function availableProviders(configured) {
   const keys = envKeys();
   return providerOrder(configured).filter((p) => {
     if (p === 'duckduckgo') return true;
+    if (p === 'contextdev') return Boolean(keys.contextdev);
     return Boolean(keys[p]);
   });
+}
+
+/** Is a spelled-any-way provider name one we actually implement? */
+export function isKnownProvider(name) {
+  return Boolean(IMPLEMENTATIONS[canonicalProvider(name)]);
+}
+
+/**
+ * Context.dev search, shaped to the same records every other provider returns.
+ * Thin wrapper so the chain has one calling convention and this file owns the
+ * mapping, not the Context.dev module.
+ */
+async function searchContextDev(query, count) {
+  const { search: contextDevSearch } = await import('./context-dev.js');
+  return contextDevSearch(query, count);
 }
 
 async function fetchJson(url, init, timeout = DEFAULT_TIMEOUT_MS) {
@@ -164,6 +203,7 @@ function stripTags(value) {
 }
 
 const IMPLEMENTATIONS = {
+  contextdev: searchContextDev,
   exa: searchExa,
   tavily: searchTavily,
   brave: searchBrave,
@@ -185,9 +225,12 @@ export async function search(input = {}) {
   const attempted = [];
   const errors = [];
   for (const name of order) {
+    // `order` is already canonical, so this also tells the two spellings apart
+    // in the error message rather than blaming the user for a typo.
     const impl = IMPLEMENTATIONS[name];
     if (!impl) {
-      errors.push({ provider: name, error: 'unknown provider' });
+      const known = Object.keys(IMPLEMENTATIONS).join(', ');
+      errors.push({ provider: name, error: `unknown provider (known: ${known})` });
       continue;
     }
     attempted.push(name);
@@ -214,5 +257,8 @@ export function formatSearchResults({ results, provider, errors }) {
     const snippet = r.snippet ? ` — ${String(r.snippet).replace(/\s+/g, ' ').slice(0, 240)}` : '';
     return `${i + 1}. ${r.title}\n   ${r.url}${snippet}`;
   });
-  return `Results from ${provider}:\n${lines.join('\n')}`;
+  // Context.dev bills per call, so report the spend rather than hiding it.
+  const credits = results.find((r) => Number.isFinite(r.creditsUsed))?.creditsUsed;
+  const cost = Number.isFinite(credits) ? `\n\n(${credits} Context.dev credit(s) used for this search.)` : '';
+  return `Results from ${provider}:\n${lines.join('\n')}${cost}`;
 }

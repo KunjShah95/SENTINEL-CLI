@@ -746,6 +746,116 @@ program
     process.exit(0);
   });
 
+// ── webeffect: would this browser action be allowed, and can it be undone? ──
+program
+  .command('webeffect [effect...]')
+  .description('Grade a proposed browser action: what it would touch, how reversible it is, and whether a session would permit it')
+  .option('-d, --dir <path>', 'Project (default: cwd)')
+  .option('--origin <url>', 'Origin the action targets')
+  .option('--resource <id>', 'Resource the action names (e.g. /api/customers/4127)')
+  .option('--account <ref>', 'Account the action is declared under')
+  .option('--session <id>', 'Check against a real session\'s lease and allowlist')
+  .option('--json', 'Print as JSON')
+  .option('-f, --file <path>', 'Read the descriptor as JSON from a file, or "-" for stdin')
+  .action(async (effectParts, options) => {
+    const { describeEffect, classifyEffect, severity, explainEffect, REVERSIBILITY } =
+      await import('../agent/web/effect.js');
+    const { checkAct, getSession } = await import('../agent/web/session.js');
+    const cwd = path.resolve(options.dir || process.cwd());
+
+    // The descriptor can arrive as free text (`sentinel webeffect "delete customer"`)
+    // or as JSON. JSON is read from a file or stdin rather than from an argv
+    // blob: a shell strips the double quotes out of an inline JSON argument
+    // before the program ever sees them, so the form most people would reach for
+    // is the one that fails. A file and a pipe both survive every shell.
+    let raw = {};
+    let parseFailed = false;
+    if (options.file) {
+      let text;
+      try {
+        text = options.file === '-'
+          ? readFileSync(0, 'utf-8')
+          : readFileSync(path.resolve(options.file), 'utf-8');
+      } catch (e) {
+        console.error(`Could not read descriptor: ${e.message}`);
+        process.exit(1);
+      }
+      try {
+        raw = JSON.parse(text);
+      } catch {
+        parseFailed = true;
+      }
+    } else if (effectParts.length === 1 && effectParts[0].trim().startsWith('{')) {
+      // Only reachable from a shell that preserves quotes (bash, zsh, fish).
+      try {
+        raw = JSON.parse(effectParts[0]);
+      } catch {
+        console.error('That looked like JSON but did not parse.');
+        console.error('Windows shells strip quotes from inline JSON — use --file - and pipe it instead.');
+        process.exit(1);
+      }
+    } else if (effectParts.length) {
+      raw.action = effectParts.join(' ');
+    }
+    if (parseFailed) {
+      console.error('The descriptor file did not parse as JSON.');
+      process.exit(1);
+    }
+    if (options.origin) raw.origin = options.origin;
+    if (options.resource) raw.resourceId = options.resource;
+    if (options.account) raw.accountRef = options.account;
+
+    const described = describeEffect(raw);
+    if (!described.ok) {
+      const payload = { ok: false, error: described.error, missing: described.missing ?? [] };
+      if (options.json) {
+        process.stdout.write(JSON.stringify(payload, null, 2) + '\n');
+      } else {
+        console.log('\x1b[31mnot gradable\x1b[0m');
+        console.log(payload.error);
+        console.log('\nA browser action is gradable only when the target can be named.');
+        console.log('This is the whole difference from a shell command: `git status` and');
+        console.log('`npm publish` share no danger, but every click shares the verb `click`.');
+      }
+      process.exit(1);
+    }
+
+    const effect = described.effect;
+    const cls = classifyEffect(effect);
+    let gate = null;
+    if (options.session) {
+      const s = getSession(options.session, cwd);
+      gate = s
+        ? checkAct(s, effect)
+        : { ok: false, reason: `no session ${options.session}` };
+    }
+
+    const report = {
+      ok: true,
+      effect,
+      reversibility: cls,
+      severity: severity(effect),
+      rollback: explainEffect(effect),
+      gate,
+    };
+
+    if (options.json) {
+      process.stdout.write(JSON.stringify(report, null, 2) + '\n');
+      process.exit(gate && gate.ok === false ? 1 : 0);
+    }
+
+    const color = cls === REVERSIBILITY.EXTERNAL || cls === REVERSIBILITY.ABSORBING
+      ? 31 : cls === REVERSIBILITY.COMPENSABLE ? 33 : 32;
+    console.log(`\x1b[${color}m${cls}\x1b[0m  ${effect.action}`);
+    console.log(report.rollback);
+    if (gate) {
+      console.log(gate.ok
+        ? `\x1b[32msession ${options.session} permits this\x1b[0m`
+        : `\x1b[31msession ${options.session} refuses: ${gate.reason}\x1b[0m${gate.hint ? `\n  ${gate.hint}` : ''}`);
+    }
+    process.exit(gate && gate.ok === false ? 1 : 0);
+  });
+
 // ── review: a turn whose findings must point at real lines ────────────────
 program
   .command('audit [runId...]')
@@ -1065,23 +1175,64 @@ program
     process.exit(report.ok ? 0 : 1);
   });
 
-// ── connect: wire SENTINEL into installed coding assistants ─────────────────
+// ── connect: wire SENTINEL (and third-party MCP servers) into assistants ──────
 program
   .command('connect')
   .description('Detect installed coding assistants and register the SENTINEL MCP server with them')
   .option('-t, --target <id>', 'Assistant id to target (default: all detected)')
   .option('-s, --scope <scope>', 'Config scope: user | project (default: user)')
+  .option('--mcp <provider>', 'Register a third-party MCP server instead: context (Context.dev)')
+  .option('--providers', 'List available third-party MCP providers and exit')
+  .option('--logout', 'Forget stored credentials for --mcp <provider>')
   .option('--list', 'List detected assistants and exit')
   .option('--skills', 'Show skill directories SENTINEL can read')
   .option('--remove', 'Remove the SENTINEL entry instead of adding it')
   .option('--dry-run', 'Show what would change without writing')
   .option('--json', 'Print the result as JSON')
   .action(async (options) => {
-    const { detectTargets, registerWithAssistant, unregisterFromAssistant, skillDiscovery, ASSISTANT_TARGETS } =
+    const { detectTargets, registerWithAssistant, unregisterFromAssistant, skillDiscovery, ASSISTANT_TARGETS, MCP_PROVIDERS } =
       await import('./connect.js');
 
     const cwd = path.resolve(options.dir || process.cwd());
     const scope = options.scope === 'project' ? 'project' : 'user';
+    const providerId = options.mcp || null;
+
+    if (options.providers) {
+      const list = Object.values(MCP_PROVIDERS).map((p) => ({
+        id: p.id, label: p.label, url: p.url, docs: p.docs,
+      }));
+      if (options.json) {
+        process.stdout.write(JSON.stringify({ providers: list }, null, 2) + '\n');
+        return;
+      }
+      console.log('Third-party MCP servers this command can register:');
+      for (const p of list) {
+        console.log(`  ${p.id.padEnd(10)} ${p.label.padEnd(14)} ${p.url}`);
+        console.log(`  ${' '.repeat(10)} ${p.docs}`);
+      }
+      console.log('\nUsage: sentinel connect --mcp context [--target <id>] [--scope user|project]');
+      return;
+    }
+
+    if (options.logout) {
+      if (!providerId) {
+        console.error('Specify which provider to forget: --mcp context --logout');
+        process.exit(1);
+      }
+      const { clearStoredAuth } = await import('../agent/mcp-oauth.js');
+      const provider = MCP_PROVIDERS[providerId];
+      const ok = clearStoredAuth(provider?.serverKey || providerId);
+      console.log(ok
+        ? `Forgot stored credentials for ${provider?.label || providerId}.`
+        : `Nothing stored for ${provider?.label || providerId}.`);
+      process.exit(0);
+    }
+
+    if (providerId && !MCP_PROVIDERS[providerId]) {
+      console.error(`\x1b[31mUnknown MCP provider "${providerId}".\x1b[0m Known: ${Object.keys(MCP_PROVIDERS).join(', ')}`);
+      console.error('Run `sentinel connect --providers` for details.');
+      process.exit(1);
+    }
 
     if (options.skills) {
       const dirs = skillDiscovery(cwd);
@@ -1129,8 +1280,8 @@ program
 
     const results = targets.map((t) =>
       options.remove
-        ? unregisterFromAssistant({ targetId: t.id, scope, cwd, dryRun: options.dryRun })
-        : registerWithAssistant({ targetId: t.id, scope, cwd, dryRun: options.dryRun }),
+        ? unregisterFromAssistant({ targetId: t.id, scope, cwd, dryRun: options.dryRun, mcpProvider: providerId })
+        : registerWithAssistant({ targetId: t.id, scope, cwd, dryRun: options.dryRun, mcpProvider: providerId }),
     );
 
     if (options.json) {
@@ -1147,6 +1298,277 @@ program
       }
     }
     process.exit(results.some((r) => !r.ok) ? 1 : 0);
+  });
+
+// ── contextdev: inspect and verify the Context.dev integration ──────────────
+program
+  .command('contextdev')
+  .description('Check the Context.dev web-context integration: key, providers, MCP auth, and a live probe')
+  .option('--json', 'Print the report as JSON')
+  .option('--check', 'Make one live API call to verify the key (costs ~1 credit)')
+  .option('--url <url>', 'Scrape one URL through Context.dev (costs ~1 credit)')
+  .option('--register', 'Register the hosted Context.dev MCP server with detected assistants')
+  .option('-t, --target <id>', 'With --register, only this assistant id')
+  .option('--dry-run', 'With --register, show what would change without writing')
+  .action(async (options) => {
+    const { hasContextDevKey, contextDevKey, contextDevMissingReason, scrape, CONTEXT_DEV_MCP_URL } =
+      await import('../shared/context-dev.js');
+    const { providerOrder, availableProviders } = await import('../shared/web-search.js');
+    const { hasStoredAuth, authSummary } = await import('../agent/mcp-oauth.js');
+
+    const report = {
+      key: {
+        // Presence and length only. The value never reaches stdout, a log, or
+        // a status report that might get pasted into an issue.
+        configured: hasContextDevKey(),
+        length: contextDevKey()?.length ?? 0,
+        problem: contextDevMissingReason(),
+      },
+      search: {
+        order: providerOrder(),
+        available: availableProviders(),
+      },
+      mcp: {
+        url: CONTEXT_DEV_MCP_URL,
+        authenticated: hasStoredAuth('context'),
+        state: authSummary('context'),
+      },
+      live: null,
+    };
+
+    if (options.register) {
+      const { detectTargets, registerWithAssistant } = await import('./connect.js');
+      const detected = detectTargets({ cwd: process.cwd() });
+      const targets = options.target ? detected.filter((t) => t.id === options.target) : detected;
+      report.registered = targets.map((t) =>
+        registerWithAssistant({ targetId: t.id, scope: 'user', cwd: process.cwd(), dryRun: !!options.dryRun, mcpProvider: 'context' }));
+      if (!targets.length) {
+        report.registerNote = 'No assistants detected. Use sentinel connect --target <id> --mcp context.';
+      }
+    }
+
+    if (options.url) {
+      try {
+        report.live = { ok: true, scrape: await scrape(options.url, { maxChars: 2000 }) };
+      } catch (e) {
+        report.live = { ok: false, error: e?.message || String(e) };
+      }
+    } else if (options.check) {
+      try {
+        // The cheapest live call that still proves the key works end to end.
+        report.live = { ok: true, search: await (await import('../shared/context-dev.js')).search('sentinel cli', 1) };
+      } catch (e) {
+        report.live = { ok: false, error: e?.message || String(e) };
+      }
+    }
+
+    if (options.json) {
+      process.stdout.write(JSON.stringify(report, null, 2) + '\n');
+      process.exit(report.live && report.live.ok === false ? 1 : 0);
+    }
+
+    const yn = (b) => (b ? '\x1b[32m✓\x1b[0m' : '\x1b[33m·\x1b[0m');
+    console.log('Context.dev integration\n');
+    console.log(`  API key       ${yn(report.key.configured)} ${report.key.configured ? `set (${report.key.length} chars)` : 'not set — optional'}`);
+    if (report.key.problem) console.log(`                 \x1b[2m${report.key.problem}\x1b[0m`);
+    console.log(`  searchWeb     ${report.search.available.join(', ') || 'none'}`);
+    console.log(`                 chain: ${report.search.order.join(' → ')}`);
+    console.log(`  MCP server    ${yn(report.mcp.authenticated)} ${report.mcp.url}`);
+    console.log(`                 ${report.mcp.authenticated ? 'signed in' : 'not signed in yet — OAuth happens in the assistant, or use CONTEXT_DEV_API_KEY'}`);
+
+    if (report.live) {
+      console.log('');
+      if (report.live.ok) {
+        const credits = report.live.scrape?.creditsUsed ?? report.live.search?.[0]?.creditsUsed;
+        console.log(`  \x1b[32m✓\x1b[0m live call succeeded${Number.isFinite(credits) ? ` (${credits} credit(s) used)` : ''}`);
+        if (report.live.scrape) {
+          console.log(`                 ${report.live.scrape.title || report.live.scrape.url}`);
+          console.log(`                 ${report.live.scrape.text.slice(0, 160).replace(/\s+/g, ' ')}…`);
+        } else {
+          console.log(`                 ${report.live.search.length} result(s)`);
+        }
+      } else {
+        console.log(`  \x1b[31m✗\x1b[0m live call failed: ${report.live.error}`);
+      }
+    }
+
+    if (report.registered) {
+      console.log('');
+      for (const r of report.registered) {
+        const mark = r.ok ? (r.action === 'unchanged' ? '·' : '✓') : '✗';
+        console.log(`  ${mark} ${r.message}`);
+      }
+    }
+
+    console.log('\n  Next:');
+    if (!report.key.configured) {
+      console.log('    • Set CONTEXT_DEV_API_KEY for searchWeb/fetchUrl, or');
+    }
+    console.log('    • sentinel connect --mcp context   → OAuth server for your other assistants');
+    console.log('    • sentinel contextdev --check      → verify with one live call (~1 credit)');
+    process.exit(report.live && report.live.ok === false ? 1 : 0);
+  });
+
+// ── heal: detect and repair drift ───────────────────────────────────────────
+program
+  .command('heal')
+  .description('Detect drift in assistant integrations and .sentinel state, then repair it')
+  .option('-d, --dir <path>', 'Project directory (default: cwd)')
+  .option('--fix', 'Apply repairs (default: report only)')
+  .option('--dry-run', 'With --fix, show what would change without writing')
+  .option('--json', 'Print the report as JSON')
+  .action(async (options) => {
+    const { fullHealthCheck, renderHealth, repairState, repairAssistantDrift, checkAssistantDrift, checkStateHealth } =
+      await import('../agent/self-heal.js');
+    const cwd = path.resolve(options.dir || process.cwd());
+
+    if (!options.fix) {
+      const report = await fullHealthCheck({ cwd });
+      if (options.json) process.stdout.write(JSON.stringify(report, null, 2) + '\n');
+      else console.log(renderHealth(report));
+      // Drift or rot is a warning, not a failure: this is a diagnostic command.
+      process.exit(0);
+    }
+
+    const drift = checkAssistantDrift(cwd);
+    const state = checkStateHealth(cwd);
+    const driftResults = repairAssistantDrift(drift, { cwd, dryRun: options.dryRun });
+    const stateResults = repairState(state, { cwd, dryRun: options.dryRun });
+
+    if (options.json) {
+      process.stdout.write(JSON.stringify({ drift, driftResults, state, stateResults }, null, 2) + '\n');
+      process.exit(0);
+    }
+
+    if (drift.length === 0 && state.length === 0) {
+      console.log('Nothing to repair.');
+      return;
+    }
+    if (driftResults.length) {
+      console.log('Assistant integration:');
+      for (const r of driftResults) {
+        const mark = r.ok ? (r.action === 'unchanged' ? '·' : '✓') : '✗';
+        console.log(`  ${mark} ${r.message}`);
+      }
+    }
+    if (stateResults.length) {
+      console.log('State:');
+      for (const r of stateResults) {
+        const mark = r.applied ? '✓' : '·';
+        console.log(`  ${mark} ${r.file}: ${r.note}`);
+      }
+    }
+    if (options.dryRun) console.log('\nDry run — nothing was written.');
+  });
+
+// ── update: check for and apply available updates ───────────────────────────
+program
+  .command('update')
+  .description('Check for a newer SENTINEL, assistant config drift, and integration health')
+  .option('-d, --dir <path>', 'Project directory (default: cwd)')
+  .option('--yes', 'Actually install updates (default: report only)')
+  .option('--skills', 'Update installed skills via the skills.sh CLI instead')
+  .option('--json', 'Print the report as JSON')
+  .action(async (options) => {
+    const { fullUpdateReport, renderUpdateReport, checkSelfUpdate, applySelfUpdate, updateSkills } =
+      await import('../agent/self-update.js');
+    const cwd = path.resolve(options.dir || process.cwd());
+
+    if (options.skills) {
+      const out = updateSkills({ cwd, yes: options.yes });
+      if (options.json) process.stdout.write(JSON.stringify(out, null, 2) + '\n');
+      else console.log(out.applied ? `Skills updated.\n${out.output || ''}` : `Not updated: ${out.reason}`);
+      process.exit(out.applied ? 0 : 1);
+    }
+
+    if (options.yes) {
+      const self = await checkSelfUpdate();
+      if (self.updateAvailable) {
+        const result = applySelfUpdate({ yes: true });
+        if (!options.json) {
+          console.log(result.applied
+            ? `Updated SENTINEL ${self.current} → ${self.latest}.`
+            : `Update failed: ${result.reason}`);
+        } else {
+          process.stdout.write(JSON.stringify({ self: result }, null, 2) + '\n');
+        }
+        // A package swap means the running process is stale; re-run to verify.
+        process.exit(result.applied ? 0 : 1);
+      }
+      const report = await fullUpdateReport({ cwd });
+      if (!options.json) console.log(`SENTINEL ${report.self.current} is already the latest published version.`);
+      else process.stdout.write(JSON.stringify(report, null, 2) + '\n');
+      return;
+    }
+
+    const report = await fullUpdateReport({ cwd });
+    if (options.json) process.stdout.write(JSON.stringify(report, null, 2) + '\n');
+    else console.log(renderUpdateReport(report));
+  });
+
+// ── memory: cross-agent memory (agentmemory) ────────────────────────────────
+program
+  .command('memory')
+  .description('Query the cross-agent memory store shared by all assistants (agentmemory)')
+  .argument('[query]', 'Search query. Omit to check status.')
+  .option('-n, --limit <n>', 'Maximum results (default 5)', parseInt)
+  .option('--remember <text>', 'Store a durable insight instead of searching')
+  .option('--concepts <list>', 'Comma-separated concepts (with --remember)')
+  .option('--project <name>', 'Scope to a project')
+  .option('--refresh', 'Re-probe server health instead of using the cache')
+  .option('--json', 'Print the result as JSON')
+  .action(async (query, options) => {
+    const bridge = await import('../agent/memory-bridge.js');
+    if (options.refresh) bridge.resetHealthCache();
+
+    if (options.remember) {
+      const out = await bridge.remember({
+        content: options.remember,
+        concepts: options.concepts ? options.concepts.split(',').map((c) => c.trim()).filter(Boolean) : [],
+        project: options.project,
+        agentId: 'sentinel',
+      });
+      if (options.json) {
+        process.stdout.write(JSON.stringify(out, null, 2) + '\n');
+      } else if (out.stored) {
+        console.log(out.similarTo ? `Already known (similar to ${out.similarTo}).` : 'Stored.');
+      } else {
+        console.log(`Not stored: agentmemory ${out.skipped}${out.detail ? ` (${out.detail})` : ''}`);
+      }
+      process.exit(out.stored ? 0 : 1);
+    }
+
+    if (!query) {
+      const s = await bridge.status();
+      if (options.json) {
+        process.stdout.write(JSON.stringify(s, null, 2) + '\n');
+      } else if (s.reachable) {
+        console.log(`agentmemory online at ${s.url}${s.sessions ? ` — ${s.sessions} sessions` : ''}`);
+      } else {
+        console.log(`agentmemory offline (${s.state}).`);
+        console.log(s.hint || 'Start it with: npx -y @agentmemory/agentmemory@latest');
+      }
+      process.exit(s.reachable ? 0 : 1);
+    }
+
+    const result = await bridge.recall({ query, limit: options.limit || 5, project: options.project });
+    if (options.json) {
+      process.stdout.write(JSON.stringify(result, null, 2) + '\n');
+      process.exit(result.ok ? 0 : 1);
+    }
+    if (!result.ok) {
+      console.log(`agentmemory unavailable (${result.skipped}).`);
+      process.exit(1);
+    }
+    if (!result.results.length) {
+      console.log('No matches.');
+      return;
+    }
+    result.results.forEach((r, i) => {
+      const content = String(r.content || r.text || r.summary || '').replace(/\s+/g, ' ').trim();
+      console.log(`${i + 1}. ${content.slice(0, 300)}`);
+      if (r.concepts?.length) console.log(`   concepts: ${r.concepts.join(', ')}`);
+    });
   });
 
 // ── mcp-status: what external MCP servers are reachable ─────────────────────

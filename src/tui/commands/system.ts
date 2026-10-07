@@ -43,6 +43,47 @@ export async function handleMcp(ctx: CommandContext) {
   appendMessage({ role: 'assistant', mode, model, parts: [{ type: 'text', text: '## MCP Server\n\nThe Sentinel MCP server exposes these tools to MCP-compatible AI assistants (Claude Code, Cursor, Zed):\n- 🩺 `sentinel_health` — Provider and version status\n- 💬 `sentinel_ask` — One-shot question, streamed answer\n- 📝 `sentinel_review_diff` — AI review of a diff\n\n**How to start:**\n\n```bash\nsentinel mcp\n```\n\nThen configure your AI tool to connect to it over stdio.' }] });
 }
 
+/**
+ * /contextdev — Context.dev web-context status.
+ *
+ * Reads the same state the CLI `sentinel contextdev` reports, so the answer is
+ * available without leaving the session. No live call: a probe costs credits,
+ * and a slash command must be free. Run `sentinel contextdev --check` for that.
+ */
+export async function handleContextDev(ctx: CommandContext) {
+  const { appendMessage, mode, model, toast } = ctx;
+  try {
+    const { hasContextDevKey, contextDevKey, CONTEXT_DEV_MCP_URL } = await import('../../shared/context-dev.js');
+    const { providerOrder, availableProviders } = await import('../../shared/web-search.js');
+    const { authSummary } = await import('../../agent/mcp-oauth.js');
+
+    const keySet = hasContextDevKey();
+    const mcp = authSummary('context');
+    const mark = (b: boolean) => (b ? '✓' : '·');
+
+    const lines = [
+      '## Context.dev',
+      '',
+      `**API key**  ${mark(keySet)} ${keySet ? `set (${contextDevKey()?.length ?? 0} chars)` : 'not set — optional'}`,
+      `**searchWeb** ${availableProviders().join(', ') || 'none'}`,
+      `  chain: ${providerOrder().join(' → ')}`,
+      `**MCP server** ${mark(mcp.authenticated)} ${CONTEXT_DEV_MCP_URL}`,
+      '',
+      keySet
+        ? '> `searchWeb` and `fetchUrl` are using Context.dev. Pass `prefer="direct"` to `fetchUrl` to spend no credits.'
+        : '> With no key, search falls back to DuckDuckGo (no account needed) and fetchUrl fetches directly. Create a key at https://www.context.dev/dashboard/api-keys',
+      '',
+      '```bash',
+      'sentinel contextdev --check      # one live call (~1 credit)',
+      'sentinel connect --mcp context   # OAuth server for your other assistants',
+      '```',
+    ];
+    appendMessage({ role: 'assistant', mode, model, parts: [{ type: 'text', text: lines.join('\n') }] });
+  } catch (e) {
+    toast.error('Context.dev status failed: ' + String(e));
+  }
+}
+
 export async function handleHelp(ctx: CommandContext) {
   const { appendMessage, mode, model } = ctx;
   const lines = [
@@ -59,6 +100,7 @@ export async function handleHelp(ctx: CommandContext) {
     '| `/export` | Export the session to Markdown |',
     '| `/health` | Show providers, memory, uptime |',
     '| `/mcp` | How to connect the MCP server |',
+    '| `/contextdev` | Context.dev web-context status (key, providers, MCP sign-in) |',
     '| `/compact` | Summarize the session to free context |',
     '| `/goal <condition>` | Work until an independent evaluator confirms the condition |',
     '| `/fork` | Branch this session (the original stays intact) |',

@@ -67,6 +67,22 @@ const TOOL_CATEGORIES = Object.freeze({
   searchWeb: 'network',
   fetchUrl: 'network',
 
+  // Browser tools.
+  //
+  // `webRead` and `webProbe` are 'network': they observe. `webProbe` resolves
+  // an action without dispatching, so it is the last safe moment before a
+  // commitment and must not prompt — a permission dialog to learn what a button
+  // does trains people to click yes without reading.
+  //
+  // `webAct` is 'write', not 'network'. It is a commitment with a blast radius,
+  // and the category it belongs to is the one whose job is to make that
+  // visible to the blast-radius gate and the mode check. Grading it as 'network'
+  // would let it ride the `network: allow` default straight past both.
+  webRead: 'network',
+  webProbe: 'network',
+  webSession: 'write',
+  webAct: 'write',
+
   // Undo/redo (safe, operates on checkpoints)
   undoLastChange: 'undo',
   redoLastUndo: 'undo',

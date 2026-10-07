@@ -124,6 +124,81 @@ export const toolInputSchemas = {
           typeof input.maxChars === 'number' && input.maxChars >= 500 && input.maxChars <= 40000
             ? input.maxChars
             : undefined,
+        // 'direct' forces the free local fetch and spends no Context.dev
+        // credits. Useful when fetchUrl is called in a loop.
+        prefer: input.prefer === 'direct' ? 'direct' : undefined,
+      },
+    };
+  }),
+  // ── Browser tools ──
+  //
+  // `webAct` does NOT validate the effect descriptor here. That is deliberate:
+  // a schema that accepts a missing descriptor and defaults it would make the
+  // gate in `web-tools.js` unreachable, and the whole design rests on the
+  // descriptor being mandatory. The tool returns a refusal the model can read
+  // and correct, which is the same treatment `normalizeTaskCall` gives an
+  // unknown action.
+  webSession: validator(input => ({
+    ok: true,
+    value: {
+      action: input.action ?? 'open',
+      sessionId: input.sessionId,
+      label: input.label,
+      origins: Array.isArray(input.origins) ? input.origins : undefined,
+      leaseMs: typeof input.leaseMs === 'number' ? input.leaseMs : undefined,
+      irreversibleCeiling:
+        typeof input.irreversibleCeiling === 'number' ? input.irreversibleCeiling : undefined,
+    },
+  })),
+  webRead: validator(input => ({
+    ok: true,
+    value: {
+      sessionId: input.sessionId,
+      url: input.url,
+      selector: input.selector,
+      maxChars: typeof input.maxChars === 'number' ? input.maxChars : undefined,
+    },
+  })),
+  webProbe: validator(input => ({
+    ok: true,
+    value: { sessionId: input.sessionId, selector: input.selector },
+  })),
+  webAct: validator(input => ({
+    ok: true,
+    value: {
+      sessionId: input.sessionId,
+      selector: input.selector,
+      kind: input.kind === 'type' ? 'type' : 'click',
+      effect: input.effect,
+    },
+  })),
+  memoryRecall: validator(input => {
+    if (typeof input.query !== 'string' || input.query.length === 0) {
+      return { ok: false, error: 'query is required' };
+    }
+    return {
+      ok: true,
+      value: {
+        query: input.query,
+        limit:
+          typeof input.limit === 'number' && input.limit >= 1 && input.limit <= 25 ? input.limit : 5,
+        project: typeof input.project === 'string' ? input.project : undefined,
+      },
+    };
+  }),
+  memoryRemember: validator(input => {
+    if (typeof input.content !== 'string' || input.content.trim().length === 0) {
+      return { ok: false, error: 'content is required' };
+    }
+    const strings = (v) => (Array.isArray(v) ? v.filter((x) => typeof x === 'string').slice(0, 10) : undefined);
+    return {
+      ok: true,
+      value: {
+        content: input.content,
+        concepts: strings(input.concepts),
+        files: strings(input.files),
+        project: typeof input.project === 'string' ? input.project : undefined,
+        agentId: typeof input.agentId === 'string' ? input.agentId : undefined,
       },
     };
   }),
@@ -249,7 +324,7 @@ export const toolInputSchemas = {
   }),
 };
 
-export const READ_ONLY_TOOL_NAMES = ['readFile', 'listDirectory', 'glob', 'grep', 'codeMap', 'searchWeb', 'fetchUrl', 'todoRead', 'skill', 'bgCheck', 'teamStatus'];
+export const READ_ONLY_TOOL_NAMES = ['readFile', 'listDirectory', 'glob', 'grep', 'codeMap', 'searchWeb', 'fetchUrl', 'memoryRecall', 'todoRead', 'skill', 'bgCheck', 'teamStatus', 'webRead'];
 export const BUILD_TOOL_NAMES = [
   ...READ_ONLY_TOOL_NAMES,
   'writeFile',
@@ -265,6 +340,7 @@ export const BUILD_TOOL_NAMES = [
   'spawnAgent',
   'memoryWrite',
   'memoryDelete',
+  'memoryRemember',
   'bgRun',
   'spawnTeammate',
   'sendMessage',

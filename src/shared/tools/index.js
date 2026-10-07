@@ -585,6 +585,51 @@ async function memoryDeleteImpl(input) {
   return deleteMemory(input.name);
 }
 
+/**
+ * memoryRecall — read the cross-agent store (agentmemory), which holds
+ * observations from every assistant on this machine, not just Sentinel.
+ * Degrades to an empty result when the server is down rather than erroring, so
+ * the model can call it freely.
+ */
+async function memoryRecallImpl(input) {
+  const { recall } = await import('../../agent/memory-bridge.js');
+  const result = await recall({
+    query: input?.query,
+    limit: input?.limit,
+    project: input?.project,
+  });
+  if (!result.ok) {
+    return { ok: false, results: [], note: `agentmemory unavailable (${result.skipped})` };
+  }
+  return {
+    ok: true,
+    count: result.count,
+    results: result.results.map((r) => ({
+      content: String(r.content || r.text || r.summary || '').slice(0, 500),
+      concepts: r.concepts || undefined,
+      files: r.files || undefined,
+    })),
+  };
+}
+
+/** memoryRemember — write to the cross-agent store so other assistants see it. */
+async function memoryRememberImpl(input) {
+  const { remember } = await import('../../agent/memory-bridge.js');
+  const out = await remember({
+    content: input?.content,
+    concepts: Array.isArray(input?.concepts) ? input.concepts : undefined,
+    files: Array.isArray(input?.files) ? input.files : undefined,
+    project: input?.project,
+    agentId: input?.agentId || 'sentinel',
+  });
+  if (!out.stored) {
+    return { stored: false, note: `agentmemory unavailable (${out.skipped}) — use memoryWrite for the local store` };
+  }
+  // A near-duplicate is a success: the server kept one copy and told us about
+  // the existing one rather than storing a second.
+  return { stored: true, similarTo: out.similarTo || null };
+}
+
 async function skillImpl(input) {
   const { getSkillPrompt } = await import('../../agent/skills.js');
   const body = getSkillPrompt(input.name);
@@ -803,6 +848,8 @@ const TOOL_IMPLS = {
   codeMap: codeMapImpl,
   searchWeb: searchWebImpl,
   fetchUrl: fetchUrlImpl,
+  memoryRecall: memoryRecallImpl,
+  memoryRemember: memoryRememberImpl,
   writeFile: queued(writeFileImpl, (i) => [i?.path]),
   editFile: queued(editFileImpl, (i) => [i?.path]),
   batchEdit: queued(batchEditImpl, (i) => (Array.isArray(i?.operations) ? i.operations.map((o) => o?.filePath) : [])),
@@ -817,6 +864,14 @@ const TOOL_IMPLS = {
   skill: skillImpl,
   memoryWrite: memoryWriteImpl,
   memoryDelete: memoryDeleteImpl,
+  // Browser tools. Lazily bound rather than imported at module load: `web-tools`
+  // reaches for the filesystem state dir on call, and pulling it in eagerly
+  // would make every tool registry load touch the disk — including in the TUI,
+  // where no browser is ever opened.
+  webSession: async (input) => (await import('../../agent/web-tools.js')).webSession(input),
+  webRead: async (input) => (await import('../../agent/web-tools.js')).webRead(input),
+  webProbe: async (input) => (await import('../../agent/web-tools.js')).webProbe(input),
+  webAct: async (input) => (await import('../../agent/web-tools.js')).webAct(input),
 };
 
 export const readOnlyToolContracts = Object.freeze({
@@ -849,7 +904,9 @@ export const readOnlyToolContracts = Object.freeze({
   },
   fetchUrl: {
     description:
-      'Fetch a web page and return its readable text content (scripts/styles/nav stripped). Use after searchWeb to read the actual page. Avoid when a snippet suffices.',
+      'Fetch a web page and return its readable text content (scripts/styles/nav stripped). ' +
+      'Use after searchWeb to read the actual page. Avoid when a snippet suffices. ' +
+      'If CONTEXT_DEV_API_KEY is configured this renders JavaScript and bypasses bot walls, which is what you want for client-rendered sites; pass prefer="direct" to force the free direct fetch.',
     inputSchema: toolInputSchemas.fetchUrl,
   },
   diffFile: {
@@ -871,6 +928,27 @@ export const readOnlyToolContracts = Object.freeze({
   teamStatus: {
     description: 'List teammates (status, worktree, branch) and background commands.',
     inputSchema: toolInputSchemas.teamStatus,
+  },
+
+  // ── Browser: observe, then commit ──
+  //
+  // The descriptions carry the ordering rule, because a model that reaches for
+  // `webAct` first will happily click blind. `webProbe` exists to be the thing
+  // it reaches for instead, and the description is the only place that says so.
+  webSession: {
+    description:
+      'Open, list, revoke, or close a leased browser session. Opening requires an explicit origins allowlist and creates a dedicated empty profile — your credentials are never imported. Sessions expire; revoke to cut one off mid-task.',
+    inputSchema: toolInputSchemas.webSession,
+  },
+  webRead: {
+    description:
+      'Open a page in the session browser and read its text. Observation only — changes nothing. Use this before probing an action you intend to take.',
+    inputSchema: toolInputSchemas.webRead,
+  },
+  webProbe: {
+    description:
+      'Resolve what a click would actually do WITHOUT performing it: the element\'s role and accessible name, whether it submits a form, the endpoint it would hit, and a suggested reversibility class. Always probe before webAct. Nothing is changed by probing.',
+    inputSchema: toolInputSchemas.webProbe,
   },
 });
 
@@ -931,6 +1009,26 @@ export const buildToolContracts = Object.freeze({
   memoryDelete: {
     description: 'Delete a memory record that turned out to be wrong or stale.',
     inputSchema: toolInputSchemas.memoryDelete,
+  },
+  memoryRecall: {
+    description:
+      'Search the CROSS-AGENT memory store (agentmemory) for what other assistants on this machine already learned. Returns observations from every agent, not just Sentinel. Use for "have we tried this before" questions. Returns empty when the store is offline.',
+    inputSchema: toolInputSchemas.memoryRecall,
+  },
+  memoryRemember: {
+    description:
+      'Save a durable insight to the CROSS-AGENT store so Cursor, Claude Code, and others can recall it too. Use memoryWrite for Sentinel-local records; use this when the fact should reach other assistants.',
+    inputSchema: toolInputSchemas.memoryRemember,
+  },
+
+  // The one tool in this file that commits an effect a human cannot undo from
+  // a checkpoint. The description states the cost in the first sentence because
+  // a model that treats this like `editFile` will get it wrong, and the refusals
+  // downstream assume it was told.
+  webAct: {
+    description:
+      'PERFORM a probed browser action. Requires an `effect` descriptor naming the action, origin, resource, and reversibility class (reversible | compensable | absorbing | external), plus a sessionId. Re-probes first and refuses if the page drifted from what you declared — including acting under a different account. Prefer webRead and webProbe; prefer a human for anything absorbing or external.',
+    inputSchema: toolInputSchemas.webAct,
   },
   bgRun: {
     description: 'Start a long shell command (build, test suite, server) in the background; returns an id immediately. Its result is delivered as a notification.',

@@ -10,17 +10,17 @@
  * boundary: the TUI and CLI call it directly.
  */
 import { resolveChatModel, getModelPricing, estimateCostUsd } from '../shared/models/index.js';
-import { getToolContracts, executeLocalTool, normalizeTimeoutMs } from '../shared/tools/index.js';
+import { executeLocalTool, normalizeTimeoutMs } from '../shared/tools/index.js';
 import { buildSystemPrompt } from './prompt.js';
 import { streamCompletion } from './providers.js';
 import { recordUsage, estimateTokensFromText } from './cost.js';
 import { withTrajectory, newRunId } from './trajectory.js';
-import { builtinPreToolUseGuard, runHooks, auditToolUse, checkStop, projectHasTests, STOP_RETRIES } from './hooks.js';
-import { isReadOnlyTool, isToolAllowedInMode } from '../shared/schemas/mode.js';
+import { runHooks, auditToolUse, checkStop, projectHasTests, STOP_RETRIES } from './hooks.js';
+import { isReadOnlyTool } from '../shared/schemas/mode.js';
 import { SWE_MAX_ITERATIONS } from './swe.js';
 import { runInWorkdir, getWorkdir } from '../shared/tools/workdir.js';
-import { classifyBashCommand } from './bash-validation.js';
 import { isFileTool } from '../shared/tool-taxonomy.js';
+import { runPreGates, assessCall, resolvePermissionGate, applySessionGrant } from './gates.js';
 import { recordGrant, recordDispatch } from './audit-trail.js';
 import { drain, hasPending, waitForMail, formatNotifications } from './mailbox.js';
 import { startBackground, checkBackground, listBackground } from './background.js';
@@ -28,10 +28,33 @@ import { createTask, awaitTask, cancelTask, getTask, PERMISSIONS } from './task.
 import { spawnTeammate, sendTeamMessage, listTeam, mergeTeammate } from './team.js';
 import { evaluateGoal, GOAL_MAX_CHECKS, GOAL_WORKER_RULE } from './goal.js';
 import { workerBrief, contractBrief } from './outcome.js';
-import { riskLevel, explainRisk, recordApproval } from './risk-ledger.js';
 import { budgetStatus, recordSpend } from './budget.js';
-import { checkBlastRadius, createGateState } from './blast-radius.js';
+import { createGateState } from './blast-radius.js';
 import { ReceiptLedger, checkClaims, claimGateMessage } from './receipts.js';
+import { buildProviderTools } from './tool-schemas.js';
+
+// Re-exported so the many existing importers of these names from loop.js keep
+// working. They are declared in tool-schemas.js now; a re-export is one line
+// and keeps this a move rather than a rename across the tree.
+export { TOOL_PARAM_SCHEMAS, LEGACY_TASK_TOOLS, buildProviderTools } from './tool-schemas.js';
+
+/**
+ * The effect descriptor a browser call carried, or null.
+ *
+ * Extracted at the point of recording rather than validated here: the gate that
+ * matters is in `web-tools.js`, and duplicating it would create a second place
+ * that has to be updated when the descriptor's required fields change. This
+ * reads the field so the audit trail can compare it, and does nothing with it.
+ */
+function webEffectOf(input) {
+  const e = input?.effect;
+  if (!e || typeof e !== 'object') return null;
+  const out = {};
+  for (const f of ['action', 'origin', 'resourceId', 'reversibility', 'recipient', 'compensatingAction', 'accountRef']) {
+    if (e[f] !== undefined && e[f] !== null && e[f] !== '') out[f] = String(e[f]);
+  }
+  return Object.keys(out).length ? out : null;
+}
 
 const MAX_ITERATIONS = 25;
 const SWE_ITERATIONS = SWE_MAX_ITERATIONS; // 60: SWE-bench tasks are multi-file, need the budget
@@ -39,207 +62,19 @@ const HISTORY_LIMIT = 60;
 const HISTORY_CHAR_CAP = 4000;
 const TOOL_RESULT_CAP = 20000;
 const SWE_TOOL_RESULT_CAP = 30000;
+/** Hard ceiling on the agentmemory recall that feeds the system prompt. */
+const MEMORY_BRIDGE_TIMEOUT_MS = 2500;
 
-/** JSON Schema per tool (providers require JSON Schema, not Zod). */
-export const TOOL_PARAM_SCHEMAS = {
-  readFile: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'] },
-  listDirectory: { type: 'object', properties: { path: { type: 'string' } } },
-  glob: { type: 'object', properties: { pattern: { type: 'string' } }, required: ['pattern'] },
-  grep: {
-    type: 'object',
-    properties: { pattern: { type: 'string' }, path: { type: 'string' } },
-    required: ['pattern'],
-  },
-  codeMap: {
-    type: 'object',
-    properties: { path: { type: 'string' } },
-  },
-  searchWeb: {
-    type: 'object',
-    properties: {
-      query: { type: 'string', description: 'Search query. Prefer natural-language questions over keyword soup.' },
-      count: { type: 'integer', description: 'Results to return (1-20, default 5).' },
-    },
-    required: ['query'],
-  },
-  fetchUrl: {
-    type: 'object',
-    properties: {
-      url: { type: 'string', description: 'Absolute http(s) URL to fetch.' },
-      maxChars: { type: 'integer', description: 'Truncate the extracted text to this many characters (default 8000).' },
-    },
-    required: ['url'],
-  },
-  writeFile: {
-    type: 'object',
-    properties: { path: { type: 'string' }, content: { type: 'string' } },
-    required: ['path', 'content'],
-  },
-  editFile: {
-    type: 'object',
-    properties: {
-      path: { type: 'string' },
-      oldString: { type: 'string' },
-      newString: { type: 'string' },
-    },
-    required: ['path', 'oldString', 'newString'],
-  },
-  batchEdit: {
-    type: 'object',
-    properties: {
-      operations: {
-        type: 'array',
-        items: {
-          type: 'object',
-          properties: {
-            filePath: { type: 'string' },
-            oldString: { type: 'string' },
-            newString: { type: 'string' },
-          },
-          required: ['filePath', 'oldString', 'newString'],
-        },
-      },
-    },
-    required: ['operations'],
-  },
-  bash: {
-    type: 'object',
-    properties: {
-      command: { type: 'string' },
-      timeout: { type: 'integer', description: 'Timeout in seconds (values ≥1000 are read as ms)' },
-      description: { type: 'string' },
-    },
-    required: ['command'],
-  },
-  runTests: {
-    type: 'object',
-    properties: {
-      command: { type: 'string' },
-      timeout: { type: 'integer', description: 'Timeout in seconds (values ≥1000 are read as ms)' },
-    },
-    required: ['command'],
-  },
-  applyPatch: {
-    type: 'object',
-    properties: { patch: { type: 'string' } },
-    required: ['patch'],
-  },
-  redoLastUndo: { type: 'object', properties: {} },
-  todoWrite: {
-    type: 'object',
-    properties: {
-      todos: {
-        type: 'array',
-        items: {
-          type: 'object',
-          properties: {
-            id: { type: 'string' },
-            title: { type: 'string' },
-            status: { type: 'string' },
-          },
-          required: ['id', 'title', 'status'],
-        },
-      },
-    },
-    required: ['todos'],
-  },
-  todoRead: { type: 'object', properties: {} },
-  skill: {
-    type: 'object',
-    properties: { name: { type: 'string' } },
-    required: ['name'],
-  },
-  spawnAgent: {
-    type: 'object',
-    properties: {
-      prompt: { type: 'string' },
-      mode: { type: 'string' },
-    },
-    required: ['prompt'],
-  },
-  diffFile: {
-    type: 'object',
-    properties: { path: { type: 'string' }, newContent: { type: 'string' } },
-    required: ['path', 'newContent'],
-  },
-  undoLastChange: { type: 'object', properties: {} },
-  memoryWrite: {
-    type: 'object',
-    properties: {
-      name: { type: 'string' },
-      type: { type: 'string', enum: ['user', 'feedback', 'project', 'reference'] },
-      description: { type: 'string' },
-      body: { type: 'string' },
-    },
-    required: ['name', 'type', 'description', 'body'],
-  },
-  memoryDelete: {
-    type: 'object',
-    properties: { name: { type: 'string' } },
-    required: ['name'],
-  },
-  bgRun: {
-    type: 'object',
-    properties: { command: { type: 'string' }, timeout: { type: 'integer', description: 'Timeout in seconds' } },
-    required: ['command'],
-  },
-  bgCheck: { type: 'object', properties: { id: { type: 'string' } } },
-
-  /**
-   * The unified task tool.
-   *
-   * `action` is required and enumerated because the whole point is that the
-   * model does not have to guess between six names. The properties are a union
-   * on purpose — JSON Schema `oneOf` is poorly supported across providers, and
-   * an optional-everything schema is more robust than a strict one that gets
-   * rejected. The handler validates per action and says what is missing.
-   */
-  task: {
-    type: 'object',
-    properties: {
-      action: {
-        type: 'string',
-        enum: ['spawn', 'spawn-async', 'run', 'status', 'check', 'merge', 'cancel', 'message'],
-        description: 'What to do. "spawn" waits for the result; "spawn-async" reports back later.',
-      },
-      prompt: { type: 'string', description: 'Required for spawn and spawn-async.' },
-      mode: { type: 'string', enum: ['BUILD', 'PLAN'], description: 'For spawn/spawn-async. Defaults to PLAN then BUILD.' },
-      name: { type: 'string', description: 'Teammate name, for spawn-async and merge.' },
-      isolation: { type: 'string', enum: ['none', 'worktree'], description: 'For spawn-async.' },
-      command: { type: 'string', description: 'Required for run.' },
-      timeout: { type: 'integer', description: 'Seconds, for run.' },
-      id: { type: 'string', description: 'For check and cancel.' },
-      to: { type: 'string', description: 'For message. Use "lead" to reach the lead.' },
-      text: { type: 'string', description: 'For message.' },
-      merge: { type: 'string', enum: ['diff', 'apply', 'discard'], description: 'For merge.' },
-    },
-    required: ['action'],
-  },
-  spawnTeammate: {
-    type: 'object',
-    properties: {
-      name: { type: 'string' },
-      prompt: { type: 'string' },
-      mode: { type: 'string', enum: ['BUILD', 'PLAN'] },
-      isolation: { type: 'string', enum: ['none', 'worktree'] },
-    },
-    required: ['name', 'prompt'],
-  },
-  sendMessage: {
-    type: 'object',
-    properties: { to: { type: 'string' }, text: { type: 'string' } },
-    required: ['to', 'text'],
-  },
-  teamStatus: { type: 'object', properties: {} },
-  teamMerge: {
-    type: 'object',
-    properties: {
-      name: { type: 'string' },
-      action: { type: 'string', enum: ['diff', 'apply', 'discard'] },
-    },
-    required: ['name'],
-  },
-};
+/** Race a promise against a deadline. Used for optional, never-blocking I/O. */
+function withTimeout(promise, ms, label) {
+  let timer;
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+    }),
+  ]).finally(() => clearTimeout(timer));
+}
 
 /**
  * Tools the loop executes itself because they need loop context (agent
@@ -290,46 +125,6 @@ export function normalizeTaskCall(input) {
   return tc;
 }
 
-/**
- * Build provider tool definitions from the shared contracts + schemas.
- *
- * The legacy concurrency names are filtered OUT here even though their
- * contracts and dispatch still exist. That split is the whole point: a
- * trajectory recorded last week replays (the dispatch is untouched), but the
- * model is only ever shown one tool for concurrent work. Showing both would
- * leave the model to choose between seven spellings, which is the problem.
- */
-export const LEGACY_TASK_TOOLS = Object.freeze([
-  'spawnAgent', 'bgRun', 'bgCheck', 'spawnTeammate', 'sendMessage', 'teamStatus', 'teamMerge',
-]);
-
-export function buildProviderTools(mode, externalTools = []) {
-  const contracts = getToolContracts(mode);
-  const local = Object.entries(contracts)
-    .filter(([name]) => TOOL_PARAM_SCHEMAS[name])
-    .filter(([name]) => !LEGACY_TASK_TOOLS.includes(name))
-    .map(([name, contract]) => ({
-      type: 'function',
-      function: {
-        name,
-        description: contract.description,
-        parameters: TOOL_PARAM_SCHEMAS[name],
-      },
-    }));
-  // External MCP tools are appended after local ones so a third-party server
-  // can never shadow a Sentinel builtin (its namespaced name can't collide,
-  // but ordering also keeps the local block cache-stable).
-  const external = (externalTools || []).map((t) => ({
-    type: 'function',
-    function: {
-      name: t.namespacedName,
-      description: t.description,
-      parameters: t.inputSchema,
-    },
-  }));
-  return [...local, ...external];
-}
-
 export const LOOP_REQUEST_CHAR_BUDGET = 200_000; // ~50k tokens: safe for all providers
 const LOOP_KEEP_TAIL = 6; // never trim the most recent messages (active context)
 
@@ -338,13 +133,29 @@ const LOOP_KEEP_TAIL = 6; // never trim the most recent messages (active context
  * tool outputs would otherwise build a megabyte request the provider
  * rejects — killing the whole turn. Oldest tool results are replaced with
  * a tombstone; task head + recent tail are always kept. Pure (no mutation).
+ *
+ * The size of each message is computed ONCE and reused. The obvious
+ * implementation re-serializes the entire conversation to measure it, and does
+ * so inside two nested loops — measured at 103 full `JSON.stringify` passes
+ * over a 1MB conversation, ~107ms, on a function that runs once per model call
+ * (so ~6.4s of pure CPU across a 60-iteration SWE turn). Per-message costs are
+ * additive and the only structural edit is a substitution, so an incremental
+ * total is exact rather than an approximation.
  */
 export function trimMessagesForBudget(messages, budget = LOOP_REQUEST_CHAR_BUDGET) {
-  const size = (list) => JSON.stringify(list).length;
-  if (size(messages) <= budget) return messages;
+  if (!Array.isArray(messages) || messages.length === 0) return messages;
+
+  // JSON size per message, measured once. The structural overhead of the
+  // enclosing array (brackets + commas) is added to the total so the budget is
+  // compared against the same quantity the provider will actually receive.
+  const msgChars = messages.map((m) => JSON.stringify(m)?.length ?? 0);
+  const overhead = Math.max(0, messages.length - 1);
+  let total = msgChars.reduce((a, b) => a + b, 0) + overhead;
+  if (total <= budget) return messages;
+
   const out = messages.map((m) => ({ ...m }));
-  const tombstone = (m) => {
-    const next = { ...m, content: '[trimmed: budget]' };
+  const tombstone = (m, nextContent) => {
+    const next = { ...m, content: nextContent };
     // History tool_calls args (e.g. a whole writeFile body) count toward the
     // bound too — truncate them, keeping ids so result linkage still parses.
     if (Array.isArray(next.tool_calls)) {
@@ -358,31 +169,41 @@ export function trimMessagesForBudget(messages, budget = LOOP_REQUEST_CHAR_BUDGE
     }
     return next;
   };
+  /** Replace out[i], keeping `total` exact. */
+  const replace = (i, next) => {
+    total += (JSON.stringify(next)?.length ?? 0) - msgChars[i];
+    msgChars[i] = JSON.stringify(next)?.length ?? 0;
+    out[i] = next;
+  };
+
   // Pass 1: tombstone old tool outputs, keep task head + recent tail intact.
   for (let i = 1; i < out.length - LOOP_KEEP_TAIL; i++) {
-    if (size(out) <= budget) break;
+    if (total <= budget) break;
     const m = out[i];
-    if (m.role === 'tool' && m.content !== '[trimmed: budget]') out[i] = tombstone(m);
+    if (m.role === 'tool' && m.content !== '[trimmed: budget]') {
+      replace(i, tombstone(m, '[trimmed: budget]'));
+    }
   }
   // Pass 2: guarantee the bound — trim the largest remaining message
-  // oldest-first (never the task head at index 0).
+  // oldest-first (never the task head at index 0). `msgChars` makes the search
+  // a scan over numbers instead of a serialization per candidate.
   let guard = out.length + 1;
-  while (size(out) > budget && guard-- > 0) {
+  while (total > budget && guard-- > 0) {
     let best = -1;
     let bestLen = 0;
     for (let i = 1; i < out.length; i++) {
-      const w = size([out[i]]);
-      if (w > bestLen && w > 60) {
+      if (msgChars[i] > bestLen && msgChars[i] > 60) {
         best = i;
-        bestLen = w;
+        bestLen = msgChars[i];
       }
     }
     if (best === -1) break;
     const m = out[best];
-    out[best] =
-      m.role === 'assistant' && typeof m.content === 'string' && m.content.length > 500
-        ? { ...tombstone(m), content: `${m.content.slice(0, 500)}\n[trimmed: budget]` }
-        : tombstone(m);
+    if (m.role === 'assistant' && typeof m.content === 'string' && m.content.length > 500) {
+      replace(best, tombstone(m, `${m.content.slice(0, 500)}\n[trimmed: budget]`));
+    } else {
+      replace(best, tombstone(m, '[trimmed: budget]'));
+    }
   }
   return out;
 }
@@ -502,7 +323,27 @@ export async function* runAgentTurnInner(opts = {}) {
   let cheapStreak = 0;
   let activeModel = resolved.modelId;
 
-  let system = buildSystemPrompt({ mode, dir: workdir });
+  // The request text ranks the skill listing, which is a fixed prefix re-sent
+  // on every model call. Ranking it by relevance is what keeps a large skill
+  // library from costing full price on every iteration of every turn.
+  const requestText = lastUserText(history);
+  // Cross-agent memory (agentmemory) is queried once per turn and folded into
+  // the prompt as its own trailing section. Best-effort and time-boxed: the
+  // server is usually absent, and a turn must never wait on it.
+  let crossAgentMemory = '';
+  if (process.env.SENTINEL_DISABLE_MEMORY_BRIDGE !== '1' && requestText) {
+    try {
+      const { buildMemoryBridgeSection } = await import('./memory-bridge.js');
+      crossAgentMemory = await withTimeout(
+        buildMemoryBridgeSection(requestText),
+        MEMORY_BRIDGE_TIMEOUT_MS,
+        'agentmemory recall',
+      );
+    } catch {
+      // Absent, slow, or failing — the local memory store stands alone.
+    }
+  }
+  let system = buildSystemPrompt({ mode, dir: workdir, request: requestText, crossAgentMemory });
   if (goal) {
     // An outcome contract replaces the one-line condition when present: the
     // worker gets the target, the proof, and the assumptions it inherited.
@@ -547,6 +388,9 @@ export async function* runAgentTurnInner(opts = {}) {
   const callCounts = new Map(); // tool+input signature -> times called this turn
   const ledger = new ReceiptLedger(); // hashed tool evidence for claim checks
   let claimChecked = false;
+
+  // Per-turn memo for the usage fallback; see estimateRequestTokens.
+  resetRequestTokenCache();
 
   let inputTokens = 0;
   let cacheReadTokens = 0;
@@ -601,8 +445,10 @@ export async function* runAgentTurnInner(opts = {}) {
     let text = '';
     let turnUsage = null;
 
-    // Request-size estimate for providers that omit usage
-    const requestEstimate = Math.ceil(JSON.stringify(messages).length / 4);
+    // Request-size estimate for providers that omit usage. Only needed when the
+    // provider will actually be asked, so it is computed lazily below rather
+    // than serializing the whole conversation on every iteration (including the
+    // ones that report real usage).
 
     // Cost-aware routing (opt-in via routeModel / SENTINEL_ROUTE_MODEL):
     // the cheap model continues read-only exploration; the main model
@@ -648,7 +494,9 @@ export async function* runAgentTurnInner(opts = {}) {
       }
     }
 
-    const callIn = turnUsage ? turnUsage.inputTokens || 0 : requestEstimate;
+    // Fallback for providers that omit usage: estimate from the request we
+    // actually sent, which is the trimmed one — that is what was billed.
+    const callIn = turnUsage ? turnUsage.inputTokens || 0 : estimateRequestTokens(messages, system);
     const callOut = turnUsage ? turnUsage.outputTokens || 0 : estimateTokensFromText(text);
     if (useModel === resolved) {
       inputTokens += callIn;
@@ -937,6 +785,29 @@ export function pickIterationModel({ cheap, iter, lastBatchReadOnly, cheapStreak
   return cheapStreak < ROUTE_MAX_CHEAP_STREAK ? 'cheap' : 'main';
 }
 
+/**
+ * Rough token estimate for providers that report no usage.
+ *
+ * Memoized per turn on conversation length. The estimate is only ever a
+ * fallback, and every iteration adds at least one message, so a repeat length
+ * means the conversation did not grow and the previous answer is still the
+ * right one — which is what keeps this off the hot path instead of
+ * serializing a megabyte of history per model call.
+ */
+let requestTokenCache = { len: -1, tokens: 0 };
+
+export function estimateRequestTokens(messages = [], system = '') {
+  if (messages.length === requestTokenCache.len) return requestTokenCache.tokens;
+  const chars = JSON.stringify(messages).length + (system ? system.length : 0);
+  requestTokenCache = { len: messages.length, tokens: Math.ceil(chars / 4) };
+  return requestTokenCache.tokens;
+}
+
+/** Reset the per-turn estimate. Exported for tests and long-lived processes. */
+export function resetRequestTokenCache() {
+  requestTokenCache = { len: -1, tokens: 0 };
+}
+
 /** USD spent so far this turn at the model's registry price. */
 export function runningCostUsd(modelId, inputTokens, outputTokens) {
   try {
@@ -984,83 +855,47 @@ async function executeOneTool({ tc: rawTc, mode, opts, subagentState, editCounts
   const requestedTool = tc.name;
   let granted = false;
 
-  // External MCP tools are read-only by assumption (they are third-party
-  // servers, not Sentinel builtins), so they pass the mode gate in every mode
-  // including PLAN/REVIEW/SCAN, where unknown tool names would otherwise be
-  // blocked. They never receive a write grant.
-  const isExternal = Boolean(externalToolNames && externalToolNames.has(tc.name));
-  if (!isExternal && !isToolAllowedInMode(tc.name, mode)) {
-    return { output: { error: `Tool ${tc.name} is not available in ${mode} mode` } };
+  // Gates 1-5: ordered refusals, all before anyone is asked anything. The order
+  // is a stated property now — see GATE_ORDER in gates.js.
+  const refusal = await runPreGates({
+    tool: tc.name, input: tc.input, mode, agentName, gateState, externalTools: externalToolNames,
+  });
+  if (refusal) {
+    return { output: { error: refusal.reason, gate: refusal.gate, ...(refusal.blastRadius ? { blastRadius: true } : {}) } };
   }
 
-  // Built-in + registered PreToolUse hooks (block before permission UI).
-  const builtin = builtinPreToolUseGuard(tc.name, tc.input);
-  if (builtin?.block) return { output: { error: builtin.reason } };
-  const hookBlock = await runHooks('preToolUse', { toolName: tc.name, input: tc.input, mode }).catch(() => null);
-  if (hookBlock?.block) return { output: { error: hookBlock.reason || `Blocked by hook: ${tc.name}` } };
-
-  // Blast-radius gate: the first write to a migration, a CI workflow, a
-  // lockfile, auth code, and friends is refused once with the justification
-  // and rollback spelled out. Blocks per path per turn, so a legitimate
-  // multi-file change is challenged once rather than on every write.
-  if (gateState) {
-    const radius = checkBlastRadius({ toolName: tc.name, input: tc.input, state: gateState });
-    if (radius?.block) return { output: { error: radius.reason, blastRadius: true } };
-  }
-
-  // A solo lead messaging "lead" is a no-op small models reach for instead of
-  // answering. Refuse it before the permission prompt so the user is never
-  // asked to approve a call that cannot succeed.
-  if (tc.name === 'sendMessage' && String(tc.input?.to || 'lead') === agentName) {
-    return { output: { error: `You are ${agentName}; there is no one to message. Reply to the user directly in your answer.` } };
-  }
-
-  // claw-code bash validation: a session-wide "allow bash" never covers a
-  // destructive command; those are re-asked every time.
-  const shellish = tc.name === 'bash' || tc.name === 'runTests' || tc.name === 'bgRun';
-  const bashCheck = shellish ? classifyBashCommand(tc.input?.command) : null;
-  // Risk ledger: a session grant for `bash` is a grant for the *shape*, not
-  // for every command the tool can run. A novel non-destructive shape is
-  // still asked, which is what keeps "allow bash for this session" from
-  // silently authorizing the first `npm publish` that walks by.
-  const risk = shellish ? riskLevel(tc.input?.command, workdir) : null;
-  const sessionGrantsShape = shellish ? allowAll.has(tc.name) && risk?.level === 'green' : allowAll.has(tc.name);
-  let permission = sessionGrantsShape ? 'allow' : null;
-  // Read-only tools never prompt (opencode behavior): a dialog per readFile
-  // stalled a live TUI turn for minutes. The config policy still applies
-  // in executeLocalTool, so `permissions.tools.readFile: deny` still denies.
-  if (!permission && onPermissionRequest && !isReadOnlyTool(tc.name)) {
-    permission = await onPermissionRequest(tc.name, tc.id, { ...(tc.input || {}), __risk: risk ? explainRisk(risk) : undefined });
-  }
+  // Classification, then the permission decision. `assessCall` is shared with
+  // the audit trail so both agree about how dangerous a command is.
+  const { bashCheck, risk, shellish, command } = assessCall(tc.name, tc.input, workdir);
+  const decision = await resolvePermissionGate({
+    tool: tc.name, input: tc.input, toolCallId: tc.id, allowAll,
+    onPermissionRequest, risk, bashCheck, shellish,
+  });
+  const { permission } = decision;
   if (permission === 'deny') return { output: { error: 'User denied permission' } };
 
   // Grant side of the binding, recorded before anything executes. Written here
-  // rather than next to `auditToolUse` because everything above can return
+  // rather than next to `auditToolUse` because the gates above can return
   // early — and an early return is not a gap, it is a call that never ran.
-  if (permission !== 'deny') {
-    recordGrant({
-      ...auditCtx,
-      toolCallId: tc.id,
-      tool: requestedTool,
-      input: tc.input,
-      decision: permission ?? 'no-prompt',
-      risk: risk?.level ?? null,
-      mode,
-    });
-    granted = true;
-  }
+  recordGrant({
+    ...auditCtx,
+    toolCallId: tc.id,
+    tool: requestedTool,
+    input: tc.input,
+    decision: permission ?? 'no-prompt',
+    risk: risk?.level ?? null,
+    mode,
+    gate: null,
+    // The browser's `workdir`. Copied out of the raw input so `audit.js`'s
+    // Effect class can compare it as a field rather than as an opaque blob.
+    // This is the descriptor as the model *asserted* it — unverified at this
+    // point. The tool layer does the verifying and says so on the dispatch side,
+    // which is why the two are recorded from different places.
+    effect: webEffectOf(tc.input),
+  });
+  granted = true;
 
-  if (permission === 'allow-session') {
-    if (bashCheck?.destructive || risk?.level === 'red') {
-      // A red command is never promoted to a session grant, even when the
-      // user said allow-session: the ledger must not learn `rm -rf /`.
-    } else if (risk && risk.level === 'yellow') {
-      recordApproval(tc.input?.command, workdir);
-      allowAll.add(tc.name);
-    } else {
-      allowAll.add(tc.name);
-    }
-  }
+  applySessionGrant({ permission, tool: tc.name, risk, bashCheck, command, allowAll, workdir });
 
   // The unified `task` tool: translate to a legacy call and take the same path.
   // A shape mismatch becomes an error the model can read and correct, which is
@@ -1164,6 +999,12 @@ async function executeOneTool({ tc: rawTc, mode, opts, subagentState, editCounts
       input: tc.input,
       ok: !output?.error,
       error: output?.error ?? null,
+      // What actually acted, which for a browser call is the *verified*
+      // descriptor the tool resolved — not the asserted one the grant recorded.
+      // The difference between the two is the Effect class, and it is only
+      // visible because both sides are recorded from different sources.
+      effect: output?.effect ?? webEffectOf(tc.input),
+      drifted: !!output?.drifted,
     });
   }
   runHooks('postToolUse', { toolName: tc.name, output, mode }).catch(() => {});

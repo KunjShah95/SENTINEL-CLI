@@ -82,6 +82,10 @@ CLI consume.
 `readFile`, `writeFile`, `editFile`, `batchEdit`, `listDirectory`, `glob`, `grep`,
 `bash`, `diffFile`, `undoLastChange`, `redoLastUndo`, `searchWeb`.
 
+Browser: `webSession`, `webRead`, `webProbe`, `webAct` — see below. Observation
+and commitment are separate tools, and `webAct` cannot run without naming what it
+is about to affect.
+
 ### Shared skills and web search
 
 Sentinel discovers standard `SKILL.md` packages in project-local and global
@@ -358,6 +362,104 @@ is named in the taxonomy with a count of zero because those divergences leave
 every recorded field unchanged — the tool states the limit of its own coverage
 rather than implying a clean result it cannot support.
 
+## Browser tools — reading, resolving, then committing
+
+Every safety primitive above works because a file action has a nameable target.
+`risk.json` grades a command *shape*, `audit` compares `workdir`, the blast-radius
+gate matches a glob. A browser click has no such name: `click(selector)` is the
+same verb whether it opens a settings page or confirms a charge. Novelty is not
+the risk variable there — context is — so a shape-based ledger would just learn
+from repetition and eventually green-light whatever it saw most often.
+
+So the browser path does not add a `computerUse` tool. It splits observation from
+commitment, exactly as the file tools already do:
+
+| Tool | Does | Prompts |
+| --- | --- | --- |
+| `webSession` | open/list/revoke/close a leased browser session | on open |
+| `webRead` | navigate and read a page | no |
+| `webProbe` | resolve what a click *would* do — role, accessible name, form target, endpoint, and a suggested reversibility class | no |
+| `webAct` | **perform** a probed action, given an effect descriptor | yes, always |
+
+`webProbe` is the one that matters. Without it the agent clicks blind and infers
+what happened from the resulting page, which is what makes browser agents
+unreviewable. With it, it resolves first, reads what the button actually calls
+itself and where it would submit, and asks.
+
+`sentinel webeffect` grades a proposed action without a browser at all:
+
+```
+$ echo '{"action":"send invoice 9","origin":"https://billing.example.com/invoices/9",
+         "resourceId":"/api/invoices/9/send","reversibility":"external",
+         "recipient":"ap@customer.test"}' | sentinel webeffect -f -
+
+external  send invoice 9
+Affects someone else — ap@customer.test. They will see this and cannot un-see it.
+```
+
+### The effect descriptor
+
+`webAct` will not run without one. This is the mechanism that makes the
+`Semantic` gap class checkable: `audit` reports `Semantic` as unverifiable
+precisely because those divergences leave every recorded field unchanged, so the
+fields it needs are made to exist *before* the effect instead of being recovered
+afterwards.
+
+```
+{ action, origin, resourceId, reversibility, recipient?, compensatingAction? }
+```
+
+Irreversibility is a currency, and it is spent against a ceiling the way money
+is in `sentinel budget`:
+
+| Class | Means | Required |
+| --- | --- | --- |
+| `reversible` | in-product undo exists | — |
+| `compensable` | a compensating action exists | `compensatingAction` |
+| `absorbing` | cannot be undone | — |
+| `external` | a third party will see it | `recipient` |
+
+An **undeclared class is not treated as mild** — it grades `unknown`, which
+outranks `external`, and the action is refused. A session's irreversible ceiling
+defaults to **0**: irreversible actions are something you opt into per session.
+
+Three refusals stand between a descriptor and a click, and none is skippable:
+
+- **Drift.** The action is re-probed immediately before it fires. A page that
+  re-rendered since the probe, a selector that now points elsewhere, or an action
+  that landed on a different origin is refused.
+- **Wrong account.** If the descriptor names an account and the page shows a
+  different one, the action is refused. The right page under the wrong identity
+  is the failure no URL reveals.
+- **Rung.** A `readonly` subagent may read and probe but never act, and
+  `absorbing`/`external` effects are denied at every rung below `inherit` — a
+  teammate works in its own worktree, and there is no worktree for a sent message.
+
+A granted descriptor and the descriptor that actually acted are recorded
+separately, so `sentinel audit` gained an **`Effect`** class: an action that
+fired on a different resource than it was approved for is now a finding rather
+than an invisible one. Reversibility maps onto the existing intent ladder
+(`reversible` → `read_only`, `absorbing` → `state`), so a click that mutated
+under a reversible grant also trips the existing `Scope` check.
+
+### Containment
+
+Sessions are single-purpose and leased. Opening one requires an explicit origin
+allowlist — an agent holding a logged-in session and the whole internet is not a
+browsing tool. Each gets a dedicated, empty profile under `.sentinel/web/profiles/`;
+**your credentials are never imported**, so if the task needs an identity you log
+that profile in while watching it happen. Leases expire, and `revoke` cuts a
+session off mid-task. Driving is CDP over a Node-22 global `WebSocket`, so there
+is no browser-automation dependency and no Chromium download; when no browser is
+found, that is reported as a capability failure rather than an empty page.
+
+**Deliberately absent:** pixel/screenshot targeting (a pixel diff cannot answer
+whether a click hit Delete or Edit), `type` as a standalone action (keystrokes
+are cheap; the submission is the irreversible part, so *that* is what needs a
+descriptor), and self-verification of a browser action — `webAct` returns a
+`verification` note pointing at an authoritative endpoint, because a page
+rendering "done" is not a receipt.
+
 ## `sentinel onboard` — the week-one survey
 
 A new engineer's first days go to comprehension, not commits. `onboard` answers
@@ -384,6 +486,80 @@ first, so it works as a CI check.
 **No model, no API key, no network.** The survey is deterministic filesystem and
 `git log` analysis, so it runs anywhere and gives the same answer twice.
 
+## `sentinel memory` — cross-agent memory
+
+Sentinel keeps its own Markdown records in `.sentinel/memory/`. It can also read
+and write the **cross-agent** store ([agentmemory](https://agent-memory.dev)),
+which every assistant on the machine shares — a decision made in Cursor is
+recallable from SENTINEL, and vice versa.
+
+```bash
+sentinel memory                                  # is it reachable?
+sentinel memory "how do we do auth"              # recall
+sentinel memory --remember "auth uses jose" \
+  --concepts auth,jwt                            # store
+```
+
+The server is optional. Start it in its own terminal with:
+
+```bash
+npx -y @agentmemory/agentmemory@latest
+```
+
+Set `AGENTMEMORY_URL` if it is not on `localhost:3111`, and
+`AGENTMEMORY_SECRET` if you put it behind auth.
+
+Two tools back this: `memoryRecall` is read-only (available in PLAN and REVIEW),
+`memoryRemember` is a write. Recall results are injected into the system prompt
+as their own trailing section, capped and relevance-ordered — and when the
+server is down, that section is simply absent rather than an error. Recall is
+time-boxed at 2.5s and never blocks a turn.
+
+Point `AGENTMEMORY_URL` at a remote instance to share memory across machines.
+
+## `sentinel heal` — detect and repair drift
+
+Things break quietly. An assistant upgrades and rewrites its config, dropping
+the SENTINEL entry with no error anywhere. A memory index stops matching the
+records it summarizes. A half-written `todos.json` makes the todo tool fail on
+every call. `heal` finds all three.
+
+```bash
+sentinel heal              # report only — read-only, always safe
+sentinel heal --fix        # repair (every removal is quarantined, not deleted)
+sentinel heal --fix --dry-run
+```
+
+Three classes of repair:
+
+| Problem | Repair |
+| --- | --- |
+| Assistant config lost or changed the SENTINEL entry | re-merge it, with a backup |
+| `MEMORY.md` disagrees with the records on disk | rebuild the index |
+| Corrupt `todos.json` / `outcome.json` / `budget.json` / `risk.json` | quarantine to `.corrupt-<ts>` |
+| Memory record with no `name:` frontmatter | reported, not auto-fixed |
+| Config that isn't valid JSON | reported, **never** rewritten |
+
+The last two are deliberate. A record with no `name:` might be a hand-written
+note worth keeping, and a config we can't parse may hold settings we cannot
+reconstruct — silently replacing either would destroy user data. Repairs are
+idempotent, so a second `heal` reports clean.
+
+## `sentinel update` — check for updates
+
+Reports drift across three independent things, then installs only on `--yes`:
+
+```bash
+sentinel update              # report: package, assistants, MCP servers, skills
+sentinel update --yes        # install the newer SENTINEL if one is published
+sentinel update --skills --yes   # refresh skills via the skills.sh CLI
+```
+
+`sentinel update --yes` runs `npm install -g sentinel-cli@latest`. Nothing is
+installed without that flag, and a registry failure is reported rather than
+treated as an update. The package swap only applies to a globally installed
+copy — a `npx`-invoked one is ephemeral and will not change.
+
 ## TUI commands
 
 `/help` `/model [id]` `/models` `/session [list|switch|delete]` `/commit`
@@ -401,7 +577,8 @@ Expose Sentinel to Claude Desktop, Cursor, or any MCP client:
 sentinel mcp
 ```
 
-Tools: `sentinel_health`, `sentinel_ask`, `sentinel_review_diff`.
+Tools: `sentinel_health`, `sentinel_ask`, `sentinel_search`, `sentinel_skills`,
+`sentinel_mcp_servers`, `sentinel_review_diff`.
 Transport is stdio — add it to your client config:
 
 ```json
@@ -411,6 +588,83 @@ Transport is stdio — add it to your client config:
   }
 }
 ```
+
+### Connect to your assistants
+
+`sentinel connect` detects installed assistants and registers the MCP server
+with each one, merging into their existing config without touching other
+entries:
+
+```bash
+sentinel connect --list          # what's detected
+sentinel connect --dry-run       # show the change, write nothing
+sentinel connect                 # apply to every detected assistant
+sentinel connect -t cursor       # just one
+sentinel connect --scope project # write ./.mcp.json instead of user config
+sentinel connect --remove        # undo
+```
+
+Understood targets: `claude-code`, `cursor`, `windsurf`, `zed`, `opencode`,
+`codex`, `vscode-copilot`. Each write takes a `.sentinel-backup` first.
+
+### Use external MCP servers
+
+Sentinel is also an MCP *host*. Configure servers in `~/.sentinel.yaml`:
+
+```yaml
+mcpServers:
+  github:
+    command: npx
+    args: ["-y", "@modelcontextprotocol/server-github"]
+    env:
+      GITHUB_TOKEN: ${GITHUB_TOKEN}
+  linear:
+    url: https://mcp.linear.app/sse
+    type: sse
+```
+
+Their tools are exposed to the agent as `<server>__<tool>` (e.g.
+`github__create_issue`) — namespaced because different servers commonly expose
+the same tool name. A server that fails to connect is skipped, not fatal.
+
+```bash
+sentinel mcp-status              # what's reachable, and what it exposes
+sentinel mcp-status --refresh    # reconnect
+```
+
+External tools are treated as read-only and never receive a write grant.
+
+### Web search
+
+`searchWeb` uses a provider chain — the first healthy provider wins, and a
+failing one is skipped rather than surfaced:
+
+| Order | Provider | Key |
+| --- | --- | --- |
+| 1 | Exa (semantic, good for code/docs) | `EXA_API_KEY` |
+| 2 | Tavily (agent-tuned) | `TAVILY_API_KEY` |
+| 3 | Brave | `BRAVE_API_KEY` |
+| 4 | DuckDuckGo | none |
+
+With no keys set, search still works via DuckDuckGo. `fetchUrl` retrieves and
+extracts a page's readable text (scripts, styles, and nav stripped) so the
+model isn't billed for markup.
+
+### Skills
+
+Skills follow the skills.sh `SKILL.md` convention. Sentinel reads
+`.sentinel/`, `.claude/`, `.codex/`, `.agents/`, and `.opencode/` skill
+directories — project and global — so a skill installed by any other assistant
+is available without copying it.
+
+```bash
+sentinel skills list
+sentinel skills install mattpocock/skills     # delegates to `npx skills add`
+sentinel skills find "tdd"
+```
+
+The skill listing injected into the system prompt is capped and relevance-ranked
+against your request, so a large library doesn't dominate every turn.
 
 ## Configuration
 
@@ -503,6 +757,7 @@ so the app looked completely frozen — nothing you typed did anything.
 - `risk` — grade a command against this repo, backed by a ledger that learns
 - `onboard` — deterministic repo survey: entry points, what gates the merge, churn, ownership, risk
 - `mini` — one-tool bash-only agent for small, scriptable tasks
+- `webeffect` — grade a proposed browser action: reversibility class, rollback, and whether a session permits it
 
 **Agent**
 - Blast-radius gate: a risky write is blocked or re-asked based on measured impact

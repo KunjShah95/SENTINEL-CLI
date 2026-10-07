@@ -30,8 +30,21 @@ export function isMode(value) {
   return Object.values(Mode).includes(value);
 }
 
+/**
+ * Tools that change nothing.
+ *
+ * `webRead` is here for the same reason `fetchUrl` is: navigating and reading a
+ * page is observation, so it belongs in PLAN and REVIEW and never prompts.
+ *
+ * `webProbe` is *also* here, and that is the more interesting half. It resolves
+ * an action to its effect without dispatching, so it is observation too — the
+ * resolve step is the last moment before commitment, and making the user pay a
+ * permission prompt to find out what a button does would train them to approve
+ * without reading. The commitment is a separate tool (`webAct`), which is not
+ * read-only and is gated like any other write.
+ */
 export function isReadOnlyTool(toolName) {
-  return ['readFile', 'listDirectory', 'glob', 'grep', 'codeMap', 'searchWeb', 'fetchUrl', 'todoRead', 'skill', 'bgCheck', 'teamStatus'].includes(toolName);
+  return ['readFile', 'listDirectory', 'glob', 'grep', 'codeMap', 'searchWeb', 'fetchUrl', 'memoryRecall', 'todoRead', 'skill', 'bgCheck', 'teamStatus', 'webRead', 'webProbe'].includes(toolName);
 }
 
 /**

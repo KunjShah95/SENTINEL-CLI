@@ -104,6 +104,30 @@ export const CHECKPOINT_TOOLS = Object.freeze(['undoLastChange', 'redoLastUndo']
 /** Read-only tools the mode check allows in PLAN/REVIEW/SCAN, beyond `isReadOnlyTool`. */
 export const DIFF_TOOLS = Object.freeze(['diffFile']);
 
+/**
+ * Tools that commit an effect outside the working tree.
+ *
+ * Their own category, and not `fileWrite`, because none of the rules that govern
+ * a file write apply:
+ *
+ *   - There is no path, so there is no checkpoint and no undo. `undoLastChange`
+ *     can revert bytes on disk; it cannot unsend a message.
+ *   - There is no `cwd`, so `blast-radius.js`'s globs have nothing to match.
+ *   - The blast radius is an *identity* — the account, the record, the third
+ *     party — which no existing category has a field for.
+ *
+ * They are excluded from `WRITE_TOOLS` for a specific reason: that set is what
+ * the audit trail counts as an intervening mutation and what invalidates a test
+ * receipt behind it. A browser action invalidating an `npm test` receipt would be
+ * nonsense, and counting them would make `boundGapRate` meaningless. The session
+ * module keeps its own irreversibility counter instead, which is the same
+ * separation of concerns that split `STATE_TOOLS` out.
+ */
+export const WEB_TOOLS = Object.freeze(['webRead', 'webProbe', 'webSession', 'webAct']);
+
+/** The subset that commits. `webRead` and `webProbe` observe and stay out. */
+export const WEB_COMMIT_TOOLS = Object.freeze(['webSession', 'webAct']);
+
 const SHELL_SET = new Set(SHELL_TOOLS);
 const FILE_SET = new Set(FILE_TOOLS);
 const WRITE_SET = new Set(WRITE_TOOLS);
@@ -111,6 +135,17 @@ const STATE_SET = new Set(STATE_TOOLS);
 const AGENT_SET = new Set(AGENT_TOOLS);
 const DIFF_SET = new Set(DIFF_TOOLS);
 const CHECKPOINT_SET = new Set(CHECKPOINT_TOOLS);
+const WEB_SET = new Set(WEB_TOOLS);
+const WEB_COMMIT_SET = new Set(WEB_COMMIT_TOOLS);
+
+export function isWebTool(toolName) {
+  return WEB_SET.has(toolName);
+}
+
+/** Whether this browser tool commits something rather than observing it. */
+export function isWebCommitTool(toolName) {
+  return WEB_COMMIT_SET.has(toolName);
+}
 
 export function isCheckpointTool(toolName) {
   return CHECKPOINT_SET.has(toolName);
@@ -171,6 +206,9 @@ export const KNOWN_TOOLS = Object.freeze([
   // read-only, per mode.js
   'readFile', 'listDirectory', 'glob', 'grep', 'codeMap', 'searchWeb', 'fetchUrl',
   'todoRead', 'skill', 'bgCheck', 'teamStatus',
+  // browser: observe vs commit. See WEB_TOOLS for why the commit half is excluded
+  // from WRITE_TOOLS.
+  ...WEB_TOOLS,
 ]);
 
 /**
@@ -180,10 +218,18 @@ export const KNOWN_TOOLS = Object.freeze([
  * "which tools are safe" is exactly the drift this module exists to remove.
  */
 export const EFFECT_CATEGORIES = Object.freeze([
-  'readOnly', 'shell', 'fileWrite', 'stateWrite', 'agent', 'checkpoint',
+  'readOnly', 'shell', 'fileWrite', 'stateWrite', 'agent', 'checkpoint', 'webCommit',
 ]);
 
-/** Which category a tool falls into, or null if no rule has an opinion. */
+/**
+ * Which category a tool falls into, or null if no rule has an opinion.
+ *
+ * `readOnly` is checked first and on purpose. `webRead` and `webProbe` are in
+ * `isReadOnlyTool`, so they land there; had `web` been checked earlier, they
+ * would have been classified as commits, and the mode check would have blocked
+ * them in PLAN — taking the safe moment before a commitment and putting it behind
+ * the commitment itself.
+ */
 export function effectCategory(toolName) {
   if (isReadOnlyTool(toolName) || DIFF_SET.has(toolName)) return 'readOnly';
   if (isShellTool(toolName)) return 'shell';
@@ -191,6 +237,7 @@ export function effectCategory(toolName) {
   if (isStateTool(toolName)) return 'stateWrite';
   if (isAgentTool(toolName)) return 'agent';
   if (isCheckpointTool(toolName)) return 'checkpoint';
+  if (isWebCommitTool(toolName)) return 'webCommit';
   return null;
 }
 

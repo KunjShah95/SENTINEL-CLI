@@ -6,6 +6,21 @@
  * boilerplate, then collapses whitespace so a 300KB HTML page becomes a few
  * KB of readable prose. That reduction is the main token lever here: sending
  * raw HTML would spend most of the budget on markup.
+ *
+ * Two strategies, in order:
+ *
+ *   1. Context.dev (`POST /web/scrape`), when CONTEXT_DEV_API_KEY is set. It
+ *      renders JavaScript and escalates proxies, which is the whole reason it
+ *      is here: on a client-rendered SPA or behind an anti-bot wall the direct
+ *      fetch below returns a JS shell or a challenge page, and the model is
+ *      handed markup with no content in it.
+ *   2. A direct HTTP fetch with local extraction. No key, no credits, no
+ *      network dependency on a third party — this is the default and it keeps
+ *      working exactly as before when Context.dev is not configured.
+ *
+ * A Context.dev failure is NOT fatal: it falls through to the direct fetch, and
+ * the reason rides along on the result so the failure is visible rather than
+ * silently hidden.
  */
 
 const DEFAULT_MAX_CHARS = 8000;
@@ -109,8 +124,9 @@ function extractMain(html) {
 }
 
 /**
- * @param {{url: string, maxChars?: number}} input
- * @returns {Promise<{url: string, title: string, text: string, truncated: boolean}>}
+ * @param {{url: string, maxChars?: number, prefer?: 'auto'|'direct'}} input
+ * @returns {Promise<{url: string, title: string, text: string, truncated: boolean,
+ *                    via?: string, contextDev?: object}>}
  */
 export async function fetchUrl(input = {}) {
   const raw = typeof input.url === 'string' ? input.url.trim() : '';
@@ -126,7 +142,39 @@ export async function fetchUrl(input = {}) {
   }
   const maxChars = Number.isInteger(input.maxChars) ? Math.min(Math.max(input.maxChars, 500), 40000) : DEFAULT_MAX_CHARS;
 
-  const res = await fetch(parsed.toString(), {
+  // Strategy 1: Context.dev, when configured and not explicitly declined.
+  // `prefer: 'direct'` exists so a user can force the free path and spend no
+  // credits — the URL-fetch tool is used in loops, and that has to be possible.
+  let contextDevNote = null;
+  if (input.prefer !== 'direct') {
+    const { hasContextDevKey, scrape } = await import('./context-dev.js');
+    if (hasContextDevKey()) {
+      try {
+        const scraped = await scrape(parsed.toString(), { maxChars });
+        if (scraped.text && scraped.text.trim().length > 40) {
+          return { ...scraped, via: 'context.dev' };
+        }
+        // Too thin to be real content — an empty SPA shell, most likely.
+        // Fall through rather than handing the model a near-empty page.
+        contextDevNote = { used: false, reason: 'returned too little content; used the direct fetch instead' };
+      } catch (e) {
+        contextDevNote = { used: false, reason: e?.message || String(e) };
+      }
+    }
+  }
+
+  const direct = await directFetch(parsed.toString(), maxChars);
+  return contextDevNote ? { ...direct, via: 'direct', contextDev: contextDevNote } : { ...direct, via: 'direct' };
+}
+
+/**
+ * Strategy 2: plain HTTP GET plus local extraction.
+ * Split out so the Context.dev path and the direct path are independently
+ * readable, and so the fallback is an explicit call rather than a `return`
+ * buried in a conditional.
+ */
+async function directFetch(urlString, maxChars) {
+  const res = await fetch(urlString, {
     signal: AbortSignal.timeout(TIMEOUT_MS),
     redirect: 'follow',
     headers: {
@@ -146,7 +194,7 @@ export async function fetchUrl(input = {}) {
     } catch {
       /* keep raw */
     }
-    return finish(parsed.toString(), '', text, maxChars);
+    return finish(urlString, '', text, maxChars);
   }
 
   const titleMatch = body.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
@@ -158,7 +206,7 @@ export async function fetchUrl(input = {}) {
     // JS-rendered). Retry against the whole cleaned body before giving up.
     text = htmlToText(body);
   }
-  return finish(parsed.toString(), title, text, maxChars);
+  return finish(urlString, title, text, maxChars);
 }
 
 function finish(url, title, text, maxChars) {

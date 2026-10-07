@@ -18,6 +18,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
+import { getTokenProvider, authSummary } from './mcp-oauth.js';
 
 const CLIENT_INFO = { name: 'sentinel-cli', version: '3.3.0' };
 
@@ -107,13 +108,17 @@ async function withTimeout(promise, ms, label) {
 
 async function openConnection(spec) {
   let transport;
+  let authProvider;
   if (spec.kind === 'stdio') {
     transport = new StdioClientTransport({
       command: spec.command,
       args: spec.args,
-      // Never inherit the parent's full env: a spawned MCP server should see
-      // only what it needs plus PATH. Explicit `env` entries are merged in.
-      env: { ...(spec.env || {}) },
+      // Pass the parent env plus explicit overrides. A fully empty env breaks
+      // child processes (no PATH, no SystemRoot on Windows, no HOME), so we
+      // inherit and layer rather than replacing. Server-specific secrets are
+      // declared under `env` in config and never read from the parent's
+      // process env implicitly by us.
+      env: { ...process.env, ...(spec.env || {}) },
       cwd: spec.cwd,
       stderr: 'ignore',
     });
@@ -122,8 +127,15 @@ async function openConnection(spec) {
       requestInit: spec.headers ? { headers: spec.headers } : undefined,
     });
   } else {
+    // Remote servers that require OAuth (the hosted Context.dev server is one)
+    // need an OAuthClientProvider, not a static header. It is resolved lazily:
+    // `getTokenProvider` returns undefined until the user has signed in, and an
+    // unauthenticated server still fails cleanly as "no tools" rather than
+    // throwing out of the connection.
+    authProvider = getTokenProvider(spec.name, spec.url);
     transport = new StreamableHTTPClientTransport(new URL(spec.url), {
-      requestInit: spec.headers ? { headers: spec.headers } : undefined,
+      ...(spec.headers || authProvider ? { requestInit: spec.headers ? { headers: spec.headers } : undefined } : {}),
+      ...(authProvider ? { authProvider } : {}),
     });
   }
 
@@ -135,7 +147,12 @@ async function openConnection(spec) {
 async function listServerTools(spec) {
   const client = await openConnection(spec);
   const { tools } = await withTimeout(client.listTools(), LIST_TIMEOUT_MS, `listTools "${spec.name}"`);
+  // Replace any prior connection for this server, closing it first. Rediscovery
+  // happens on every `refresh`, and a stdio server is a real child process —
+  // without this, repeated rediscovery leaks processes and open pipes.
+  const previous = connections.get(spec.name);
   connections.set(spec.name, { client, spec });
+  if (previous) await previous.client?.close?.().catch(() => {});
   return Array.isArray(tools) ? tools : [];
 }
 
@@ -352,4 +369,18 @@ export async function closeAll() {
 /** Introspection for `sentinel mcp status` and doctor. */
 export function activeConnections() {
   return [...connections.values()].map((c) => ({ name: c.spec.name, kind: c.spec.kind }));
+}
+
+/**
+ * Auth state per configured server, for `sentinel mcp-status`.
+ *
+ * Reported separately from connectivity because "needs sign-in" and
+ * "unreachable" look identical in a tool listing but need different user
+ * actions. Token values are never included.
+ */
+export function authStatus(mcpServers) {
+  return Object.entries(mcpServers || {})
+    .map(([name, raw]) => normalizeServerSpec(name, raw))
+    .filter((s) => s && !s.disabled && s.kind !== 'stdio')
+    .map((s) => authSummary(s.name));
 }

@@ -2,7 +2,7 @@ import type { CommandContext } from './types.js';
 import type { CommandHandler } from './types.js';
 
 import { handleCommit, handleDiff } from './git.js';
-import { handleHealth, handleHelp, handleMcp } from './system.js';
+import { handleHealth, handleHelp, handleMcp, handleContextDev } from './system.js';
 import { handleModels, handleModel } from './model-commands.js';
 import { handleUndo, handleRedo, handleExport, handleShare, handleSession } from './session-cmds.js';
 
@@ -17,6 +17,7 @@ export const registry: Record<string, CommandHandler> = {
   health: handleHealth,
   help: handleHelp,
   mcp: handleMcp,
+  contextdev: handleContextDev,
   models: handleModels,
   model: handleModel,
   undo: handleUndo,

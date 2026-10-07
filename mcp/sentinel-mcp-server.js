@@ -10,7 +10,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -25,12 +25,27 @@ const VERSION = (() => {
 
 const server = new McpServer({ name: 'sentinel-cli', version: VERSION });
 
+/**
+ * The project directory the agent should operate on.
+ *
+ * MCP clients spawn this process with cwd set to the *client's* cwd, which is
+ * usually the user's project — but `bin/sentinel.js` spawns it with cwd set to
+ * the SENTINEL install directory, which would point every agent turn at the
+ * package folder. SENTINEL_CWD is set by the CLI entry and wins; otherwise the
+ * inherited cwd is used as-is.
+ */
+function resolveWorkdir() {
+  const explicit = process.env.SENTINEL_CWD;
+  if (explicit && existsSync(explicit)) return explicit;
+  return process.cwd();
+}
+
 /** Collect the final text of an agent turn (REVIEW/PLAN modes are read-only). */
 async function collectAgentText(history, mode, model) {
   const { runAgentTurn } = await import('../src/agent/loop.js');
   let text = '';
   let error = null;
-  for await (const ev of runAgentTurn({ history, mode, model })) {
+  for await (const ev of runAgentTurn({ history, mode, model, workdir: resolveWorkdir() })) {
     if (ev.event === 'text') text += ev.data.delta;
     else if (ev.event === 'error') error = ev.data.message;
   }
@@ -89,6 +104,83 @@ server.tool(
       return { content: [{ type: 'text', text: error ? JSON.stringify({ error }) : text }] };
     } catch (err) {
       return { content: [{ type: 'text', text: JSON.stringify({ error: err.message }) }] };
+    }
+  }
+);
+
+server.tool(
+  'sentinel_search',
+  'Search the web and/or fetch a page for grounding. Uses the configured provider chain (Exa → Tavily → Brave → DuckDuckGo).',
+  {
+    query: z.string().optional().describe('Search query. Omit when only url is given.'),
+    url: z.string().optional().describe('Fetch this URL and return its readable text.'),
+    count: z.number().int().min(1).max(20).optional().describe('Number of search results (default 5).'),
+    maxChars: z.number().int().min(500).max(40000).optional().describe('Cap on fetched page text (default 8000).'),
+  },
+  async ({ query, url, count, maxChars }) => {
+    try {
+      const payload = {};
+      if (typeof query === 'string' && query.trim()) {
+        const { search } = await import('../src/shared/web-search.js');
+        const outcome = await search({ query, count });
+        payload.search = { provider: outcome.provider, results: outcome.results, errors: outcome.errors };
+      }
+      if (typeof url === 'string' && url.trim()) {
+        const { fetchUrl } = await import('../src/shared/fetch-url.js');
+        payload.page = await fetchUrl({ url, maxChars });
+      }
+      if (!Object.keys(payload).length) {
+        return { content: [{ type: 'text', text: JSON.stringify({ error: 'query or url is required' }) }], isError: true };
+      }
+      return { content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: 'text', text: JSON.stringify({ error: err.message }) }], isError: true };
+    }
+  }
+);
+
+server.tool(
+  'sentinel_skills',
+  'List installable/available skills that Sentinel can load, including skills installed by other assistants.',
+  {
+    query: z.string().optional().describe('Optional skill-name filter (substring match).'),
+  },
+  async ({ query }) => {
+    try {
+      const { listSkills } = await import('../src/agent/skills.js');
+      const cwd = resolveWorkdir();
+      let skills = listSkills(cwd);
+      if (typeof query === 'string' && query.trim()) {
+        const q = query.toLowerCase();
+        skills = skills.filter((s) => s.name.toLowerCase().includes(q));
+      }
+      return {
+        content: [{ type: 'text', text: JSON.stringify({ workdir: cwd, count: skills.length, skills }, null, 2) }],
+      };
+    } catch (err) {
+      return { content: [{ type: 'text', text: JSON.stringify({ error: err.message }) }], isError: true };
+    }
+  }
+);
+
+server.tool(
+  'sentinel_mcp_servers',
+  'List configured external MCP servers, their connection state, and the tools they expose to Sentinel.',
+  {},
+  async () => {
+    try {
+      const { configManager } = await import('../src/config/configManager.js');
+      await configManager.load();
+      const mcpServers = configManager.get('mcpServers', {}) || {};
+      const { buildToolRegistry, closeAll } = await import('../src/agent/mcp-client.js');
+      if (!Object.keys(mcpServers).length) {
+        return { content: [{ type: 'text', text: JSON.stringify({ configured: 0, servers: [], tools: [] }) }] };
+      }
+      const registry = await buildToolRegistry(mcpServers, { refresh: true });
+      await closeAll();
+      return { content: [{ type: 'text', text: JSON.stringify(registry, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: 'text', text: JSON.stringify({ error: err.message }) }], isError: true };
     }
   }
 );

@@ -44,6 +44,7 @@ const SLASH_COMMANDS: Array<{ name: string; description: string; args?: string }
   { name: 'thinking', description: 'Toggle reasoning block display' },
   { name: 'details',  description: 'Toggle tool detail display' },
   { name: 'mcp',      description: 'MCP server info and usage' },
+  { name: 'contextdev', description: 'Context.dev web-context status (key, providers, MCP sign-in)' },
   { name: 'goal',     description: 'Work until an evaluator confirms a condition', args: '<condition>' },
   { name: 'steer',    description: 'Redirect the running turn', args: '<message>' },
   { name: 'fork',     description: 'Branch this session' },

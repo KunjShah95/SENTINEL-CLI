@@ -30,7 +30,7 @@
 import { randomUUID } from 'node:crypto';
 import { createWorktree, removeWorktree, worktreePatch, applyPatchToRoot } from './worktree.js';
 import { isReadOnlyTool } from '../shared/schemas/mode.js';
-import { isShellTool, isFileTool } from '../shared/tool-taxonomy.js';
+import { isShellTool, isFileTool, isWebCommitTool } from '../shared/tool-taxonomy.js';
 import { classifyBashCommand } from './bash-validation.js';
 import { getWorkdir } from '../shared/tools/workdir.js';
 
@@ -102,7 +102,31 @@ export function taskPermission(policy, { isolated = false, leadAllowAll = null, 
     if (policy === PERMISSIONS.NONE) return 'deny';
 
     if (isReadOnlyTool(toolName) || toolName === 'sendMessage' || toolName === 'taskStatus') {
+      // `webRead` and `webProbe` are allowed here by virtue of being in
+      // `isReadOnlyTool`, which is correct: reading a page and resolving what a
+      // button does both change nothing. The commitment is `webAct`, which is
+      // not read-only and falls through to the rung ladder below.
       return 'allow';
+    }
+
+    if (isWebCommitTool(toolName)) {
+      // A rung that cannot write files cannot act on a third party's account.
+      //
+      // This is not a policy preference, it is the same reasoning as
+      // "destructive is denied at every rung": a `readonly` subagent exists to
+      // gather and report, and a browser commit is the one tool class with no
+      // checkpoint, no diff, and no rollback. Denying it at `readonly` is what
+      // makes `audit.js`'s Delegation class meaningful for browser work —
+      // without it, the recorded `rung` field would say `readonly` on a record
+      // whose effect was a sent message.
+      if (policy === PERMISSIONS.READONLY) return 'deny';
+      // Absorbing and external effects are denied at every rung below
+      // `inherit`. A teammate works in its own worktree; there is no worktree
+      // for "an email that was sent".
+      const rev = input?.effect?.reversibility;
+      if (rev === 'absorbing' || rev === 'external') return 'deny';
+      if (rev === undefined) return 'deny'; // no descriptor, no action
+      // fall through: reversible/compensable inherits like any other write
     }
 
     if (isShellTool(toolName)) {
@@ -144,7 +168,7 @@ export function taskPermission(policy, { isolated = false, leadAllowAll = null, 
 /** Describe a rung in one line. Used by `sentinel tasks`. */
 export function describePermission(policy) {
   switch (policy) {
-  case PERMISSIONS.READONLY: return 'read-only: files and read-only commands';
+  case PERMISSIONS.READONLY: return 'read-only: files, read-only commands, and page reads/probes — never a browser commit';
   case PERMISSIONS.TEAMMATE: return 'teammate: writes inside its own worktree, no destructive commands';
   case PERMISSIONS.NONE: return 'none: every tool call refused';
   case PERMISSIONS.INHERIT:

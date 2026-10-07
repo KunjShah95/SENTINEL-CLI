@@ -75,7 +75,63 @@ will be updated with the run log when it does.
 - `__tests__/swe-workflow.test.js`: 13 unit tests for the gates.
 - `__tests__/providers.test.js` (new): SSE flush, Gemini tool replay, Anthropic budget, adapter round-trips.
 
-## 5. Limitations (read before citing this file)
+## 5. Context cost — the per-model-call budget
+
+A turn is `model call → tools → model call → …`, up to 25 times in BUILD and 60
+in SWE. So anything in the request prefix is paid **per call**, not per turn.
+Reproduce: `npm run bench:context` (no API key, ~2s).
+
+### What the fixed prefix costs
+
+| Part | Before | After |
+|---|---:|---:|
+| Skill listing (208 skills installed) | 57.5k chars ≈ **14,375 tok** | 2.1k chars ≈ **529 tok** |
+| Whole system prompt | 59.3k chars ≈ **14,815 tok** | 3.9k chars ≈ **969 tok** |
+| Tool schemas | 7.6k chars ≈ 1,904 tok | unchanged |
+
+The skill listing was the bug: every installed skill's **full** description was
+injected, and that block was 96% of the system prompt. It is now capped
+(`SKILL_LISTING_CHAR_CAP = 2000`) and ranked by relevance to the request, with
+an explicit note naming how many skills were omitted and how to reach them —
+so a skill outside the budget is deferred, not lost.
+
+Prefix tokens billed per turn at the iteration ceiling:
+
+| Iterations | Tokens | @$3/M | @$10/M |
+|---|---:|---:|---:|
+| 25 (BUILD) | 71,825 | $0.22 | $0.72 |
+| 60 (SWE) | 172,380 | $0.52 | $1.72 |
+
+### Known gap: prefix caching is provider-specific
+
+Only some providers discount a repeated prefix. Sentinel sends
+`cache_control: ephemeral` for Anthropic; the table below is the honest state,
+not a claim.
+
+| Provider | `cache_control` sent | Prefix billed per iteration |
+|---|---|---|
+| anthropic, openai, github-copilot, google | yes | ~10% |
+| groq, mistral, deepseek, xai, openrouter, together, fireworks, perplexity | no | 100% |
+
+This is the largest remaining *cost* item and it is not fixable in Sentinel —
+it is a provider feature. The lever Sentinel does control is making the prefix
+small, which is what the table above does.
+
+### Loop CPU per model call
+
+| Work | Before | After |
+|---|---:|---:|
+| `trimMessagesForBudget` (60-round convo) | 94ms, 103 full `JSON.stringify` passes | 1.3ms |
+| Same, across a 60-iteration SWE turn | ~6.4s | ~0.1s |
+| Usage fallback (`estimateRequestTokens`) | full serialize every iteration | memoized; 0 passes on a hit |
+| `git rev-parse` for the env section | ~52ms subprocess per build | cached per dir |
+| System prompt assembly (warm) | rebuilt every turn | ~0.001ms |
+
+The trimming rewrite is verified **byte-identical** to the previous
+implementation across 20 size×budget combinations — the budget is unchanged,
+only the way it is measured changed.
+
+## 6. Limitations (read before citing this file)
 
 - SWE-mini tests *tools*, not *model reasoning*. A strong model + weak tools
   fails; strong tools + weak model also fails. Real score = tools × model × harness.
@@ -84,7 +140,7 @@ will be updated with the run log when it does.
 - Do not present SWE-mini 15/15 as "beats Claude Code". Present it as
   "has the tool prerequisites to be benchmarked fairly".
 
-## 6. Live bench: local models on the real agent loop (2026-09-30)
+## 7. Live bench: local models on the real agent loop (2026-09-30)
 
 Five planted-bug JavaScript tasks (`avg`, `sort`, `nullsafe`, `async`,
 `slug`), one BUILD-mode agent turn per model × task, tools auto-approved
