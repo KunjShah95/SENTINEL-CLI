@@ -20,7 +20,7 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { getTokenProvider, authSummary } from './mcp-oauth.js';
 
-const CLIENT_INFO = { name: 'sentinel-cli', version: '3.3.0' };
+const CLIENT_INFO = { name: 'sentinel-cli', version: '3.4.0' };
 
 const NAME_SEP = '__';
 const CONNECT_TIMEOUT_MS = 15_000;

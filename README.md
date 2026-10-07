@@ -703,6 +703,35 @@ npm run release:check  # all three
 
 ## Changelog
 
+### v3.4.0 — Context.dev web context + cheaper turns
+
+**New**
+- `searchWeb` / `fetchUrl` can now use Context.dev: it renders JavaScript and bypasses bot walls, so
+  client-rendered sites return real content instead of an empty app shell. Opt-in via `CONTEXT_DEV_API_KEY`;
+  with no key, search still falls back to DuckDuckGo (no account) and `fetchUrl` fetches directly.
+- `fetchUrl` gained `prefer: "direct"` to force the free local fetch and spend no credits.
+- The hosted Context.dev MCP server can be registered with your other assistants: `sentinel connect --mcp context`.
+  Writes only the URL — no secret is ever put into an assistant config.
+- `sentinel contextdev` — status of the integration: key presence (length only, never the value), available
+  search providers, MCP sign-in state, and `--check` / `--url` for a live probe.
+- `/contextdev` slash command in the TUI.
+- Sentinel's own MCP client now supports OAuth for remote servers (`mcp-oauth`): tokens stored 0600 under
+  `~/.sentinel/mcp-auth`, never in a repo or assistant config, with `--logout`.
+
+**Fixed / cheaper**
+- The skill listing was 96% of the system prompt — every installed skill's full description, re-sent on every
+  model call. It is now capped (`SKILL_LISTING_CHAR_CAP`) and ranked by relevance to the request. Measured on a
+  208-skill machine: 14,375 → ~529 tokens per iteration.
+- `trimMessagesForBudget` re-serialized the whole conversation inside two nested loops (103 full
+  `JSON.stringify` passes, ~94ms per model call). It is now incremental and byte-identical: ~1.3ms.
+- The usage fallback no longer serializes the full conversation on every iteration; it is memoized per turn.
+- `git rev-parse` for the environment section ran a subprocess per turn build (~52ms); it is now cached per
+  directory, and the assembled system prompt is memoized.
+- A bad/expired `CONTEXT_DEV_API_KEY` is reported as an auth problem, not as "no match".
+
+**Benchmarks**
+- `npm run bench:context` reproduces all of the above.
+
 ### v3.3.0 — `sentinel doctor`
 
 - `sentinel doctor` — pre-flight checks before the first turn: Node runtime (against the Node 20

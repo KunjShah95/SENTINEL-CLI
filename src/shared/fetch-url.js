@@ -178,7 +178,7 @@ async function directFetch(urlString, maxChars) {
     signal: AbortSignal.timeout(TIMEOUT_MS),
     redirect: 'follow',
     headers: {
-      'user-agent': 'Mozilla/5.0 (compatible; sentinel-cli/3.3.0; +https://github.com/KunjShah95/SENTINEL-CLI)',
+      'user-agent': 'Mozilla/5.0 (compatible; sentinel-cli/3.4.0; +https://github.com/KunjShah95/SENTINEL-CLI)',
       accept: 'text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8',
     },
   });
