@@ -19,9 +19,33 @@ import cursorAlt from "@/content/posts/cursor-alternative-cli";
 import filePermissions from "@/content/posts/ai-agent-file-permissions";
 import evaluateAgent from "@/content/posts/evaluate-coding-agent";
 import guardrails from "@/content/posts/ai-coding-agent-guardrails";
+import prOwlOverview from "@/content/posts/pr-owl-course-overview";
+import prOwlSkeleton from "@/content/posts/pr-owl-github-app-skeleton";
+import prOwlSignature from "@/content/posts/pr-owl-webhook-signature-verification";
+import prOwlPolicy from "@/content/posts/pr-owl-review-policy";
+import prOwlQueue from "@/content/posts/pr-owl-review-queue";
+import prOwlClone from "@/content/posts/pr-owl-clone-the-repo";
+import prOwlTask from "@/content/posts/pr-owl-review-as-a-task";
+import prOwlFork from "@/content/posts/pr-owl-fork-permission-rung";
+import prOwlDiff from "@/content/posts/pr-owl-diff-parser";
+import prOwlPost from "@/content/posts/pr-owl-post-the-review";
+import prOwlFailure from "@/content/posts/pr-owl-review-failure-modes";
+import prOwlShip from "@/content/posts/pr-owl-ship-it-or-not";
 
 /** Newest first. The blog index, the sitemap and the RSS feed all read this order. */
 export const posts: Post[] = [
+  prOwlShip,
+  prOwlFailure,
+  prOwlPost,
+  prOwlDiff,
+  prOwlFork,
+  prOwlTask,
+  prOwlClone,
+  prOwlQueue,
+  prOwlPolicy,
+  prOwlSignature,
+  prOwlSkeleton,
+  prOwlOverview,
   techLeadPitch,
   courseQuiz,
   blastRadiusGate,

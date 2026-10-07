@@ -48,7 +48,6 @@ export const DEFAULT_KEYBINDS = Object.freeze({
   'command.palette.show': 'ctrl+p',
   'help.show': 'ctrl+/',
   'theme.switch': null,
-  'sentinel.mode.toggle': 'ctrl+m',
   // Sentinel extra. opencode's `app.clear` (ctrl+l) is mini-only, so the chord
   // is free in the full TUI; this keeps the session log viewer reachable.
   'sentinel.logs': 'ctrl+l',

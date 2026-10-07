@@ -2,6 +2,26 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import { useTheme } from '../../providers/theme/index.js';
 
+/**
+ * The slash commands this build actually dispatches.
+ *
+ * Every entry below was verified against `screens/session.tsx` (the inline
+ * handlers) and `commands/index.ts` (the registry). The previous version of
+ * this file advertised 17 commands that exist nowhere — `/init`, `/review`,
+ * `/review-branch`, `/scan`, `/sast`, `/sarif`, `/vulndb`, `/trust`,
+ * `/feedback`, `/hooks`, `/loop`, `/agents`, `/background`, `/parallel`,
+ * `/wizard`, `/test`, `/dismiss` — and every one of them answered
+ * `Unknown command "…"` from session.tsx:298.
+ *
+ * A help dialog is a promise. Listing a command that does not work is worse
+ * than listing nothing, because the user finds out at the moment they needed
+ * it, by typing something the app told them to type.
+ *
+ * Note also that this list is still hand-maintained and therefore still able to
+ * drift from the registry. It is the third place command names live (the other
+ * two being session.tsx's dispatch and commands/index.ts); that is a known
+ * duplication, not a fixed one, and the fix is to derive this from the registry.
+ */
 const SECTIONS: Array<{ title: string; bindings: Array<{ keys: string; desc: string }> }> = [
   {
     title: 'Chat & Input',
@@ -14,9 +34,9 @@ const SECTIONS: Array<{ title: string; bindings: Array<{ keys: string; desc: str
       { keys: 'Ctrl+W', desc: 'Delete the previous word' },
       { keys: 'Tab', desc: 'Complete the highlighted autocomplete item' },
       { keys: 'Ctrl+P', desc: 'Command palette' },
-      { keys: 'Ctrl+M', desc: 'Toggle mode (BUILD/PLAN)' },
       { keys: '!<cmd>', desc: 'Run shell command' },
       { keys: '@<name>', desc: 'File/agent mention completion' },
+      { keys: '/steer <message>', desc: 'Redirect a turn that is already running' },
     ],
   },
   {
@@ -41,8 +61,6 @@ const SECTIONS: Array<{ title: string; bindings: Array<{ keys: string; desc: str
     bindings: [
       { keys: 'Ctrl+X', desc: 'Enter leader mode (1.5s timeout)' },
       { keys: 'Ctrl+P', desc: 'Command palette' },
-      { keys: 'Ctrl+M', desc: 'Toggle mode' },
-      { keys: 'Ctrl+B', desc: 'Background blocking session tools' },
       { keys: 'Ctrl+L', desc: 'Session log viewer' },
       { keys: 'Ctrl+/', desc: 'Show this help' },
       { keys: 'Esc', desc: 'Interrupt the turn / close a dialog' },
@@ -63,55 +81,42 @@ const SECTIONS: Array<{ title: string; bindings: Array<{ keys: string; desc: str
     title: 'Slash Commands',
     bindings: [
       { keys: '/model [id]', desc: 'Switch model (or open picker)' },
-      { keys: '/mode', desc: 'Toggle mode' },
+      { keys: '/mode [build|plan|review]', desc: 'Show or set the agent mode' },
       { keys: '/thinking', desc: 'Toggle thinking blocks' },
       { keys: '/details', desc: 'Toggle tool details' },
       { keys: '/clear', desc: 'Clear messages' },
       { keys: '/new', desc: 'Start new session' },
       { keys: '/setup', desc: 'AI provider setup' },
       { keys: '/compact', desc: 'Compact session' },
-      { keys: '/goal', desc: 'Work until condition verified' },
+      { keys: '/context', desc: 'Show the context / token breakdown' },
+      { keys: '/theme [name]', desc: 'Pick a theme' },
+      { keys: '/goal <condition>', desc: 'Work until the condition is verified' },
       { keys: '/fork', desc: 'Branch this session' },
-      { keys: '/steer', desc: 'Redirect a running turn' },
-      { keys: '/undo', desc: 'Undo last change' },
-      { keys: '/redo', desc: 'Redo last undo' },
       { keys: '/editor', desc: 'Open external $EDITOR' },
-      { keys: '/init', desc: 'Init project AGENTS.md' },
       { keys: '/health', desc: 'System health check' },
       { keys: '/models', desc: 'List all models' },
+      { keys: '/sessions', desc: 'Toggle the session panel' },
       { keys: '/session list|switch <id>|delete <id>', desc: 'Manage sessions' },
       { keys: '/share', desc: 'Share current session' },
+      { keys: '/export', desc: 'Export session to file' },
       { keys: '/help', desc: 'List slash commands' },
     ],
   },
   {
-    title: 'Review & Security',
+    title: 'Git',
     bindings: [
-      { keys: '/review [file]', desc: 'Review changes' },
-      { keys: '/review-branch <branch>', desc: 'Review branch diff' },
-      { keys: '/scan [path]', desc: 'Security scan' },
-      { keys: '/sast [path]', desc: 'Run SAST analyzers' },
-      { keys: '/sarif [path]', desc: 'Export SARIF report' },
-      { keys: '/vulndb [search|get|tags]', desc: 'Query vulnerability DB' },
-      { keys: '/trust [modelId]', desc: 'View model trust scores' },
-      { keys: '/feedback <id> accurate|fp', desc: 'Rate issue accuracy' },
-      { keys: '/hooks', desc: 'Install git pre-push hooks' },
+      { keys: '/commit', desc: 'Generate a commit message from staged changes' },
+      { keys: '/diff [--staged|branch|file]', desc: 'Show git diff' },
+      { keys: '/undo', desc: 'Undo last change' },
+      { keys: '/redo', desc: 'Redo last undo' },
     ],
   },
   {
-    title: 'Advanced',
+    title: 'Also available',
     bindings: [
-      { keys: '/loop <prompt>', desc: 'Auto-iterate until DONE' },
-      { keys: '/agents', desc: 'List background agents' },
-      { keys: '/background <prompt>', desc: 'Launch background agent' },
-      { keys: '/parallel', desc: 'Parallel specialist review' },
-      { keys: '/commit', desc: 'Generate commit message' },
-      { keys: '/wizard', desc: 'Multi-step analysis wizard' },
-      { keys: '/diff [--staged|branch|file]', desc: 'Show git diff' },
-      { keys: '/test <file>', desc: 'Generate unit tests' },
-      { keys: '/export', desc: 'Export session to file' },
-      { keys: '/context', desc: 'Show/create context file' },
-      { keys: '/dismiss <file:line:rule> [reason]', desc: 'Dismiss finding' },
+      { keys: '/mcp', desc: 'MCP server status' },
+      { keys: '/<custom>', desc: 'Any command in .sentinel/commands/' },
+      { keys: '/<template>', desc: 'Any prompt template in .sentinel/prompts/' },
     ],
   },
 ];
@@ -128,14 +133,11 @@ export function HelpDialog() {
           {section.bindings.map(({ keys, desc }) => (
             <Box key={keys} flexDirection="row" gap={2} marginLeft={1}>
               <Text color={colors.info} bold>{keys.padEnd(28)}</Text>
-              <Text dimColor>{desc}</Text>
+              <Text color={colors.textSecondary} dimColor>{desc}</Text>
             </Box>
           ))}
         </Box>
       ))}
-      <Box flexDirection="row" gap={2} marginTop={1}>
-        <Text dimColor>↑↓ navigate  Esc close</Text>
-      </Box>
     </Box>
   );
 }

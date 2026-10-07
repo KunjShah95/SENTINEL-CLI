@@ -26,7 +26,17 @@ export const MIN_NODE_MAJOR = 20;
 /** Severity levels. Only `fail` makes the command exit non-zero; see runDoctor. */
 export const LEVELS = Object.freeze(['pass', 'warn', 'fail', 'skip']);
 
-/** Provider env var per registry key. Kept beside the checks, not in config, so the mapping is auditable. */
+/**
+ * Provider env var(s) per registry key.
+ *
+ * A value may be an array when a provider is reachable under more than one
+ * name. Copilot is the case that forced it: `/setup` writes `GITHUB_TOKEN`
+ * (provider-setup.tsx) and `discovery.js:261` reads `GITHUB_TOKEN ||
+ * GITHUB_COPILOT_TOKEN`, but this table listed only `GITHUB_COPILOT_TOKEN` — so
+ * a user who had run `/setup` successfully was told by `sentinel doctor` that
+ * they had no key. Seven copies of this mapping existed and two had already
+ * drifted; the alternative to this fix was a seventh.
+ */
 export const PROVIDER_ENV = Object.freeze({
   openai: 'OPENAI_API_KEY',
   anthropic: 'ANTHROPIC_API_KEY',
@@ -39,8 +49,15 @@ export const PROVIDER_ENV = Object.freeze({
   together: 'TOGETHER_API_KEY',
   fireworks: 'FIREWORKS_API_KEY',
   perplexity: 'PERPLEXITY_API_KEY',
-  'github-copilot': 'GITHUB_COPILOT_TOKEN',
+  'github-copilot': ['GITHUB_TOKEN', 'GITHUB_COPILOT_TOKEN'],
 });
+
+/** Every var name for a provider, as an array. The single place callers ask. */
+export function providerEnvVars(provider) {
+  const v = PROVIDER_ENV[provider];
+  if (!v) return [];
+  return Array.isArray(v) ? v : [v];
+}
 
 /** Local model servers need no key, so they get their own probe. */
 export const LOCAL_HOSTS = Object.freeze({
@@ -137,19 +154,25 @@ export function checkWorkdir(cwd = getWorkdir()) {
  * provider and variable names are ever surfaced, never the values.
  */
 export function checkProviders(env = process.env, configured = []) {
-  const present = Object.entries(PROVIDER_ENV)
-    .filter(([, varName]) => {
-      const v = env[varName];
-      return typeof v === 'string' && v.trim().length > 0;
+  // The first var name that is actually set is the one reported, so the output
+  // names the variable the user's shell really has rather than the table's
+  // preference. Both count as present.
+  const present = Object.keys(PROVIDER_ENV)
+    .map((provider) => {
+      const varName = providerEnvVars(provider).find((n) => {
+        const v = env[n];
+        return typeof v === 'string' && v.trim().length > 0;
+      });
+      return varName ? { provider, varName } : null;
     })
-    .map(([provider, varName]) => ({ provider, varName }));
+    .filter(Boolean);
 
   // Saved in config but not exported: still a working provider. Unknown ids are
   // ignored so a stale or hand-edited config cannot make this pass.
   const stored = Array.from(new Set(configured))
     .filter((provider) => PROVIDER_ENV[provider])
     .filter((provider) => !present.some((p) => p.provider === provider))
-    .map((provider) => ({ provider, varName: PROVIDER_ENV[provider] }));
+    .map((provider) => ({ provider, varName: providerEnvVars(provider)[0] }));
 
   const found = [...present, ...stored];
 

@@ -19,6 +19,14 @@ type ModelPickerDialogProps = {
   onSelect: (modelId: string) => void;
 };
 
+/** Registry IDs are normally `provider/model`, but keep this defensive for
+ * providers that return an unqualified ID. The picker owns the provider badge,
+ * so printing the full ID beside it would duplicate the prefix. */
+export function modelDisplayName(model: Pick<ModelEntry, 'id' | 'provider'>): string {
+  const prefix = `${model.provider}/`;
+  return model.id.startsWith(prefix) ? model.id.slice(prefix.length) : model.id;
+}
+
 export function ModelPickerDialog({ currentModel, onSelect }: ModelPickerDialogProps) {
   const { colors } = useTheme();
   const { close } = useDialog();
@@ -161,7 +169,7 @@ export function ModelPickerDialog({ currentModel, onSelect }: ModelPickerDialogP
                   {m.provider}/
                 </Text>
                 <Text bold={isSelected} color={isSelected ? colors.selection : undefined}>
-                  {m.id}
+                  {modelDisplayName(m)}
                 </Text>
                 <Text dimColor>
                   {m.thinking ? '🧠' : ''}{priceStr}

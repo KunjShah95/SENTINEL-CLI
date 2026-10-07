@@ -1,20 +1,21 @@
 /**
- * Session chrome:
- *   ActivityLine — MiniMax Code shell/activity-line.ts: spinner · phase ·
- *                  elapsed (revealed after 1.5s) · output tok/s · controls.
- *   TodoPanel    — MiniMax Code shell/todo-panel.ts: live task list above
- *                  the prompt while the agent works.
- *   Footer       — opencode routes/session/footer.tsx: directory left,
- *                  status items right, plus a MiniMax capacity meter.
- *   Home         — opencode routes/home.tsx: centered two-tone logo, prompt,
- *                  and a rotating tip line (MiniMax shell/tips.ts).
+ * Session chrome, matched to the two CLIs this TUI copies:
+ *   Home         — MiniMax shell/welcome: ANSI-shadow wordmark, rounded frame,
+ *                  "Tips for getting started" and "What's new".
+ *   ActivityLine — MiniMax shell/activity-line.ts: spinner, phase, elapsed
+ *                  (after 1.5s), tok/s, then `enter steer · esc stop`.
+ *   TodoPanel    — MiniMax shell/todo-panel.ts: ✓ / ● / ○ rows and a
+ *                  "n/m done · p pending" summary.
+ *   Footer       — opencode session footer: directory left, status right,
+ *                  with MiniMax's context meter and model.
+ *   Composer     — lives in input-bar.tsx (MiniMax box + opencode meta row).
  */
 import React, { useEffect, useState } from "react";
 import { Box, Text, useStdout } from "ink";
 import os from "node:os";
 import { execFileSync } from "node:child_process";
 import { useTheme } from "../../providers/theme/index.js";
-import { CapacityBar, formatDuration } from "./primitives.js";
+import { CapacityBar, formatDuration, shortModelName } from "./primitives.js";
 
 const FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 const ELAPSED_REVEAL_AFTER_MS = 1_500;
@@ -23,10 +24,10 @@ export type ActivityPhase = "idle" | "running" | "waiting" | "compacting" | "sto
 
 const PHASE_LABEL: Record<ActivityPhase, string> = {
   idle: "",
-  running: "Working",
-  waiting: "Waiting for background work",
+  running: "Running",
+  waiting: "Waiting",
   compacting: "Compacting context",
-  stopping: "Stopping",
+  stopping: "Stopping response",
 };
 
 export function ActivityLine({
@@ -53,17 +54,15 @@ export function ActivityLine({
   const elapsed = startedAt ? now - startedAt : 0;
   const secs = elapsed / 1000;
   const tps = secs > 1 && outputChars > 0 ? Math.round(outputChars / 4 / secs) : 0;
+  const tone = phase === "stopping" ? colors.error : colors.primary;
   return (
-    <Box flexDirection="row" justifyContent="space-between" paddingLeft={1} paddingRight={1} width="100%">
+    <Box paddingLeft={2} width="100%">
       <Text>
-        <Text color={colors.primary}>{FRAMES[frame]} </Text>
-        <Text color={colors.text}>{PHASE_LABEL[phase]}</Text>
-        {elapsed >= ELAPSED_REVEAL_AFTER_MS ? <Text color={colors.textMuted}>{` · ${formatDuration(elapsed)}`}</Text> : null}
-        {tps > 0 ? <Text color={colors.textMuted}>{` · ~${tps} tok/s`}</Text> : null}
-      </Text>
-      <Text color={colors.textMuted}>
-        <Text color={colors.text}>enter</Text>{" steer · "}
-        <Text color={colors.text}>esc</Text>{" stop"}
+        <Text color={tone} bold>{FRAMES[frame]} </Text>
+        <Text color={tone} bold>{PHASE_LABEL[phase]}</Text>
+        {elapsed >= ELAPSED_REVEAL_AFTER_MS ? <Text color={colors.textMuted}>{` ${formatDuration(elapsed)}`}</Text> : null}
+        {tps > 0 ? <Text color={colors.secondary}>{` · ⚡ ~${tps} tok/s`}</Text> : null}
+        <Text color={colors.textMuted}>{" · enter steer · esc stop"}</Text>
       </Text>
     </Box>
   );
@@ -90,23 +89,52 @@ export function useTodos(active: boolean): Todo[] {
   return todos;
 }
 
-export function TodoPanel({ todos, max = 6 }: { todos: Todo[]; max?: number }) {
+function todoMarker(status: string): { mark: string; tone: "done" | "active" | "pending" | "skip" } {
+  if (status === "completed" || status === "done") return { mark: "✓", tone: "done" };
+  if (status === "in_progress") return { mark: "●", tone: "active" };
+  if (status === "cancelled") return { mark: "–", tone: "skip" };
+  return { mark: "○", tone: "pending" };
+}
+
+/** MiniMax compact todo list: marker rows, then "n/m done · p pending". */
+export function TodoPanel({ todos, max = 3 }: { todos: Todo[]; max?: number }) {
   const { colors } = useTheme();
-  const open = todos.filter((t) => t.status !== "completed" && t.status !== "done" && t.status !== "cancelled");
-  if (!todos.length || !open.length) return null;
-  const done = todos.length - open.length;
-  const shown = todos.filter((t) => t.status === "in_progress").concat(open.filter((t) => t.status !== "in_progress")).slice(0, max);
+  if (!todos.length) return null;
+  const done = todos.filter((t) => t.status === "completed" || t.status === "done").length;
+  if (done === todos.length) {
+    return (
+      <Box paddingLeft={2} marginTop={1}>
+        <Text color={colors.success}>{`✓ Todo list ${done}/${todos.length} completed`}</Text>
+      </Box>
+    );
+  }
+  const pending = todos.filter((t) => t.status === "pending" || !t.status).length;
+  const active = todos.filter((t) => t.status === "in_progress");
+  const rest = todos.filter((t) => t.status !== "in_progress");
+  const shown = active.concat(rest).slice(0, max);
+  const hidden = todos.length - shown.length;
   return (
-    <Box flexDirection="column" paddingLeft={1} marginTop={1}>
+    <Box flexDirection="column" paddingLeft={2} marginTop={1}>
+      {shown.map((t) => {
+        const { mark, tone } = todoMarker(t.status);
+        const color = tone === "active" ? colors.primary : tone === "pending" ? colors.text : colors.textMuted;
+        return (
+          <Text key={t.id} wrap="truncate-end">
+            <Text color={tone === "done" ? colors.success : tone === "active" ? colors.primary : colors.textMuted}>{mark}</Text>
+            <Text
+              color={color}
+              strikethrough={tone === "done" || tone === "skip"}
+              bold={tone === "active"}
+            >
+              {` ${t.title}`}
+            </Text>
+          </Text>
+        );
+      })}
       <Text color={colors.textMuted}>
-        {"Todos "}<Text color={colors.text}>{`${done}/${todos.length}`}</Text>
+        {hidden > 0 ? `… +${hidden} more · ` : ""}
+        {`${done}/${todos.length} done · ${pending} pending`}
       </Text>
-      {shown.map((t) => (
-        <Text key={t.id} color={t.status === "in_progress" ? colors.warning : colors.textMuted} wrap="truncate-end">
-          {t.status === "in_progress" ? "[•] " : "[ ] "}{t.title}
-        </Text>
-      ))}
-      {open.length > max ? <Text color={colors.textMuted}>{`  … ${open.length - max} more`}</Text> : null}
     </Box>
   );
 }
@@ -143,6 +171,7 @@ export function Footer({
   background = 0,
   microSaved = 0,
   scroll = 0,
+  model,
 }: {
   contextRatio?: number;
   costUsd?: number;
@@ -151,46 +180,80 @@ export function Footer({
   microSaved?: number;
   /** Lines the transcript is scrolled up from the live edge. */
   scroll?: number;
+  model?: string;
 }) {
   const { colors } = useTheme();
   const dir = useDirectoryLabel();
   const { stdout } = useStdout();
   const columns = stdout?.columns || 100;
+  const { name: modelName } = shortModelName(model);
+  const right = [
+    teammates > 0 ? `◆ ${teammates} teammate${teammates > 1 ? "s" : ""}` : "",
+    background > 0 ? `& ${background} bg` : "",
+    modelName,
+    microSaved > 0 ? `⌫ ${(microSaved / 1000).toFixed(1)}k` : "",
+    costUsd ? `$${costUsd < 0.01 ? costUsd.toFixed(4) : costUsd.toFixed(2)}` : "",
+    "ctrl+p",
+  ].filter(Boolean).join("  ");
+  const dirWidth = Math.max(16, Math.floor(columns * 0.34));
   return (
-    <Box flexDirection="row" justifyContent="space-between" paddingLeft={1} paddingRight={1} flexShrink={0} width="100%">
-      <Box flexGrow={1} flexShrink={1} minWidth={0} marginRight={2}>
-        <Text color={colors.textMuted}>{middleEllipsis(dir, Math.max(12, Math.floor(columns * 0.45)))}</Text>
+    <Box flexDirection="row" paddingLeft={1} paddingRight={1} flexShrink={0} width="100%">
+      <Box width={dirWidth} flexShrink={0} marginRight={1}>
+        <Text color={colors.textMuted} wrap="truncate-end">{middleEllipsis(dir, dirWidth)}</Text>
       </Box>
-      <Box flexDirection="row" gap={2} flexShrink={0}>
-        {teammates > 0 ? <Text color={colors.text}><Text color={colors.accent}>◆</Text>{` ${teammates} teammate${teammates > 1 ? "s" : ""}`}</Text> : null}
-        {scroll > 0 ? <Text color={colors.warning}>{`⇅ ${scroll}↑`}</Text> : null}
-        {background > 0 ? <Text color={colors.text}><Text color={colors.warning}>&</Text>{` ${background} bg`}</Text> : null}
-        {microSaved > 0 ? <Text color={colors.textMuted}>{`⌫ ${(microSaved / 1000).toFixed(1)}k`}</Text> : null}
-        {contextRatio !== undefined ? (
-          <Text color={colors.textMuted}>
-            <CapacityBar ratio={contextRatio} width={10} />{` ${Math.round(contextRatio * 100)}%`}
-          </Text>
-        ) : null}
-        {costUsd ? <Text color={colors.textMuted}>{`$${costUsd < 0.01 ? costUsd.toFixed(4) : costUsd.toFixed(2)}`}</Text> : null}
-        <Text color={colors.textMuted}>ctrl+p</Text>
+      {scroll > 0 ? (
+        // Its own Box, outside the truncating cluster.
+        //
+        // `truncate-start` elides from the LEFT, so an indicator sitting inside
+        // that cluster is the first thing cut on a narrow terminal. That is the
+        // worst possible element to lose: it is the only thing telling you the
+        // transcript is parked above the live edge, and without it a parked view
+        // is indistinguishable from a stalled one. Everything to its right (model,
+        // cost, token bar) degrades gracefully when clipped; this does not.
+        <Box flexShrink={0} marginRight={1}>
+          <Text color={colors.warning}>{`⇅ ${scroll}↑`}</Text>
+        </Box>
+      ) : null}
+      <Box flexGrow={1} justifyContent="flex-end" minWidth={0}>
+        <Text wrap="truncate-start" color={colors.textMuted}>
+          {right}
+          {contextRatio !== undefined ? (
+            <Text color={colors.textMuted}>
+              {"  "}
+              <CapacityBar ratio={contextRatio} width={10} />
+              {` ${Math.round(contextRatio * 100)}%`}
+            </Text>
+          ) : null}
+        </Text>
       </Box>
     </Box>
   );
 }
 
-/** Two-tone block logo in opencode's style (left muted, right bright). */
-export const LOGO = {
-  left: [
-    "█▀▀▀ █▀▀▀ █▀▀▄ ▀█▀",
-    "▀▀▀█ █▀▀  █  █  █ ",
-    "▀▀▀▀ ▀▀▀▀ ▀  ▀  ▀ ",
-  ],
-  right: [
-    "█ █▀▀▄ █▀▀▀ █   ",
-    "█ █  █ █▀▀  █   ",
-    "▀ ▀  ▀ ▀▀▀▀ ▀▀▀▀",
-  ],
-};
+/**
+ * ANSI Shadow "SENTINEL", the same face MiniMax Code uses for its wordmark.
+ * Lines are equal width so the gradient rows stay aligned.
+ */
+export const WORDMARK = [
+  "███████╗███████╗███╗   ██╗████████╗██╗███╗   ██╗███████╗██╗     ",
+  "██╔════╝██╔════╝████╗  ██║╚══██╔══╝██║████╗  ██║██╔════╝██║     ",
+  "███████╗█████╗  ██╔██╗ ██║   ██║   ██║██╔██╗ ██║█████╗  ██║     ",
+  "╚════██║██╔══╝  ██║╚██╗██║   ██║   ██║██║╚██╗██║██╔══╝  ██║     ",
+  "███████║███████╗██║ ╚████║   ██║   ██║██║ ╚████║███████╗███████╗",
+  "╚══════╝╚══════╝╚═╝  ╚═══╝   ╚═╝   ╚═╝╚═╝  ╚═══╝╚══════╝╚══════╝",
+];
+
+const WELCOME_TIPS = [
+  "Say what you want and how to verify it.",
+  "Use @ for files and / for commands.",
+  "/goal keeps long-running work on a finish line.",
+];
+
+const WELCOME_NEWS = [
+  "Type while a turn runs to steer it.",
+  "/context shows the current context budget.",
+  "/fork branches this conversation.",
+];
 
 export const TIPS = [
   "/goal keeps multi-step work focused on a finish line",
@@ -221,12 +284,45 @@ export function Tip() {
 
 export function Logo() {
   const { colors } = useTheme();
+  const { stdout } = useStdout();
+  const columns = stdout?.columns || 100;
+  const gradient = [colors.secondary, colors.secondary, colors.primary, colors.primary, colors.textMuted, colors.textMuted];
+  if (columns < WORDMARK[0].length + 4) {
+    return <Text bold color={colors.primary}>SENTINEL</Text>;
+  }
   return (
-    <Box flexDirection="column">
-      {LOGO.left.map((l, i) => (
-        <Text key={i}>
-          <Text color={colors.textMuted}>{l}</Text>
-          <Text color={colors.text} bold>{` ${LOGO.right[i]}`}</Text>
+    <Box flexDirection="column" alignItems="center" width="100%">
+      {WORDMARK.map((line, i) => (
+        <Text key={i} bold color={gradient[i]}>{line}</Text>
+      ))}
+    </Box>
+  );
+}
+
+/** MiniMax welcome frame: version, tips, and a short what's-new list. */
+export function WelcomeFrame({ version }: { version?: string }) {
+  const { colors } = useTheme();
+  return (
+    <Box flexDirection="column" borderStyle="round" borderColor={colors.border} paddingX={1} width="100%">
+      <Box flexDirection="row" justifyContent="space-between">
+        <Text color={colors.textMuted}>{version ? `v${version}` : "sentinel"}</Text>
+        <Text color={colors.success}>● Ready</Text>
+      </Box>
+      <Box marginTop={1}>
+        <Text bold color={colors.primary}>Tips for getting started</Text>
+      </Box>
+      {WELCOME_TIPS.map((tip) => (
+        <Text key={tip}>
+          <Text bold color={colors.secondary}>› </Text>
+          <Text color={colors.text}>{tip}</Text>
+        </Text>
+      ))}
+      <Box marginTop={1} borderStyle="single" borderTop borderBottom={false} borderLeft={false} borderRight={false} borderColor={colors.border} />
+      <Text bold color={colors.primary}>{"What's new"}</Text>
+      {WELCOME_NEWS.map((item) => (
+        <Text key={item}>
+          <Text bold color={colors.secondary}>› </Text>
+          <Text color={colors.text}>{item}</Text>
         </Text>
       ))}
     </Box>
@@ -234,14 +330,18 @@ export function Logo() {
 }
 
 export function Home({ version }: { version?: string }) {
-  const { colors } = useTheme();
   return (
-    <Box flexDirection="column" alignItems="center" flexGrow={1} justifyContent="center" paddingY={2}>
+    <Box flexDirection="column" width="100%" paddingY={1} alignItems="center">
       <Logo />
-      <Box marginTop={1}>
-        <Text color={colors.textMuted}>{`the minimal coding agent${version ? ` · v${version}` : ""}`}</Text>
+      <Box marginTop={1} width="100%">
+        <WelcomeFrame version={version} />
       </Box>
-      <Box marginTop={2}><Tip /></Box>
     </Box>
   );
+}
+
+/** Composer tip, rotated on the same 30s buckets MiniMax uses. */
+export function composerTip(now = Date.now()): string {
+  const bucket = Math.floor(now / 30_000);
+  return `Tip: ${TIPS[((bucket % TIPS.length) + TIPS.length) % TIPS.length]}`;
 }

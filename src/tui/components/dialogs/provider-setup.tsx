@@ -20,7 +20,13 @@ const PROVIDERS: ProviderDef[] = [
   { id: 'groq', name: 'Groq (Free Tier)', envKey: 'GROQ_API_KEY', keyUrl: 'https://console.groq.com/keys', keyPrefix: 'gsk_', isLocal: false, isFree: true, defaultModel: 'openai/gpt-oss-20b', docs: 'Free GPT-OSS / Qwen / Llama models — default provider' },
   { id: 'openai', name: 'OpenAI / ChatGPT', envKey: 'OPENAI_API_KEY', keyUrl: 'https://platform.openai.com/api-keys', keyPrefix: 'sk-', isLocal: false, isFree: false, defaultModel: 'gpt-4o-mini', docs: 'ChatGPT Plus/Pro users get API credits included' },
   { id: 'anthropic', name: 'Anthropic / Claude', envKey: 'ANTHROPIC_API_KEY', keyUrl: 'https://console.anthropic.com/settings/keys', keyPrefix: 'sk-ant-', isLocal: false, isFree: false, defaultModel: 'claude-sonnet-4-6', docs: 'Claude Pro/Max/Team users get API credits included' },
-  { id: 'gemini', name: 'Google Gemini', envKey: 'GEMINI_API_KEY', keyUrl: 'https://aistudio.google.com/apikey', keyPrefix: 'AIza', isLocal: false, isFree: true, defaultModel: 'gemini-2.0-flash', docs: 'Free tier available from Google AI Studio' },
+  // `id` is the REGISTRY key, not a display name: it is passed to
+  // configManager.setApiKey / getApiKey and matched against
+  // SupportedProvider. It was 'gemini' here while the registry says 'google'
+  // (models/index.js:21, providers.js:487, doctor.js), so /setup saved the key
+  // under config.providers.gemini and every reader looked under
+  // config.providers.google — a saved Gemini key that no provider could find.
+  { id: 'google', name: 'Google Gemini', envKey: 'GEMINI_API_KEY', keyUrl: 'https://aistudio.google.com/apikey', keyPrefix: 'AIza', isLocal: false, isFree: true, defaultModel: 'gemini-2.0-flash', docs: 'Free tier available from Google AI Studio' },
   { id: 'github-copilot', name: 'GitHub Copilot', envKey: 'GITHUB_TOKEN', keyUrl: 'https://github.com/settings/tokens', keyPrefix: 'ghp_', isLocal: false, isFree: false, defaultModel: 'copilot/gpt-4o', docs: 'Uses your GitHub Copilot subscription' },
   { id: 'mistral', name: 'Mistral AI', envKey: 'MISTRAL_API_KEY', keyUrl: 'https://console.mistral.ai/api-keys', keyPrefix: '', isLocal: false, isFree: true, defaultModel: 'mistral-small-latest', docs: 'Free tier available (Mistral Small)' },
   { id: 'deepseek', name: 'DeepSeek', envKey: 'DEEPSEEK_API_KEY', keyUrl: 'https://platform.deepseek.com', keyPrefix: 'sk-', isLocal: false, isFree: true, defaultModel: 'deepseek-chat', docs: 'Very affordable, excellent reasoning models' },

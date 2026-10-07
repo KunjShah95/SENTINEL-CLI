@@ -9,10 +9,30 @@
  */
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, resolve, basename } from 'node:path';
+import { homedir } from 'node:os';
 
-export function skillDirs(cwd = process.cwd()) {
+export function skillDirs(cwd = process.cwd(), { includeGlobal = true } = {}) {
   const dir = resolve(cwd);
-  return [join(dir, '.sentinel', 'skills'), join(dir, '.claude', 'skills')];
+  const home = homedir();
+  // skills.sh and the major coding assistants use the same SKILL.md format,
+  // but not the same install directory. Read all of the conventional project
+  // and global locations so one installed skill is available to Sentinel
+  // without copying it into `.sentinel/skills`.
+  const projectDirs = [
+    join(dir, '.sentinel', 'skills'),
+    join(dir, '.claude', 'skills'),
+    join(dir, '.codex', 'skills'),
+    join(dir, '.agents', 'skills'),
+    join(dir, '.opencode', 'skills'),
+  ];
+  const globalDirs = [
+    join(home, '.sentinel', 'skills'),
+    join(home, '.claude', 'skills'),
+    join(home, '.codex', 'skills'),
+    join(home, '.agents', 'skills'),
+    join(home, '.opencode', 'skills'),
+  ];
+  return [...new Set(includeGlobal ? [...projectDirs, ...globalDirs] : projectDirs)];
 }
 
 function parseSkillFile(file) {
@@ -43,10 +63,10 @@ function parseSkillFile(file) {
   return { name, description, body, file };
 }
 
-export function listSkills(cwd = process.cwd()) {
+export function listSkills(cwd = process.cwd(), options = {}) {
   const out = [];
   const seen = new Set();
-  for (const dir of skillDirs(cwd)) {
+  for (const dir of skillDirs(cwd, options)) {
     if (!existsSync(dir)) continue;
     let entries;
     try {
@@ -68,8 +88,8 @@ export function listSkills(cwd = process.cwd()) {
   return out;
 }
 
-export function getSkillPrompt(name, cwd = process.cwd()) {
-  for (const dir of skillDirs(cwd)) {
+export function getSkillPrompt(name, cwd = process.cwd(), options = {}) {
+  for (const dir of skillDirs(cwd, options)) {
     const direct = join(dir, name, 'SKILL.md');
     if (existsSync(direct)) {
       const skill = parseSkillFile(direct);
@@ -92,8 +112,8 @@ export function getSkillPrompt(name, cwd = process.cwd()) {
 }
 
 /** One-line-per-skill listing for system-prompt injection (cheap). */
-export function formatSkillListing(cwd = process.cwd()) {
-  const skills = listSkills(cwd);
+export function formatSkillListing(cwd = process.cwd(), options = {}) {
+  const skills = listSkills(cwd, options);
   if (skills.length === 0) return '';
   const lines = skills.map((s) => `- ${s.name}: ${s.description}`);
   return `Available skills (invoke with the skill tool BEFORE handling the request yourself):\n${lines.join('\n')}`;

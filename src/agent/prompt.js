@@ -32,8 +32,8 @@ export function buildProjectContextSection(dir = process.cwd()) {
   return buildContextInjection(loadContextFiles(dir));
 }
 
-export function buildSkillListingSection(dir = process.cwd()) {
-  return formatSkillListing(dir);
+export function buildSkillListingSection(dir = process.cwd(), options = {}) {
+  return formatSkillListing(dir, options);
 }
 
 function buildModeSection(mode) {
@@ -76,14 +76,19 @@ function buildModeSection(mode) {
     toolsLine:
       'Available tools: readFile, listDirectory, glob, grep, codeMap, writeFile, editFile, ' +
       'batchEdit, bash, runTests, applyPatch, searchWeb, diffFile, undoLastChange, redoLastUndo, ' +
-      'todoWrite, todoRead, skill, spawnAgent, memoryWrite, memoryDelete, bgRun, bgCheck, ' +
-      'spawnTeammate, sendMessage, teamStatus, teamMerge.',
+      'todoWrite, todoRead, skill, task, memoryWrite, memoryDelete.',
     rules: [
       'If a bash command fails due to a missing package, install it and retry.',
       'For multi-step work, track progress with todoWrite (send the FULL list every call).',
-      'Delegate bounded research subtasks with spawnAgent; it returns a summary, not a transcript.',
-      'Run long commands (full test suites, builds, servers) with bgRun and keep working; results arrive as <notifications>.',
-      'For large parallelizable work, propose a small team and wait for the user to confirm before spawnTeammate; use isolation="worktree" when teammates edit overlapping areas, then review with teamMerge action="diff" and apply or discard.',
+      'Use the single `task` tool for ALL concurrent work, with an action: ' +
+      'action="spawn" delegates a bounded research subtask and returns its summary; ' +
+      'action="run" starts a long command (test suite, build, server) and its result arrives as a notification; ' +
+      'action="status" lists what is running; ' +
+      'action="merge" with merge="diff"|"apply"|"discard" brings a worktree teammate\'s work home. ' +
+      'Never start a task you do not intend to wait for: use "spawn" when you need the answer now and ' +
+      '"spawn-async"/"run" when you can keep working. ' +
+      'For large parallelizable work, propose a small team and wait for the user to confirm before ' +
+      'action="spawn-async"; use isolation="worktree" when teammates edit overlapping areas.',
       'Save only durable, non-obvious facts with memoryWrite (user preferences, feedback, project constraints).',
     ],
   };

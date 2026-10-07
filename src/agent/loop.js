@@ -20,8 +20,10 @@ import { isReadOnlyTool, isToolAllowedInMode } from '../shared/schemas/mode.js';
 import { SWE_MAX_ITERATIONS } from './swe.js';
 import { runInWorkdir, getWorkdir } from '../shared/tools/workdir.js';
 import { classifyBashCommand } from './bash-validation.js';
+import { recordGrant, recordDispatch } from './audit-trail.js';
 import { drain, hasPending, waitForMail, formatNotifications } from './mailbox.js';
 import { startBackground, checkBackground, listBackground } from './background.js';
+import { createTask, awaitTask, cancelTask, getTask, PERMISSIONS } from './task.js';
 import { spawnTeammate, sendTeamMessage, listTeam, mergeTeammate } from './team.js';
 import { evaluateGoal, GOAL_MAX_CHECKS, GOAL_WORKER_RULE } from './goal.js';
 import { workerBrief, contractBrief } from './outcome.js';
@@ -38,7 +40,7 @@ const TOOL_RESULT_CAP = 20000;
 const SWE_TOOL_RESULT_CAP = 30000;
 
 /** JSON Schema per tool (providers require JSON Schema, not Zod). */
-const TOOL_PARAM_SCHEMAS = {
+export const TOOL_PARAM_SCHEMAS = {
   readFile: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'] },
   listDirectory: { type: 'object', properties: { path: { type: 'string' } } },
   glob: { type: 'object', properties: { pattern: { type: 'string' } }, required: ['pattern'] },
@@ -170,6 +172,37 @@ const TOOL_PARAM_SCHEMAS = {
     required: ['command'],
   },
   bgCheck: { type: 'object', properties: { id: { type: 'string' } } },
+
+  /**
+   * The unified task tool.
+   *
+   * `action` is required and enumerated because the whole point is that the
+   * model does not have to guess between six names. The properties are a union
+   * on purpose — JSON Schema `oneOf` is poorly supported across providers, and
+   * an optional-everything schema is more robust than a strict one that gets
+   * rejected. The handler validates per action and says what is missing.
+   */
+  task: {
+    type: 'object',
+    properties: {
+      action: {
+        type: 'string',
+        enum: ['spawn', 'spawn-async', 'run', 'status', 'check', 'merge', 'cancel', 'message'],
+        description: 'What to do. "spawn" waits for the result; "spawn-async" reports back later.',
+      },
+      prompt: { type: 'string', description: 'Required for spawn and spawn-async.' },
+      mode: { type: 'string', enum: ['BUILD', 'PLAN'], description: 'For spawn/spawn-async. Defaults to PLAN then BUILD.' },
+      name: { type: 'string', description: 'Teammate name, for spawn-async and merge.' },
+      isolation: { type: 'string', enum: ['none', 'worktree'], description: 'For spawn-async.' },
+      command: { type: 'string', description: 'Required for run.' },
+      timeout: { type: 'integer', description: 'Seconds, for run.' },
+      id: { type: 'string', description: 'For check and cancel.' },
+      to: { type: 'string', description: 'For message. Use "lead" to reach the lead.' },
+      text: { type: 'string', description: 'For message.' },
+      merge: { type: 'string', enum: ['diff', 'apply', 'discard'], description: 'For merge.' },
+    },
+    required: ['action'],
+  },
   spawnTeammate: {
     type: 'object',
     properties: {
@@ -200,13 +233,69 @@ const TOOL_PARAM_SCHEMAS = {
  * Tools the loop executes itself because they need loop context (agent
  * name, workdir, model, stream seam) rather than a plain input -> output.
  */
-export const HARNESS_TOOLS = new Set(['spawnAgent', 'bgRun', 'bgCheck', 'spawnTeammate', 'sendMessage', 'teamStatus', 'teamMerge']);
+export const HARNESS_TOOLS = new Set([
+  // The unified tool.
+  'task',
+  // Legacy names, still dispatched identically. A trajectory recorded with them
+  // has to keep replaying, and a model that learned one last session still works.
+  'spawnAgent', 'bgRun', 'bgCheck', 'spawnTeammate', 'sendMessage', 'teamStatus', 'teamMerge',
+]);
 
-/** Build provider tool definitions from the shared contracts + schemas. */
+/**
+ * `task` action -> the legacy tool it is.
+ *
+ * This table is the compatibility layer stated as data. Each action maps onto
+ * exactly one of the old dispatch cases, so there is one behaviour to test
+ * rather than two implementations to keep in agreement. `spawn` is the exception
+ * and is handled in place, because it is the only one that waits for its result
+ * and was never a member of this set.
+ */
+export const TASK_ACTIONS = Object.freeze({
+  'spawn-async': 'spawnTeammate',
+  run: 'bgRun',
+  status: 'teamStatus',
+  check: 'bgCheck',
+  merge: 'teamMerge',
+  cancel: null, // cancelTask, not a legacy tool
+  message: 'sendMessage',
+});
+
+/** Normalise a `task` call into a legacy tool call, or return null if unhandled. */
+export function normalizeTaskCall(input) {
+  const action = String(input?.action || '');
+  if (action === 'spawn') return null; // handled by the caller: it awaits
+  if (action === 'cancel') return null;
+  const legacy = TASK_ACTIONS[action];
+  if (!legacy) return undefined; // an unknown action
+  const tc = { name: legacy, input: { ...input } };
+  delete tc.input.action;
+  // `task` calls `merge`; the legacy tool calls the field `action`.
+  if (action === 'merge') {
+    tc.input.action = input.merge || input.action_ || 'diff';
+    delete tc.input.merge;
+  }
+  if (action === 'spawn-async') tc.input.name = input.name || '';
+  return tc;
+}
+
+/**
+ * Build provider tool definitions from the shared contracts + schemas.
+ *
+ * The legacy concurrency names are filtered OUT here even though their
+ * contracts and dispatch still exist. That split is the whole point: a
+ * trajectory recorded last week replays (the dispatch is untouched), but the
+ * model is only ever shown one tool for concurrent work. Showing both would
+ * leave the model to choose between seven spellings, which is the problem.
+ */
+export const LEGACY_TASK_TOOLS = Object.freeze([
+  'spawnAgent', 'bgRun', 'bgCheck', 'spawnTeammate', 'sendMessage', 'teamStatus', 'teamMerge',
+]);
+
 export function buildProviderTools(mode) {
   const contracts = getToolContracts(mode);
   return Object.entries(contracts)
     .filter(([name]) => TOOL_PARAM_SCHEMAS[name])
+    .filter(([name]) => !LEGACY_TASK_TOOLS.includes(name))
     .map(([name, contract]) => ({
       type: 'function',
       function: {
@@ -368,6 +457,8 @@ export async function* runAgentTurnInner(opts = {}) {
     engagement,
     maxCostUsd = Number(process.env.SENTINEL_MAX_COST_USD) || 0,
     routeModel = process.env.SENTINEL_ROUTE_MODEL || undefined,
+    runId = null,
+    rung = null,
   } = opts;
   const workdir = opts.workdir || getWorkdir();
 
@@ -650,6 +741,9 @@ export async function* runAgentTurnInner(opts = {}) {
         agentName,
         workdir,
         headless: !onPermissionRequest,
+        runId,
+        rung,
+        parentTaskId: opts.parentTaskId || null,
       },
       subagentState: { disabled: subagentDepth >= 1 },
       editCounts,
@@ -805,8 +899,28 @@ export function loopHint(editCounts) {
  * Execute one tool call: hooks → permission → subagent-or-local → audit.
  * Extracted so batching shares one path. Returns { output, stopBlocked }.
  */
-async function executeOneTool({ tc, mode, opts, subagentState, editCounts, gateState }) {
+async function executeOneTool({ tc: rawTc, mode, opts, subagentState, editCounts, gateState }) {
+  // `let`, because the unified `task` tool is rewritten into its legacy
+  // equivalent below and the rest of this function reads `tc` throughout.
+  let tc = rawTc;
   const { onPermissionRequest, allowAll, createStream, model, subagentDepth = 0, agentName, workdir, headless } = opts;
+  const parentTaskId = opts.parentTaskId || null;
+  const auditCtx = {
+    runId: opts.runId ?? null,
+    agent: agentName,
+    taskId: parentTaskId,
+    // The task one level up. Resolved from the registry now, while it still
+    // exists: the auditor reads this file later, long after the in-memory
+    // registry that could have answered the question is gone.
+    parentTaskId: parentTaskId ? (getTask(parentTaskId)?.parent ?? null) : null,
+    rung: opts.rung ?? null,
+    workdir,
+  };
+  // The tool name as the model asked for it. `task` is rewritten into a legacy
+  // name below, and the auditor has to see both: a translation that dispatched
+  // a different tool than was granted is exactly the Tool-class gap.
+  const requestedTool = tc.name;
+  let granted = false;
 
   if (!isToolAllowedInMode(tc.name, mode)) {
     return { output: { error: `Tool ${tc.name} is not available in ${mode} mode` } };
@@ -852,6 +966,23 @@ async function executeOneTool({ tc, mode, opts, subagentState, editCounts, gateS
     permission = await onPermissionRequest(tc.name, tc.id, { ...(tc.input || {}), __risk: risk ? explainRisk(risk) : undefined });
   }
   if (permission === 'deny') return { output: { error: 'User denied permission' } };
+
+  // Grant side of the binding, recorded before anything executes. Written here
+  // rather than next to `auditToolUse` because everything above can return
+  // early — and an early return is not a gap, it is a call that never ran.
+  if (permission !== 'deny') {
+    recordGrant({
+      ...auditCtx,
+      toolCallId: tc.id,
+      tool: requestedTool,
+      input: tc.input,
+      decision: permission ?? 'no-prompt',
+      risk: risk?.level ?? null,
+      mode,
+    });
+    granted = true;
+  }
+
   if (permission === 'allow-session') {
     if (bashCheck?.destructive || risk?.level === 'red') {
       // A red command is never promoted to a session grant, even when the
@@ -862,6 +993,29 @@ async function executeOneTool({ tc, mode, opts, subagentState, editCounts, gateS
     } else {
       allowAll.add(tc.name);
     }
+  }
+
+  // The unified `task` tool: translate to a legacy call and take the same path.
+  // A shape mismatch becomes an error the model can read and correct, which is
+  // better than silently defaulting a merge to "diff".
+  if (tc.name === 'task') {
+    const legacy = normalizeTaskCall(tc.input);
+    if (legacy === undefined) {
+      const known = Object.keys(TASK_ACTIONS).concat(['spawn']).join(', ');
+      return { output: { error: `unknown task action "${tc.input?.action}". Expected one of: ${known}` } };
+    }
+    if (legacy === null && String(tc.input?.action) === 'cancel') {
+      const id = String(tc.input?.id || '');
+      const ok = cancelTask(id, 'cancelled by the agent');
+      if (granted) recordDispatch({ ...auditCtx, toolCallId: rawTc.id, tool: 'task', input: tc.input, ok });
+      return { output: { cancelled: ok, id, hint: ok ? null : `no running task with id ${id}` } };
+    }
+    if (legacy === null) {
+      const out = await spawnSubagentTask(tc.input, { agentName, workdir, model, createStream, subagentDepth, subagentState, parentTaskId, runId: auditCtx.runId });
+      recordDispatch({ ...auditCtx, toolCallId: rawTc.id, tool: tc.name, input: tc.input, ok: !out?.output?.error, error: out?.output?.error ?? null });
+      return { output: out.output };
+    }
+    tc = { name: legacy.name, input: legacy.input };
   }
 
   if (HARNESS_TOOLS.has(tc.name) && tc.name !== 'spawnAgent') {
@@ -879,39 +1033,20 @@ async function executeOneTool({ tc, mode, opts, subagentState, editCounts, gateS
       output = { error: e?.message || String(e) };
     }
     auditToolUse({ toolName: tc.name, ok: !output?.error, cwd: workdir });
+    if (granted) recordDispatch({ ...auditCtx, toolCallId: rawTc.id, tool: tc.name, input: tc.input, ok: !output?.error });
     return { output };
   }
 
-  // Subagent: same loop, fresh messages, restricted tools, depth ≤ 1.
+  // Subagent: same loop, fresh messages, read-only, depth ≤ 1.
+  //
+  // Previously this was an inline `onPermissionRequest: async () => 'deny'`,
+  // which is the `readonly` rung written out by hand in the one place that
+  // needed it. It is now the same rung the rest of the system uses, and the
+  // depth limit is enforced by the primitive rather than restated here.
   if (tc.name === 'spawnAgent') {
-    if (subagentDepth >= 1) {
-      return { output: { error: 'Subagents cannot spawn further subagents (depth limit 1).' } };
-    }
-    if (subagentState.disabled) {
-      return { output: { error: 'spawnAgent is not available in this context.' } };
-    }
-    const subPrompt = String(tc.input?.prompt || '');
-    const subMode = tc.input?.mode === 'BUILD' ? 'BUILD' : 'PLAN';
-    let text = '';
-    try {
-      for await (const ev of runAgentTurnInner({
-        history: [{ id: `sub_${Date.now()}`, role: 'user', parts: [{ type: 'text', text: subPrompt }] }],
-        mode: subMode,
-        model: model,
-        createStream,
-        trajectory: false,
-        subagentDepth: subagentDepth + 1,
-        workdir,
-        agentName: `${agentName}/sub`,
-        onPermissionRequest: async () => 'deny',
-      })) {
-        if (ev.event === 'text') text += ev.data.delta;
-        else if (ev.event === 'error') text += `\n[subagent error: ${ev.data.message}]`;
-      }
-    } catch (e) {
-      return { output: { error: `Subagent failed: ${e?.message || String(e)}` } };
-    }
-    return { output: { summary: text.slice(0, 8000) || '(subagent returned no text)' } };
+    const out = await spawnSubagentTask(tc.input, { agentName, workdir, model, createStream, subagentDepth, subagentState, parentTaskId });
+    if (granted) recordDispatch({ ...auditCtx, toolCallId: rawTc.id, tool: tc.name, input: tc.input, ok: !out?.output?.error });
+    return out;
   }
 
   let output;
@@ -928,6 +1063,16 @@ async function executeOneTool({ tc, mode, opts, subagentState, editCounts, gateS
     output = { ...output, warnings: bashCheck.warnings };
   }
   auditToolUse({ toolName: tc.name, ok: !output?.error, cwd: workdir });
+  if (granted) {
+    recordDispatch({
+      ...auditCtx,
+      toolCallId: rawTc.id,
+      tool: tc.name,
+      input: tc.input,
+      ok: !output?.error,
+      error: output?.error ?? null,
+    });
+  }
   runHooks('postToolUse', { toolName: tc.name, output, mode }).catch(() => {});
   return { output };
 }
@@ -941,6 +1086,79 @@ export function lastUserText(history = []) {
     return (m.parts || []).filter((p) => p.type === 'text').map((p) => p.text).join('\n');
   }
   return '';
+}
+
+/**
+ * Start a subagent and WAIT for it.
+ *
+ * The only tool that is not fire-and-forget: the caller wants the summary now,
+ * not a notification later. Shared by the legacy `spawnAgent` name and the
+ * unified `task` action "spawn", so the two cannot drift.
+ */
+async function spawnSubagentTask(input, { agentName, workdir, model, createStream, subagentDepth = 0, subagentState, parentTaskId = null, runId = null }) {
+  if (subagentState?.disabled) {
+    return { output: { error: 'a subagent is not available in this context (depth limit 1). Do the work inline.' } };
+  }
+  const subPrompt = String(input?.prompt || '');
+  if (!subPrompt.trim()) return { output: { error: 'prompt is required' } };
+  const subMode = input?.mode === 'BUILD' ? 'BUILD' : 'PLAN';
+
+  const { id, task, rejected } = createTask({
+    kind: 'agent',
+    prompt: subPrompt,
+    mode: subMode,
+    model,
+    parent: parentTaskId,
+    // A subagent researches and reports; it does not edit. BUILD mode is
+    // preserved because it changes which read-oriented tools are offered,
+    // not what the agent is allowed to do with the filesystem.
+    permission: PERMISSIONS.READONLY,
+    cwd: workdir,
+    depthSeed: subagentDepth,
+    // `taskId` comes from the run context, not the outer `id` binding: `createTask`
+    // starts the body synchronously, so referencing the outer const here reads it
+    // before its initializer has finished — a TDZ error, and one that only shows
+    // up when a subagent is actually spawned.
+    run: async ({ id: taskId, permission, signal }) => {
+      let text = '';
+      for await (const ev of runAgentTurnInner({
+        history: [{ id: `sub_${Date.now()}`, role: 'user', parts: [{ type: 'text', text: subPrompt }] }],
+        mode: subMode,
+        model: model,
+        createStream,
+        trajectory: false,
+        subagentDepth: subagentDepth + 1,
+        workdir,
+        agentName: `${agentName}/sub`,
+        signal,
+        onPermissionRequest: permission,
+        rung: PERMISSIONS.READONLY,
+        runId,
+        // Which task this turn's calls belong to. executeOneTool reads it to
+        // attribute each record, and without it the subagent's calls are
+        // recorded as unattributed — leaving the Delegation class no parent to
+        // compare against.
+        parentTaskId: taskId,
+      })) {
+        if (ev.event === 'text') text += ev.data.delta;
+        else if (ev.event === 'error') text += `\n[subagent error: ${ev.data.message}]`;
+      }
+      return { summary: text.slice(0, 8000) || '(subagent returned no text)' };
+    },
+  });
+
+  if (rejected) return { output: { error: rejected } };
+  // Unlike a teammate, a subagent is awaited: the caller wants its summary
+  // now, not a notification later.
+  const finished = await awaitTask(id);
+  if (finished.status === 'failed') {
+    return { output: { error: `Subagent failed: ${finished.error || 'unknown error'}` } };
+  }
+  if (finished.status === 'cancelled') {
+    return { output: { error: 'Subagent was cancelled.' } };
+  }
+  void task;
+  return { output: finished.result || { summary: '(subagent returned no text)' } };
 }
 
 /** Dispatch loop-context tools (background, team). */
@@ -996,7 +1214,12 @@ export async function* runAgentTurn(opts = {}) {
     return;
   }
   const runId = typeof opts.trajectory === 'string' ? opts.trajectory : newRunId();
-  yield* withTrajectory(runAgentTurnInner(opts), {
+  // The audit trail is keyed by the same run id as the trajectory, so
+  // `sentinel audit <runId>` and `sentinel replay <runId>` describe one run.
+  // Without this the audit file would be named `adhoc_*` while the trajectory
+  // kept the real id, and joining the two — the only reason to record both —
+  // would need a guess.
+  yield* withTrajectory(runAgentTurnInner({ ...opts, runId }), {
     runId,
     model: opts.model,
     mode: opts.mode,

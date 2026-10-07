@@ -71,7 +71,7 @@ describe('compileKeybinds', () => {
     assert.equal(leader, 'ctrl+x');
     assert.equal(app.get('ctrl+p'), 'command.palette.show');
     assert.equal(app.get('escape'), 'session.interrupt');
-    assert.equal(app.get('ctrl+m'), 'sentinel.mode.toggle');
+    assert.equal(app.get('ctrl+m'), undefined);
   });
 
   it('splits app and prompt tables so a chord can mean different things', () => {

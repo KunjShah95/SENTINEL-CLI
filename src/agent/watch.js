@@ -20,16 +20,23 @@
  * The engagement budget is the natural ceiling for a standing loop: it is
  * checked before every tick, which is the one guard this feature cannot do
  * without.
+ *
+ * Each tick is a `task.js` task, so a standing watcher is visible in
+ * `sentinel tasks`, counts against the same concurrency cap as everything else,
+ * and can be cancelled mid-turn. The judgement stays here: only watch knows what
+ * counts as progress.
  */
 import { execFileSync } from 'node:child_process';
-import { appendFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { getWorkdir } from '../shared/tools/workdir.js';
+import { relativeStatePath, ensureStateDir } from '../utils/state-dir.js';
 import { budgetStatus } from './budget.js';
+import { createTask, awaitTask, PERMISSIONS } from './task.js';
 
 export const WATCH_VERSION = '1';
-export const STATE_PATH = '.sentinel/watch-state.json';
-export const STEER_PATH = '.sentinel/steer.jsonl';
+export const STATE_PATH = relativeStatePath('watch-state.json');
+export const STEER_PATH = relativeStatePath('steer.jsonl');
 
 /** Give up after this many consecutive ticks that make no progress. */
 export const MAX_UNPRODUCTIVE = 5;
@@ -72,7 +79,7 @@ export function readWatchState(cwd = getWorkdir()) {
 
 export function writeWatchState(state, cwd = getWorkdir()) {
   const doc = { ...createWatchState(), ...state, version: WATCH_VERSION };
-  mkdirSync(join(cwd, '.sentinel'), { recursive: true });
+  ensureStateDir(cwd);
   writeFileSync(stateFile(cwd), JSON.stringify(doc, null, 2), 'utf-8');
   return doc;
 }
@@ -202,7 +209,7 @@ export function shouldStop(state, { maxTicks = 0, maxUnproductive = MAX_UNPRODUC
 export function steer(text, cwd = getWorkdir()) {
   const t = String(text || '').trim();
   if (!t) throw new Error('steering text is required');
-  mkdirSync(join(cwd, '.sentinel'), { recursive: true });
+  ensureStateDir(cwd);
   appendFileSync(steerFile(cwd), JSON.stringify({ ts: new Date().toISOString(), text: t }) + '\n', 'utf-8');
   return t;
 }
@@ -266,7 +273,16 @@ export async function runWatcher({
   baseDelayMs = 60_000,
   signal,
   agentName = 'watch',
-  permission = true,
+  /**
+   * The operator's own permission callback for a tick, or undefined for
+   * headless (nobody to prompt).
+   *
+   * This used to be a parameter named `permission` defaulting to `true`, which
+   * was wrong twice over: `cli/main.js` passes `onPermissionRequest`, so the
+   * value it supplied was silently dropped, and the `true` default would have
+   * been called as a function the moment anything actually used it.
+   */
+  onPermissionRequest,
 }) {
   if (!String(task || '').trim()) throw new Error('watch needs a task');
   if (typeof runTurn !== 'function') throw new Error('watch needs a runTurn generator');
@@ -315,27 +331,71 @@ export async function runWatcher({
     const tick = { index: state.ticks + 1, fired, steering: steering.map((s) => s.text), at: new Date().toISOString() };
     let progressed = false;
     let text = '';
-    try {
-      for await (const ev of runTurn({
-        history: [{ id: `watch_${state.ticks + 1}_${Date.now()}`, role: 'user', parts: [{ type: 'text', text: turnTask }] }],
-        mode: 'BUILD',
-        goal,
-        outcome,
-        createStream,
-        agentName,
-        workdir: cwd,
-        engagement: true,
-        onPermissionRequest: permission,
-      })) {
-        if (ev.event === 'text') text += ev.data.delta;
-        if (ev.event === 'goal' && ev.data?.ok) progressed = true;
-        if (ev.event === 'finish') tick.costUsd = ev.data?.costUsd;
-        onEvent({ type: 'agent', event: ev });
+    // A tick is a task. Same primitive as a teammate or a race candidate: it
+    // gets an id, a registry entry, a cancellation path and a budget-counted
+    // place in the concurrency cap. What stays here is watch's own judgement —
+    // whether the tick made progress — which is the whole point of the feature.
+    const { id: tickId, rejected } = createTask({
+      kind: 'agent',
+      name: `watch-${state.ticks + 1}`,
+      owner: 'watch',
+      prompt: turnTask,
+      mode: 'BUILD',
+      permission: PERMISSIONS.INHERIT,
+      isolation: 'none',
+      cwd,
+      meta: { tick: state.ticks + 1, fired, steering: steering.length, headless: !onPermissionRequest },
+      run: async ({ signal: tickSignal }) => {
+        try {
+          for await (const ev of runTurn({
+            history: [{ id: `watch_${state.ticks + 1}_${Date.now()}`, role: 'user', parts: [{ type: 'text', text: turnTask }] }],
+            mode: 'BUILD',
+            goal,
+            outcome,
+            createStream,
+            agentName,
+            workdir: cwd,
+            engagement: true,
+            // The watcher's own signal, so `sentinel tasks --cancel` reaches a
+            // tick in flight rather than only the loop between ticks.
+            signal: tickSignal,
+            onPermissionRequest,
+          })) {
+            if (ev.event === 'text') text += ev.data.delta;
+            if (ev.event === 'goal' && ev.data?.ok) progressed = true;
+            if (ev.event === 'finish') tick.costUsd = ev.data?.costUsd;
+            onEvent({ type: 'agent', event: ev });
+          }
+        } catch (e) {
+          tick.error = String(e?.message || e);
+          onEvent({ type: 'error', text: tick.error });
+        }
+        return { summary: text, progressed, costUsd: tick.costUsd ?? 0 };
+      },
+    });
+
+    if (rejected) {
+      // Refused admission is not a crash: a watcher that is already running the
+      // configured number of ticks should say so and back off, not throw.
+      tick.error = rejected;
+      tick.progressed = false;
+      tick.summary = '';
+      tick.rejected = true;
+      ticks.push(tick);
+      state.ticks++;
+      state.consecutiveUnproductive++;
+      state.lastTickAt = tick.at;
+      onEvent({ type: 'tick-end', tick, delay: nextDelay(state.consecutiveUnproductive, baseDelayMs) });
+      if (shouldStop(state, { maxTicks, maxUnproductive })) {
+        onEvent({ type: 'stop', text: `stopping: ${tick.error}` });
+        return { reason: 'no-progress', state, ticks };
       }
-    } catch (e) {
-      tick.error = String(e?.message || e);
-      onEvent({ type: 'error', text: tick.error });
+      await sleep(nextDelay(state.consecutiveUnproductive, baseDelayMs));
+      continue;
     }
+
+    await awaitTask(tickId);
+    void tickId;
 
     // "Progress" is deliberately weak: the goal was met, or the agent wrote
     // something. A tick that only read files has not moved the engagement, and

@@ -22,9 +22,9 @@
  * It fails closed: a missing or corrupt ledger is `yellow`, never `green`.
  * An approving ledger that does not exist is not consent.
  */
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { getWorkdir } from '../shared/tools/workdir.js';
+import { relativeStatePath, statePath, ensureStateDir } from '../utils/state-dir.js';
 import { classifyBashCommand, splitSegments } from './bash-validation.js';
 
 export const LEDGER_VERSION = '1';
@@ -33,10 +33,10 @@ export const RISK_LEVELS = Object.freeze(['green', 'yellow', 'red']);
 /** How many distinct shapes a ledger remembers before the oldest are dropped. */
 export const LEDGER_MAX_SHAPES = 200;
 
-export const LEDGER_PATH = '.sentinel/risk.json';
+export const LEDGER_PATH = relativeStatePath('risk.json');
 
 export function ledgerFile(cwd = getWorkdir()) {
-  return join(cwd, '.sentinel', 'risk.json');
+  return statePath('risk.json', cwd);
 }
 
 /**
@@ -141,7 +141,7 @@ export function writeLedger(ledger, cwd = getWorkdir()) {
     .sort((a, b) => (b[1]?.at || 0) - (a[1]?.at || 0))
     .slice(0, LEDGER_MAX_SHAPES);
   const doc = { version: LEDGER_VERSION, shapes: Object.fromEntries(entries) };
-  mkdirSync(join(cwd, '.sentinel'), { recursive: true });
+  ensureStateDir(cwd);
   writeFileSync(ledgerFile(cwd), JSON.stringify(doc, null, 2), 'utf-8');
   return doc;
 }

@@ -8,14 +8,10 @@ type Mode = 'BUILD' | 'PLAN' | 'REVIEW' | 'SCAN' | 'FIX';
 type Props = {
   children: ReactNode;
   onSubmit: (value: string) => void;
-  onCommand?: (command: string) => void;
-  onSlashCommand?: () => void;
   onShellCommand?: (command: string) => void;
   inputDisabled?: boolean;
   loading?: boolean;
   mode?: Mode;
-  onModeToggle?: () => void;
-  onCommandPalette?: () => void;
   model?: string;
   statusText?: string;
   sessionId?: string;
@@ -72,14 +68,10 @@ function useHarnessCounts(active: boolean) {
 export function SessionShell({
   children,
   onSubmit,
-  onCommand,
-  onSlashCommand,
   onShellCommand,
   inputDisabled = false,
   loading = false,
   mode = 'BUILD',
-  onModeToggle,
-  onCommandPalette,
   model,
   tokenUsage,
   microcompactSaved,
@@ -135,13 +127,9 @@ export function SessionShell({
           model={model}
           busy={loading}
           onSubmit={submitAndReset}
-          onCommand={onCommand}
-          onSlashCommand={onSlashCommand}
           onShellCommand={onShellCommand}
           disabled={inputDisabled}
           mode={mode}
-          onModeToggle={onModeToggle}
-          onCommandPalette={onCommandPalette}
         />
       </Box>
 
@@ -153,6 +141,7 @@ export function SessionShell({
           background={background}
           microSaved={microcompactSaved}
           scroll={scrollFromBottom}
+          model={model}
         />
       </Box>
     </Box>

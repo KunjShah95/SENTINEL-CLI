@@ -986,6 +986,34 @@ export const buildToolContracts = Object.freeze({
     description: 'Bring a finished worktree teammate\'s work home: action "diff" to review its patch, "apply" to apply it to the main tree (undoable) and remove the worktree, "discard" to throw it away.',
     inputSchema: toolInputSchemas.teamMerge,
   },
+
+  /**
+   * The one tool for concurrent work.
+   *
+   * Six names used to do this — spawnAgent, spawnTeammate, bgRun, bgCheck,
+   * teamStatus, teamMerge, plus sendMessage — and the model had to learn which of
+   * them to reach for. They were all the same primitive with different
+   * arguments, so they are now one tool with an `action`.
+   *
+   * The six legacy names are still accepted, unchanged and undeprecated in
+   * behaviour, because a transcript recorded with them must still replay. What
+   * changed is what the model is *shown*: one tool and one description. That is
+   * the part that changes model behaviour, and it is why this is a prompt change
+   * rather than a refactor.
+   */
+  task: {
+    description:
+      'Start and manage concurrent work. Actions: ' +
+      '"spawn" starts a subagent (prompt, mode) and WAITS for its summary; ' +
+      '"spawn-async" starts one that reports back later (name, prompt, mode, isolation); ' +
+      '"run" starts a shell command in the background (command, timeout); ' +
+      '"status" lists running and finished work; ' +
+      '"check" reads one background command\'s output (id); ' +
+      '"merge" brings a finished worktree teammate home (name, action: diff|apply|discard); ' +
+      '"cancel" stops one (id); ' +
+      '"message" sends a note to a teammate (to, text).',
+    inputSchema: toolInputSchemas.task,
+  },
 });
 
 export function getToolContracts(mode) {

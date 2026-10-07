@@ -128,7 +128,10 @@ export function PromptInput({ value, onChange, onSubmit, onHistory, placeholder 
       onChange(state.current.value);
       return;
     }
-    if (action === 'input.submit' && key.return) {
+    // Ink normally sets `key.return`; a few terminal streams (and the
+    // headless TUI probe) supply only the raw carriage-return byte.
+    if ((action === 'input.submit' || key.return || input === '\r' || input === '\n') &&
+        !key.shift && !key.ctrl && !(key as { alt?: boolean }).alt && !key.meta) {
       onSubmit(state.current.value);
       return;
     }

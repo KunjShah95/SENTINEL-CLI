@@ -17,13 +17,14 @@
  * The spend log is append-only JSONL for the same reason trajectories are:
  * it survives a crash mid-write, and it can be tailed without loading it all.
  */
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { getWorkdir } from '../shared/tools/workdir.js';
+import { relativeStatePath, ensureStateDir } from '../utils/state-dir.js';
 
 export const BUDGET_VERSION = '1';
-export const BUDGET_PATH = '.sentinel/budget.json';
-export const SPEND_PATH = '.sentinel/spend.jsonl';
+export const BUDGET_PATH = relativeStatePath('budget.json');
+export const SPEND_PATH = relativeStatePath('spend.jsonl');
 
 export function budgetFile(cwd = getWorkdir()) {
   return join(cwd, BUDGET_PATH);
@@ -79,7 +80,7 @@ export function writeBudget(budget, cwd = getWorkdir()) {
     stopCondition: budget.stopCondition ? String(budget.stopCondition) : null,
     startedAt: budget.startedAt || new Date().toISOString(),
   };
-  mkdirSync(join(cwd, '.sentinel'), { recursive: true });
+  ensureStateDir(cwd);
   writeFileSync(budgetFile(cwd), JSON.stringify(clean, null, 2), 'utf-8');
   return clean;
 }
@@ -92,7 +93,7 @@ export function clearBudget(cwd = getWorkdir()) {
 /** Append one completed turn's spend. Best-effort: never break a turn over it. */
 export function recordSpend({ usd = 0, inputTokens = 0, outputTokens = 0, model, runId, prompt }, cwd = getWorkdir()) {
   try {
-    mkdirSync(join(cwd, '.sentinel'), { recursive: true });
+    ensureStateDir(cwd);
     appendFileSync(spendFile(cwd), JSON.stringify({
       ts: new Date().toISOString(),
       usd: Number(usd) || 0,

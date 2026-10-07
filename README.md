@@ -82,6 +82,16 @@ CLI consume.
 `readFile`, `writeFile`, `editFile`, `batchEdit`, `listDirectory`, `glob`, `grep`,
 `bash`, `diffFile`, `undoLastChange`, `redoLastUndo`, `searchWeb`.
 
+### Shared skills and web search
+
+Sentinel discovers standard `SKILL.md` packages in project-local and global
+Sentinel, Claude Code, Codex, Agents, and OpenCode skill folders. This means a
+skill installed with skills.sh for one of those assistants is also listed to
+Sentinel and can be loaded on demand with its `skill` tool.
+
+Web search is available to the agent through `searchWeb`. It uses DuckDuckGo by
+default; set `SEARCH_WEB_ENDPOINT` to use a compatible internal search endpoint.
+
 - Writes are sandboxed to the project root (path traversal rejected).
 - `bash` runs with a timeout and output cap.
 - PLAN/REVIEW modes refuse non-read-only tools; BUILD mode allows everything.
@@ -95,7 +105,8 @@ CLI consume.
 | `PLAN` | ✗ | ✗ | questions, code review, exploration |
 | `REVIEW` | ✗ | ✗ | diff review with review-focused prompt |
 
-Toggle with `Ctrl+M` or `/mode` inside the TUI.
+Use `/mode` inside the TUI. `/mode` toggles BUILD and PLAN; `/mode build`,
+`/mode plan`, and `/mode review` select a mode explicitly.
 
 ### Keybinds — opencode-compatible
 
@@ -110,7 +121,6 @@ so muscle memory carries over: leader is `Ctrl+X`, the palette is `Ctrl+P`, `Esc
 | `Ctrl+P` | Command palette |
 | `PageUp` / `PageDown` | Scroll the transcript a page (`Ctrl+Alt+U`/`D` half a page, `Ctrl+Alt+Y`/`E` a line) |
 | `Ctrl+G` / `Ctrl+Alt+G` | Jump to the first message / back to the live edge |
-| `Ctrl+M` | Toggle mode |
 | `Ctrl+L` | Session log viewer |
 | `Ctrl+/` | Help |
 | `Ctrl+X` then… | `m` models · `n` new session · `b` sidebar · `l` sessions · `s` status · `c` compact · `u`/`r` undo/redo · `x` export · `e` editor · `t`/`d` thinking/details · `q` quit |
@@ -310,6 +320,44 @@ as `yellow`. An approving ledger that does not exist is not consent.
 
 The lead still sees a shell command the first time — the ledger narrows what is
 asked, it does not remove asking.
+
+## `sentinel audit` — was the thing that ran the thing you approved?
+
+Every harness rests on an assumption nobody checks: that the action a human
+approved (`A`) is the action that gets executed (`A'`). When they differ, nothing
+notices at the time. `sentinel audit` replays a recorded run and reports the
+gap, split into the classes it can actually distinguish:
+
+| Class | Example |
+| ----- | ------- |
+| `Scope` | approved a read, a write ran; or a worktree was not the one approved |
+| `Argument` | same command shape, different arguments — the cost of shape matching |
+| `Temporal` | the grant went stale: writes landed between approval and execution |
+| `Tool` | a different tool ran than the one granted |
+| `Delegation` | a subagent executed above its parent's rung |
+| `Semantic` | **not assessable from recorded fields** — reported as such, never as clean |
+
+```bash
+sentinel audit                     # the most recent run
+sentinel audit --last 5           # five runs, newest first
+sentinel audit --list             # what has a trail
+sentinel audit <runId> --json
+```
+
+Exit `2` when a gap is found, `0` when clean, `1` when there is no trail. The
+distinction between `0` and `1` matters: "audited and found nothing" and "nothing
+to audit" look identical otherwise, and only one of them is evidence.
+
+Every approved tool call is recorded in `.sentinel/audit/<runId>.jsonl` as a
+paired grant and dispatch, keyed by tool call id. The grant is written *before*
+the tool runs — a crash mid-dispatch then leaves a record of an action nobody
+approved, which is the finding this is for.
+
+Read-only over recorded JSONL: no model, no network, no credentials. `Semantic`
+is named in the taxonomy with a count of zero because those divergences leave
+every recorded field unchanged — the tool states the limit of its own coverage
+rather than implying a clean result it cannot support. See
+`docs/market-brief.md` §8.
 
 ## `sentinel onboard` — the week-one survey
 

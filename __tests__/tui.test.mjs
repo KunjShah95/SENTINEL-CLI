@@ -13,6 +13,7 @@ import { toolView } from '../src/tui/components/oc/tool-display.ts';
 import { parseMarkdown, parseInline } from '../src/tui/components/oc/markdown.tsx';
 import { formatContextReport, measureContext, bar } from '../src/tui/lib/context-report.ts';
 import { snapshot, snapshotPermission, stripAnsi } from '../scripts/tui-snapshot.tsx';
+import { modelDisplayName } from '../src/tui/components/dialogs/model-picker.tsx';
 
 const THEME_DIR = join(import.meta.dirname, '..', 'src', 'tui', 'themes', 'opencode');
 
@@ -47,6 +48,13 @@ describe('opencode themes', () => {
     }
     assert.equal(modeColor(DEFAULT_THEME.colors, 'BUILD'), DEFAULT_THEME.colors.secondary);
     assert.equal(modeColor(DEFAULT_THEME.colors, 'PLAN'), DEFAULT_THEME.colors.accent);
+  });
+});
+
+describe('model picker labels', () => {
+  it('does not repeat a provider that is already part of the registry id', () => {
+    assert.equal(modelDisplayName({ provider: 'ollama', id: 'ollama/qwen3.5-coder:latest' }), 'qwen3.5-coder:latest');
+    assert.equal(modelDisplayName({ provider: 'custom', id: 'my-model' }), 'my-model');
   });
 });
 
@@ -141,9 +149,10 @@ describe('render snapshot', () => {
     assert.match(out, /┃ {2}\$ npm test -- parse/);
     assert.match(out, /▣ Build · openai\/gpt-oss-20b · 8\.4s/);
     assert.match(out, /STEER/);
-    assert.match(out, /Todos 1\/3/);
-    assert.match(out, /Working · 4\.2s/);
+    assert.match(out, /1\/3 done/);
+    assert.match(out, /Running\s+\d+\.\ds/);
     assert.match(out, /enter steer · esc stop/);
+    assert.match(out, /› /);
     assert.match(out, /Build · openai\/gpt-oss-20b groq/);
     assert.match(out, /\[████░░░░░░\] 42%/);
     // Scroll indicator: how many lines up from the live edge the view is parked.
@@ -152,8 +161,10 @@ describe('render snapshot', () => {
 
   it('home frame shows the logo and a tip', async () => {
     const out = stripAnsi(await snapshot('OpenCode', { home: true }));
-    assert.match(out, /█▀▀▀ █▀▀▀ █▀▀▄/);
-    assert.match(out, /Tip: /);
+    assert.match(out, /███████╗███████╗/);
+    assert.match(out, /Tips for getting started/);
+    assert.match(out, /What's new/);
+    assert.match(out, /● Ready/);
   });
 
   it('renders under every theme without throwing', async () => {

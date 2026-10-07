@@ -1,0 +1,20 @@
+# Line endings.
+#
+# `text=auto` lets git detect text vs binary; `eol=crlf` pins the working tree
+# to CRLF on every platform, which is what this checkout already produced via
+# `core.autocrlf=true`.
+#
+# This file exists because the tree had 13 files with MIXED endings (up to 32
+# bare LF lines inside an 88-CRLF file). Mixed endings mean a one-line edit can
+# produce a whole-file diff, `git blame` points at the wrong commit, and every
+# `split('\n')` parser in this codebase leaves a stray `\r` on the last field of
+# every line — including the JSONL readers for trajectories and audit records.
+#
+# Pinning it makes the normalization a property of the repository instead of a
+# property of whoever happens to have autocrlf set.
+* text=auto eol=crlf
+
+# Generated build output. Already gitignored, but saying so here stops a
+# Windows check-in from ever staging one.
+.next/        binary
+node_modules/ binary

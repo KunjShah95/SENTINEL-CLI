@@ -72,6 +72,46 @@ describe('pi-mono: file mutation queue', () => {
     assert.deepEqual(order, ['a:start', 'a:end', 'b']);
   });
 
+  it('serializes in CALL order, not resolution order', async () => {
+    // The regression this guards: the original implementation resolved the real
+    // path BEFORE acquiring the lock, so `await` made acquisition order
+    // scheduling order. Under light load realpath resolves in call order and
+    // the bug hides; under parallel load it inverts and two mutations of the
+    // SAME file run concurrently. This asserts the property directly, with no
+    // sleep to make the race likely — the ordering must hold regardless.
+    const order = [];
+    const calls = [];
+    for (let i = 0; i < 8; i++) {
+      // Deliberately mixed spellings of one path, so key resolution is exercised.
+      const spelling = ['q.txt', './q.txt', 'q.txt'][i % 3];
+      calls.push(
+        withFileMutationQueue(spelling, async () => {
+          order.push(`in${i}`);
+          // Yield, so an unserialized queue would interleave visibly.
+          await new Promise((r) => setImmediate(r));
+          order.push(`out${i}`);
+        }),
+      );
+    }
+    await Promise.all(calls);
+    assert.deepEqual(order, [
+      'in0', 'out0', 'in1', 'out1', 'in2', 'out2', 'in3', 'out3',
+      'in4', 'out4', 'in5', 'out5', 'in6', 'out6', 'in7', 'out7',
+    ], 'each mutation must complete before the next begins, in the order they were called');
+  });
+
+  it('does not hold up mutations of different files', async () => {
+    // The admission ticket is global, so this is the cost of the fix: key
+    // resolution is serialized. Assert the property still holds so a future
+    // change cannot quietly reintroduce the race by removing it.
+    const order = [];
+    await Promise.all([
+      withFileMutationQueue('a1.txt', async () => { await new Promise((r) => setTimeout(r, 20)); order.push('a'); }),
+      withFileMutationQueue('b1.txt', async () => { order.push('b'); }),
+    ]);
+    assert.deepEqual(order, ['b', 'a'], 'different files still overlap');
+  });
+
   it('different files do not wait on each other', async () => {
     const order = [];
     await Promise.all([

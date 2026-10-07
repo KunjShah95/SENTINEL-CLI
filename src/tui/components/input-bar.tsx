@@ -3,7 +3,8 @@ import { Box, Text, useInput } from 'ink';
 import { PromptInput } from './prompt-input.js';
 import { useTheme } from '../providers/theme/index.js';
 import { modeColor } from '../theme.js';
-import { SPLIT_BORDER, shortModelName, titlecase } from './oc/primitives.js';
+import { shortModelName, titlecase } from './oc/primitives.js';
+import { composerTip } from './oc/chrome.js';
 
 type Mode = 'BUILD' | 'PLAN' | 'REVIEW' | 'SCAN' | 'FIX';
 
@@ -12,14 +13,10 @@ type Props = {
   /** A turn is running: Enter steers it. */
   busy?: boolean;
   onSubmit: (value: string) => void;
-  onCommand?: (command: string) => void;
-  onSlashCommand?: () => void;
   onShellCommand?: (command: string) => void;
   disabled?: boolean;
   placeholder?: string;
   mode?: Mode;
-  onModeToggle?: () => void;
-  onCommandPalette?: () => void;
 };
 
 const MAX_SUGGESTIONS = 8;
@@ -41,7 +38,7 @@ const SLASH_COMMANDS: Array<{ name: string; description: string; args?: string }
   { name: 'compact',  description: 'Summarize session to free context' },
   { name: 'clear',    description: 'Clear all messages' },
   { name: 'new',      description: 'Start a new session' },
-  { name: 'mode',     description: 'Toggle BUILD / PLAN mode' },
+  { name: 'mode',     description: 'Show or change agent mode', args: '[build|plan|review]' },
   { name: 'setup',    description: 'Configure AI providers' },
   { name: 'editor',   description: 'Compose next message in $EDITOR' },
   { name: 'thinking', description: 'Toggle reasoning block display' },
@@ -72,8 +69,6 @@ export function InputBar({
   model,
   busy = false,
   onSubmit,
-  onCommand,
-  onSlashCommand,
   onShellCommand,
   disabled = false,
   placeholder = 'Ask anything · /command · !shell',
@@ -242,59 +237,55 @@ export function InputBar({
       // No onShellCommand wired — fall through to submit so it reaches wrappedSubmit
     }
 
-    if (trimmed.startsWith('/')) {
-      // Prefer onCommand if provided, else fall through to onSubmit (wrappedSubmit handles it)
-      if (onCommand) { onCommand(trimmed); return; }
-      // onSlashCommand (palette opener) is intentionally NOT called here —
-      // it drops the command text. Route through onSubmit instead.
-    }
-
     onSubmit(trimmed);
-  }, [onSubmit, onCommand, onShellCommand, hasSuggestions, hasSlash, slashSuggestions, selectedIndex,
+  }, [onSubmit, onShellCommand, hasSuggestions, hasSlash, slashSuggestions, selectedIndex,
       insertMentionSelected, insertSlashSelected, clearInput, pushHistory]);
 
+  const isCommand = value.startsWith('/') && !isShell;
+  const headerTitle = isShell ? 'Shell' : isCommand ? 'Command' : modeLabel;
+  const headerDetail = busy
+    ? 'enter steer'
+    : isShell
+      ? 'enter run'
+      : isCommand
+        ? 'enter run · tab complete'
+        : 'enter send · shift+enter newline';
+  const borderColor = disabled
+    ? colors.border
+    : isShell
+      ? colors.warning
+      : isCommand
+        ? colors.accent
+        : colors.border;
+  const caretColor = isShell ? colors.warning : isCommand ? colors.accent : barColor;
+
   return (
-    <Box flexDirection="column" width="100%">
-      {/* Slash command autocomplete */}
+    <Box flexDirection="column" width="100%" paddingLeft={2}>
       {hasSlash ? (
-        <Box
-          flexDirection="column"
-          borderStyle="single"
-          borderColor={activeColor}
-          paddingX={1}
-          marginBottom={0}
-        >
+        <Box flexDirection="column" marginBottom={1}>
           {slashSuggestions.slice(0, MAX_SUGGESTIONS).map((cmd, i) => {
             const isSel = i === selectedIndex;
             return (
-              <Box key={cmd.name} flexDirection="row" gap={1}>
-                <Text color={isSel ? activeColor : colors.dimSeparator}>{isSel ? '▶' : ' '}</Text>
+              <Box key={cmd.name} flexDirection="row">
+                <Text color={isSel ? activeColor : colors.textMuted}>{isSel ? '› ' : '  '}</Text>
                 <Text bold={isSel} color={isSel ? activeColor : colors.primary}>
                   {'/' + cmd.name}
-                  {cmd.args ? <Text color={colors.dimSeparator}>{' ' + cmd.args}</Text> : null}
+                  {cmd.args ? <Text color={colors.textMuted}>{' ' + cmd.args}</Text> : null}
                 </Text>
-                <Text dimColor>{'  ' + cmd.description}</Text>
+                <Text color={colors.textMuted}>{'  ' + cmd.description}</Text>
               </Box>
             );
           })}
-          <Text dimColor>{'  Tab to complete · ↑↓ navigate · Esc dismiss'}</Text>
         </Box>
       ) : null}
 
-      {/* @mention / file autocomplete */}
       {hasSuggestions ? (
-        <Box
-          flexDirection="column"
-          borderStyle="single"
-          borderColor={colors.info}
-          paddingX={2}
-          marginBottom={0}
-        >
+        <Box flexDirection="column" marginBottom={1}>
           {suggestions.map((fp, i) => {
             const isSel = i === selectedIndex;
             return (
-              <Box key={fp} flexDirection="row" gap={1}>
-                <Text color={isSel ? colors.primary : colors.dimSeparator}>{isSel ? '▶' : ' '}</Text>
+              <Box key={fp} flexDirection="row">
+                <Text color={isSel ? colors.primary : colors.textMuted}>{isSel ? '› ' : '  '}</Text>
                 <Text bold={isSel} color={isSel ? colors.primary : colors.info}>{fp}</Text>
               </Box>
             );
@@ -302,49 +293,55 @@ export function InputBar({
         </Box>
       ) : null}
 
-      {/* opencode prompt: left bar in the agent color, element background,
-          then a meta row "Build · model provider". */}
+      {/* MiniMax composer header. Hidden while a turn runs — the activity
+          line already owns steer / stop for that moment. */}
+      {busy ? null : (
+        <Box flexDirection="row" width="100%">
+          <Box flexShrink={0}>
+            <Text wrap="truncate">
+              <Text bold color={caretColor}>{headerTitle}</Text>
+              <Text color={colors.textMuted}>{` · ${headerDetail}`}</Text>
+            </Text>
+          </Box>
+          {!value ? (
+            <Box flexGrow={1} justifyContent="flex-end" marginLeft={2}>
+              <Text color={colors.textMuted} wrap="truncate-end">{composerTip()}</Text>
+            </Box>
+          ) : null}
+        </Box>
+      )}
+
+      {/* Rounded editor (MiniMax) with opencode's "Build · model provider" row. */}
       <Box
-        borderStyle={SPLIT_BORDER}
-        borderTop={false}
-        borderRight={false}
-        borderBottom={false}
-        borderLeftColor={disabled ? colors.border : (isShell ? colors.warning : barColor)}
+        borderStyle="round"
+        borderColor={borderColor}
+        flexDirection="column"
+        paddingX={1}
         width="100%"
       >
-        <Box
-          flexDirection="column"
-          paddingLeft={2}
-          paddingRight={2}
-          paddingTop={1}
-          flexGrow={1}
-          backgroundColor={colors.backgroundElement}
-        >
-          <Box flexDirection="row">
-            {isShell ? <Text color={colors.warning}>{'$ '}</Text> : null}
-            <PromptInput
-              value={value}
-              onChange={handleChange}
-              onSubmit={handleSubmit}
-              onHistory={handleHistory}
-              busy={busy}
-              placeholder={disabled ? '…' : (busy ? 'Type to steer the running turn…' : placeholder)}
-              focus={!disabled}
-            />
-          </Box>
-          <Box flexDirection="row" justifyContent="space-between" paddingTop={1}>
-            <Text>
-              <Text color={isShell ? colors.warning : barColor}>{isShell ? 'Shell' : modeLabel}</Text>
-              {modelName && !isShell ? <Text color={colors.textMuted}>{' · '}</Text> : null}
-              {modelName && !isShell ? <Text color={colors.text}>{modelName}</Text> : null}
-              {provider && !isShell ? <Text color={colors.textMuted}>{` ${provider}`}</Text> : null}
-            </Text>
-            <Text color={colors.textMuted}>
-              <Text color={colors.text}>ctrl+m</Text>{' mode  '}
-              <Text color={colors.text}>ctrl+p</Text>{' commands  '}
-              <Text color={colors.text}>shift+enter</Text>{' newline'}
-            </Text>
-          </Box>
+        <Box flexDirection="row">
+          <Text bold color={caretColor}>{'› '}</Text>
+          <PromptInput
+            value={value}
+            onChange={handleChange}
+            onSubmit={handleSubmit}
+            onHistory={handleHistory}
+            busy={busy}
+            placeholder={disabled ? '…' : (busy ? 'Type to steer the running turn…' : placeholder)}
+            focus={!disabled}
+          />
+        </Box>
+        <Box flexDirection="row" justifyContent="space-between">
+          <Text>
+            <Text color={caretColor}>{isShell ? 'Shell' : modeLabel}</Text>
+            {modelName && !isShell ? <Text color={colors.textMuted}>{' · '}</Text> : null}
+            {modelName && !isShell ? <Text color={colors.text}>{modelName}</Text> : null}
+            {provider && !isShell ? <Text color={colors.textMuted}>{` ${provider}`}</Text> : null}
+          </Text>
+          <Text color={colors.textMuted}>
+            <Text color={colors.text}>/mode</Text>{' change mode  '}
+            <Text color={colors.text}>ctrl+p</Text>{' commands'}
+          </Text>
         </Box>
       </Box>
     </Box>

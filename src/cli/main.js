@@ -11,7 +11,22 @@
  *   sentinel watch "task"     keep working when something breaks, steerable
  *   sentinel steer "msg"      add an instruction for a running watcher
  *   sentinel risk "cmd"      grade a command against this repo's risk ledger
+ *   sentinel tasks           list agent tasks: status, depth, permission, worktree
+ *
+ * The model has ONE tool for concurrent work — `task`, with an action — where it
+ * used to have seven names (spawnAgent, spawnTeammate, bgRun, bgCheck,
+ * teamStatus, teamMerge, sendMessage). Those seven are still dispatched exactly
+ * as before, so a recorded trajectory replays; they are just no longer shown to
+ * the model. `task(action="spawn")` waits for a subagent's summary, which is
+ * what the old `spawnAgent` did.
+ *   sentinel review [ref]    review a change; findings point at real diff lines
  *   sentinel doctor          pre-flight: runtime, data dir, provider keys, tool layer
+ *
+ * `sentinel review` is read-only by default and needs no network: it reads a
+ * local git diff, or the worktree patch a finished task produced. It refuses a
+ * diff over 800 changed lines before any model call, and exits 2 when it had to
+ * drop a finding it could not place — a partial review is a warning, not a
+ * clean pass.
  *   sentinel outcome "..."   turn a vague ask into a verifiable contract, then work to it
  *   sentinel onboard         survey this repo: entry points, CI, ownership, risk
  *   sentinel prompts         list prompt templates (/name args in ask/goal)
@@ -730,6 +745,176 @@ program
     process.exit(0);
   });
 
+// ── review: a turn whose findings must point at real lines ────────────────
+program
+  .command('audit [runId...]')
+  .description('Replay recorded approvals and report bound-gaps (the action that ran vs the action that was approved)')
+  .option('-d, --dir <path>', 'Project to audit (default: cwd)')
+  .option('--last <n>', 'Audit the N most recent runs', (v) => Number(v))
+  .option('--list', 'List runs with an audit trail and exit')
+  .option('--json', 'Print as JSON')
+  .action(async (runIds, options) => {
+    const { auditRun, auditRuns, listAuditRuns, renderAudit, summarizeAudits } =
+      await import('../agent/audit.js');
+
+    const cwd = path.resolve(options.dir || process.cwd());
+
+    if (options.list) {
+      const ids = listAuditRuns(cwd);
+      if (options.json) {
+        process.stdout.write(JSON.stringify(ids, null, 2) + '\n');
+      } else if (!ids.length) {
+        console.error('No recorded runs. A run has an audit trail once a tool call has been approved.');
+      } else {
+        for (const id of ids) console.log(id);
+      }
+      process.exit(0);
+    }
+
+    // With no argument, audit the most recent run: "audit this" is the question
+    // someone asks after something looked wrong, and making them find the id
+    // first would be making the tool do less work than the person using it.
+    const ids = (runIds || []).length ? runIds : null;
+    const reports = ids
+      ? ids.map((id) => auditRun(id, { cwd }))
+      : auditRuns(Number(options.last) > 0 ? Number(options.last) : 1, { cwd });
+
+    if (!reports.length) {
+      console.error('No recorded runs. A run has an audit trail once a tool call has been approved.');
+      process.exit(1);
+    }
+
+    const missing = reports.filter((r) => !r.grants && !r.dispatches);
+    if (missing.length === reports.length) {
+      console.error(`No audit trail for: ${reports.map((r) => r.runId).join(', ')}`);
+      process.exit(1);
+    }
+
+    if (options.json) {
+      const payload = reports.length === 1 ? reports[0] : { summary: summarizeAudits(reports), runs: reports };
+      process.stdout.write(JSON.stringify(payload, null, 2) + '\n');
+      process.exit(reports.some((r) => r.gaps.length) ? 2 : 0);
+    }
+
+    for (const report of reports) process.stdout.write(renderAudit(report));
+    // Non-zero when a gap was found: a bound-gap is the finding, so a clean
+    // exit has to mean "audited, nothing found" and not merely "audited".
+    process.exit(reports.some((r) => r.gaps.length) ? 2 : 0);
+  });
+
+// ── review: a turn whose findings must point at real lines ────────────────
+program
+  .command('review [ref...]')
+  .description('Review a change and report defects that point at real diff lines')
+  .option('-d, --dir <path>', 'Repository to review (default: cwd)')
+  .option('-b, --base <ref>', 'Diff this branch against a base ref (e.g. main)')
+  .option('--staged', 'Review only what is staged')
+  .option('--task <id>', 'Review the worktree patch produced by a finished task')
+  .option('-m, --model <id>', 'Model id')
+  .option('--max-lines <n>', 'Refuse a diff larger than this many changed lines', (v) => Number(v))
+  .option('--json', 'Print as JSON')
+  .option('--no-read-only', 'Allow the reviewer write access (it has no reason to need it)')
+  .action(async (refParts, options) => {
+    const { repoState, collectReviewableDiff, reviewTargetWorktree, decideReviewable } =
+      await import('../agent/review-refs.js');
+    const { runReview, buildBrief, renderReview } = await import('../agent/review.js');
+    const { getTask, listTasks, describePermission } = await import('../agent/task.js');
+    const { DEFAULT_CHAT_MODEL_ID } = await import('../shared/models/index.js');
+
+    const cwd = path.resolve(options.dir || process.cwd());
+    const state = await repoState(cwd);
+    if (!state.isRepo) {
+      console.error('Not a git repository, so there is no diff to review.');
+      process.exit(1);
+    }
+
+    // An explicit positional ref is a shorthand for --base.
+    const positional = (refParts || []).join(' ').trim();
+    const base = options.base || positional || null;
+
+    let diff;
+    if (options.task) {
+      // Review what a teammate actually produced. Reading the task's workdir
+      // rather than the main tree is the whole point: the patch is not merged.
+      const task = getTask(options.task) || listTasks().find((t) => t.id === options.task);
+      if (!task) {
+        console.error(`No task with id ${options.task}. Try: sentinel tasks --all`);
+        process.exit(1);
+      }
+      if (!task.workdir || !task.baseSha) {
+        console.error(
+          `Task ${task.id} has no worktree patch to review (isolation: ${task.isolation}). ` +
+          'Only a task with a worktree produced a diff.',
+        );
+        process.exit(1);
+      }
+      diff = reviewTargetWorktree({ dir: task.workdir, baseSha: task.baseSha });
+    } else {
+      diff = await collectReviewableDiff({ cwd, base, staged: Boolean(options.staged) });
+    }
+
+    const verdict = decideReviewable({
+      stats: diff.stats,
+      maxLines: Number(options.maxLines) > 0 ? Number(options.maxLines) : undefined,
+    });
+    if (!verdict.review) {
+      // A refusal says why, because "decided not to look" and "broken" look
+      // identical from the outside.
+      if (options.json) {
+        process.stdout.write(JSON.stringify({ skipped: true, reason: verdict.reason }, null, 2) + '\n');
+      } else {
+        console.error(`Nothing reviewed: ${verdict.reason}.`);
+      }
+      process.exit(0);
+    }
+
+    if (!options.json) {
+      const rung = options.readOnly === false ? 'teammate' : 'readonly';
+      console.error(
+        `\x1b[2m${diff.stats.files} file(s) +${diff.stats.additions} -${diff.stats.deletions} · ${diff.ref} · ${describePermission(rung)}\x1b[0m`,
+      );
+    }
+
+    const brief = buildBrief({
+      ref: diff.ref,
+      stats: diff.stats,
+      readOnly: options.readOnly !== false,
+    });
+
+    const controller = new AbortController();
+    const onSig = () => controller.abort();
+    process.on('SIGINT', onSig);
+    process.on('SIGTERM', onSig);
+
+    try {
+      const out = await runReview({
+        brief,
+        cwd,
+        model: options.model || DEFAULT_CHAT_MODEL_ID,
+        readOnly: options.readOnly !== false,
+        name: 'review',
+        files: diff.files,
+        signal: controller.signal,
+      });
+
+      if (options.json) {
+        process.stdout.write(JSON.stringify({ ref: diff.ref, ...out }, null, 2) + '\n');
+        // Non-zero only when something was dropped: a partially-delivered
+        // review is a warning, not a clean pass.
+        process.exit(out.dropped.length ? 2 : 0);
+      }
+
+      process.stdout.write(renderReview({ ...out, ref: diff.ref }));
+      process.exit(out.dropped.length ? 2 : 0);
+    } catch (e) {
+      console.error(`\x1b[31mreview failed: ${e.message}\x1b[0m`);
+      process.exit(1);
+    } finally {
+      process.off('SIGINT', onSig);
+      process.off('SIGTERM', onSig);
+    }
+  });
+
 // ── outcome: turn a vague ask into a contract a machine can judge ─────────
 program
   .command('outcome [ask...]')
@@ -808,6 +993,48 @@ program
     }
     process.stdout.write('\n');
     process.exit(met && !sawError ? 0 : 1);
+  });
+
+// ── tasks: inspect the concurrent work the primitive owns ──────────────────
+program
+  .command('tasks')
+  .description('List agent tasks and background commands: status, depth, permission, worktree')
+  .option('--json', 'Print as JSON')
+  .option('--all', 'Include finished tasks (default: running only)')
+  .action(async (options) => {
+    const { listTasks, renderTasks, describePermission } = await import('../agent/task.js');
+    const all = listTasks();
+    const list = options.all ? all : all.filter((t) => t.status === 'running' || t.status === 'pending');
+
+    if (options.json) {
+      process.stdout.write(
+        JSON.stringify(
+          list.map((t) => ({
+            id: t.id,
+            kind: t.kind,
+            name: t.name,
+            parent: t.parent,
+            status: t.status,
+            depth: t.depth,
+            permission: t.permission,
+            permissionDetail: describePermission(t.permission),
+            isolation: t.isolation,
+            branch: t.branch,
+            error: t.error,
+            summary: t.result?.summary || null,
+          })),
+          null,
+          2,
+        ) + '\n',
+      );
+      process.exit(0);
+    }
+
+    console.log(renderTasks(list));
+    if (!options.all && all.length > list.length) {
+      console.log(`\x1b[2m${all.length - list.length} finished task(s) hidden; --all to show them\x1b[0m`);
+    }
+    process.exit(0);
   });
 
 // ── doctor: pre-flight checks before the first turn ─────────────────────────

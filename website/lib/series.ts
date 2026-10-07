@@ -43,7 +43,7 @@ export const series: Series[] = [
     title: "PR Owl: an autonomous AI code reviewer for GitHub",
     metaTitle: "PR Owl: Autonomous AI Code Reviewer",
     description:
-      "A twelve-part build of a GitHub App that reviews pull requests autonomously — webhooks, a queued review job, Pinecone retrieval and an agent that posts inline comments.",
+      "A twelve-part build of a GitHub App that reviews pull requests autonomously — verified webhooks, a coalescing queue, an agent that reads the repo, and inline comments on real line numbers.",
     kicker: "Course · 12 parts",
     outcome:
       "By the end you have an installed GitHub App that receives a pull request, reviews the diff with repo context, and posts inline comments.",

@@ -12,6 +12,7 @@ import {
   steer, drainSteering, pendingSteering, buildTask, runWatcher, steerFile, stateFile,
   MAX_UNPRODUCTIVE, MAX_BACKOFF_MS, WATCH_VERSION, STEER_PATH,
 } from '../src/agent/watch.js';
+import { listTasks, cancelTask, createTask, awaitTask } from '../src/agent/task.js';
 import { parseTrigger, parseTriggers } from '../src/agent/watch-cli.js';
 
 let dir;
@@ -322,6 +323,66 @@ describe('runWatcher', () => {
       task: 'x', triggers: [{ type: 'once' }], runTurn, baseDelayMs: 1, cwd: dir, signal: ac.signal,
     });
     assert.equal(res.reason, 'aborted');
+  });
+
+  test('every tick is a task, so a standing watcher is visible and countable', async () => {
+    // The point of putting ticks in the registry is that a watcher burning
+    // money in another terminal is not invisible: `sentinel tasks` shows it,
+    // and it occupies the same concurrency budget as everything else.
+    const runTurn = () => (async function* () { yield { event: 'text', data: { delta: 'Fixed it.' } }; })();
+    // The registry is global and earlier tests in this file left ticks in it,
+    // so count the delta rather than the total.
+    const before = listTasks({ kind: 'agent', status: 'done' }).filter((t) => t.owner === 'watch').length;
+    const res = await runWatcher({
+      task: 'keep it green',
+      triggers: ALWAY,
+      runTurn,
+      maxTicks: 3,
+      baseDelayMs: 1,
+      cwd: dir,
+    });
+    assert.equal(res.reason, 'max-ticks');
+
+    const ticks = listTasks({ kind: 'agent', status: 'done' }).filter((t) => t.owner === 'watch');
+    assert.equal(ticks.length - before, 3, 'each tick must leave a task in the registry');
+    assert.ok(ticks.every((t) => t.status === 'done'), 'a finished tick is done, not running');
+    // Newest first, so ticks[0] is the third.
+    assert.match(ticks[0].name, /^watch-\d+$/);
+    assert.equal(ticks[0].permission, 'teammate', 'inherit clamps to teammate for display');
+    assert.equal(cancelTask(ticks[0].id), false, 'a finished tick cannot be cancelled');
+  });
+
+  test('a tick refused admission backs the watcher off instead of crashing it', async () => {
+    // Filling the concurrency budget means the next tick cannot start. The
+    // watcher must treat that as unproductive — the same as a tick that did
+    // nothing — not throw and take the whole process down.
+    let turns = 0;
+    const runTurn = () => (async function* () { turns++; yield { event: 'text', data: { delta: 'ok' } }; })();
+    const hogs = [];
+    for (let i = 0; i < 6; i++) {
+      hogs.push(createTask({
+        kind: 'command', name: `hog${i}`, owner: 'test',
+        run: () => new Promise((r) => setTimeout(() => r({ summary: 'held' }), 400)),
+      }));
+    }
+    try {
+      const res = await runWatcher({
+        task: 'keep it green',
+        triggers: ALWAY,
+        runTurn,
+        maxTicks: 2,
+        maxUnproductive: 1,
+        baseDelayMs: 1,
+        cwd: dir,
+      });
+      assert.equal(turns, 0, 'no tick may reach the model while the budget is full');
+      assert.equal(res.reason, 'no-progress');
+      assert.equal(res.ticks.length, 1);
+      assert.match(res.ticks[0].error, /too many tasks running/);
+    } finally {
+      for (const h of hogs) cancelTask(h.id);
+      await Promise.all(hogs.map((h) => awaitTask(h.id)));
+    }
   });
 
   test('the steering file lives under .sentinel so it is gitignored', () => {

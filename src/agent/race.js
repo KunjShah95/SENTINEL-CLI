@@ -14,10 +14,15 @@
  * The winner's patch is applied to the main tree (checkpointed → undoable);
  * every worktree and branch is removed. Candidates never touch the main
  * tree and cannot run destructive commands.
+ *
+ * On the primitive: a candidate is a task with `isolation: 'worktree'` and the
+ * `teammate` rung. What remains here is the part that was always race's own
+ * logic — the ranker, the scorer and the critic. The lifecycle, the worktrees
+ * and the teardown are no longer reimplemented once per candidate.
  */
 import { runAgentTurnInner } from './loop.js';
-import { createWorktree, worktreePatch, applyPatchToRoot, removeWorktree } from './worktree.js';
-import { teammatePermission } from './team.js';
+import { worktreePatch } from './worktree.js';
+import { createTask, awaitTask, mergeTask, PERMISSIONS } from './task.js';
 import { runSandboxedAsync } from '../shared/tools/sandbox.js';
 import { parseTestOutput } from './swe.js';
 
@@ -103,39 +108,67 @@ export async function critiqueDiff({ task, patch, model, createStream, signal })
   return parseCritique(text);
 }
 
-async function runCandidate(c, { task, createStream, allowBash, onEvent, signal }) {
+async function runCandidate(c, { task, createStream, allowBash, onEvent, signal, cwd }) {
   const brief = [
     task,
     c.hint ? `\nApproach: ${c.hint}` : '',
     '\nYou work alone in an isolated copy of the repository. Make the change, verify it, then reply with a short summary.',
   ].join('');
+  // Bash is opt-in for candidates: a tournament that can run anything is a
+  // tournament that can install anything, N times over.
   const leadAllowAll = new Set(allowBash ? ['bash', 'runTests'] : []);
-  let text = '';
-  try {
-    for await (const ev of runAgentTurnInner({
-      history: [{ id: `race_${c.index}`, role: 'user', parts: [{ type: 'text', text: brief }] }],
-      mode: 'BUILD',
-      model: c.model,
-      createStream,
-      trajectory: false,
-      agentName: c.name,
-      workdir: c.wt.dir,
-      subagentDepth: 1,
-      signal,
-      onPermissionRequest: teammatePermission({ leadAllowAll, leadHeadless: false, isolated: true }),
-    })) {
-      if (ev.event === 'text') text += ev.data.delta;
-      else if (ev.event === 'tool_call') onEvent({ type: 'tool', candidate: c.name, tool: ev.data.toolName });
-      else if (ev.event === 'finish') c.costUsd = ev.data.costUsd || 0;
-      else if (ev.event === 'error') {
-        c.error = ev.data.message;
-        onEvent({ type: 'error', candidate: c.name, message: ev.data.message });
+
+  const { id, rejected } = createTask({
+    kind: 'agent',
+    name: c.name,
+    prompt: brief,
+    mode: 'BUILD',
+    model: c.model,
+    isolation: 'worktree',
+    permission: PERMISSIONS.TEAMMATE,
+    cwd,
+    // The race owns its own budget: N candidates are the point, so the global
+    // cap must not throttle a legitimate tournament.
+    maxConcurrent: RACE_MAX,
+    meta: { leadAllowAll, candidateIndex: c.index },
+    run: async ({ workdir, permission }) => {
+      let text = '';
+      for await (const ev of runAgentTurnInner({
+        history: [{ id: `race_${c.index}`, role: 'user', parts: [{ type: 'text', text: brief }] }],
+        mode: 'BUILD',
+        model: c.model,
+        createStream,
+        trajectory: false,
+        agentName: c.name,
+        workdir,
+        subagentDepth: 1,
+        signal,
+        onPermissionRequest: permission,
+      })) {
+        if (ev.event === 'text') text += ev.data.delta;
+        else if (ev.event === 'tool_call') onEvent({ type: 'tool', candidate: c.name, tool: ev.data.toolName });
+        else if (ev.event === 'finish') c.costUsd = ev.data.costUsd || 0;
+        else if (ev.event === 'error') {
+          c.error = ev.data.message;
+          onEvent({ type: 'error', candidate: c.name, message: ev.data.message });
+        }
       }
-    }
-  } catch (e) {
-    c.error = e?.message || String(e);
+      return { summary: text.trim().slice(0, 2000) };
+    },
+  });
+
+  if (rejected) {
+    c.error = rejected;
+    return;
   }
-  c.summary = text.trim().slice(0, 2000);
+  c.taskId = id;
+  const finished = await awaitTask(id);
+  // The primitive owns the worktree now, so read its location back rather than
+  // creating one here and keeping a second copy of the truth.
+  c.wt = { dir: finished.workdir, baseSha: finished.baseSha, root: finished.root };
+  if (finished.status === 'failed') c.error = finished.error;
+  else if (finished.status === 'cancelled') c.error = 'cancelled';
+  c.summary = finished.result?.summary || '';
 }
 
 /**
@@ -160,12 +193,13 @@ export async function runRace({
   try {
     for (let i = 0; i < count; i++) {
       const name = `race-${stamp}-${i + 1}`;
-      const wt = createWorktree(name, cwd);
-      cands.push({ index: i, name, wt, model: models[i % models.length], hint: APPROACH_HINTS[i % APPROACH_HINTS.length] });
+      // No worktree here: createTask creates it, so the candidate never has a
+      // directory the primitive does not know about.
+      cands.push({ index: i, name, model: models[i % models.length], hint: APPROACH_HINTS[i % APPROACH_HINTS.length] });
       onEvent({ type: 'start', candidate: name, model: models[i % models.length] });
     }
 
-    await Promise.all(cands.map((c) => runCandidate(c, { task, createStream, allowBash, onEvent, signal })));
+    await Promise.all(cands.map((c) => runCandidate(c, { task, createStream, allowBash, onEvent, signal, cwd })));
 
     // Score sequentially: test suites often share ports / caches.
     for (const c of cands) {
@@ -203,7 +237,13 @@ export async function runRace({
     const winner = best && !best.disqualified && best.check?.exitCode === 0 ? best : null;
     let merge = null;
     if (winner && apply) {
-      merge = await applyPatchToRoot(winner.wt.root, winner.diff.patch, winner.diff.files);
+      // mergeTask, not applyPatchToRoot: it checkpoints the touched files and
+      // removes the worktree, so the teardown below has nothing left to do.
+      try {
+        merge = await mergeTask(winner.taskId, 'apply');
+      } catch (e) {
+        merge = { applied: false, reason: e?.message || String(e) };
+      }
     }
     return {
       winner: winner ? winner.name : null,
@@ -227,6 +267,12 @@ export async function runRace({
       })),
     };
   } finally {
-    for (const c of cands) removeWorktree(c.wt);
+    // Discard whatever the primitive still owns: every candidate except one
+    // that was merged. This is the same path a teammate's worktree takes, so a
+    // leaked worktree is now impossible rather than merely unlikely.
+    for (const c of cands) {
+      if (!c.taskId) continue;
+      try { await mergeTask(c.taskId, 'discard'); } catch { /* already merged or gone */ }
+    }
   }
 }

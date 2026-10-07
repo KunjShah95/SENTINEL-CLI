@@ -237,7 +237,21 @@ export function Session() {
         }
         if (cmd === 'clear') { clear(); return; }
         if (cmd === 'new') { clear(); toast.info('New session'); return; }
-        if (cmd === 'mode') { toggleMode(); return; }
+        if (cmd === 'mode') {
+          const requested = args.toUpperCase();
+          if (!requested) {
+            toggleMode();
+            toast.info(`Mode: ${mode === 'BUILD' ? 'PLAN' : 'BUILD'} (use /mode build, /mode plan, or /mode review)`);
+            return;
+          }
+          if (requested === 'BUILD' || requested === 'PLAN' || requested === 'REVIEW') {
+            setMode(requested);
+            toast.success(`Mode: ${requested}`);
+            return;
+          }
+          toast.error('Usage: /mode [build|plan|review]');
+          return;
+        }
         if (cmd === 'editor') { handleExternalEditor(); return; }
         if (cmd === 'thinking') { setShowThinking(v => !v); toast.info(`Thinking blocks ${showThinking ? 'hidden' : 'shown'}`); return; }
         if (cmd === 'details') { setShowDetails(v => !v); toast.info(`Tool details ${showDetails ? 'hidden' : 'shown'}`); return; }
@@ -340,7 +354,6 @@ export function Session() {
       case 'session.last': jumpToBottom(); return true;
       case 'session.toggle.thinking': setShowThinking((v) => !v); return true;
       case 'session.toggle.details': setShowDetails((v) => !v); return true;
-      case 'sentinel.mode.toggle': toggleMode(); return true;
       case 'model.list':
         dialog.open({ title: 'Model Picker', width: 60, height: 25, children: <ModelPickerDialog currentModel={model} onSelect={(m) => { setModel(m); dialog.close(); }} /> });
         return true;
@@ -353,8 +366,11 @@ export function Session() {
       case 'session.undo': wrappedSubmit('/undo'); return true;
       case 'session.redo': wrappedSubmit('/redo'); return true;
       case 'session.export': wrappedSubmit('/export'); return true;
-      case 'session.background': wrappedSubmit('/background'); return true;
-      case 'agent.list': wrappedSubmit('/agents'); return true;
+      // `session.background` and `agent.list` were removed. They submitted
+      // `/background` and `/agents`, neither of which is dispatched anywhere,
+      // so both bindings produced `Unknown command "…"` — a keypress that
+      // looked bound and did nothing. The features they reached for are CLI
+      // commands (`sentinel tasks`, `sentinel watch`), not TUI slash commands.
       case 'prompt.editor': handleExternalEditor(); return true;
       case 'help.show': handleHelp(); return true;
       case 'sentinel.logs': handleLogs(); return true;
@@ -488,9 +504,6 @@ export function Session() {
     return () => clearInterval(timer);
   }, [toast, submitAndWaitForCompaction, clear, appendMessage]);
 
-  const handleModeToggle = useCallback(() => toggleMode(), [toggleMode]);
-  const handleCommandPalette = useCallback(() => setShowCommands(v => !v), []);
-
   const isLoading = loading || status === 'streaming';
 
   const commandCtx: PaletteCommandContext = {
@@ -518,8 +531,6 @@ export function Session() {
           inputDisabled={compacting || dialog.isOpen || showCommands}
           loading={isLoading}
           mode={mode}
-          onModeToggle={handleModeToggle}
-          onCommandPalette={handleCommandPalette}
           model={model}
           sessionId={sessionId}
           statusText={`${messages.length} msgs · ${theme.name}`}
@@ -570,11 +581,4 @@ export function Session() {
         </SessionShell>
 
         {showCommands ? (
-          <Overlay title="Command Palette" width={80} hint="↑↓ navigate · Enter run · Esc close">
-            <CommandMenu onClose={() => setShowCommands(false)} ctx={commandCtx} />
-          </Overlay>
-        ) : null}
-      </Box>
-    </Box>
-  );
-}
+          <O

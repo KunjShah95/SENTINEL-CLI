@@ -21,6 +21,7 @@ import { resetMailboxes } from '../src/agent/mailbox.js';
 import { resetBackground } from '../src/agent/background.js';
 import { resetTeam } from '../src/agent/team.js';
 import { runMini, SUBMIT_SENTINEL } from '../src/agent/mini.js';
+import { listTasks, getTask, cancelTask } from '../src/agent/task.js';
 
 const MODEL = 'openai/gpt-oss-20b';
 const user = (text) => [{ id: `u${Date.now()}`, role: 'user', parts: [{ type: 'text', text }] }];
@@ -495,5 +496,47 @@ describe('mini-swe-agent parity (mock provider)', () => {
       : [tool('bash', { command: `echo ${SUBMIT_SENTINEL}` })]));
     const res = await runMini({ task: 't', model: MODEL, createStream, cwd: dir });
     assert.match(res.messages.find((m) => m.role === 'tool').content, /<exception>Blocked dangerous command/);
+  });
+
+  it('is a task, so it is visible in the registry and cancellable by anyone holding its id', async () => {
+    // Before mini ran on the primitive, the only thing that could stop a run
+    // was the caller that owned its AbortSignal. Now it has an id, so a
+    // timeout, a budget ceiling or a second terminal can cancel it.
+    // A generator that deliberately yields nothing: it stands in for a model
+    // call that never returns, which is the state a run is in when something
+    // else decides to cancel it.
+    // eslint-disable-next-line require-yield
+    const createStream = async function* ({ signal }) {
+      await new Promise((r) => signal?.addEventListener('abort', r, { once: true }));
+    };
+
+    const running = runMini({ task: 't', model: MODEL, createStream, cwd: dir });
+    await new Promise((r) => setTimeout(r, 30));
+
+    const mine = listTasks({ kind: 'agent' }).find((t) => t.owner === 'mini' && t.status === 'running');
+    assert.ok(mine, 'the mini run must appear in the task registry while it works');
+
+    assert.equal(cancelTask(mine.id, 'test timeout'), true);
+    const res = await running;
+    assert.equal(res.exitStatus, 'Interrupted');
+
+    const after = getTask(mine.id);
+    assert.equal(after.status, 'cancelled');
+    assert.equal(after.error, 'test timeout');
+  });
+
+  it('bridges a caller abort signal into a task cancellation', async () => {
+    // The task owns the signal mini runs under, so the caller's signal has to
+    // be bridged or aborting the caller would silently do nothing.
+    // eslint-disable-next-line require-yield
+    const createStream = async function* ({ signal }) {
+      await new Promise((r) => signal?.addEventListener('abort', r, { once: true }));
+    };
+    const ac = new AbortController();
+    const running = runMini({ task: 't', model: MODEL, createStream, cwd: dir, signal: ac.signal });
+    await new Promise((r) => setTimeout(r, 30));
+    ac.abort();
+    const res = await running;
+    assert.equal(res.exitStatus, 'Interrupted');
   });
 });

@@ -22,10 +22,11 @@
  * condition, and can return an `unknown` verdict that sends the turn back to
  * the interview rather than looping blindly.
  */
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { streamCompletion } from './providers.js';
 import { getWorkdir } from '../shared/tools/workdir.js';
+import { ensureStateDir } from '../utils/state-dir.js';
 
 export const OUTCOME_VERSION = '1';
 export const INTERVIEW_MAX_ROUNDS = 4;
@@ -115,7 +116,7 @@ export function readContract(cwd = getWorkdir()) {
 export function writeContract(contract, cwd = getWorkdir()) {
   const clean = validateContract(contract);
   const doc = { version: OUTCOME_VERSION, ask: oneLine(contract.ask), ...clean };
-  mkdirSync(join(cwd, '.sentinel'), { recursive: true });
+  ensureStateDir(cwd);
   writeFileSync(contractFile(cwd), JSON.stringify(doc, null, 2), 'utf-8');
   return doc;
 }

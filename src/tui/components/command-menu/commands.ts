@@ -16,6 +16,13 @@ export const COMMANDS: Command[] = [
     action: (ctx: CommandContext) => ctx.execute('model'),
   },
   {
+    name: 'mode',
+    description: 'Show or change Build, Plan, or Review mode',
+    value: '/mode',
+    category: 'settings',
+    action: (ctx: CommandContext) => ctx.execute('mode'),
+  },
+  {
     name: 'setup',
     description: 'Configure AI providers (API keys)',
     value: '/setup',

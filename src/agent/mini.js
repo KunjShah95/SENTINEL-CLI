@@ -11,6 +11,21 @@
  *
  * Sentinel keeps its own safety floor: the builtin dangerous-command guard
  * still runs before every command.
+ *
+ * On the primitive: a mini run is a task. That is a small change with three
+ * real consequences — it appears in `sentinel tasks`, it counts against the
+ * same concurrency cap as a teammate or a race candidate, and it can now be
+ * cancelled by anything holding its id, which previously only the caller that
+ * created the AbortSignal could do.
+ *
+ * It deliberately keeps its own guard rather than adopting a rung from
+ * `task.js`. Mini is a headless benchmark agent: there is nobody to prompt, so
+ * the ladder's `teammate` rung — which allows a non-read-only shell command
+ * only under an interactive grant — would deny every file write and make the
+ * agent unable to do its job. "No prompts, deny the destructive patterns" is a
+ * real policy that the ladder does not have a rung for, and inventing a rung
+ * for it inside a refactor would be changing a security posture in a diff that
+ * claims only to move code.
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
@@ -19,6 +34,7 @@ import { resolveChatModel } from '../shared/models/index.js';
 import { streamCompletion } from './providers.js';
 import { recordUsage, estimateTokensFromText } from './cost.js';
 import { runCommand } from './background.js';
+import { createTask, awaitTask, cancelTask, PERMISSIONS } from './task.js';
 import { builtinPreToolUseGuard } from './hooks.js';
 import { truncateHead, truncateTail } from '../shared/tools/truncate.js';
 
@@ -91,9 +107,58 @@ export function checkSubmitted({ exitCode, output }) {
 
 /**
  * Run the mini agent to completion.
+ *
+ * The linear loop lives in `runMiniLoop`; this wrapper is the task shell.
+ *
  * @returns {Promise<{exitStatus: string, submission: string, messages: object[], cost: number, apiCalls: number}>}
  */
-export async function runMini({
+export async function runMini(opts = {}) {
+  const { cwd = process.cwd(), signal, task: taskText } = opts;
+
+  const { id, rejected } = createTask({
+    kind: 'agent',
+    name: `mini-${String(taskText || '').slice(0, 24).replace(/\s+/g, '-') || 'run'}`,
+    owner: 'mini',
+    prompt: taskText,
+    mode: 'BUILD',
+    permission: PERMISSIONS.INHERIT,
+    isolation: 'none',
+    cwd,
+    meta: { mini: true, headless: true },
+    run: ({ signal: taskSignal }) => runMiniLoop({ ...opts, cwd, signal: taskSignal }),
+  });
+
+  if (rejected) {
+    // Mini has no partial-result path of its own, so a refusal is surfaced as
+    // the same shape the loop uses for its own exits rather than a throw: the
+    // caller is a benchmark harness that reads `exitStatus`.
+    return { exitStatus: 'Rejected', submission: rejected, messages: [], cost: 0, apiCalls: 0 };
+  }
+
+  // The caller's signal still has to reach the run: aborting the caller must
+  // cancel the task, not just be ignored because the task owns the signal now.
+  const onAbort = () => cancelTask(id, 'aborted by caller');
+  if (signal) {
+    if (signal.aborted) onAbort();
+    else signal.addEventListener('abort', onAbort, { once: true });
+  }
+
+  try {
+    const finished = await awaitTask(id);
+    if (finished.status === 'failed') {
+      return { exitStatus: 'ModelError', submission: finished.error || '', messages: [], cost: 0, apiCalls: 0 };
+    }
+    if (finished.status === 'cancelled') {
+      return { exitStatus: 'Interrupted', submission: '', messages: [], cost: 0, apiCalls: 0 };
+    }
+    return finished.result;
+  } finally {
+    signal?.removeEventListener?.('abort', onAbort);
+  }
+}
+
+/** The linear mini-swe-agent loop: one tool, three exits, nothing else. */
+async function runMiniLoop({
   task,
   model,
   stepLimit = 0,

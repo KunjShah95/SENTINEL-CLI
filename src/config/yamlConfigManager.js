@@ -470,10 +470,14 @@ export class YamlConfigManager {
    */
   injectEnvVars() {
     const providers = this.get('providers', {});
+    // Keys are the REGISTRY provider ids, not vendor names. This read
+    // `gemini` while configManager.js and the whole registry use `google`, so
+    // a Gemini key saved in YAML was injected into no variable any provider
+    // looked at — and it read the same file the other manager wrote to.
     const envMap = {
       openai: 'OPENAI_API_KEY',
       anthropic: 'ANTHROPIC_API_KEY',
-      gemini: 'GEMINI_API_KEY',
+      google: 'GEMINI_API_KEY',
       groq: 'GROQ_API_KEY',
       openrouter: 'OPENROUTER_API_KEY',
       ollama: 'OLLAMA_HOST'

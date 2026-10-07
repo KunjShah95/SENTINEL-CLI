@@ -78,18 +78,18 @@ describe('skills on demand', () => {
 
   it('lists names without bodies, expands on invoke', () => {
     seedSkill('demo', 'Does demo things', '# Demo\nStep one.');
-    const listed = listSkills(dir);
+    const listed = listSkills(dir, { includeGlobal: false });
     assert.equal(listed.length, 1);
     assert.equal(listed[0].name, 'demo');
-    assert.match(formatSkillListing(dir), /demo: Does demo things/);
-    assert.match(getSkillPrompt('demo', dir), /Step one/);
-    assert.equal(getSkillPrompt('nope', dir), null);
+    assert.match(formatSkillListing(dir, { includeGlobal: false }), /demo: Does demo things/);
+    assert.match(getSkillPrompt('demo', dir, { includeGlobal: false }), /Step one/);
+    assert.equal(getSkillPrompt('nope', dir, { includeGlobal: false }), null);
   });
 
   it('empty without skills', () => {
-    assert.deepEqual(listSkills(dir), []);
-    assert.equal(formatSkillListing(dir), '');
-    assert.equal(buildSkillListingSection(dir), '');
+    assert.deepEqual(listSkills(dir, { includeGlobal: false }), []);
+    assert.equal(formatSkillListing(dir, { includeGlobal: false }), '');
+    assert.equal(buildSkillListingSection(dir, { includeGlobal: false }), '');
   });
 });
 

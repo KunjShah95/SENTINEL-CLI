@@ -495,10 +495,10 @@ node -e "
       />
 
       <Cta
-        title="Continue with part 11"
-        body="Cost accounting that survives the process, an engagement budget with a deadline, and the hard stop that enforces it."
-        href="/blog/engagement-budget-cost-caps"
-        cta="Part 11: the budget"
+        title="Check what you have built"
+        body="The quiz covers every part of the course — modes, gates, ledgers and the cost rules — and names the gaps rather than the score."
+        href="/blog/cursor-cli-course-quiz"
+        cta="Take the quiz"
       />
 
       <p className="text-sm text-muted">
