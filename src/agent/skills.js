@@ -23,11 +23,12 @@
  *     `skill` tool. See the note on `runSkillScript` in `tools/index.js`.
  */
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
-import { join, resolve, basename, relative, isAbsolute, sep } from 'node:path';
+import { join, resolve, basename, relative, isAbsolute, sep, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { homedir } from 'node:os';
 import { substituteArgs } from './prompt-templates.js';
 
-export function skillDirs(cwd = process.cwd(), { includeGlobal = true } = {}) {
+export function skillDirs(cwd = process.cwd(), { includeGlobal = true, includeBuiltin = true } = {}) {
   const dir = resolve(cwd);
   const home = homedir();
   // `skills/` at the repo root is the *shipped* location — the one a clone gets,
@@ -45,6 +46,10 @@ export function skillDirs(cwd = process.cwd(), { includeGlobal = true } = {}) {
   // It exists because `.sentinel/` is gitignored. A skill placed there is
   // untracked by definition, which is how this repository came to describe a
   // skill that no clone had.
+  //
+  // `includeBuiltin: false` (below) excludes the package's own shipped skills.
+  // That answers a real and different question — "what has this *project*
+  // installed?" — and is what a test isolating one directory wants.
   const projectDirs = [
     join(dir, 'skills'),
     join(dir, '.sentinel', 'skills'),
@@ -60,7 +65,56 @@ export function skillDirs(cwd = process.cwd(), { includeGlobal = true } = {}) {
     join(home, '.agents', 'skills'),
     join(home, '.opencode', 'skills'),
   ];
-  return [...new Set(includeGlobal ? [...projectDirs, ...globalDirs] : projectDirs)];
+  // The package's OWN `skills/` — the ones that ship with Sentinel.
+  //
+  // A separate category, last, and NOT gated by `includeGlobal`. Two reasons,
+  // and the second is the one that bit:
+  //
+  //   1. Last, so a user's own skill of the same name wins over the shipped
+  //      default. An override is a deliberate choice and must beat a baseline.
+  //   2. Not gated. `includeGlobal: false` exists so a test does not read the
+  //      developer's real `~/.claude/skills`. Silently dropping Sentinel's own
+  //      bundled workflow along with it means a shipped skill is reachable only
+  //      when the caller happens to leave the flag off — which is exactly what
+  //      happened the first time this was wired up.
+  //
+  // In development this is the same directory as `<cwd>/skills` and deduplicates
+  // away. For an installed package it is the only route to a shipped skill at
+  // all: the user's cwd is their project, not `node_modules/sentinel-cli`. Found
+  // by simulating an install — the tarball carried the SKILL.md and the skill
+  // still would not resolve.
+  const builtinDirs = [join(packageRoot(), 'skills')];
+  return [...new Set([
+    ...projectDirs,
+    ...(includeGlobal ? globalDirs : []),
+    ...(includeBuiltin ? builtinDirs : []),
+  ])];
+}
+
+/**
+ * The installed package's root — the directory holding this package's
+ * `package.json`.
+ *
+ * The same walk `src/version.js` performs, and deliberately so: that module
+ * already answers "where is the package I am part of", and a second walk here
+ * would be two answers to one question, free to disagree after a repackage.
+ */
+function packageRoot() {
+  let dir = dirname(fileURLToPath(import.meta.url));
+  for (let i = 0; i < 5; i++) {
+    try {
+      const pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf-8'));
+      if (pkg?.name === 'sentinel-cli') return dir;
+    } catch {
+      // keep walking
+    }
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  // Unreachable in a working install; falls back to cwd rather than throwing, so
+  // a packaging problem cannot take down skill discovery.
+  return resolve('.');
 }
 
 function parseSkillFile(file) {

@@ -90,12 +90,12 @@ describe('skills on demand', () => {
 
   it('lists names without bodies, expands on invoke', () => {
     seedSkill('demo', 'Does demo things', '# Demo\nStep one.');
-    const listed = listSkills(dir, { includeGlobal: false });
+    const listed = listSkills(dir, { includeGlobal: false, includeBuiltin: false });
     assert.equal(listed.length, 1);
     assert.equal(listed[0].name, 'demo');
-    assert.match(formatSkillListing(dir, { includeGlobal: false }), /demo: Does demo things/);
-    assert.match(getSkillPrompt('demo', dir, { includeGlobal: false }), /Step one/);
-    assert.equal(getSkillPrompt('nope', dir, { includeGlobal: false }), null);
+    assert.match(formatSkillListing(dir, { includeGlobal: false, includeBuiltin: false }), /demo: Does demo things/);
+    assert.match(getSkillPrompt('demo', dir, { includeGlobal: false, includeBuiltin: false }), /Step one/);
+    assert.equal(getSkillPrompt('nope', dir, { includeGlobal: false, includeBuiltin: false }), null);
   });
 
   it('a skill ships with the repo, in a location git tracks', () => {
@@ -106,7 +106,7 @@ describe('skills on demand', () => {
     // directory is removed.
     const shipped = join(REPO_ROOT, 'skills', 'reproduce-fix-verify', 'SKILL.md');
     assert.ok(existsSync(shipped), `expected a shipped skill at ${shipped}`);
-    const skill = resolveSkill('reproduce-fix-verify', REPO_ROOT, { includeGlobal: false });
+    const skill = resolveSkill('reproduce-fix-verify', REPO_ROOT, { includeGlobal: false, includeBuiltin: false });
     assert.ok(skill, 'and it must resolve from the repo root');
     assert.match(skill.description, /bug/i);
     assert.equal(skill.disableModelInvocation, false, 'it is safe to advertise');
@@ -130,15 +130,55 @@ describe('skills on demand', () => {
     mkdirSync(shadow, { recursive: true });
     writeFileSync(join(shadow, 'SKILL.md'), '---\nname: reproduce-fix-verify\ndescription: STALE LOCAL COPY\n---\nstale body', 'utf-8');
 
-    const skill = resolveSkill('reproduce-fix-verify', dir, { includeGlobal: false });
+    const skill = resolveSkill('reproduce-fix-verify', dir, { includeGlobal: false, includeBuiltin: false });
     assert.notEqual(skill.description, 'STALE LOCAL COPY', 'the shipped copy must win');
     assert.equal(skill.description, 'Fix a bug without shipping another one. Reproduce first, fix second, verify third.');
   });
 
+  it('the shipped skills are reachable from any cwd, not only this repo', () => {
+    // The bug this pins: `npm pack` produced a tarball containing
+    // `skills/reproduce-fix-verify/SKILL.md`, and an installed Sentinel still
+    // could not load it — because `skillDirs` only ever looked at paths relative
+    // to the *user's* cwd, which is their project, never `node_modules`.
+    //
+    // Found by installing the packed tarball into a scratch project and asking
+    // for the skill by name. A test that only ran inside this repo would never
+    // have found it: here `<cwd>/skills` happens to be the shipped directory.
+    const cwd = mkdtempSync(join(tmpdir(), 'sentinel-foreign-cwd-'));
+    const skill = resolveSkill('reproduce-fix-verify', cwd);
+    assert.ok(skill, 'the shipped skill must resolve from an unrelated cwd');
+    assert.ok(
+      skill.file.startsWith(REPO_ROOT),
+      `it must come from the package, not from the cwd: ${skill.file}`,
+    );
+    // Not gated by `includeGlobal`, which exists to isolate a developer's
+    // `~/.claude/skills` — not to hide Sentinel's own bundled workflow.
+    assert.ok(
+      resolveSkill('reproduce-fix-verify', cwd, { includeGlobal: false }),
+      'and it must survive includeGlobal: false',
+    );
+    // But a caller can still ask the other question explicitly.
+    assert.equal(
+      resolveSkill('reproduce-fix-verify', cwd, { includeGlobal: false, includeBuiltin: false }),
+      null,
+      'includeBuiltin: false asks "what has this project installed?"',
+    );
+  });
+
+  it('a user\'s own skill still overrides the shipped one', () => {
+    // Builtin last, so an override is a deliberate choice that beats a baseline.
+    // If this ever flips, a user can no longer replace a shipped skill.
+    const cwd = mkdtempSync(join(tmpdir(), 'sentinel-override-cwd-'));
+    const mine = join(cwd, '.sentinel', 'skills', 'reproduce-fix-verify');
+    mkdirSync(mine, { recursive: true });
+    writeFileSync(join(mine, 'SKILL.md'), '---\nname: reproduce-fix-verify\ndescription: MINE\n---\nmy body');
+    assert.equal(resolveSkill('reproduce-fix-verify', cwd).description, 'MINE');
+  });
+
   it('empty without skills', () => {
-    assert.deepEqual(listSkills(dir, { includeGlobal: false }), []);
-    assert.equal(formatSkillListing(dir, { includeGlobal: false }), '');
-    assert.equal(buildSkillListingSection(dir, { includeGlobal: false }), '');
+    assert.deepEqual(listSkills(dir, { includeGlobal: false, includeBuiltin: false }), []);
+    assert.equal(formatSkillListing(dir, { includeGlobal: false, includeBuiltin: false }), '');
+    assert.equal(buildSkillListingSection(dir, { includeGlobal: false, includeBuiltin: false }), '');
   });
 
   it('substitutes args into the body, and lists a skill\'s own scripts', () => {
@@ -151,14 +191,14 @@ describe('skills on demand', () => {
     assert.equal(getSkillPrompt('demo', dir, { includeGlobal: false, args: 'one.js' }),
       'Run one.js against one.js with default.');
     // No args means the body is untouched, placeholders and all.
-    assert.equal(getSkillPrompt('demo', dir, { includeGlobal: false }),
+    assert.equal(getSkillPrompt('demo', dir, { includeGlobal: false, includeBuiltin: false }),
       'Run $1 against $ARGUMENTS with ${2:-default}.');
 
     mkdirSync(join(dir, '.sentinel', 'skills', 'demo', 'scripts'), { recursive: true });
     writeFileSync(join(dir, '.sentinel', 'skills', 'demo', 'scripts', 'verify.sh'), 'echo ok', 'utf-8');
     writeFileSync(join(dir, '.sentinel', 'skills', 'demo', 'scripts', 'run.py'), 'print(1)', 'utf-8');
     writeFileSync(join(dir, '.sentinel', 'skills', 'demo', 'notes.txt'), 'x', 'utf-8');
-    assert.deepEqual(listSkillScripts(resolveSkill('demo', dir, { includeGlobal: false })),
+    assert.deepEqual(listSkillScripts(resolveSkill('demo', dir, { includeGlobal: false, includeBuiltin: false })),
       ['scripts/run.py', 'scripts/verify.sh']);
   });
 
@@ -170,7 +210,7 @@ describe('skills on demand', () => {
     writeFileSync(join(dir, '.sentinel', 'skills', 'demo', 'scripts', 'ok.js'), 'console.log(1)', 'utf-8');
     writeFileSync(join(dir, '.sentinel', 'skills', 'demo', 'notes.txt'), 'x', 'utf-8');
     writeFileSync(join(dir, 'outside.js'), 'console.log("pwned")', 'utf-8');
-    const skill = resolveSkill('demo', dir, { includeGlobal: false });
+    const skill = resolveSkill('demo', dir, { includeGlobal: false, includeBuiltin: false });
 
     const ok = resolveSkillScript(skill, 'scripts/ok.js');
     assert.equal(ok.error, undefined, ok.error);
@@ -194,7 +234,7 @@ describe('skills on demand', () => {
       '---\nname: hidden\ndescription: d\ndisable-model-invocation: true\nargument-hint: <file>\nallowed-tools: readFile, grep\n---\nbody',
       'utf-8',
     );
-    const s = resolveSkill('hidden', dir, { includeGlobal: false });
+    const s = resolveSkill('hidden', dir, { includeGlobal: false, includeBuiltin: false });
     assert.equal(s.disableModelInvocation, true);
     assert.equal(s.argumentHint, '<file>');
     assert.equal(s.allowedTools, 'readFile, grep');
@@ -216,7 +256,7 @@ describe('skills on demand', () => {
         'utf-8',
       );
       assert.equal(
-        resolveSkill(`v${value || 'empty'}`, dir, { includeGlobal: false }).disableModelInvocation,
+        resolveSkill(`v${value || 'empty'}`, dir, { includeGlobal: false, includeBuiltin: false }).disableModelInvocation,
         false,
         `"${value}" must not disable`,
       );
@@ -224,12 +264,12 @@ describe('skills on demand', () => {
     const d = join(dir, '.sentinel', 'skills', 'von');
     mkdirSync(d, { recursive: true });
     writeFileSync(join(d, 'SKILL.md'), '---\nname: von\ndescription: d\ndisable-model-invocation: true\n---\nb', 'utf-8');
-    assert.equal(resolveSkill('von', dir, { includeGlobal: false }).disableModelInvocation, true);
+    assert.equal(resolveSkill('von', dir, { includeGlobal: false, includeBuiltin: false }).disableModelInvocation, true);
     // Absent means absent.
     const e = join(dir, '.sentinel', 'skills', 'vnone');
     mkdirSync(e, { recursive: true });
     writeFileSync(join(e, 'SKILL.md'), '---\nname: vnone\ndescription: d\n---\nb', 'utf-8');
-    assert.equal(resolveSkill('vnone', dir, { includeGlobal: false }).disableModelInvocation, false);
+    assert.equal(resolveSkill('vnone', dir, { includeGlobal: false, includeBuiltin: false }).disableModelInvocation, false);
   });
 
   it('withholds a disabled skill from the listing but still resolves it by name', () => {
@@ -244,7 +284,7 @@ describe('skills on demand', () => {
     const listing = formatSkillListing(dir, { includeGlobal: false, request: 'hidden h' });
     assert.match(listing, /visible/, 'the normal skill is advertised');
     assert.doesNotMatch(listing, /hidden/, 'the disabled one is not');
-    assert.ok(getSkillPrompt('hidden', dir, { includeGlobal: false }), 'but it still resolves');
+    assert.ok(getSkillPrompt('hidden', dir, { includeGlobal: false, includeBuiltin: false }), 'but it still resolves');
 
     // The opt-in listing is for humans (the CLI, the MCP server).
     const all = formatSkillListing(dir, { includeGlobal: false, request: 'hidden h', includeHidden: true });
@@ -262,13 +302,13 @@ describe('skills on demand', () => {
       '---\nname: hinted\ndescription: rewrite a file\nargument-hint: <file> [--flag]\n---\nRewrite $1',
       'utf-8',
     );
-    assert.match(formatSkillListing(dir, { includeGlobal: false }), /hinted: rewrite a file \(args: <file> \[--flag\]\)/);
+    assert.match(formatSkillListing(dir, { includeGlobal: false, includeBuiltin: false }), /hinted: rewrite a file \(args: <file> \[--flag\]\)/);
     // No hint, no cost: the line is exactly what it was.
     seedSkill('plain', 'just a description', 'b');
     const p2 = join(dir, '.sentinel', 'skills', 'plain2');
     mkdirSync(p2, { recursive: true });
     writeFileSync(join(p2, 'SKILL.md'), '---\nname: plain2\ndescription: d\n---\nb', 'utf-8');
-    const line = formatSkillListing(dir, { includeGlobal: false }).split('\n').find((l) => l.startsWith('- plain:'));
+    const line = formatSkillListing(dir, { includeGlobal: false, includeBuiltin: false }).split('\n').find((l) => l.startsWith('- plain:'));
     assert.equal(line, '- plain: just a description');
   });
 
@@ -284,10 +324,10 @@ describe('skills on demand', () => {
       '---\nname: scoped\ndescription: d\nallowed-tools: readFile, grep  codeMap\n---\nb',
       'utf-8',
     );
-    const s = resolveSkill('scoped', dir, { includeGlobal: false });
+    const s = resolveSkill('scoped', dir, { includeGlobal: false, includeBuiltin: false });
     assert.deepEqual([...skillAllowedTools(s)].sort(), ['codeMap', 'grep', 'readFile']);
     // Absent means "no declaration", not "no tools".
-    assert.equal(skillAllowedTools(resolveSkill('plain2', dir, { includeGlobal: false })), null);
+    assert.equal(skillAllowedTools(resolveSkill('plain2', dir, { includeGlobal: false, includeBuiltin: false })), null);
   });
 
   it('names the interpreters it looked for when none is installed', () => {
@@ -297,7 +337,7 @@ describe('skills on demand', () => {
     seedSkill('demo', 'd', 'body');
     mkdirSync(join(dir, '.sentinel', 'skills', 'demo', 'scripts'), { recursive: true });
     writeFileSync(join(dir, '.sentinel', 'skills', 'demo', 'scripts', 'x.unknownext'), 'x', 'utf-8');
-    const skill = resolveSkill('demo', dir, { includeGlobal: false });
+    const skill = resolveSkill('demo', dir, { includeGlobal: false, includeBuiltin: false });
     const r = resolveSkillScript(skill, 'scripts/x.unknownext');
     assert.match(r.error, /Unsupported script type/);
   });
