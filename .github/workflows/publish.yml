@@ -1,0 +1,114 @@
+name: Publish
+
+# Publishes to npm using OIDC trusted publishing — no long-lived token.
+#
+# ## Why this exists
+#
+# There was no publish path in CI at all, so every release meant running
+# `npm publish` by hand from a laptop. Doing that on this repository failed with
+# E404 — "you do not have permission to access it" — because the only credential
+# available locally was an automation token that npm no longer honours for
+# direct publishes (npm deprecated 2FA-bypassing automation tokens for exactly
+# this use). The failure is unrecoverable from the CLI side: it needs an account
+# change, not a retry.
+#
+# Trusted publishing removes the credential entirely. GitHub mints a short-lived,
+# cryptographically-signed OIDC token scoped to this workflow, npm CLI exchanges it
+# automatically, and no secret is ever stored. It also makes provenance
+# attestations automatic, so installs carry proof of where the tarball was built.
+#
+# ## One-time setup on npmjs.com (required, cannot be done from here)
+#
+#   Package -> Settings -> Trusted Publisher -> GitHub Actions
+#     Organization or user : KunjShah95
+#     Repository           : SENTINEL-CLI
+#     Workflow filename    : publish.yml      <- filename only, not the full path
+#     Allowed actions      : must include "npm publish"   <- see below
+#
+# Two things here are easy to get wrong and both fail only at publish time,
+# because npm does not validate the configuration when you save it:
+#
+#   - Configurations created after 2026-09-03 default to allowing
+#     `npm stage publish` ONLY. Without ticking "npm publish", this workflow will
+#     be refused. Either allow it, or switch the publish step to
+#     `npm stage publish` and approve from the CLI or the website.
+#   - A new configuration must complete its first successful publish within
+#     2 days or it expires and has to be recreated.
+#
+# `package.json`'s `repository.url` already matches this GitHub repository,
+# which trusted publishing requires.
+#
+# ## Why v3.5.0 needs workflow_dispatch
+#
+# That tag was pushed before this workflow existed, so the `push` trigger never
+# fired for it and never will. Publishing it requires a manual run — which is
+# also why `workflow_dispatch` is wired to the same file rather than a separate
+# one. npm validates the workflow that *contains* the publish command, so
+# splitting the trigger into a second workflow would mismatch the configured
+# filename.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+# The OIDC token is what authenticates the publish; contents:read is the floor
+# for checking out the tag. No NPM_TOKEN secret exists or is needed.
+permissions:
+  id-token: write
+  contents: read
+
+# Two tags in flight at once would race to publish the same version.
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest # self-hosted runners are not supported by OIDC
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # OIDC needs npm >= 11.5.1, which ships with Node 24. The CI matrix
+          # runs Node 20/22 (npm 10.x) — those can build and test but cannot
+          # publish, so this job pins its own version rather than inheriting one.
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+          # npm docs: never cache in a release build. A cached tarball in the
+          # publish path is a class of bug that only ever shows up during a
+          # release, which is the worst possible time to discover it.
+          cache: false
+
+      - name: Verify the tag matches package.json
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          tag="${GITHUB_REF#refs/tags/}"
+          pkg="$(node -p "require('./package.json').version")"
+          if [ "$tag" != "v$pkg" ]; then
+            echo "::error::tag $tag does not match package.json version $pkg"
+            echo "::error::npm would publish $pkg under a $tag tag, and published versions are immutable"
+            exit 1
+          fi
+          echo "Tag $tag matches package.json $pkg"
+
+      - run: npm ci
+
+      # Publishing is irreversible, so the full gate runs here rather than
+      # trusting that whoever pushed the tag also waited for CI on main.
+      - run: npm run release:check
+
+      # No NODE_AUTH_TOKEN. npm CLI detects the OIDC environment and exchanges
+      # the GitHub-issued identity for a short-lived publish token by itself.
+      # Provenance is generated automatically for trusted publishes from a
+      # public repo — do not add --provenance, and do not add a token here.
+      - name: Publish to npm
+        run: npm publish
+
+      - name: Report
+        run: |
+          echo "Published sentinel-cli@$(node -p "require('./package.json').version")"
+          echo "Registry propagation takes a few minutes; check with:"
+          echo "  npm view sentinel-cli version"
