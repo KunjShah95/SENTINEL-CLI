@@ -100,7 +100,7 @@ function TermLine({ line }: { line: Line }) {
     default:
       return (
         <p className={cn(base, "text-muted")}>
-          <span className="text-ink-600">▸</span>
+          <span className="text-ink-500">▸</span>
           <span className="min-w-0 flex-1 truncate text-paper/85">{line.text}</span>
           <span className="shrink-0 text-muted">{line.meta}</span>
         </p>

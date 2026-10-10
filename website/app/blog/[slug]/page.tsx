@@ -173,7 +173,7 @@ export default async function PostPage({ params }: { params: Promise<{ slug: str
             Written by {site.author}
           </h2>
           <p className="mt-2 text-sm leading-6 text-muted">
-            Sentinel is an open source AI coding agent for the terminal — MIT licensed, no servers,
+            Sentinel is an open source AI coding agent for the terminal, MIT licensed, no servers,
             no telemetry.{" "}
             <a href={site.repo} className="text-moss underline-offset-4 hover:underline">
               Read the source

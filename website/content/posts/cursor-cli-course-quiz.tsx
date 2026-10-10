@@ -8,7 +8,7 @@ export default {
   title: "Quiz: can you spot the three agents that would leak?",
   metaTitle: "Cursor-Style CLI Quiz: Spot the Leaks",
   description:
-    "Twelve questions on building a terminal coding agent — with answers, because the wrong options are more instructive than the right ones.",
+    "Twelve questions on building a terminal coding agent, with answers, because the wrong options are more instructive than the right ones.",
   date: "2026-10-15",
   readingMinutes: 11,
   tags: ["Quiz", "Tutorial", "Security"],
@@ -18,11 +18,11 @@ export default {
   faq: [
     {
       q: "How should I use this quiz?",
-      a: "Answer before reading the explanations, and treat a wrong answer as more informative than a right one. The wrong options are all things that look reasonable, ship, and pass a code review — which is precisely why they get written. If you get all twelve right, the next thing worth doing is writing the parts you disagreed with, because an agent you can defend is an agent your team will adopt.",
+      a: "Answer before reading the explanations, and treat a wrong answer as more informative than a right one. The wrong options are all things that look reasonable, ship, and pass a code review. Which is precisely why they get written. If you get all twelve right, the next thing worth doing is writing the parts you disagreed with, because an agent you can defend is an agent your team will adopt.",
     },
     {
       q: "Is there a score that means 'ready to build this'?",
-      a: "Not really. What matters is whether you can explain why the wrong options are wrong without referring to the article. Questions 4, 5 and 8 are the ones that separate 'has read about guard rails' from 'has had to debug one' — if those three are shaky, read parts 8 through 10 again rather than pressing on.",
+      a: "Not really. What matters is whether you can explain why the wrong options are wrong without referring to the article. Questions 4, 5 and 8 are the ones that separate 'has read about guard rails' from 'has had to debug one'. If those three are shaky, read parts 8 through 10 again rather than pressing on.",
     },
     {
       q: "Why are there so many questions about refusals?",
@@ -66,10 +66,10 @@ export default {
 
       <H2 id="q2" text="2. A user approves `git commit` for the session. Later the agent runs `git push --force`. What should happen?" />
       <ol className="list-[a] space-y-1.5 pl-5 text-muted marker:text-moss">
-        <li>It runs — bash is allowed.</li>
-        <li>It asks — force-push is a different command shape.</li>
-        <li>It runs — the session grant covers all git.</li>
-        <li>It is denied permanently — git is dangerous.</li>
+        <li>It runs. Bash is allowed.</li>
+        <li>It asks, force-push is a different command shape.</li>
+        <li>It runs, the session grant covers all git.</li>
+        <li>It is denied permanently. Git is dangerous.</li>
       </ol>
       <p className="text-sm text-moss">
         <strong>B.</strong> A session grant covers a <em>shape</em>. This only works if{" "}
@@ -90,8 +90,8 @@ export default {
         <li>Not setting `signal` on the fetch.</li>
       </ol>
       <p className="text-sm text-moss">
-        <strong>B.</strong> Servers routinely close without a trailing blank line, so the final frame —
-        carrying <code className="font-mono text-[13px]">finish_reason</code> and usage — is still in
+        <strong>B.</strong> Servers routinely close without a trailing blank line, so the final frame
+        (carrying <code className="font-mono text-[13px]">finish_reason</code> and usage) is still in
         your accumulator. (A is a real bug too: you get replacement characters mid-word. It breaks
         output rather than billing.) See{" "}
         <Link href="/blog/first-agent-turn-claude-agent-sdk" className="text-moss underline-offset-4 hover:underline">
@@ -108,7 +108,7 @@ export default {
         <li>Disable animation whenever `--json` is passed.</li>
       </ol>
       <p className="text-sm text-moss">
-        <strong>C.</strong> B is necessary but not sufficient — CI captures both streams, so stderr
+        <strong>C.</strong> B is necessary but not sufficient, CI captures both streams, so stderr
         frames land in the log too. D handles one code path and misses the twenty other ways CI runs
         your tool. See{" "}
         <Link href="/blog/chalk-figlet-terminal-banner" className="text-moss underline-offset-4 hover:underline">
@@ -119,21 +119,21 @@ export default {
 
       <H2 id="q5" text="5. The risk ledger file is corrupted by a merge conflict. What happens?" />
       <ol className="list-[a] space-y-1.5 pl-5 text-muted marker:text-moss">
-        <li>It falls back to prompting on everything — correct.</li>
+        <li>It falls back to prompting on everything, correct.</li>
         <li>It falls back to allowing everything for the session.</li>
         <li>It refuses all shell commands until fixed.</li>
         <li>It regenerates an empty ledger and logs a warning.</li>
       </ol>
       <p className="text-sm text-moss">
         <strong>A.</strong> The module fails closed: unreadable is treated as empty, and empty means
-        every novel command is asked. B is the trap — a truncated write silently disables the whole
+        every novel command is asked. B is the trap, a truncated write silently disables the whole
         mechanism, and disables it <em>quietly</em>. See part 9.
       </p>
 
       <H2 id="q6" text="6. Why record tool-call arguments in history when trimming for a request budget?" />
       <ol className="list-[a] space-y-1.5 pl-5 text-muted marker:text-moss">
         <li>For debugging, so a trace is complete.</li>
-        <li>They count toward request size — one big writeFile can blow the limit.</li>
+        <li>They count toward request size, one big writeFile can blow the limit.</li>
         <li>Because the provider requires them alongside tool results.</li>
         <li>To let the model see what it already wrote.</li>
       </ol>
@@ -145,7 +145,7 @@ export default {
 
       <H2 id="q7" text="7. The user presses Ctrl-C mid-turn. Which cleanup happens automatically?" />
       <ol className="list-[a] space-y-1.5 pl-5 text-muted marker:text-moss">
-        <li>Nothing — you need an explicit handler per resource.</li>
+        <li>Nothing, you need an explicit handler per resource.</li>
         <li>The generator's `finally` blocks run.</li>
         <li>The HTTP request is aborted.</li>
         <li>All three, automatically.</li>
@@ -154,7 +154,7 @@ export default {
         <strong>B.</strong> Breaking a <code className="font-mono text-[13px]">for await</code> loop
         calls the generator&rsquo;s <code className="font-mono text-[13px]">.return()</code>, which runs{" "}
         <code className="font-mono text-[13px]">finally</code>. C still needs an{" "}
-        <code className="font-mono text-[13px]">AbortSignal</code> threaded into the provider call —
+        <code className="font-mono text-[13px]">AbortSignal</code> threaded into the provider call, 
         the socket does not know about your loop. See{" "}
         <Link href="/blog/chat-cli-async-generators" className="text-moss underline-offset-4 hover:underline">
           part 7
@@ -172,7 +172,7 @@ export default {
       <p className="text-sm text-moss">
         <strong>A</strong>, with the reason being adoption rather than logic. A gate that fires
         repeatedly trains people to disable it, and a disabled gate is worse than none because you stop
-        looking for it. C is not true — the state is per path, not per turn. See part 10.
+        looking for it. C is not true. The state is per path, not per turn. See part 10.
       </p>
 
       <H2 id="q9" text="9. Which mode lets an agent edit files but not execute commands?" />
@@ -184,7 +184,7 @@ export default {
       </ol>
       <p className="text-sm text-moss">
         <strong>B.</strong> This is the most useful mode most permission designs skip. It is the
-        difference between &ldquo;let it help&rdquo; and &ldquo;let it help and verify&rdquo; — and the
+        difference between &ldquo;let it help&rdquo; and &ldquo;let it help and verify&rdquo;, and the
         reason teams end up either refusing writes entirely or granting shell access. See part 8.
       </p>
 
@@ -252,7 +252,7 @@ export default {
           ],
           [
             "0–4",
-            "Not a problem — these are subtle by design. Start at part 3, since the output discipline is the cheapest habit to build",
+            "Not a problem. These are subtle by design. Start at part 3, since the output discipline is the cheapest habit to build",
           ],
         ]}
       />
@@ -277,11 +277,11 @@ export default {
         items={[
           {
             q: "How should I use this quiz?",
-            a: "Answer before reading the explanations, and treat a wrong answer as more informative than a right one. The wrong options are all things that look reasonable, ship, and pass a code review — which is precisely why they get written. If you get all twelve right, the next thing worth doing is writing the parts you disagreed with, because an agent you can defend is an agent your team will adopt.",
+            a: "Answer before reading the explanations, and treat a wrong answer as more informative than a right one. The wrong options are all things that look reasonable, ship, and pass a code review. Which is precisely why they get written. If you get all twelve right, the next thing worth doing is writing the parts you disagreed with, because an agent you can defend is an agent your team will adopt.",
           },
           {
             q: "Is there a score that means 'ready to build this'?",
-            a: "Not really. What matters is whether you can explain why the wrong options are wrong without referring to the article. Questions 4, 5 and 8 are the ones that separate 'has read about guard rails' from 'has had to debug one' — if those three are shaky, read parts 8 through 10 again rather than pressing on.",
+            a: "Not really. What matters is whether you can explain why the wrong options are wrong without referring to the article. Questions 4, 5 and 8 are the ones that separate 'has read about guard rails' from 'has had to debug one'. If those three are shaky, read parts 8 through 10 again rather than pressing on.",
           },
           {
             q: "Why are there so many questions about refusals?",

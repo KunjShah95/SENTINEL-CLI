@@ -8,7 +8,7 @@ export default {
   title: "Terminal output that survives being piped into a file",
   metaTitle: "Terminal UI With Chalk and Figlet",
   description:
-    "Using Chalk and Figlet to make a CLI look finished — and the TTY, NO_COLOR and buffering rules that stop your banner from ending up inside someone else's data file.",
+    "Using Chalk and Figlet to make a CLI look finished, and the TTY, NO_COLOR and buffering rules that stop your banner from ending up inside someone else's data file.",
   date: "2026-10-07",
   readingMinutes: 10,
   tags: ["Tutorial", "CLI", "Chalk", "Terminal"],
@@ -61,8 +61,8 @@ export default {
  * Whether we are talking to a human at a terminal.
  *
  * Two separate questions get conflated here, so keep them apart:
- *   isTTY     — is there a terminal on the other end at all?
- *   supportsColor — will it render ANSI, and did the user ask us not to?
+ *   isTTY. Is there a terminal on the other end at all?
+ *   supportsColor, will it render ANSI, and did the user ask us not to?
  *
  * Chalk answers the second (including NO_COLOR and FORCE_COLOR). The first is
  * ours to check, and it is the one that decides whether a spinner may exist.
@@ -136,7 +136,7 @@ const RESET = '\\x1b[0m';
 export function renderDoctor(report) {
   const lines = [];
   for (const c of report.checks) {
-    lines.push(\`\${COLOR[c.level]}\${MARK[c.level]}\${RESET} \${c.title} — \${c.detail}\`);
+    lines.push(\`\${COLOR[c.level]}\${MARK[c.level]}\${RESET} \${c.title}, \${c.detail}\`);
     if (c.hint && c.level !== 'pass') lines.push(\`  \${chalk.gray(c.hint)}\`);
   }
   return lines.join('\\n');
@@ -269,7 +269,7 @@ export function spinner(label, delay = DELAY_MS) {
       <CodeBlock
         label="src/agent/table.js"
         code={`/**
- * Pad to the widest cell. Display width, not .length — the box-drawing and
+ * Pad to the widest cell. Display width, not .length, the box-drawing and
  * unicode marks people use in file paths would otherwise skew every column.
  */
 function width(s) {

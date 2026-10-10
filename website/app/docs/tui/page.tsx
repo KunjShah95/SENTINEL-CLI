@@ -4,7 +4,7 @@ import { pageMeta } from "@/lib/seo";
 export const metadata: Metadata = pageMeta({
   title: "TUI commands",
   description:
-    "Every Sentinel slash command — model, session, diff, undo, redo, export, compact — plus shell passthrough with ! and agent personas with @agent.",
+    "Every Sentinel slash command (model, session, diff, undo, redo, export, compact), plus shell passthrough with ! and agent personas with @agent.",
   path: "/docs/tui",
   keywords: ["terminal ui commands", "cli slash commands", "sentinel tui"],
 });

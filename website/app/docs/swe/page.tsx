@@ -25,11 +25,11 @@ export default function Swe() {
 
       <h2 className="pt-4 text-xl font-semibold">The five phases</h2>
       <ol className="list-decimal space-y-2 pl-5 text-muted marker:text-moss">
-        <li><strong className="text-paper">Reproduce</strong> — run the failing tests with <code className="font-mono text-[13px] text-paper">runTests</code> first. If you cannot reproduce, stop — do not guess.</li>
-        <li><strong className="text-paper">Localize</strong> — <code className="font-mono text-[13px] text-paper">codeMap</code> for orientation, then grep + read. Read the test file first; it is the specification.</li>
-        <li><strong className="text-paper">Fix</strong> — smallest edit that addresses the root cause. Never rewrite files, never edit tests to make them pass.</li>
-        <li><strong className="text-paper">Verify</strong> — re-run the repro and failing tests. All must pass.</li>
-        <li><strong className="text-paper">Regress</strong> — run the related passing suite. On regression, <code className="font-mono text-[13px] text-paper">undoLastChange</code> and retry.</li>
+        <li><strong className="text-paper">Reproduce</strong>: run the failing tests with <code className="font-mono text-[13px] text-paper">runTests</code> first. If you cannot reproduce, stop, do not guess.</li>
+        <li><strong className="text-paper">Localize</strong>: <code className="font-mono text-[13px] text-paper">codeMap</code> for orientation, then grep + read. Read the test file first; it is the specification.</li>
+        <li><strong className="text-paper">Fix</strong>: smallest edit that addresses the root cause. Never rewrite files, never edit tests to make them pass.</li>
+        <li><strong className="text-paper">Verify</strong>: re-run the repro and failing tests. All must pass.</li>
+        <li><strong className="text-paper">Regress</strong>: run the related passing suite. On regression, <code className="font-mono text-[13px] text-paper">undoLastChange</code> and retry.</li>
       </ol>
 
       <h2 className="pt-4 text-xl font-semibold">Offline capability gates</h2>
@@ -39,7 +39,7 @@ export default function Swe() {
       <CodeBlock label="bash" code={"npm run eval:check              # validate fixtures + graders (CI-gated)\nnode evals/run.mjs --agent --model gpt-6-luna   # real agent runs + report"} />
       <p className="text-muted">
         Every task ships a pristine fixture (must fail), a reference solution
-        (must pass), and a Node grader — so results are reproducible on Linux,
+        (must pass), and a Node grader, so results are reproducible on Linux,
         macOS, and Windows.
       </p>
 
@@ -47,7 +47,7 @@ export default function Swe() {
         <Callout title="Honest benchmarking">
           Bench gates measure tool capability, not model reasoning. Real
           SWE-bench % scores require the official Docker harness plus a model
-          key — report them with harness version, model id, and retries, never
+          key, report them with harness version, model id, and retries, never
           as self-awarded numbers.
         </Callout>
       </div>

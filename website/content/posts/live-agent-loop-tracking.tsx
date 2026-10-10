@@ -26,7 +26,7 @@ export default {
     },
     {
       q: "What should I actually look at when a turn goes wrong?",
-      a: "The tool calls that produced an error, in order, with their inputs. Not the text the model wrote — the model is usually correct about what it was trying to do. Start from `summarizeEvents`, which already reduces a trace to the tool sequence, the files written, the errors and the finish state, and diff that against a run that worked.",
+      a: "The tool calls that produced an error, in order, with their inputs. Not the text the model wrote. The model is usually correct about what it was trying to do. Start from `summarizeEvents`, which already reduces a trace to the tool sequence, the files written, the errors and the finish state, and diff that against a run that worked.",
     },
     {
       q: "Does recording every turn cost anything at runtime?",
@@ -90,12 +90,12 @@ export default {
       <CodeBlock
         label="src/agent/trajectory.js"
         code={`/**
- * Trajectory logging — every agent turn recorded as JSONL.
+ * Trajectory logging, every agent turn recorded as JSONL.
  *
  * Why: traces are the raw material for all eval work (trace first, derive
  * evals from real failures). One small JSONL file per run under
  * \`.sentinel/trajectories/\`. Graders, the eval runner, and humans read
- * these — never the model.
+ * these, never the model.
  *
  * Record shape (OpenTelemetry-flavored, file-first, no SDK dependency):
  *   { ts, runId (=traceId), seq, event, data?, model?, mode?,
@@ -139,7 +139,7 @@ function truncateData(data) {
         label="src/agent/trajectory.js"
         code={`/**
  * Wrap an event generator: every yielded {event, data} is appended as one
- * JSONL line, then passed through untouched. Never throws — logging must
+ * JSONL line, then passed through untouched. Never throws, logging must
  * not break the turn it observes.
  */
 export async function* withTrajectory(source, { runId = newRunId(), model, mode, prompt, goal } = {}) {
@@ -340,7 +340,7 @@ ls -t .sentinel/trajectories/*.jsonl | head
 # the raw event stream for one run
 cat .sentinel/trajectories/9f3c1a2b7d4e5081.jsonl | head -5
 
-# the tool sequence — the fastest answer to "what did it actually do?"
+# the tool sequence, the fastest answer to "what did it actually do?"
 grep -o '"event":"tool_call"' -c .sentinel/trajectories/*.jsonl
 
 # find every turn that hit a guard rail
@@ -482,7 +482,7 @@ node -e "
           },
           {
             q: "What should I actually look at when a turn goes wrong?",
-            a: "The tool calls that produced an error, in order, with their inputs. Not the text the model wrote — the model is usually correct about what it was trying to do. Start from `summarizeEvents`, which already reduces a trace to the tool sequence, the files written, the errors and the finish state, and diff that against a run that worked.",
+            a: "The tool calls that produced an error, in order, with their inputs. Not the text the model wrote. The model is usually correct about what it was trying to do. Start from `summarizeEvents`, which already reduces a trace to the tool sequence, the files written, the errors and the finish state, and diff that against a run that worked.",
           },
           {
             q: "Does recording every turn cost anything at runtime?",

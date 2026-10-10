@@ -8,7 +8,7 @@ export default {
   title: "The cautious tech lead asks three questions. Answer those.",
   metaTitle: "Convincing a Cautious Tech Lead to Adopt an Agent",
   description:
-    "How to answer a sceptical tech lead about running a terminal coding agent on a production repo — the questions they actually ask, and what you can honestly offer instead of a demo.",
+    "How to answer a sceptical tech lead about running a terminal coding agent on a production repo, the questions they actually ask, and what you can honestly offer instead of a demo.",
   date: "2026-10-16",
   readingMinutes: 12,
   tags: ["Adoption", "Architecture", "Engineering Management"],
@@ -18,15 +18,15 @@ export default {
   faq: [
     {
       q: "What if the tech lead's objection is fundamentally about trust in vendors?",
-      a: "Then it is not an objection you should argue away, because it may be correct for your context — regulated data, a contractual no-training requirement, a procurement process that takes six months. The answer that works is to show what the agent looks like with a local model: point it at Ollama or LM Studio and no request leaves the machine. That does not satisfy a vendor objection about the model, but it satisfies the operational one, which is usually the real blocker, and it lets the conversation move to tooling where you have actual leverage.",
+      a: "Then it is not an objection you should argue away, because it may be correct for your context, regulated data, a contractual no-training requirement, a procurement process that takes six months. The answer that works is to show what the agent looks like with a local model: point it at Ollama or LM Studio and no request leaves the machine. That does not satisfy a vendor objection about the model, but it satisfies the operational one, which is usually the real blocker, and it lets the conversation move to tooling where you have actual leverage.",
     },
     {
       q: "How do I pitch this to someone who has been burned by an AI tool before?",
-      a: "Do not pitch it as AI. Pitch it as a permission system, because that is what they actually need to govern, and what they have no equivalent for today. The interesting claim is not 'the model is smart' — it is 'every action this tool takes passes through an allowlist I can print and read'. That framing sidesteps the hype objection entirely, and it happens to be the part of the system that is hardest to build well.",
+      a: "Do not pitch it as AI. Pitch it as a permission system, because that is what they actually need to govern, and what they have no equivalent for today. The interesting claim is not 'the model is smart'. It is 'every action this tool takes passes through an allowlist I can print and read'. That framing sidesteps the hype objection entirely, and it happens to be the part of the system that is hardest to build well.",
     },
     {
       q: "What if they want a pilot?",
-      a: "Good — agree immediately and make it concrete, because a pilot is the only thing that settles this argument. The mistake is proposing a time-boxed trial without a success criterion, which just delays the decision. Propose instead: one repository, one named owner, PLAN mode only for two weeks, with three things measured — questions answered without help, time saved on unfamiliar-codebase tasks, and zero writes outside the pilot repository. A pilot that cannot fail is not a pilot.",
+      a: "Good, agree immediately and make it concrete, because a pilot is the only thing that settles this argument. The mistake is proposing a time-boxed trial without a success criterion, which just delays the decision. Propose instead: one repository, one named owner, PLAN mode only for two weeks, with three things measured, questions answered without help, time saved on unfamiliar-codebase tasks, and zero writes outside the pilot repository. A pilot that cannot fail is not a pilot.",
     },
   ],
   body: () => (
@@ -200,7 +200,7 @@ active  ████████░░░░░░░░░░░░  $6.12 of $
           [
             "The model can be confidently wrong",
             "Real, and not solved by anything on this list",
-            "The controls reduce blast radius; they do not improve judgement. This is why the permission model is code and not a prompt — but do not oversell it",
+            "The controls reduce blast radius; they do not improve judgement. This is why the permission model is code and not a prompt. But do not oversell it",
           ],
           [
             "It will train people to accept unreviewed writes",
@@ -210,7 +210,7 @@ active  ████████░░░░░░░░░░░░  $6.12 of $
           [
             "A tool with shell access on a production repo is a supply-chain risk",
             "Legitimate, and the one to resolve before deploying",
-            "Offer FIX mode for unattended work — edits with no shell — and run the pilot on a repository with a working restore procedure",
+            "Offer FIX mode for unattended work (edits with no shell), and run the pilot on a repository with a working restore procedure",
           ],
         ]}
       />
@@ -236,7 +236,7 @@ Owner:       one named engineer, who is also the person who reports back
 Duration:    two weeks
 Measured:    (a) unfamiliar-codebase questions answered without help
              (b) hours spent on those questions before, from git history
-             (c) zero writes — trivially true, and stated anyway so it is checked
+             (c) zero writes, trivially true, and stated anyway so it is checked
 
 Kill switch: delete .sentinel/ and remove the binary. No server, no database,
              no data to migrate out.`}
@@ -318,15 +318,15 @@ Kill switch: delete .sentinel/ and remove the binary. No server, no database,
         items={[
           {
             q: "What if the tech lead's objection is fundamentally about trust in vendors?",
-            a: "Then it is not an objection you should argue away, because it may be correct for your context — regulated data, a contractual no-training requirement, a procurement process that takes six months. The answer that works is to show what the agent looks like with a local model: point it at Ollama or LM Studio and no request leaves the machine. That does not satisfy a vendor objection about the model, but it satisfies the operational one, which is usually the real blocker, and it lets the conversation move to tooling where you have actual leverage.",
+            a: "Then it is not an objection you should argue away, because it may be correct for your context, regulated data, a contractual no-training requirement, a procurement process that takes six months. The answer that works is to show what the agent looks like with a local model: point it at Ollama or LM Studio and no request leaves the machine. That does not satisfy a vendor objection about the model, but it satisfies the operational one, which is usually the real blocker, and it lets the conversation move to tooling where you have actual leverage.",
           },
           {
             q: "How do I pitch this to someone who has been burned by an AI tool before?",
-            a: "Do not pitch it as AI. Pitch it as a permission system, because that is what they actually need to govern, and what they have no equivalent for today. The interesting claim is not 'the model is smart' — it is 'every action this tool takes passes through an allowlist I can print and read'. That framing sidesteps the hype objection entirely, and it happens to be the part of the system that is hardest to build well.",
+            a: "Do not pitch it as AI. Pitch it as a permission system, because that is what they actually need to govern, and what they have no equivalent for today. The interesting claim is not 'the model is smart'. It is 'every action this tool takes passes through an allowlist I can print and read'. That framing sidesteps the hype objection entirely, and it happens to be the part of the system that is hardest to build well.",
           },
           {
             q: "What if they want a pilot?",
-            a: "Good — agree immediately and make it concrete, because a pilot is the only thing that settles this argument. The mistake is proposing a time-boxed trial without a success criterion, which just delays the decision. Propose instead: one repository, one named owner, PLAN mode only for two weeks, with three things measured — questions answered without help, time saved on unfamiliar-codebase tasks, and zero writes outside the pilot repository. A pilot that cannot fail is not a pilot.",
+            a: "Good, agree immediately and make it concrete, because a pilot is the only thing that settles this argument. The mistake is proposing a time-boxed trial without a success criterion, which just delays the decision. Propose instead: one repository, one named owner, PLAN mode only for two weeks, with three things measured, questions answered without help, time saved on unfamiliar-codebase tasks, and zero writes outside the pilot repository. A pilot that cannot fail is not a pilot.",
           },
         ]}
       />

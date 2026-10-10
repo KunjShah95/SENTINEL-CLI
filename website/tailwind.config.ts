@@ -13,6 +13,22 @@ const config: Config = {
           800: "#222622",
           700: "#323732",
           600: "#474D47",
+          /**
+           * The lightest gray still permitted to carry text.
+           *
+           * ink-600 measured 2.15:1 on ink-900, so every step number, sidebar
+           * label and link arrow drawn in it failed WCAG AA at 4.5:1 by more
+           * than half. It looked deliberate, which is what made it durable:
+           * "subtle" reads as an intentional tier until someone measures it.
+           *
+           * Lightened along the same hue (green stays 6 above red) until it
+           * clears AA on every background it is used against: 5.22 on ink-950,
+           * 4.95 on ink-900, 4.65 on ink-850. Worst-case headroom +0.15.
+           *
+           * ink-600 is kept for non-text marks only, where 3:1 applies and
+           * nothing is being read.
+           */
+          500: "#7F857F",
         },
         paper: "#ECEEE9",
         muted: "#959C94",

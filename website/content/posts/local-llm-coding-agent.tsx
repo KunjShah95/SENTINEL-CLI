@@ -17,7 +17,7 @@ export default {
   faq: [
     {
       q: "Can an AI coding agent run fully offline?",
-      a: "Yes, if the model is local. With Ollama or LM Studio running on the same machine, the agent, the model and the tools all execute locally and no request leaves your network. The agent binary being open source is not sufficient on its own — a local model is what actually makes the run private, because the model call is where your source code would otherwise be sent.",
+      a: "Yes, if the model is local. With Ollama or LM Studio running on the same machine, the agent, the model and the tools all execute locally and no request leaves your network. The agent binary being open source is not sufficient on its own, a local model is what actually makes the run private, because the model call is where your source code would otherwise be sent.",
     },
     {
       q: "What is the best local model size for coding?",
@@ -25,7 +25,7 @@ export default {
     },
     {
       q: "Are local models cheaper than hosted APIs?",
-      a: "Per token, no — a local token costs electricity and hardware you already own. Per engineering hour, often yes, if the tasks you route locally are the high-volume mechanical ones. Local inference is free at the margin, which makes it a good fit for a standing loop that wakes on every failed test, and a poor fit for the one hard reasoning problem you need to get right.",
+      a: "Per token, no. A local token costs electricity and hardware you already own. Per engineering hour, often yes, if the tasks you route locally are the high-volume mechanical ones. Local inference is free at the margin, which makes it a good fit for a standing loop that wakes on every failed test, and a poor fit for the one hard reasoning problem you need to get right.",
     },
   ],
   body: () => (
@@ -57,7 +57,7 @@ export default {
       <ul className="list-disc space-y-1.5 pl-5 text-muted marker:text-ink-700">
         <li>
           <strong className="text-paper">Your code cannot leave your infrastructure.</strong> Not a
-          policy promise from a vendor, not a zero-retention setting with an expiry — a network fact
+          policy promise from a vendor, not a zero-retention setting with an expiry, a network fact
           you can verify with <code className="font-mono text-[13px]">lsof</code>.
         </li>
         <li>
@@ -83,7 +83,7 @@ ollama serve
 # 2. pull a coding-capable model
 ollama pull qwen2.5-coder:14b
 
-# 3. run the agent — no API key of any kind
+# 3. run the agent, no API key of any kind
 cd SENTINEL-CLI && npm install && npm link
 sentinel`}
       />
@@ -113,7 +113,7 @@ sentinel ask "list the entry points in src/agent"`}
         The column people underrate is <strong>context</strong>. Coding agents live on how much of
         the repo they can hold at once, and local models generally ship with shorter context
         windows than hosted frontier models. Past roughly 30B parameters, the wall you hit is your
-        context budget rather than your VRAM — which is why compaction, read-only code maps and hard
+        context budget rather than your VRAM. Which is why compaction, read-only code maps and hard
         output caps exist as features rather than as niceties.
       </p>
 
@@ -126,7 +126,7 @@ sentinel ask "list the entry points in src/agent"`}
       </p>
       <p>
         Two practical consequences. First, prefer a model explicitly tuned for tool use over a
-        general chat model. Second, give it fewer, wider tools — every additional tool is another
+        general chat model. Second, give it fewer, wider tools, every additional tool is another
         chance to pick the wrong one.
       </p>
 
@@ -172,7 +172,7 @@ sentinel ask -m claude-sonnet-4 "why does this deadlock only under load?"`}
         />
         <Failure
           title="Hallucinated paths"
-          body="Symptom: it claims to have edited a file that does not exist. Fix: this is what the sandbox is for — an out-of-root path is rejected rather than created, so the failure is loud."
+          body="Symptom: it claims to have edited a file that does not exist. Fix: this is what the sandbox is for, an out-of-root path is rejected rather than created, so the failure is loud."
         />
       </div>
 
@@ -189,7 +189,7 @@ sentinel ask -m claude-sonnet-4 "why does this deadlock only under load?"`}
         items={[
           {
             q: "Can an AI coding agent run fully offline?",
-            a: "Yes, if the model is local. With Ollama or LM Studio running on the same machine, the agent, the model and the tools all execute locally and no request leaves your network. The agent binary being open source is not sufficient on its own — a local model is what actually makes the run private, because the model call is where your source code would otherwise be sent.",
+            a: "Yes, if the model is local. With Ollama or LM Studio running on the same machine, the agent, the model and the tools all execute locally and no request leaves your network. The agent binary being open source is not sufficient on its own, a local model is what actually makes the run private, because the model call is where your source code would otherwise be sent.",
           },
           {
             q: "What is the best local model size for coding?",
@@ -197,7 +197,7 @@ sentinel ask -m claude-sonnet-4 "why does this deadlock only under load?"`}
           },
           {
             q: "Are local models cheaper than hosted APIs?",
-            a: "Per token, no — a local token costs electricity and hardware you already own. Per engineering hour, often yes, if the tasks you route locally are the high-volume mechanical ones. Local inference is free at the margin, which makes it a good fit for a standing loop that wakes on every failed test, and a poor fit for the one hard reasoning problem you need to get right.",
+            a: "Per token, no. A local token costs electricity and hardware you already own. Per engineering hour, often yes, if the tasks you route locally are the high-volume mechanical ones. Local inference is free at the margin, which makes it a good fit for a standing loop that wakes on every failed test, and a poor fit for the one hard reasoning problem you need to get right.",
           },
         ]}
       />

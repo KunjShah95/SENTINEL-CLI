@@ -18,15 +18,15 @@ export default {
   faq: [
     {
       q: "Do I need the Claude Agent SDK for this, or is raw fetch better?",
-      a: "Raw fetch is better for learning and better for a product with more than one provider. The SDK is excellent and it is what I would reach for to ship something tomorrow — it ships file and shell tools, permission modes and hooks that would otherwise be weeks of work. But it hides exactly the two things this part exists to teach: how a tool call is actually assembled from a stream, and why three providers disagree about how to spell it. Once you have read this part, the SDK stops being magic and starts being a convenience.",
+      a: "Raw fetch is better for learning and better for a product with more than one provider. The SDK is excellent and it is what I would reach for to ship something tomorrow, it ships file and shell tools, permission modes and hooks that would otherwise be weeks of work. But it hides exactly the two things this part exists to teach: how a tool call is actually assembled from a stream, and why three providers disagree about how to spell it. Once you have read this part, the SDK stops being magic and starts being a convenience.",
     },
     {
       q: "Why normalise provider responses into one event shape?",
-      a: "Because the alternative is a switch statement in every consumer. The moment you have a terminal UI, a JSON pipeline and an MCP server, you have three places that each need to understand Anthropic's `content_block_delta` events and OpenAI's `choices[0].delta`. Normalising once at the client boundary means a provider bug is a one-file fix and the loop never learns a provider exists. Sentinel yields five event types — text, reasoning, tool_call, usage, error — and that set has not changed as providers were added.",
+      a: "Because the alternative is a switch statement in every consumer. The moment you have a terminal UI, a JSON pipeline and an MCP server, you have three places that each need to understand Anthropic's `content_block_delta` events and OpenAI's `choices[0].delta`. Normalising once at the client boundary means a provider bug is a one-file fix and the loop never learns a provider exists. Sentinel yields five event types (text, reasoning, tool_call, usage, error), and that set has not changed as providers were added.",
     },
     {
       q: "What is the most common SSE bug?",
-      a: "Not flushing the buffer after the stream ends. Servers routinely close the connection without a trailing blank line, so the final frame — which usually carries `finish_reason` and the token usage — is still sitting in your accumulator. Drop it and you lose the cost accounting for every single turn. It is worth writing the test that asserts usage is present after a stream that ends without a trailing newline, because that is exactly the case your dev server will never produce.",
+      a: "Not flushing the buffer after the stream ends. Servers routinely close the connection without a trailing blank line, so the final frame, which usually carries `finish_reason` and the token usage, is still sitting in your accumulator. Drop it and you lose the cost accounting for every single turn. It is worth writing the test that asserts usage is present after a stream that ends without a trailing newline, because that is exactly the case your dev server will never produce.",
     },
     {
       q: "How many tool-call iterations should one turn allow?",
@@ -39,7 +39,7 @@ export default {
         <p>
           A turn is a loop, and the loop is not the interesting part. The interesting part is the{" "}
           <strong>client boundary</strong>: one function that turns a provider&rsquo;s wire format into{" "}
-          <em>your</em> event shape. Everything downstream — the loop, the UI, the cost accounting —
+          <em>your</em> event shape. Everything downstream (the loop, the UI, the cost accounting) 
           then works against one contract instead of three dialects.
         </p>
         <p>
@@ -59,7 +59,7 @@ export default {
       <CodeBlock
         label="src/agent/providers.js"
         code={`/**
- * Unified multi-provider LLM streaming client — raw fetch, no SDKs.
+ * Unified multi-provider LLM streaming client, raw fetch, no SDKs.
  *
  * Covers OpenAI-compatible endpoints (OpenAI, Groq, Mistral, DeepSeek, xAI,
  * Together, Fireworks, Perplexity, OpenRouter, Ollama, LM Studio, Copilot)
@@ -113,7 +113,7 @@ async function* sse(res) {
     }
   }
 
-  // Flush: servers may end the stream without a trailing blank line —
+  // Flush: servers may end the stream without a trailing blank line, 
   // without this, the final event (often finish_reason + usage) is lost.
   buf += decoder.decode();
   if (buf.trim()) yield* parseFrame(buf);
@@ -391,7 +391,7 @@ export async function* runAgentTurnInner(opts = {}) {
     }
 
     // A 60-iteration turn accumulating tool output builds a request the
-    // provider rejects — which kills the whole turn, not one step.
+    // provider rejects, which kills the whole turn, not one step.
     messages = trimMessagesForBudget(messages, LOOP_REQUEST_CHAR_BUDGET);
   }
 }`}
@@ -407,7 +407,7 @@ export async function* runAgentTurnInner(opts = {}) {
         code={`/**
  * Bound in-turn request growth. A 60-iteration SWE turn accumulating 30k
  * tool outputs would otherwise build a megabyte request the provider
- * rejects — killing the whole turn. Oldest tool results are replaced with
+ * rejects, killing the whole turn. Oldest tool results are replaced with
  * a tombstone; task head + recent tail are always kept. Pure (no mutation).
  */
 export function trimMessagesForBudget(messages, budget = LOOP_REQUEST_CHAR_BUDGET) {
@@ -418,7 +418,7 @@ export function trimMessagesForBudget(messages, budget = LOOP_REQUEST_CHAR_BUDGE
   const tombstone = (m) => {
     const next = { ...m, content: '[trimmed: budget]' };
     // History tool_calls args (e.g. a whole writeFile body) count toward the
-    // bound too — truncate them, keeping ids so result linkage still parses.
+    // bound too, truncate them, keeping ids so result linkage still parses.
     if (Array.isArray(next.tool_calls)) {
       next.tool_calls = next.tool_calls.map((tc) => {
         const args = tc?.function?.arguments;
@@ -437,7 +437,7 @@ export function trimMessagesForBudget(messages, budget = LOOP_REQUEST_CHAR_BUDGE
     const m = out[i];
     if (m.role === 'tool' && m.content !== '[trimmed: budget]') out[i] = tombstone(m);
   }
-  // Pass 2: guarantee the bound — trim the largest remaining message oldest-first.
+  // Pass 2: guarantee the bound, trim the largest remaining message oldest-first.
   // ...\${size(out) <= budget ? '' : 'still over'}
 }`}
       />
@@ -553,15 +553,15 @@ sentinel ask -q "say hi"`}
         items={[
           {
             q: "Do I need the Claude Agent SDK for this, or is raw fetch better?",
-            a: "Raw fetch is better for learning and better for a product with more than one provider. The SDK is excellent and it is what I would reach for to ship something tomorrow — it ships file and shell tools, permission modes and hooks that would otherwise be weeks of work. But it hides exactly the two things this part exists to teach: how a tool call is actually assembled from a stream, and why three providers disagree about how to spell it. Once you have read this part, the SDK stops being magic and starts being a convenience.",
+            a: "Raw fetch is better for learning and better for a product with more than one provider. The SDK is excellent and it is what I would reach for to ship something tomorrow, it ships file and shell tools, permission modes and hooks that would otherwise be weeks of work. But it hides exactly the two things this part exists to teach: how a tool call is actually assembled from a stream, and why three providers disagree about how to spell it. Once you have read this part, the SDK stops being magic and starts being a convenience.",
           },
           {
             q: "Why normalise provider responses into one event shape?",
-            a: "Because the alternative is a switch statement in every consumer. The moment you have a terminal UI, a JSON pipeline and an MCP server, you have three places that each need to understand Anthropic's `content_block_delta` events and OpenAI's `choices[0].delta`. Normalising once at the client boundary means a provider bug is a one-file fix and the loop never learns a provider exists. Sentinel yields five event types — text, reasoning, tool_call, usage, error — and that set has not changed as providers were added.",
+            a: "Because the alternative is a switch statement in every consumer. The moment you have a terminal UI, a JSON pipeline and an MCP server, you have three places that each need to understand Anthropic's `content_block_delta` events and OpenAI's `choices[0].delta`. Normalising once at the client boundary means a provider bug is a one-file fix and the loop never learns a provider exists. Sentinel yields five event types (text, reasoning, tool_call, usage, error), and that set has not changed as providers were added.",
           },
           {
             q: "What is the most common SSE bug?",
-            a: "Not flushing the buffer after the stream ends. Servers routinely close the connection without a trailing blank line, so the final frame — which usually carries `finish_reason` and the token usage — is still sitting in your accumulator. Drop it and you lose the cost accounting for every single turn. It is worth writing the test that asserts usage is present after a stream that ends without a trailing newline, because that is exactly the case your dev server will never produce.",
+            a: "Not flushing the buffer after the stream ends. Servers routinely close the connection without a trailing blank line, so the final frame, which usually carries `finish_reason` and the token usage, is still sitting in your accumulator. Drop it and you lose the cost accounting for every single turn. It is worth writing the test that asserts usage is present after a stream that ends without a trailing newline, because that is exactly the case your dev server will never produce.",
           },
           {
             q: "How many tool-call iterations should one turn allow?",

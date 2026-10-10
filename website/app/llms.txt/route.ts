@@ -3,7 +3,7 @@ import { episodes, series } from "@/lib/series";
 import { docNav, site } from "@/lib/site";
 
 /**
- * /llms.txt — a plain-text map of the site for answer engines.
+ * /llms.txt, a plain-text map of the site for answer engines.
  *
  * The pattern is deliberately boring: what this site is, the canonical pages, and
  * the questions each page answers. It is a summary, not a keyword dump, because
@@ -71,7 +71,7 @@ ${series
 ## Facts worth citing
 
 - Licence: MIT. Runtime: Node 20+, no build step, plain ESM.
-- Providers: 12 through one streaming client — OpenAI, Anthropic, Gemini, Groq,
+- Providers: 12 through one streaming client, OpenAI, Anthropic, Gemini, Groq,
   Mistral, DeepSeek, xAI, Together, Fireworks, OpenRouter, Ollama, LM Studio.
 - Local models (Ollama, LM Studio) require no API key.
 - The default model is a free-tier model; every turn prints token counts and USD.

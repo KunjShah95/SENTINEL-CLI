@@ -19,7 +19,7 @@ body {
   font-feature-settings: "ss01", "cv11";
 }
 
-/* Fixed film grain — breaks the flatness of large dark fields. */
+/* Fixed film grain, breaks the flatness of large dark fields. */
 body::before {
   content: "";
   position: fixed;
@@ -79,7 +79,7 @@ p {
     mask-image: radial-gradient(ellipse 70% 60% at 50% 0%, #000 30%, transparent 75%);
   }
 
-  /* Surface with a lit top edge — one light source, from above. */
+  /* Surface with a lit top edge, one light source, from above. */
   .surface {
     background: linear-gradient(180deg, #151815 0%, #111311 100%);
     box-shadow:
@@ -109,7 +109,7 @@ p {
   }
 }
 
-/* Docs typography — the pages set their own classes; this tunes rhythm. */
+/* Docs typography, the pages set their own classes; this tunes rhythm. */
 .prose-docs h1 {
   letter-spacing: -0.03em;
 }

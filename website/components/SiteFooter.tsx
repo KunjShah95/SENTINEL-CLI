@@ -12,7 +12,7 @@ export function SiteFooter() {
             <span aria-hidden="true" className="grid h-6 w-6 place-items-center rounded bg-moss text-xs font-bold text-ink-950">◈</span> Sentinel
           </p>
           <p className="mt-2 max-w-xs text-sm leading-6 text-muted">
-            Minimalist AI coding assistant for the terminal. No servers, no
+            A local coding agent for the terminal. No servers, no
             telemetry, no bloat.
           </p>
         </div>
@@ -60,7 +60,7 @@ export function SiteFooter() {
       </div>
       <div className="border-t border-ink-800">
         <p className="mx-auto max-w-6xl px-4 py-4 text-xs text-muted sm:px-6">
-          MIT © Kunj Shah. Sentinel runs locally — nothing leaves your machine
+          MIT © Kunj Shah. Sentinel runs locally, nothing leaves your machine
           except LLM API calls.
         </p>
       </div>

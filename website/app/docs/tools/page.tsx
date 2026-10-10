@@ -29,7 +29,7 @@ const build: { name: string; body: string }[] = [
   { name: "bash", body: "Runs with a timeout and output cap. Shell passthrough via ! in TUI." },
   { name: "runTests", body: "Test twin of bash: returns structured pass/fail lists (jest, pytest, mocha, TAP) instead of raw stdout." },
   { name: "undoLastChange / redoLastUndo", body: "Step through write checkpoints across turns." },
-  { name: "todoWrite", body: "Overwrite the full task list — send ALL todos every call so the plan can't drift." },
+  { name: "todoWrite", body: "Overwrite the full task list, send ALL todos every call so the plan can't drift." },
   { name: "spawnAgent", body: "Delegate a bounded subtask to a fresh subagent. Returns its summary, not a transcript. Depth limit 1." },
 ];
 
@@ -61,12 +61,12 @@ export default function Tools() {
 
       <div className="pt-2">
         <Callout title="Checkpoints">
-          Every write creates a checkpoint — <code className="font-mono text-[13px]">/undo</code> and <code className="font-mono text-[13px]">/redo</code> work across turns.
+          Every write creates a checkpoint, <code className="font-mono text-[13px]">/undo</code> and <code className="font-mono text-[13px]">/redo</code> work across turns.
         </Callout>
       </div>
       <div className="pt-2">
         <Callout title="Guards">
-          Dangerous commands (<code className="font-mono text-[13px]">rm -rf /</code>, fork bombs, shutdown) and secret files (<code className="font-mono text-[13px]">.env</code>, <code className="font-mono text-[13px]">*.pem</code>) are refused before they execute — in every mode.
+          Dangerous commands (<code className="font-mono text-[13px]">rm -rf /</code>, fork bombs, shutdown) and secret files (<code className="font-mono text-[13px]">.env</code>, <code className="font-mono text-[13px]">*.pem</code>) are refused before they execute, in every mode.
         </Callout>
       </div>
       <div className="pt-2">

@@ -18,7 +18,7 @@ export default {
   faq: [
     {
       q: "Why does a coding agent need a doctor command when a normal CLI does not?",
-      a: "Because of how many independent things can be wrong, and how late they surface. A broken CLI fails on its first line, where the stack trace is useful. An agent CLI can pass its startup, take a key, build a prompt, and then fail when a tool tries to write to a directory that is read-only — after you have spent money and two minutes. A pre-flight collapses all of that into one second and one list.",
+      a: "Because of how many independent things can be wrong, and how late they surface. A broken CLI fails on its first line, where the stack trace is useful. An agent CLI can pass its startup, take a key, build a prompt, and then fail when a tool tries to write to a directory that is read-only, after you have spent money and two minutes. A pre-flight collapses all of that into one second and one list.",
     },
     {
       q: "Should doctor contact the model provider?",
@@ -26,11 +26,11 @@ export default {
     },
     {
       q: "How do I check a directory is writable portably?",
-      a: "Write to it. `fs.access(path, fs.constants.W_OK)` is a permissions check, and permissions are not the same as capability — a mounted filesystem, a container with a read-only mount, an ACL, or a full disk all pass a permissions check and fail an actual write. Write a uniquely named temp file, then remove it. Sentinel does exactly this, and the test asserts the probe file is not left behind.",
+      a: "Write to it. `fs.access(path, fs.constants.W_OK)` is a permissions check, and permissions are not the same as capability, a mounted filesystem, a container with a read-only mount, an ACL, or a full disk all pass a permissions check and fail an actual write. Write a uniquely named temp file, then remove it. Sentinel does exactly this, and the test asserts the probe file is not left behind.",
     },
     {
       q: "Should warnings make the command exit non-zero?",
-      a: "No. Only failures should. Warnings exist for conditions that are information for a human but not blockers: the PATH separator note on Windows, low memory, an unrecognised directory. If a warning exits non-zero, then on any platform with a routine warning the command always fails, people wrap it in `|| true`, and the check silently stops running — which is worse than not shipping it.",
+      a: "No. Only failures should. Warnings exist for conditions that are information for a human but not blockers: the PATH separator note on Windows, low memory, an unrecognised directory. If a warning exits non-zero, then on any platform with a routine warning the command always fails, people wrap it in `|| true`, and the check silently stops running. Which is worse than not shipping it.",
     },
   ],
   body: () => (
@@ -95,7 +95,7 @@ export default {
           ],
           [
             "Tool layer silently not gating",
-            "Never — this one does not announce itself",
+            "Never. This one does not announce itself",
             "A safety control you believed in was decorative",
           ],
         ]}
@@ -113,17 +113,17 @@ export default {
       />
       <ul className="list-disc space-y-1.5 pl-5 text-muted marker:text-ink-700">
         <li>
-          <code className="font-mono text-[13px] text-paper">pass</code> — verified working.
+          <code className="font-mono text-[13px] text-paper">pass</code>: verified working.
         </li>
         <li>
-          <code className="font-mono text-[13px] text-paper">warn</code> — real, but not a blocker.
+          <code className="font-mono text-[13px] text-paper">warn</code>: real, but not a blocker.
           Low memory. A PATH note on Windows. An empty directory.
         </li>
         <li>
-          <code className="font-mono text-[13px] text-paper">fail</code> — the tool cannot work.
+          <code className="font-mono text-[13px] text-paper">fail</code>: the tool cannot work.
         </li>
         <li>
-          <code className="font-mono text-[13px] text-paper">skip</code> — not checked, and the
+          <code className="font-mono text-[13px] text-paper">skip</code>: not checked, and the
           output says so and says why.
         </li>
       </ul>
@@ -140,8 +140,8 @@ export default {
         code={`return {
   cwd: resolve(cwd),
   checks,
-  // Only \`fail\` blocks. A \`warn\` is information for a human — the Windows PATH
-  // note, low memory, an unrecognised directory — and exiting non-zero on those
+  // Only \`fail\` blocks. A \`warn\` is information for a human, the Windows PATH
+  // note, low memory, an unrecognised directory, and exiting non-zero on those
   // would make the command useless, so nobody would run it.
   ok: checks.every((c) => c.level !== 'fail'),
   counts: LEVELS.reduce((acc, lvl) => {
@@ -409,15 +409,15 @@ export function checkTooling() {
         label="terminal"
         code={`$ node bin/owl.js doctor
 owl doctor · /home/you/projects/myapp
-✓ Node runtime — v22.23.2
-✓ Working directory — /home/you/projects/myapp · package.json, .git, src
-✓ Project data directory — writable · /home/you/projects/myapp/.owl
-✗ Provider credentials — no provider API key found in the environment
+✓ Node runtime, v22.23.2
+✓ Working directory, /home/you/projects/myapp · package.json, .git, src
+✓ Project data directory, writable · /home/you/projects/myapp/.owl
+✗ Provider credentials, no provider API key found in the environment
   Export one, e.g. \`export GROQ_API_KEY=gsk_...\`, or run Ollama locally which needs no key.
-✓ Host resources — linux 6.8.0 · 32 GB RAM (24 GB free)
-✓ Tool layer — classified 6 probe command(s); destructive patterns armed
-! Shell PATH — PATH separator ":" on linux
-· Local model servers — not probed (--network)
+✓ Host resources, linux 6.8.0 · 32 GB RAM (24 GB free)
+✓ Tool layer, classified 6 probe command(s); destructive patterns armed
+! Shell PATH. PATH separator ":" on linux
+· Local model servers, not probed (--network)
 
 5 passed · 1 warning(s) · 1 failed · 1 skipped
 Not ready. Fix the failures above before starting a turn.
@@ -541,7 +541,7 @@ it('exits 0 when healthy and 1 when a check fails', async () => {
         items={[
           {
             q: "Why does a coding agent need a doctor command when a normal CLI does not?",
-            a: "Because of how many independent things can be wrong, and how late they surface. A broken CLI fails on its first line, where the stack trace is useful. An agent CLI can pass its startup, take a key, build a prompt, and then fail when a tool tries to write to a directory that is read-only — after you have spent money and two minutes. A pre-flight collapses all of that into one second and one list.",
+            a: "Because of how many independent things can be wrong, and how late they surface. A broken CLI fails on its first line, where the stack trace is useful. An agent CLI can pass its startup, take a key, build a prompt, and then fail when a tool tries to write to a directory that is read-only, after you have spent money and two minutes. A pre-flight collapses all of that into one second and one list.",
           },
           {
             q: "Should doctor contact the model provider?",
@@ -549,11 +549,11 @@ it('exits 0 when healthy and 1 when a check fails', async () => {
           },
           {
             q: "How do I check a directory is writable portably?",
-            a: "Write to it. `fs.access(path, fs.constants.W_OK)` is a permissions check, and permissions are not the same as capability — a mounted filesystem, a container with a read-only mount, an ACL, or a full disk all pass a permissions check and fail an actual write. Write a uniquely named temp file, then remove it. Sentinel does exactly this, and the test asserts the probe file is not left behind.",
+            a: "Write to it. `fs.access(path, fs.constants.W_OK)` is a permissions check, and permissions are not the same as capability, a mounted filesystem, a container with a read-only mount, an ACL, or a full disk all pass a permissions check and fail an actual write. Write a uniquely named temp file, then remove it. Sentinel does exactly this, and the test asserts the probe file is not left behind.",
           },
           {
             q: "Should warnings make the command exit non-zero?",
-            a: "No. Only failures should. Warnings exist for conditions that are information for a human but not blockers: the PATH separator note on Windows, low memory, an unrecognised directory. If a warning exits non-zero, then on any platform with a routine warning the command always fails, people wrap it in `|| true`, and the check silently stops running — which is worse than not shipping it.",
+            a: "No. Only failures should. Warnings exist for conditions that are information for a human but not blockers: the PATH separator note on Windows, low memory, an unrecognised directory. If a warning exits non-zero, then on any platform with a routine warning the command always fails, people wrap it in `|| true`, and the check silently stops running. Which is worse than not shipping it.",
           },
         ]}
       />

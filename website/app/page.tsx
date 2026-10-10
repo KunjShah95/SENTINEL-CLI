@@ -98,10 +98,13 @@ export default function Home() {
               that shows <span className="text-moss">its work.</span>
             </h1>
             <p className="mt-6 max-w-[34rem] text-[17px] leading-7 text-muted">
-              Sentinel is a minimalist AI coding assistant for the terminal. It streams from the
-              LLM you pick, edits files through sandboxed local tools, and prints what every turn
-              cost. Sessions are plain JSON on disk.
+              Sentinel is a local coding agent for the terminal. It streams from the LLM you pick,
+              edits files through sandboxed tools, and prints what every turn cost.
             </p>
+            {/* Two actions, not three. A third link here competed with the two
+                below it for the same attention and only repeated the GitHub
+                button already sitting in the header, so it was removed rather
+                than restyled. The header keeps it. */}
             <div className="mt-8 flex flex-wrap items-center gap-2">
               <Link href="/docs/quickstart" className="btn-primary">
                 Get started
@@ -110,9 +113,6 @@ export default function Home() {
               <Link href="/docs" className="btn-link">
                 Read the docs
               </Link>
-              <a href={site.repo} className="btn-link text-muted">
-                GitHub
-              </a>
             </div>
           </div>
 
@@ -139,8 +139,8 @@ export default function Home() {
         <div className="grid gap-14 lg:grid-cols-[minmax(0,6fr)_minmax(0,5fr)] lg:gap-20">
           <div>
             <SectionHeading id="principles-title" eyebrow="What it is" title="Does one thing well.">
-              Most terminal assistants either do everything or are a hosted service. Sentinel is a
-              fast, cheap, transparent coding chat — the whole brain is one loop in{" "}
+              Most terminal coding agents either do everything or are a hosted service. Sentinel
+              is a fast, cheap, transparent coding chat: the whole brain is one loop in{" "}
               <code className="font-mono text-[13px] text-paper">src/agent/loop.js</code>.
             </SectionHeading>
             <div className="mt-10">
@@ -164,7 +164,7 @@ export default function Home() {
               Every turn prints tokens and USD. Free models default to $0. Context auto-compacts at 40k.
             </Principle>
             <Principle title="Sandboxed tools">
-              Reads, edits, grep, bash and more — scoped to the project root, path traversal rejected,
+              Reads, edits, grep, bash and more, scoped to the project root, path traversal rejected,
               every write checkpointed.
             </Principle>
             <Principle title="Sessions as files">
@@ -209,7 +209,7 @@ export default function Home() {
             <FdeRow
               command='sentinel outcome "the sync is flaky"'
               title="Vague ask in, judgeable contract out"
-              body="Turns a request into current state, one measurable target, the exact verification command, blast radius, rollback and unknowns — then works to it."
+              body="Turns a request into current state, one measurable target, the exact verification command, blast radius, rollback and unknowns, then works to it."
               output={
                 <pre>
                   <span className="text-paper">CURRENT STATE</span>{"  "}retries hit 3 before the lock clears{"\n"}
@@ -266,7 +266,7 @@ export default function Home() {
                   <span className="text-ink-600"># .sentinel/HANDOFF.md</span>{"\n"}
                   <span className="text-paper">## What was verified</span>{"\n"}
                   <span className="text-paper">## Tried and rejected</span>{"\n"}
-                  {"   "}incremental parser patch — broke on nested arrays
+                  {"   "}incremental parser patch, broke on nested arrays
                 </pre>
               }
             />

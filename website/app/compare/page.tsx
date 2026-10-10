@@ -9,7 +9,7 @@ import { site } from "@/lib/site";
 
 const TITLE = "Compare: Sentinel vs AI IDEs and hosted agents";
 const DESCRIPTION =
-  "A feature-by-feature comparison of a local terminal coding agent against AI IDEs, hosted agents and closed CLIs — on privacy, cost, models and auditability.";
+  "A feature-by-feature comparison of a local terminal coding agent against AI IDEs, hosted agents and closed CLIs, on privacy, cost, models and auditability.";
 
 export const metadata: Metadata = pageMeta({
   title: "Sentinel vs AI IDEs and hosted agents",
@@ -26,7 +26,7 @@ export const metadata: Metadata = pageMeta({
 const FAQ = [
   {
     q: "Is Sentinel a replacement for Cursor?",
-    a: "For whole-codebase work, scripting and SSH, yes — often better, because the agent has grep, glob and a shell rather than only the open file. For inline autocompletion and visual diff review inside the editor, no: keep the editor for typing and use the agent for changes. The two solve different problems, and most engineers end up running both.",
+    a: "For whole-codebase work, scripting and SSH, yes. Often better, because the agent has grep, glob and a shell rather than only the open file. For inline autocompletion and visual diff review inside the editor, no: keep the editor for typing and use the agent for changes. The two solve different problems, and most engineers end up running both.",
   },
   {
     q: "Does Sentinel require an account or a subscription?",
@@ -38,7 +38,7 @@ const FAQ = [
   },
   {
     q: "Can I use Sentinel in CI or over SSH?",
-    a: "Yes. The headless surface — ask, goal, outcome, watch, budget, handoff, risk — is designed for exactly that, and the MCP stdio server lets any MCP client call the agent. There is no server component to deploy and nothing to authenticate against.",
+    a: "Yes. The headless surface (ask, goal, outcome, watch, budget, handoff, risk) is designed for exactly that, and the MCP stdio server lets any MCP client call the agent. There is no server component to deploy and nothing to authenticate against.",
   },
 ];
 
@@ -81,7 +81,7 @@ const ROWS: { dim: string; sentinel: string; ide: string; hosted: string }[] = [
   },
   {
     dim: "Permission model you can read",
-    sentinel: "Yes — it is the source",
+    sentinel: "Yes. It is the source",
     ide: "Opaque",
     hosted: "Opaque",
   },
@@ -196,8 +196,8 @@ export default function Compare() {
         <h2 className="mt-20 text-2xl font-semibold tracking-tight">Where Sentinel wins outright</h2>
         <ul className="mt-5 space-y-4 text-[15px] leading-7 text-muted">
           <li>
-            <strong className="text-paper">Auditability.</strong> Every guard rail — sandboxed
-            paths, per-mode allowlists, the risk ledger, the blast-radius gate — is a few hundred
+            <strong className="text-paper">Auditability.</strong> Every guard rail (sandboxed
+            paths, per-mode allowlists, the risk ledger, the blast-radius gate) is a few hundred
             lines of readable JavaScript. You can verify the control instead of trusting a policy
             page.{" "}
             <Link href="/blog/ai-agent-file-permissions" className="text-moss underline-offset-4 hover:underline">
@@ -219,7 +219,7 @@ export default function Compare() {
           </li>
           <li>
             <strong className="text-paper">Offline.</strong> Point it at Ollama or LM Studio and no
-            request leaves the machine — the one claim no hosted product can make.{" "}
+            request leaves the machine, the one claim no hosted product can make.{" "}
             <Link href="/blog/local-llm-coding-agent" className="text-moss underline-offset-4 hover:underline">
               Running fully local
             </Link>

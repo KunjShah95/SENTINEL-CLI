@@ -8,7 +8,7 @@ export default {
   title: "How to evaluate a coding agent you are building",
   metaTitle: "How to Evaluate a Coding Agent You Are Building",
   description:
-    "Capability gates, FAIL_TO_PASS fixtures, deterministic graders and reproducible task evals — how to measure an agent without fooling yourself.",
+    "Capability gates, FAIL_TO_PASS fixtures, deterministic graders and reproducible task evals, how to measure an agent without fooling yourself.",
   date: "2026-09-28",
   updated: "2026-09-30",
   readingMinutes: 10,
@@ -22,7 +22,7 @@ export default {
   faq: [
     {
       q: "How do you benchmark a coding agent you built yourself?",
-      a: "In two separate layers, because they fail for different reasons. Capability gates test whether the harness can do things at all — a round trip, a refused write in the wrong mode, a traversal blocked, an undo that restores. Task evals test whether the agent solves problems. Keep them separate, because a capability failure masquerading as a reasoning failure will send you optimising a prompt when the bug is in your tool result parser.",
+      a: "In two separate layers, because they fail for different reasons. Capability gates test whether the harness can do things at all, a round trip, a refused write in the wrong mode, a traversal blocked, an undo that restores. Task evals test whether the agent solves problems. Keep them separate, because a capability failure masquerading as a reasoning failure will send you optimising a prompt when the bug is in your tool result parser.",
     },
     {
       q: "What is a FAIL_TO_PASS test?",
@@ -30,7 +30,7 @@ export default {
     },
     {
       q: "Should I report SWE-bench scores for my own agent?",
-      a: "Only with the official harness version, the exact model id, the retry count and the Docker configuration attached. Self-awared percentages without that context are marketing, not measurement — the numbers move with the harness, the model and the retry budget, and readers have no way to tell which. Report the harness, the model and the retries, or report nothing.",
+      a: "Only with the official harness version, the exact model id, the retry count and the Docker configuration attached. Self-awared percentages without that context are marketing, not measurement, the numbers move with the harness, the model and the retry budget, and readers have no way to tell which. Report the harness, the model and the retries, or report nothing.",
     },
   ],
   body: () => (
@@ -61,7 +61,7 @@ export default {
         fast, boring, deterministic one that runs in under a minute and never needs a model key.
       </p>
 
-      <H2 id="layer-one" text="Layer one — capability gates, no model required" />
+      <H2 id="layer-one" text="Layer one: capability gates, no model required" />
       <p>
         These test the harness. Can the agent loop actually call a tool, respect a mode, sandbox a
         path, parse a test result? They should be fast, hermetic and run in CI on every commit,
@@ -81,7 +81,7 @@ export default {
         </li>
         <li>
           <strong className="text-paper">Sandbox escape.</strong> Traversal, absolute paths outside
-          the root, and a symlink pointing out of the tree must all be rejected — see{" "}
+          the root, and a symlink pointing out of the tree must all be rejected, see{" "}
           <Link href="/blog/ai-agent-file-permissions" className="underline-offset-4 hover:underline">
             the permission model
           </Link>
@@ -105,12 +105,12 @@ export default {
       <div className="pt-2">
         <Callout title="The last one is the dangerous one" tone="warn">
           A grader that cannot parse the output must fail loudly. Returning an empty pass list turns
-          a bug fix into a no-op that reports success — the exact failure mode an eval exists to
+          a bug fix into a no-op that reports success, the exact failure mode an eval exists to
           catch.
         </Callout>
       </div>
 
-      <H2 id="layer-two" text="Layer two — task evals that can be trusted" />
+      <H2 id="layer-two" text="Layer two: task evals that can be trusted" />
       <p>
         Now the agent has to actually solve something. Three artefacts per task, and all three are
         required.
@@ -135,7 +135,7 @@ export default {
 
       <H3 id="reference" text="The reference solution must pass" />
       <p>
-        Someone has to write the fix. It does not need to be the best fix — it needs to exist, so
+        Someone has to write the fix. It does not need to be the best fix, it needs to exist, so
         you know the task is solvable and your grader is satisfiable. A task where the reference
         solution fails is a broken task, and shipping it teaches your agent the wrong lesson.
       </p>
@@ -156,7 +156,7 @@ node evals/run.mjs --agent --model gpt-6-luna   # real agent runs + report`}
       <ol className="list-decimal space-y-2 pl-5 text-muted marker:text-moss">
         <li>
           <strong className="text-paper">Reproduce before you touch anything.</strong> Run the
-          failing test first. If you cannot reproduce it, stop — the agent must not guess, and
+          failing test first. If you cannot reproduce it, stop, the agent must not guess, and
           neither should the task. This is the discipline the{" "}
           <Link href="/docs/swe" className="underline-offset-4 hover:underline">
             SWE workflow
@@ -165,7 +165,7 @@ node evals/run.mjs --agent --model gpt-6-luna   # real agent runs + report`}
         </li>
         <li>
           <strong className="text-paper">Localise to the smallest scope.</strong> A symbol-level
-          code map first, then grep, then read the test — the test is the specification.
+          code map first, then grep, then read the test. The test is the specification.
         </li>
         <li>
           <strong className="text-paper">Make the smallest edit that addresses the root cause.</strong>
@@ -205,7 +205,7 @@ node evals/run.mjs --agent --model gpt-6-luna   # real agent runs + report`}
       <div className="pt-2">
         <Callout title="The rule">
           Bench gates measure tool capability, not model reasoning. Real benchmark percentages
-          require the official harness plus a model key — report them with harness version, model id
+          require the official harness plus a model key, report them with harness version, model id
           and retries, never as self-awarded numbers.
         </Callout>
       </div>
@@ -215,7 +215,7 @@ node evals/run.mjs --agent --model gpt-6-luna   # real agent runs + report`}
         items={[
           {
             q: "How do you benchmark a coding agent you built yourself?",
-            a: "In two separate layers, because they fail for different reasons. Capability gates test whether the harness can do things at all — a round trip, a refused write in the wrong mode, a traversal blocked, an undo that restores. Task evals test whether the agent solves problems. Keep them separate, because a capability failure masquerading as a reasoning failure will send you optimising a prompt when the bug is in your tool result parser.",
+            a: "In two separate layers, because they fail for different reasons. Capability gates test whether the harness can do things at all, a round trip, a refused write in the wrong mode, a traversal blocked, an undo that restores. Task evals test whether the agent solves problems. Keep them separate, because a capability failure masquerading as a reasoning failure will send you optimising a prompt when the bug is in your tool result parser.",
           },
           {
             q: "What is a FAIL_TO_PASS test?",
@@ -223,7 +223,7 @@ node evals/run.mjs --agent --model gpt-6-luna   # real agent runs + report`}
           },
           {
             q: "Should I report SWE-bench scores for my own agent?",
-            a: "Only with the official harness version, the exact model id, the retry count and the Docker configuration attached. Self-awarded percentages without that context are marketing, not measurement — the numbers move with the harness, the model and the retry budget, and readers have no way to tell which. Report the harness, the model and the retries, or report nothing.",
+            a: "Only with the official harness version, the exact model id, the retry count and the Docker configuration attached. Self-awarded percentages without that context are marketing, not measurement, the numbers move with the harness, the model and the retry budget, and readers have no way to tell which. Report the harness, the model and the retries, or report nothing.",
           },
         ]}
       />

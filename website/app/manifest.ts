@@ -3,7 +3,7 @@ import { site } from "@/lib/site";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: `${site.name} — AI coding agent for the terminal`,
+    name: `${site.name}, AI coding agent for the terminal`,
     short_name: site.name,
     description:
       "Open source AI coding agent for the terminal. Multi-LLM, sandboxed local tools, sessions as JSON, MCP. No servers, no telemetry.",

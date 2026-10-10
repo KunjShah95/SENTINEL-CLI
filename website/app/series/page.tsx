@@ -56,7 +56,7 @@ export default function SeriesIndex() {
         <h1 className="mt-4 text-4xl font-semibold tracking-[-0.035em] sm:text-5xl">Courses</h1>
         <p className="mt-5 text-[17px] leading-7 text-muted">
           Each course is an ordered build. Every episode assumes the previous ones, so read them in
-          order — the code in part nine is the code from part four with the mode gate added, not a
+          order, the code in part nine is the code from part four with the mode gate added, not a
           fresh example. Written for engineers who intend to run what they build.
         </p>
 

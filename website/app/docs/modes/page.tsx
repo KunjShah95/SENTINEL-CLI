@@ -6,7 +6,7 @@ import { pageMeta } from "@/lib/seo";
 export const metadata: Metadata = pageMeta({
   title: "Modes",
   description:
-    "Six permission modes — BUILD, PLAN, REVIEW, SCAN, FIX, SWE — each mapped to a fixed tool allowlist the model cannot argue its way out of. Switch with Ctrl+M or /mode.",
+    "Six permission modes (BUILD, PLAN, REVIEW, SCAN, FIX, SWE), each mapped to a fixed tool allowlist the model cannot argue its way out of. Switch with Ctrl+M or /mode.",
   path: "/docs/modes",
   keywords: ["ai agent permission modes", "read only ai coding agent", "agent sandbox modes"],
 });

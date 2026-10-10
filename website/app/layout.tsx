@@ -46,7 +46,7 @@ export const metadata: Metadata = {
   },
   manifest: "/manifest.webmanifest",
   // The homepage self-canonicalises. Every other route sets its own canonical
-  // through pageMeta(), which replaces this inherited value — that inheritance
+  // through pageMeta(), which replaces this inherited value, that inheritance
   // is exactly why a blanket "/" here used to mark every docs and blog page as a
   // duplicate of the homepage.
   alternates: {
@@ -69,7 +69,7 @@ export const metadata: Metadata = {
         ),
         width: 1200,
         height: 630,
-        alt: "Sentinel — the coding agent that shows its work",
+        alt: "Sentinel, the coding agent that shows its work",
       },
     ],
   },

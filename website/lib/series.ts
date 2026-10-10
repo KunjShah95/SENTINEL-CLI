@@ -7,7 +7,7 @@ import { posts } from "./blog";
  * The blog stays flat and chronological; a series layers a second, author-controlled
  * reading order on top of it. `order` is the position inside the series, so episodes
  * can be published out of order or back-dated without breaking the curriculum. Nothing
- * here derives from `date` — a course is a dependency graph, not a timeline.
+ * here derives from `date`: a course is a dependency graph, not a timeline.
  */
 export type Series = {
   /** URL segment under /series. Never change one without a 301. */
@@ -16,7 +16,7 @@ export type Series = {
   title: string;
   /** <title> tag. Kept <= 60 chars. */
   metaTitle: string;
-  /** Meta description. 140-158 chars — the whole SERP budget. */
+  /** Meta description. 140-158 chars, the whole SERP budget. */
   description: string;
   /** Small label above the H1, same role as "Writing" on the blog index. */
   kicker: string;
@@ -32,7 +32,7 @@ export const series: Series[] = [
     title: "Build a Cursor-style AI coding agent in your terminal",
     metaTitle: "Build a Cursor-Style AI Coding Agent CLI",
     description:
-      "A twelve-part build of a terminal coding agent with the Claude Agent SDK — Commander, Chalk, a doctor pre-flight, streamed agent turns, permission modes and a global pnpm install.",
+      "A twelve-part build of a terminal coding agent with the Claude Agent SDK. Commander, Chalk, a doctor pre-flight, streamed agent turns, permission modes and a global pnpm install.",
     kicker: "Course · 12 parts",
     outcome:
       "By the end you have a globally installed CLI that streams an agent turn, gates writes by mode, and prints what the turn cost.",

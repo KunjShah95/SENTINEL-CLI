@@ -30,7 +30,7 @@ export default {
     },
     {
       q: "Where do I put shared flag definitions?",
-      a: "In a function, not a constant. Commander options carry state — once you attach them to a command, reusing the same Option instance across commands causes subtle leakage. A factory that returns fresh options per command costs three lines and removes the entire class of bug.",
+      a: "In a function, not a constant. Commander options carry state, once you attach them to a command, reusing the same Option instance across commands causes subtle leakage. A factory that returns fresh options per command costs three lines and removes the entire class of bug.",
     },
   ],
   body: () => (
@@ -80,7 +80,7 @@ mkdir bin src/agent`}
         label="bin/owl.js"
         code={`#!/usr/bin/env node
 /**
- * owl — a terminal coding agent.
+ * owl, a terminal coding agent.
  *
  *   owl                 interactive chat (the default command)
  *   owl ask "..."       one-shot question, streamed answer
@@ -301,7 +301,7 @@ owl ask; echo "exit=$?"`}
           },
           {
             q: "Where do I put shared flag definitions?",
-            a: "In a function, not a constant. Commander options carry state — once you attach them to a command, reusing the same Option instance across commands causes subtle leakage. A factory that returns fresh options per command costs three lines and removes the entire class of bug.",
+            a: "In a function, not a constant. Commander options carry state, once you attach them to a command, reusing the same Option instance across commands causes subtle leakage. A factory that returns fresh options per command costs three lines and removes the entire class of bug.",
           },
         ]}
       />

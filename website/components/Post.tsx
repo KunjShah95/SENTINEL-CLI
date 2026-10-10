@@ -12,7 +12,7 @@ export function H2({ id, text }: HeadingProps) {
         {text}
         <span
           aria-hidden="true"
-          className="font-mono text-sm text-ink-600 opacity-0 transition-opacity group-hover:opacity-100"
+          className="font-mono text-sm text-ink-500 opacity-0 transition-opacity group-hover:opacity-100"
         >
           #
         </span>

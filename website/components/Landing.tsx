@@ -46,11 +46,11 @@ export function LoopDiagram() {
       <ol className="grid grid-cols-2 gap-px overflow-hidden rounded-md bg-ink-800 sm:grid-cols-4">
         {LOOP.map((s, i) => (
           <li key={s.n} className="relative bg-ink-900 p-4">
-            <span className="font-mono text-[11px] text-ink-600">{s.n}</span>
+            <span className="font-mono text-[11px] text-ink-500">{s.n}</span>
             <p className="mt-3 font-mono text-sm text-paper">{s.label}</p>
             <p className="mt-1 text-xs text-muted">{s.note}</p>
             {i < LOOP.length - 1 && (
-              <span aria-hidden="true" className="absolute right-3 top-4 hidden font-mono text-xs text-ink-600 sm:block">
+              <span aria-hidden="true" className="absolute right-3 top-4 hidden font-mono text-xs text-ink-500 sm:block">
                 →
               </span>
             )}
@@ -110,7 +110,7 @@ export function DocsRow({ href, n, title, body }: { href: string; n: string; tit
         href={href}
         className="group grid grid-cols-[2.25rem_minmax(0,1fr)_auto] items-baseline gap-3 border-t border-ink-800 py-4 transition-colors duration-200 hover:border-moss/40"
       >
-        <span className="font-mono text-xs text-ink-600 transition-colors group-hover:text-moss">{n}</span>
+        <span className="font-mono text-xs text-ink-500 transition-colors group-hover:text-moss">{n}</span>
         <span>
           <span className="block text-[15px] font-medium text-paper">{title}</span>
           <span className="mt-0.5 block text-sm leading-6 text-muted">{body}</span>
@@ -118,7 +118,7 @@ export function DocsRow({ href, n, title, body }: { href: string; n: string; tit
         <ArrowUpRight
           size={16}
           aria-hidden="true"
-          className="text-ink-600 transition duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-moss"
+          className="text-ink-500 transition duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-moss"
         />
       </Link>
     </li>

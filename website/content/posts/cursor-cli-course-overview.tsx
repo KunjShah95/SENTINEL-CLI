@@ -26,7 +26,7 @@ export default {
     },
     {
       q: "How long does it take to go from empty directory to working agent?",
-      a: "Parts 1 to 4 — argument parsing, a banner, pre-flight checks and a read-only chat loop — are a couple of hours and no model access beyond one API key. That first version already answers questions about your codebase. Everything after that is about letting it write, and about being able to prove what it did.",
+      a: "Parts 1 to 4 (argument parsing, a banner, pre-flight checks and a read-only chat loop) are a couple of hours and no model access beyond one API key. That first version already answers questions about your codebase. Everything after that is about letting it write, and about being able to prove what it did.",
     },
     {
       q: "Should I build this or just install an existing agent?",
@@ -262,7 +262,7 @@ export async function* runAgentTurn({ history, mode, model, goal }) {
           },
           {
             q: "How long does it take to go from empty directory to working agent?",
-            a: "Parts 1 to 4 — argument parsing, a banner, pre-flight checks and a read-only chat loop — are a couple of hours and no model access beyond one API key. That first version already answers questions about your codebase. Everything after that is about letting it write, and about being able to prove what it did.",
+            a: "Parts 1 to 4 (argument parsing, a banner, pre-flight checks and a read-only chat loop) are a couple of hours and no model access beyond one API key. That first version already answers questions about your codebase. Everything after that is about letting it write, and about being able to prove what it did.",
           },
           {
             q: "Should I build this or just install an existing agent?",

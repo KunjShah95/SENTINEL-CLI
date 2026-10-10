@@ -87,7 +87,7 @@ export default async function SeriesPage({ params }: { params: Promise<{ slug: s
                 {eps.length} of {total} parts published.
               </strong>{" "}
               {isComplete
-                ? "The course is complete — start at part 1."
+                ? "The course is complete, start at part 1."
                 : "Read in order; each part builds on the last."}
             </p>
           </KeyTakeaways>

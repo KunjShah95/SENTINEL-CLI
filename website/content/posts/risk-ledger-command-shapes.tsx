@@ -18,7 +18,7 @@ export default {
   faq: [
     {
       q: "Why not just ask every time a command runs?",
-      a: "Because you train people to disable the prompt. A permission system that fires on every tool call gets `--yes` added to every command within a week, and once that flag is muscle memory the control is decoration. The fix is not to prompt less often in general — it is to prompt less often for the commands that have already been shown to be safe in this repository, which is what the ledger does.",
+      a: "Because you train people to disable the prompt. A permission system that fires on every tool call gets `--yes` added to every command within a week, and once that flag is muscle memory the control is decoration. The fix is not to prompt less often in general. It is to prompt less often for the commands that have already been shown to be safe in this repository, which is what the ledger does.",
     },
     {
       q: "What is a command shape, exactly?",
@@ -30,7 +30,7 @@ export default {
     },
     {
       q: "How is this different from a blast-radius gate?",
-      a: "Different axes entirely. Modes decide whether a tool may run at all; the ledger decides whether this particular command, in this repository, has earned trust. The blast-radius gate is a third thing again — it challenges writes to sensitive paths once per turn regardless of history. All three compose: mode is capability, blast radius is consequence, and the ledger is memory.",
+      a: "Different axes entirely. Modes decide whether a tool may run at all; the ledger decides whether this particular command, in this repository, has earned trust. The blast-radius gate is a third thing again: it challenges writes to sensitive paths once per turn regardless of history. All three compose: mode is capability, blast radius is consequence, and the ledger is memory.",
     },
   ],
   body: () => (
@@ -116,7 +116,7 @@ export default {
  *
  * Placeholder classes matter. Collapsing everything to <arg> would make
  * \`--force\` and \`--dry-run\` the same shape, which is precisely the mistake
- * this module exists to prevent — flags are kept verbatim, only values go.
+ * this module exists to prevent. Flags are kept verbatim, only values go.
  */
 const URL_RE = /^[a-z][a-z0-9+.-]*:\\/\\/\\S+$/i;
 
@@ -152,7 +152,7 @@ function shapeToken(token) {
         code={`/**
  * Tools whose SECOND word is the real verb. Without this, \`git commit\` and
  * \`git push\` collapse to the same shape and approving a commit would
- * silently authorize a push — the single worst failure this module could
+ * silently authorize a push, the single worst failure this module could
  * have.
  */
 const SUBCOMMAND_TOOLS = new Set([
@@ -595,7 +595,7 @@ sentinel risk "rm -rf /"`}
         items={[
           {
             q: "Why not just ask every time a command runs?",
-            a: "Because you train people to disable the prompt. A permission system that fires on every tool call gets `--yes` added to every command within a week, and once that flag is muscle memory the control is decoration. The fix is not to prompt less often in general — it is to prompt less often for the commands that have already been shown to be safe in this repository, which is what the ledger does.",
+            a: "Because you train people to disable the prompt. A permission system that fires on every tool call gets `--yes` added to every command within a week, and once that flag is muscle memory the control is decoration. The fix is not to prompt less often in general. It is to prompt less often for the commands that have already been shown to be safe in this repository, which is what the ledger does.",
           },
           {
             q: "What is a command shape, exactly?",
@@ -607,7 +607,7 @@ sentinel risk "rm -rf /"`}
           },
           {
             q: "How is this different from a blast-radius gate?",
-            a: "Different axes entirely. Modes decide whether a tool may run at all; the ledger decides whether this particular command, in this repository, has earned trust. The blast-radius gate is a third thing again — it challenges writes to sensitive paths once per turn regardless of history. All three compose: mode is capability, blast radius is consequence, and the ledger is memory.",
+            a: "Different axes entirely. Modes decide whether a tool may run at all; the ledger decides whether this particular command, in this repository, has earned trust. The blast-radius gate is a third thing again: it challenges writes to sensitive paths once per turn regardless of history. All three compose: mode is capability, blast radius is consequence, and the ledger is memory.",
           },
         ]}
       />

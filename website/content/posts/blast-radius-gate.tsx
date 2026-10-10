@@ -22,15 +22,15 @@ export default {
     },
     {
       q: "Why block once rather than on every write?",
-      a: "Because a gate that fires every time trains people to disable it, and a disabled gate is worse than no gate because you stop looking for it. Challenging a legitimate multi-file migration once per path per turn is enough — the agent states its justification, a human reads it, and the rest of the turn proceeds. The state is per-turn deliberately: a path challenged on Monday is not challenged again on Tuesday, but a new turn re-asks, so nothing is grandfathered across days.",
+      a: "Because a gate that fires every time trains people to disable it, and a disabled gate is worse than no gate because you stop looking for it. Challenging a legitimate multi-file migration once per path per turn is enough, the agent states its justification, a human reads it, and the rest of the turn proceeds. The state is per-turn deliberately: a path challenged on Monday is not challenged again on Tuesday, but a new turn re-asks, so nothing is grandfathered across days.",
     },
     {
       q: "How do you detect a sensitive path?",
-      a: "Two signals, and both are cheap. The primary one is path patterns: a table of regexes covering migrations, .sql files, .github/workflows, Dockerfiles and Makefiles, lockfiles, schema definitions, auth and billing filenames, .env, terraform/infra and k8s. The secondary signal is your own onboarding survey — high churn with no test coverage — which you already computed and can reuse. Sentinel keeps the second one opt-in and unwired, because running the survey shells out to git twice and paying that on every write would be a performance regression for a marginal signal.",
+      a: "Two signals, and both are cheap. The primary one is path patterns: a table of regexes covering migrations, .sql files, .github/workflows, Dockerfiles and Makefiles, lockfiles, schema definitions, auth and billing filenames, .env, terraform/infra and k8s. The secondary signal is your own onboarding survey (high churn with no test coverage), which you already computed and can reuse. Sentinel keeps the second one opt-in and unwired, because running the survey shells out to git twice and paying that on every write would be a performance regression for a marginal signal.",
     },
     {
       q: "Does blocking actually make the agent behave differently?",
-      a: "Yes, and for a reason worth understanding: the block is returned as a tool result, so the model reads it as an observation and its next move must include the justification. That converts a silent, plausible edit into a stated one with evidence attached, and it puts a human-readable record of the reasoning into the transcript. The gate does not verify the justification is correct — a regex cannot do that — it verifies that one was offered, which is the part that is mechanically checkable.",
+      a: "Yes, and for a reason worth understanding: the block is returned as a tool result, so the model reads it as an observation and its next move must include the justification. That converts a silent, plausible edit into a stated one with evidence attached, and it puts a human-readable record of the reasoning into the transcript. The gate does not verify the justification is correct (a regex cannot do that) it verifies that one was offered, which is the part that is mechanically checkable.",
     },
   ],
   body: () => (
@@ -60,7 +60,7 @@ export default {
         caption="Three controls, three axes, composed"
         head={["Control", "Question it answers", "State it keeps"]}
         rows={[
-          ["Permission modes", "Is this tool allowed at all?", "Nothing — a static allowlist"],
+          ["Permission modes", "Is this tool allowed at all?", "Nothing, a static allowlist"],
           ["Risk ledger", "Has this kind of command earned trust here?", "Per repository, per shape"],
           ["Blast radius", "How bad is it if this specific write is wrong?", "Per turn, per path"],
         ]}
@@ -102,7 +102,7 @@ export default {
 const SENSITIVE_PATTERNS = [
   [/(^|\\/)(migrations?|alembic|db\\/migrate)(\\/|$)/i, 'database migration'],
   [/\\.(sql)$/i, 'raw SQL'],
-  [/(^|\\/)\\.github\\/workflows\\//i, 'CI workflow — this gates every merge'],
+  [/(^|\\/)\\.github\\/workflows\\//i, 'CI workflow, this gates every merge'],
   [/(^|\\/)(Dockerfile|docker-compose[^/]*|Makefile)$/i, 'build or deploy definition'],
   [/(^|\\/)(package-lock\\.json|yarn\\.lock|pnpm-lock\\.yaml|Cargo\\.lock|go\\.sum|poetry\\.lock)$/i, 'lockfile'],
   [/(^|\\/)(schema\\.(prisma|sql|graphql)|.*\\.schema\\.(json|ts))$/i, 'schema definition'],
@@ -180,7 +180,7 @@ export function createGateState() {
  *   high-churn-with-no-tests. Deliberately opt-in and NOT wired into the loop:
  *   \`analyzeRepo\` shells out to git twice, and paying that on every write
  *   would be a performance regression to buy a marginal extra signal.
- * @returns {null | { block: true, reason: string }} — null means the write may
+ * @returns {null | { block: true, reason: string }}. Null means the write may
  *   proceed. A block is a request for a justification, not a refusal.
  */
 export function checkBlastRadius({ toolName, input, state, surveyed = null }) {
@@ -228,11 +228,11 @@ export function checkBlastRadius({ toolName, input, state, surveyed = null }) {
  * reading the transcript.
  */
 export function justificationPrompt(radius) {
-  const L = ['Before this change lands, state two things — this path is a blast centre:'];
+  const L = ['Before this change lands, state two things, this path is a blast centre:'];
   for (const t of radius.targets) L.push(\`  - \\\`\${t.path}\\\` (\${t.reasons.join('; ')})\`);
   L.push('');
-  L.push('1. JUSTIFICATION — the file:line that shows why this change is correct, read before you edited.');
-  L.push('2. ROLLBACK — the exact command or edit that undoes it if it is wrong.');
+  L.push('1. JUSTIFICATION. The file:line that shows why this change is correct, read before you edited.');
+  L.push('2. ROLLBACK. The exact command or edit that undoes it if it is wrong.');
   L.push('');
   L.push('Then repeat the same tool call. Do not paraphrase the change; state the evidence.');
   return L.join('\\n');
@@ -250,13 +250,13 @@ export function looksJustified(text) {
         label="terminal"
         code={`→ writeFile      migrations/0042_add_users_index.sql
 
-  Before this change lands, state two things — this path is a blast centre:
+  Before this change lands, state two things, this path is a blast centre:
     - migrations/0042_add_users_index.sql (database migration; raw SQL)
 
-  1. JUSTIFICATION — src/db/users.js:214 queries users by email on every
+  1. JUSTIFICATION. Src/db/users.js:214 queries users by email on every
      login, and without an index that is a sequential scan over the whole
      table. I read it before editing.
-  2. ROLLBACK — \`DROP INDEX CONCURRENTLY idx_users_email;\` on the same
+  2. ROLLBACK. \`DROP INDEX CONCURRENTLY idx_users_email;\` on the same
      database. No data loss; the index is derived state.
 
 → writeFile      migrations/0042_add_users_index.sql   ← now permitted`}
@@ -481,22 +481,22 @@ node -e "
           },
           {
             q: "Why block once rather than on every write?",
-            a: "Because a gate that fires every time trains people to disable it, and a disabled gate is worse than no gate because you stop looking for it. Challenging a legitimate multi-file migration once per path per turn is enough — the agent states its justification, a human reads it, and the rest of the turn proceeds. The state is per-turn deliberately: a path challenged on Monday is not challenged again on Tuesday, but a new turn re-asks, so nothing is grandfathered across days.",
+            a: "Because a gate that fires every time trains people to disable it, and a disabled gate is worse than no gate because you stop looking for it. Challenging a legitimate multi-file migration once per path per turn is enough, the agent states its justification, a human reads it, and the rest of the turn proceeds. The state is per-turn deliberately: a path challenged on Monday is not challenged again on Tuesday, but a new turn re-asks, so nothing is grandfathered across days.",
           },
           {
             q: "How do you detect a sensitive path?",
-            a: "Two signals, and both are cheap. The primary one is path patterns: a table of regexes covering migrations, .sql files, .github/workflows, Dockerfiles and Makefiles, lockfiles, schema definitions, auth and billing filenames, .env, terraform/infra and k8s. The secondary signal is your own onboarding survey — high churn with no test coverage — which you already computed and can reuse. Sentinel keeps the second one opt-in and unwired, because running the survey shells out to git twice and paying that on every write would be a performance regression for a marginal signal.",
+            a: "Two signals, and both are cheap. The primary one is path patterns: a table of regexes covering migrations, .sql files, .github/workflows, Dockerfiles and Makefiles, lockfiles, schema definitions, auth and billing filenames, .env, terraform/infra and k8s. The secondary signal is your own onboarding survey (high churn with no test coverage), which you already computed and can reuse. Sentinel keeps the second one opt-in and unwired, because running the survey shells out to git twice and paying that on every write would be a performance regression for a marginal signal.",
           },
           {
             q: "Does blocking actually make the agent behave differently?",
-            a: "Yes, and for a reason worth understanding: the block is returned as a tool result, so the model reads it as an observation and its next move must include the justification. That converts a silent, plausible edit into a stated one with evidence attached, and it puts a human-readable record of the reasoning into the transcript. The gate does not verify the justification is correct — a regex cannot do that — it verifies that one was offered, which is the part that is mechanically checkable.",
+            a: "Yes, and for a reason worth understanding: the block is returned as a tool result, so the model reads it as an observation and its next move must include the justification. That converts a silent, plausible edit into a stated one with evidence attached, and it puts a human-readable record of the reasoning into the transcript. The gate does not verify the justification is correct (a regex cannot do that) it verifies that one was offered, which is the part that is mechanically checkable.",
           },
         ]}
       />
 
       <Cta
         title="Check what you have built"
-        body="The quiz covers every part of the course — modes, gates, ledgers and the cost rules — and names the gaps rather than the score."
+        body="The quiz covers every part of the course (modes, gates, ledgers and the cost rules), and names the gaps rather than the score."
         href="/blog/cursor-cli-course-quiz"
         cta="Take the quiz"
       />

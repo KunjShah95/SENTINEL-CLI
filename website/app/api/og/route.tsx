@@ -13,13 +13,13 @@ const HEIGHT = 630;
  * One card generator for the whole site. `/api/og?t=&d=&p=` renders the title,
  * the description and a path label, so every URL gets a distinct image without a
  * hand-made PNG per page. Static assets beat generated ones for the homepage,
- * but 30+ hand-drawn cards do not get maintained — this is the honest trade.
+ * but 30+ hand-drawn cards do not get maintained. This is the honest trade.
  */
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const title = (searchParams.get("t") || "The coding agent that shows its work.").slice(0, 90);
   const description = (
-    searchParams.get("s") || "Minimalist AI coding assistant for the terminal."
+    searchParams.get("s") || "A local coding agent for the terminal."
   ).slice(0, 96);
   const path = searchParams.get("p") || "/";
 

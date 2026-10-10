@@ -13,7 +13,7 @@ export const metadata: Metadata = pageMeta({
 const items: { name: string; body: React.ReactNode }[] = [
   {
     name: "Project context",
-    body: "SENTINEL.md → CLAUDE.md → AGENTS.md → .sentinel/context.md are injected into the system prompt (3k chars each). Plain files, no database — the repo is the index.",
+    body: "SENTINEL.md → CLAUDE.md → AGENTS.md → .sentinel/context.md are injected into the system prompt (3k chars each). Plain files, no database. The repo is the index.",
   },
   {
     name: "Skills",
@@ -25,7 +25,7 @@ const items: { name: string; body: React.ReactNode }[] = [
   },
   {
     name: "Subagents",
-    body: "spawnAgent runs the same loop with fresh messages and restricted tools (depth limit 1) and returns a summary — the parent's context grows by the summary, not the transcript.",
+    body: "spawnAgent runs the same loop with fresh messages and restricted tools (depth limit 1) and returns a summary, the parent's context grows by the summary, not the transcript.",
   },
   {
     name: "Hooks",
@@ -33,7 +33,7 @@ const items: { name: string; body: React.ReactNode }[] = [
   },
   {
     name: "Trajectories",
-    body: "Every turn records JSONL to .sentinel/trajectories/<runId>.jsonl — the raw material for evals. Read failing traces to find the next behavior to gate.",
+    body: "Every turn records JSONL to .sentinel/trajectories/<runId>.jsonl, the raw material for evals. Read failing traces to find the next behavior to gate.",
   },
 ];
 
@@ -44,7 +44,7 @@ export default function Harness() {
       <h1 className="text-3xl font-semibold tracking-tight">Harness</h1>
       <p className="text-muted">
         The model is the driver, the harness is the vehicle. One agent loop
-        owns everything; these mechanisms attach to it — each a small module,
+        owns everything; these mechanisms attach to it, each a small module,
         never a framework.
       </p>
 
@@ -74,7 +74,7 @@ export default function Harness() {
       <div className="pt-2">
         <Callout title="Full map">
           <code className="font-mono text-[13px]">docs/claude-code-adaptation.md</code> in the repo maps every
-          Claude-Code mechanism to its Sentinel adaptation — including what was
+          Claude-Code mechanism to its Sentinel adaptation, including what was
           deliberately deferred (agent teams, background agents, microcompact).
         </Callout>
       </div>

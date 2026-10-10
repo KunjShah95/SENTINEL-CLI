@@ -17,7 +17,7 @@ export default {
   faq: [
     {
       q: "What are guardrails in an AI coding agent?",
-      a: "Code-enforced limits on what the agent may do, independent of what the system prompt says. In practice there are four kinds: permission modes that map to tool allowlists, path sandboxing that keeps reads and writes inside the project, refusals for secret files and catastrophic commands, and higher friction on paths where a mistake is expensive — migrations, CI workflows, lockfiles, auth, billing, infrastructure. Only the last kind is usually built, and it is the one that decides whether the agent is trusted with a real repository.",
+      a: "Code-enforced limits on what the agent may do, independent of what the system prompt says. In practice there are four kinds: permission modes that map to tool allowlists, path sandboxing that keeps reads and writes inside the project, refusals for secret files and catastrophic commands, and higher friction on paths where a mistake is expensive, migrations, CI workflows, lockfiles, auth, billing, infrastructure. Only the last kind is usually built, and it is the one that decides whether the agent is trusted with a real repository.",
     },
     {
       q: "Why do agent guardrails get disabled?",
@@ -33,7 +33,7 @@ export default {
       <KeyTakeaways>
         <p>
           Guardrails do not fail because they are too weak. They fail because they are{" "}
-          <strong>calibrated for correctness instead of adoption</strong> — fire too often, and
+          <strong>calibrated for correctness instead of adoption</strong>: fire too often, and
           engineers disable them within a week, which converts every control you built into
           decoration.
         </p>
@@ -53,7 +53,7 @@ export default {
       </p>
       <p>
         So the question that actually matters is not &ldquo;does this block dangerous
-        writes?&rdquo; — it always does, on the tenth attempt. The question is{" "}
+        writes?&rdquo;, it always does, on the tenth attempt. The question is{" "}
         <strong>&ldquo;will it still be enabled next month?&rdquo;</strong> That reframes guardrail
         design from a security exercise into a product exercise, and it changes the answers.
       </p>
@@ -85,7 +85,7 @@ export default {
         table stakes and one is the whole design problem.
       </p>
 
-      <H3 id="l1" text="Layer 1 — expectations, not enforcement" />
+      <H3 id="l1" text="Layer 1: expectations, not enforcement" />
       <p>
         The system prompt tells the agent to stay inside the project. This is documentation, not a
         control, and it is worth keeping for the same reason any interface has a label: it aligns
@@ -93,15 +93,15 @@ export default {
         than a fight. Never count it as a layer.
       </p>
 
-      <H3 id="l2" text="Layer 2 — modes as allowlists" />
+      <H3 id="l2" text="Layer 2: modes as allowlists" />
       <p>
         A review mode that cannot write is worth more than a sandbox you have to trust. Use
         allowlists so the failure mode is closed: a tool you forgot to think of is refused rather
         than permitted. This layer is easy to build, which is exactly why it is easy to get wrong
-        quietly — assert it in tests, because nothing else will tell you it regressed.
+        quietly, assert it in tests, because nothing else will tell you it regressed.
       </p>
 
-      <H3 id="l3" text="Layer 3 — canonicalised paths, refused secrets" />
+      <H3 id="l3" text="Layer 3: canonicalised paths, refused secrets" />
       <p>
         Resolve every path to its real location before comparing, and refuse secrets and
         catastrophic commands in every mode including the read-only ones. Nothing about this is
@@ -112,7 +112,7 @@ export default {
         , and it does not generate friction, so there is no adoption cost to worry about.
       </p>
 
-      <H3 id="l4" text="Layer 4 — the expensive-path gate" />
+      <H3 id="l4" text="Layer 4: the expensive-path gate" />
       <p>
         This is the one that gets skipped, and the one that carries the actual risk. Layers 1 to 3
         are uniform: everything outside the root is refused, everything inside is fair game. But
@@ -133,7 +133,7 @@ infra/, terraform/, k8s/      infrastructure definition
       <p>
         A typo in a comment costs nothing. A migration that quietly drops a column costs a restore,
         and it is the kind of restore that happens at 2 a.m. with a customer waiting. That asymmetry
-        — one keystroke versus one incident — is the entire justification for a separate control,
+ (one keystroke versus one incident) is the entire justification for a separate control,
         and it is why the trade should be explicitly{" "}
         <strong>toward over-asking</strong> on these globs. A utility file inside an auth directory
         should still get challenged. Nobody minds being asked once about a file that turned out to
@@ -184,12 +184,12 @@ function gateWrite(relPath, justification) {
         <li>
           <strong className="text-paper">It opens on a complete answer, not on a confirmation.</strong>{" "}
           &ldquo;yes&rdquo; is not a justification. Requiring a specific file and a specific undo
-          converts a rubber stamp into a two-second act of reasoning — and sometimes into the moment
+          converts a rubber stamp into a two-second act of reasoning, and sometimes into the moment
           the agent realises it is about to do the wrong thing.
         </li>
         <li>
           <strong className="text-paper">The answer is recorded.</strong> Once the file:line and the
-          rollback are in the trajectory, the next person — or the next session — can see why the
+          rollback are in the trajectory, the next person (or the next session) can see why the
           change was made instead of reconstructing it.
         </li>
       </ul>
@@ -210,7 +210,7 @@ function gateWrite(relPath, justification) {
       />
       <p>
         The middle line is doing more work than it looks. It explains the{" "}
-        <em>category</em> of risk — irreversibility — rather than asserting a policy, which is what
+        <em>category</em> of risk (irreversibility) rather than asserting a policy, which is what
         makes it survive contact with a model that has never seen this tool before. &ldquo;Required:
         justifying file:line · exact rollback&rdquo; is equally important: it is a contract the
         agent can satisfy on its next turn without guessing.
@@ -238,7 +238,7 @@ function gateWrite(relPath, justification) {
         <code className="font-mono text-[13px]">npm publish</code>, and no amount of prior approval
         should let an agent modify a migration without saying why this time. If a repo-level
         &ldquo;trusted path&rdquo; list grows over time, the gate has been laundered into a
-        suggestion — and that is the moment to delete the feature.
+        suggestion, and that is the moment to delete the feature.
       </p>
 
       <H2 id="antipatterns" text="Six ways to build a guardrail that gets switched off" />
@@ -277,7 +277,7 @@ function gateWrite(relPath, justification) {
       <p>
         Guardrails are the part of an agent most likely to regress silently, because they only fire
         in situations you are not looking at. They belong in the capability gate suite, next to the
-        tool tests, and they need assertions on the failure path — not just the happy path.
+        tool tests, and they need assertions on the failure path, not just the happy path.
       </p>
       <CodeBlock
         label="the four assertions that matter"
@@ -304,7 +304,7 @@ it("still asks on turn two for a new migration", ...)        // memory is not a 
 
       <H2 id="metrics" text="Measure the thing that actually predicts failure" />
       <p>
-        &ldquo;Number of blocked writes&rdquo; is a vanity metric — a healthy project with dangerous
+        &ldquo;Number of blocked writes&rdquo; is a vanity metric, a healthy project with dangerous
         habits can post a high number, and a broken gate can post zero. The signals worth watching
         are these:
       </p>
@@ -334,7 +334,7 @@ it("still asks on turn two for a new migration", ...)        // memory is not a 
         items={[
           {
             q: "What are guardrails in an AI coding agent?",
-            a: "Code-enforced limits on what the agent may do, independent of what the system prompt says. In practice there are four kinds: permission modes that map to tool allowlists, path sandboxing that keeps reads and writes inside the project, refusals for secret files and catastrophic commands, and higher friction on paths where a mistake is expensive — migrations, CI workflows, lockfiles, auth, billing, infrastructure. Only the last kind is usually built, and it is the one that decides whether the agent is trusted with a real repository.",
+            a: "Code-enforced limits on what the agent may do, independent of what the system prompt says. In practice there are four kinds: permission modes that map to tool allowlists, path sandboxing that keeps reads and writes inside the project, refusals for secret files and catastrophic commands, and higher friction on paths where a mistake is expensive, migrations, CI workflows, lockfiles, auth, billing, infrastructure. Only the last kind is usually built, and it is the one that decides whether the agent is trusted with a real repository.",
           },
           {
             q: "Why do agent guardrails get disabled?",

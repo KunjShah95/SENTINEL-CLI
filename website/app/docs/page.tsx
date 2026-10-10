@@ -25,12 +25,12 @@ export default function DocsOverview() {
 
       <h2 className="pt-4 text-xl font-semibold">What&apos;s inside</h2>
       <ul className="list-disc space-y-1 pl-5 text-muted marker:text-ink-700">
-        <li><code className="font-mono text-[13px] text-paper">bin/sentinel.js</code> — entry point (TUI / ask / mcp / --version)</li>
-        <li><code className="font-mono text-[13px] text-paper">src/agent/</code> — loop, providers, tools glue, cost, sessions, prompt</li>
-        <li><code className="font-mono text-[13px] text-paper">src/shared/tools/</code> — read, write, edit, glob, grep, bash…</li>
-        <li><code className="font-mono text-[13px] text-paper">src/shared/models/</code> — registry + live discovery from provider APIs</li>
-        <li><code className="font-mono text-[13px] text-paper">src/tui/</code> — the Ink (React) terminal UI</li>
-        <li><code className="font-mono text-[13px] text-paper">mcp/</code> — MCP stdio server (health, ask, review-diff)</li>
+        <li><code className="font-mono text-[13px] text-paper">bin/sentinel.js</code>: entry point (TUI / ask / mcp / --version)</li>
+        <li><code className="font-mono text-[13px] text-paper">src/agent/</code>: loop, providers, tools glue, cost, sessions, prompt</li>
+        <li><code className="font-mono text-[13px] text-paper">src/shared/tools/</code>: read, write, edit, glob, grep, bash…</li>
+        <li><code className="font-mono text-[13px] text-paper">src/shared/models/</code>: registry + live discovery from provider APIs</li>
+        <li><code className="font-mono text-[13px] text-paper">src/tui/</code>: the Ink (React) terminal UI</li>
+        <li><code className="font-mono text-[13px] text-paper">mcp/</code>: MCP stdio server (health, ask, review-diff)</li>
       </ul>
 
       <h2 className="pt-4 text-xl font-semibold">The agent loop</h2>

@@ -86,7 +86,7 @@ export function pageMeta({
       description,
       locale: "en_US",
       ...(type === "article" ? { publishedTime, modifiedTime: modifiedTime ?? publishedTime } : {}),
-      images: [{ url: image, width: 1200, height: 630, alt: `${title} — ${site.name}` }],
+      images: [{ url: image, width: 1200, height: 630, alt: `${title}, ${site.name}` }],
     },
     twitter: {
       card: "summary_large_image",

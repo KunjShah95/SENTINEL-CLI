@@ -1,6 +1,12 @@
 export const site = {
   name: "Sentinel",
-  tagline: "A minimalist AI coding assistant for the terminal.",
+  /**
+   * "Agent", not "assistant". The <title>, the blog index, the comparison page
+   * and the web manifest all already said coding agent; this one line said
+   * assistant, and it is the string that gets quoted in listings and previews.
+   * One product, one name.
+   */
+  tagline: "A local coding agent for the terminal.",
   version: "3.5.0",
   /** Canonical origin. One place, so sitemap/robots/canonical/OG never drift. */
   url: "https://sentinel-cli.dev",

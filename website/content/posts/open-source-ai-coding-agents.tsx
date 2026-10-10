@@ -139,7 +139,7 @@ export default {
         ]}
       />
       <p className="text-sm text-muted">
-        Categories and licence terms move over time — check each project&apos;s own README before
+        Categories and licence terms move over time, check each project&apos;s own README before
         you rely on this table for a procurement decision.
       </p>
 
@@ -180,7 +180,7 @@ export default {
           into a placeholder.
         </li>
         <li>
-          <strong className="text-paper">Higher friction on expensive paths</strong> — migrations,
+          <strong className="text-paper">Higher friction on expensive paths</strong>: migrations,
           CI workflows, lockfiles, auth, billing, infrastructure. One extra prompt on those globs
           costs a second. Missing real billing code costs the incident.
         </li>
@@ -242,8 +242,8 @@ sentinel risk "npm publish"`}
         would rather you find that out in two minutes than in a procurement cycle.
       </p>
       <p>
-        What is left is one loop you can read in one sitting — under a thousand lines in{" "}
-        <code className="font-mono text-[13px] text-paper">src/agent/loop.js</code> — plus the
+        What is left is one loop you can read in one sitting, under a thousand lines in{" "}
+        <code className="font-mono text-[13px] text-paper">src/agent/loop.js</code>: plus the
         unglamorous controls around it: modes, checkpoints, budgets, a risk ledger, and a handoff
         document. The{" "}
         <Link href="/blog/ai-agent-file-permissions" className="underline-offset-4 hover:underline">

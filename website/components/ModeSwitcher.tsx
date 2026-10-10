@@ -24,7 +24,7 @@ const MODES: Mode[] = [
     edits: false,
     shell: false,
     use: "Questions, review, exploration",
-    detail: "Read-only tools only. The model cannot escalate itself out of PLAN — the allowlist is fixed, not prompted.",
+    detail: "Read-only tools only. The model cannot escalate itself out of PLAN. The allowlist is fixed, not prompted.",
   },
   {
     id: "REVIEW",

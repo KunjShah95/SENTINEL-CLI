@@ -8,7 +8,7 @@ export default {
   title: "Looking for a Cursor alternative that runs in your terminal?",
   metaTitle: "Cursor Alternative: A Local CLI Agent",
   description:
-    "An honest look at switching from an AI IDE to a local, multi-model CLI coding agent — what you gain, what you lose, and who should not make the move.",
+    "An honest look at switching from an AI IDE to a local, multi-model CLI coding agent, what you gain, what you lose, and who should not make the move.",
   date: "2026-09-26",
   readingMinutes: 8,
   tags: ["Comparison", "Workflow"],
@@ -21,7 +21,7 @@ export default {
     },
     {
       q: "Can a terminal coding agent replace an AI IDE?",
-      a: "For whole-codebase tasks, yes, and it is often better: an agent with grep, glob and a shell has more reach than an editor that can only see the open file. What it does not replace is keystroke-level assistance — inline completion, cursor-anchored edits, visual diff review. Keep the editor for typing and use the agent for changes, and the overlap disappears.",
+      a: "For whole-codebase tasks, yes, and it is often better: an agent with grep, glob and a shell has more reach than an editor that can only see the open file. What it does not replace is keystroke-level assistance, inline completion, cursor-anchored edits, visual diff review. Keep the editor for typing and use the agent for changes, and the overlap disappears.",
     },
     {
       q: "Is a CLI agent cheaper than an AI IDE subscription?",
@@ -32,7 +32,7 @@ export default {
     <>
       <KeyTakeaways>
         <p>
-          A local CLI agent and an AI IDE are not really competitors — they optimise for different
+          A local CLI agent and an AI IDE are not really competitors, they optimise for different
           moments. The agent wins on whole-repo work, scripting, SSH and auditability; the IDE wins
           on keystroke-level assistance and visual diff review.
         </p>
@@ -90,7 +90,7 @@ sentinel ask "which files still import the old client?"
 sentinel ask -m claude-sonnet-4 "why does the lock deadlock under concurrency?"`}
       />
       <p>
-        With twelve providers behind one client — plus Ollama and LM Studio for fully local runs —
+        With twelve providers behind one client (plus Ollama and LM Studio for fully local runs) 
         changing provider is a command, not a migration.
       </p>
 
@@ -145,8 +145,8 @@ sentinel steer "also check the retry path"`}
               ["Works over SSH / headless", "Yes, first class", "Awkward"],
               ["Model choice", "12 providers + local models", "Usually the vendor's lineup"],
               ["Cost shape", "BYO key, free tier by default", "Seat subscription"],
-              ["Inline autocomplete", "No", "Yes — its main advantage"],
-              ["Visual diff review", "Terminal diff", "Yes — its other advantage"],
+              ["Inline autocomplete", "No", "Yes. Its main advantage"],
+              ["Visual diff review", "Terminal diff", "Yes. Its other advantage"],
               ["Scriptable / repeatable", "Yes", "Limited"],
               ["Permission model you can read", "Yes, it is the source", "Opaque"],
               ["MCP interoperability", "Server + client", "Varies"],
@@ -215,7 +215,7 @@ sentinel steer "also check the retry path"`}
           },
           {
             q: "Can a terminal coding agent replace an AI IDE?",
-            a: "For whole-codebase tasks, yes, and it is often better: an agent with grep, glob and a shell has more reach than an editor that can only see the open file. What it does not replace is keystroke-level assistance — inline completion, cursor-anchored edits, visual diff review. Keep the editor for typing and use the agent for changes, and the overlap disappears.",
+            a: "For whole-codebase tasks, yes, and it is often better: an agent with grep, glob and a shell has more reach than an editor that can only see the open file. What it does not replace is keystroke-level assistance, inline completion, cursor-anchored edits, visual diff review. Keep the editor for typing and use the agent for changes, and the overlap disappears.",
           },
           {
             q: "Is a CLI agent cheaper than an AI IDE subscription?",

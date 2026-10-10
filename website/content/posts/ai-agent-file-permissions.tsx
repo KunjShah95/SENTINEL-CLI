@@ -23,7 +23,7 @@ export default {
   faq: [
     {
       q: "How do you stop an AI coding agent from reading files outside the project?",
-      a: "Resolve every path to its real location before comparing it, then compare against the project root — string prefix checks are bypassable. `root.includes(path)` is defeated by `../secrets` and by a symlink pointing outside the tree. Canonicalise first, reject on the resolved path, and treat an unreadable or unresolvable path as a refusal rather than as a pass. Sentinel does this at the tool boundary so it applies to every mode, including the ones you think are read-only.",
+      a: "Resolve every path to its real location before comparing it, then compare against the project root, string prefix checks are bypassable. `root.includes(path)` is defeated by `../secrets` and by a symlink pointing outside the tree. Canonicalise first, reject on the resolved path, and treat an unreadable or unresolvable path as a refusal rather than as a pass. Sentinel does this at the tool boundary so it applies to every mode, including the ones you think are read-only.",
     },
     {
       q: "Is a system prompt enough to stop an agent from doing damage?",
@@ -31,7 +31,7 @@ export default {
     },
     {
       q: "Should an agent ask before every file write?",
-      a: "No — a gate that fires on every write trains people to disable it, usually within a day. Ask once per risky path per turn, then open the path for the rest of that turn, and record the justification. The cost of a false positive is one keystroke; the cost of a real mistake on a migration is not recoverable, so the design should err heavily toward over-asking on the paths that are expensive to get wrong.",
+      a: "No. A gate that fires on every write trains people to disable it, usually within a day. Ask once per risky path per turn, then open the path for the rest of that turn, and record the justification. The cost of a false positive is one keystroke; the cost of a real mistake on a migration is not recoverable, so the design should err heavily toward over-asking on the paths that are expensive to get wrong.",
     },
   ],
   body: () => (
@@ -67,7 +67,7 @@ export default {
           write outside the project, into a directory that happens to be mounted.
         </li>
         <li>
-          <strong className="text-paper">Destructive command.</strong> Not a bug in the agent — a
+          <strong className="text-paper">Destructive command.</strong> Not a bug in the agent, a
           <em> correct</em> execution of <code className="font-mono text-[13px]">rm -rf</code> on a
           path the model mis-resolved.
         </li>
@@ -88,7 +88,7 @@ export default {
         own.
       </p>
 
-      <H2 id="layer-1" text="Layer 1 — the prompt is not a control" />
+      <H2 id="layer-1" text="Layer 1: the prompt is not a control" />
       <p>
         Almost every agent ships a system prompt that says something like &ldquo;never write outside
         the project directory&rdquo;. Treat that as documentation. A model is a prediction
@@ -102,7 +102,7 @@ export default {
         not a control.
       </p>
 
-      <H2 id="layer-2" text="Layer 2 — read-only modes that are actually read-only" />
+      <H2 id="layer-2" text="Layer 2: read-only modes that are actually read-only" />
       <p>
         A mode that is meant to review code should not be able to write code, and the way to
         guarantee that is an allowlist, not a denylist. Denylists fail open: a tool you forgot to
@@ -123,7 +123,7 @@ SWE     full loop, 60-iteration budget, verbatim tool history`}
         enforcement that one handler will eventually forget.
       </p>
 
-      <H2 id="layer-3" text="Layer 3 — canonicalise, then compare" />
+      <H2 id="layer-3" text="Layer 3: canonicalise, then compare" />
       <p>
         This is the layer most sandboxes get wrong, and the bug is always the same shape:{" "}
         <code className="font-mono text-[13px]">path.startsWith(root)</code>{" "}
@@ -144,7 +144,7 @@ async function isInside(root, candidate) {
   // 1. make the path absolute against the project root
   const abs = path.resolve(root, candidate);
 
-  // 2. canonicalise BOTH sides — this is what defeats symlink escapes
+  // 2. canonicalise BOTH sides. This is what defeats symlink escapes
   const [realRoot, realTarget] = await Promise.all([
     realpath(root),
     realpath(abs).catch(() => abs), // unresolvable => treat as the raw abs path
@@ -156,7 +156,7 @@ async function isInside(root, candidate) {
       />
       <p>
         Two details carry the weight. You must canonicalise the <em>root</em> too, because the
-        project itself is often reached through a symlink —{" "}
+        project itself is often reached through a symlink, {" "}
         <code className="font-mono text-[13px]">/tmp</code> to{" "}
         <code className="font-mono text-[13px]">/private/tmp</code> on macOS is the classic case, and
         comparing a canonical path against a symlinked one refuses everything. And the comparison
@@ -181,7 +181,7 @@ async function isInside(root, candidate) {
         </Callout>
       </div>
 
-      <H2 id="layer-4" text="Layer 4 — refuse secrets and the obvious footguns" />
+      <H2 id="layer-4" text="Layer 4: refuse secrets and the obvious footguns" />
       <p>
         Path sandboxing answers &ldquo;where may it write&rdquo;. It does not answer &ldquo;which of
         the legal paths should be off limits in every mode&rdquo;. Two categories need a hard deny:
@@ -194,7 +194,7 @@ async function isInside(root, candidate) {
           <code className="font-mono text-[13px]">*.key</code>,{" "}
           <code className="font-mono text-[13px]">id_rsa</code>,{" "}
           <code className="font-mono text-[13px]">.npmrc</code>, cloud credential files. A read
-          refusal is the point — the model does not need the value, and anything it reads can end
+          refusal is the point. The model does not need the value, and anything it reads can end
           up in a provider request.
         </li>
         <li>
@@ -209,11 +209,11 @@ async function isInside(root, candidate) {
       <p>
         Note the asymmetry: refusing a secret <em>read</em> is safe and cheap, because nothing
         legitimate needs the value. Refusing a command is a judgement call, so keep the list
-        deliberately short and unmistakable rather than clever — a denylist that blocks{" "}
+        deliberately short and unmistakable rather than clever, a denylist that blocks{" "}
         <code className="font-mono text-[13px]">rm</code> is a denylist that gets disabled.
       </p>
 
-      <H2 id="layer-5" text="Layer 5 — grade by command shape, not by command" />
+      <H2 id="layer-5" text="Layer 5: grade by command shape, not by command" />
       <p>
         &ldquo;Allow bash for this session&rdquo; is one grant covering{" "}
         <code className="font-mono text-[13px]">git status</code> and{" "}
@@ -254,7 +254,7 @@ red     git push --force               always asked`}
         </li>
       </ol>
 
-      <H2 id="layer-6" text="Layer 6 — a blast-radius gate that asks once" />
+      <H2 id="layer-6" text="Layer 6: a blast-radius gate that asks once" />
       <p>
         Sandbox rules are uniform: everything outside the root is refused. But the cost of being
         wrong is wildly non-uniform. A typo in a comment costs nothing; a migration that quietly
@@ -282,8 +282,8 @@ red     git push --force               always asked`}
         to disable it. A gate that asks once and records the answer builds a habit.</strong> The
         trade is explicitly toward over-asking: a utility file in an auth directory still gets
         challenged, because a false positive costs one prompt and a missed billing change does not
-        come back. The full design — refusal wording, memory boundaries, the metrics that predict
-        failure — is in{" "}
+        come back. The full design (refusal wording, memory boundaries, the metrics that predict
+        failure) is in{" "}
         <Link
           href="/blog/ai-coding-agent-guardrails"
           className="underline-offset-4 hover:underline"
@@ -293,7 +293,7 @@ red     git push --force               always asked`}
         .
       </p>
 
-      <H2 id="layer-7-8" text="Layers 7 and 8 — reversibility, and cost of unattended loops" />
+      <H2 id="layer-7-8" text="Layers 7 and 8: reversibility, and cost of unattended loops" />
       <p>
         <strong>Checkpoints.</strong> Every write is recorded, and undo works across turns, not just
         within one. The turn that breaks something is rarely the turn that looks like it did, so
@@ -301,7 +301,7 @@ red     git push --force               always asked`}
       </p>
       <p>
         <strong>Budgets.</strong> A standing loop that wakes on every failed test is a presence, not
-        a cron job — and it is a way to spend money quietly unless the ceiling is checked before
+        a cron job, and it is a way to spend money quietly unless the ceiling is checked before
         every wakeup. Pair it with backoff (double the wait on a tick that made no progress, stop
         after five) and record failures rather than treating them as fatal.
       </p>
@@ -334,7 +334,7 @@ sentinel budget --usd 25 --deadline 2h`}
         items={[
           {
             q: "How do you stop an AI coding agent from reading files outside the project?",
-            a: "Resolve every path to its real location before comparing it, then compare against the project root — string prefix checks are bypassable. `root.includes(path)` is defeated by `../secrets` and by a symlink pointing outside the tree. Canonicalise first, reject on the resolved path, and treat an unreadable or unresolvable path as a refusal rather than as a pass. Sentinel does this at the tool boundary so it applies to every mode, including the ones you think are read-only.",
+            a: "Resolve every path to its real location before comparing it, then compare against the project root, string prefix checks are bypassable. `root.includes(path)` is defeated by `../secrets` and by a symlink pointing outside the tree. Canonicalise first, reject on the resolved path, and treat an unreadable or unresolvable path as a refusal rather than as a pass. Sentinel does this at the tool boundary so it applies to every mode, including the ones you think are read-only.",
           },
           {
             q: "Is a system prompt enough to stop an agent from doing damage?",
@@ -342,7 +342,7 @@ sentinel budget --usd 25 --deadline 2h`}
           },
           {
             q: "Should an agent ask before every file write?",
-            a: "No — a gate that fires on every write trains people to disable it, usually within a day. Ask once per risky path per turn, then open the path for the rest of that turn, and record the justification. The cost of a false positive is one keystroke; the cost of a real mistake on a migration is not recoverable, so the design should err heavily toward over-asking on the paths that are expensive to get wrong.",
+            a: "No. A gate that fires on every write trains people to disable it, usually within a day. Ask once per risky path per turn, then open the path for the rest of that turn, and record the justification. The cost of a false positive is one keystroke; the cost of a real mistake on a migration is not recoverable, so the design should err heavily toward over-asking on the paths that are expensive to get wrong.",
           },
         ]}
       />

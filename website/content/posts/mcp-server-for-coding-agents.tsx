@@ -18,7 +18,7 @@ export default {
   faq: [
     {
       q: "Can a terminal coding agent be used as an MCP server?",
-      a: "Yes, and it is one of the better fits for the protocol. A CLI agent is already a long-lived process that owns a project directory, a model client and a tool allowlist. Exposing it over MCP adds a transport and a tool schema — it does not require restructuring anything. The three things you must get right are the transport, the tool descriptions, and keeping stdout free of logs.",
+      a: "Yes, and it is one of the better fits for the protocol. A CLI agent is already a long-lived process that owns a project directory, a model client and a tool allowlist. Exposing it over MCP adds a transport and a tool schema. It does not require restructuring anything. The three things you must get right are the transport, the tool descriptions, and keeping stdout free of logs.",
     },
     {
       q: "What transport should an MCP server use?",
@@ -50,8 +50,8 @@ export default {
 
       <H2 id="why-cli-agents" text="Why a CLI agent is a good MCP server" />
       <p>
-        MCP is a JSON-RPC protocol over stdio or HTTP that lets a host application — Claude
-        Desktop, Cursor, an IDE, another agent — call tools your program exposes. Most MCP servers
+        MCP is a JSON-RPC protocol over stdio or HTTP that lets a host application, Claude
+        Desktop, Cursor, an IDE, another agent, call tools your program exposes. Most MCP servers
         are small scripts written for this purpose.
       </p>
       <p>
@@ -68,8 +68,8 @@ export default {
           accounting and context compaction already solved.
         </li>
         <li>
-          <strong className="text-paper">A permission model</strong> — modes, tool allowlists,
-          path sandboxing — which is exactly the control plane an MCP host wants to inherit rather
+          <strong className="text-paper">A permission model</strong>: modes, tool allowlists,
+          path sandboxing. Which is exactly the control plane an MCP host wants to inherit rather
           than reimplement.
         </li>
         <li>
@@ -96,7 +96,7 @@ export default {
       <p>
         <code className="font-mono text-[13px] text-paper">sentinel_health</code> is the one people
         forget. It returns a cheap, structured answer to &ldquo;is this thing installed, configured
-        and working?&rdquo; — which is the first thing a host model will try, and the first thing
+        and working?&rdquo;. Which is the first thing a host model will try, and the first thing
         that fails confusingly if it is missing.
       </p>
 
@@ -126,7 +126,7 @@ export default {
       <H3 id="stdout" text="The stdout trap" />
       <p>
         The single most common way to break an MCP server is to print to stdout. Not the protocol
-        output — anything else. A <code>console.log</code>, a Node deprecation warning, a shell
+        output, anything else. A <code>console.log</code>, a Node deprecation warning, a shell
         script that echoes its own commands, a progress bar: all of it lands between two JSON-RPC
         frames, and the client desynchronises and reports an unhelpful parse error.
       </p>
@@ -196,7 +196,7 @@ sentinel outcome "the sync is flaky" --plan`}
         items={[
           {
             q: "Can a terminal coding agent be used as an MCP server?",
-            a: "Yes, and it is one of the better fits for the protocol. A CLI agent is already a long-lived process that owns a project directory, a model client and a tool allowlist. Exposing it over MCP adds a transport and a tool schema — it does not require restructuring anything. The three things you must get right are the transport, the tool descriptions, and keeping stdout free of logs.",
+            a: "Yes, and it is one of the better fits for the protocol. A CLI agent is already a long-lived process that owns a project directory, a model client and a tool allowlist. Exposing it over MCP adds a transport and a tool schema. It does not require restructuring anything. The three things you must get right are the transport, the tool descriptions, and keeping stdout free of logs.",
           },
           {
             q: "What transport should an MCP server use?",
@@ -227,7 +227,7 @@ function CompareToolList() {
   const tools = [
     {
       name: "sentinel_health",
-      body: "Is Sentinel installed, configured, and reachable? Returns structured status — model, providers, working directory, sandbox root.",
+      body: "Is Sentinel installed, configured, and reachable? Returns structured status, model, providers, working directory, sandbox root.",
     },
     {
       name: "sentinel_ask",

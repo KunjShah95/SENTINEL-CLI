@@ -22,15 +22,15 @@ export default {
     },
     {
       q: "How does this make cancellation free?",
-      a: "Break out of a `for await` loop and JavaScript calls the generator's `.return()`, which runs its `finally` blocks. So cancelling a turn means `break`ing in the consumer — no abort flag threaded through five layers, no orphaned child process, no half-written file. The one thing you still need is an AbortSignal to stop the HTTP request itself, because the socket does not know about your loop.",
+      a: "Break out of a `for await` loop and JavaScript calls the generator's `.return()`, which runs its `finally` blocks. So cancelling a turn means `break`ing in the consumer, no abort flag threaded through five layers, no orphaned child process, no half-written file. The one thing you still need is an AbortSignal to stop the HTTP request itself, because the socket does not know about your loop.",
     },
     {
       q: "Should the TUI be React, or can it be plain readline?",
       a: "A full-screen TUI that repaints needs something that owns the terminal, and Ink over React is the cheapest thing that works. The important architectural point is that the choice is *contained*: `use-agent-chat.ts` is the only file that knows Ink exists, and it consumes the same events as the CLI and the MCP server. Write the loop against a plain interface first, and the front end becomes a replaceable detail.",
     },
     {
-      q: "What about backpressure — what if the consumer is slow?",
-      a: "For a terminal UI it does not matter, because a human reads slower than tokens arrive. But the loop is an async generator, so a slow consumer naturally applies backpressure: it just stops pulling, the HTTP stream's reader stops being drained, and the provider's socket buffer fills. That is the correct behaviour and it is free. Where you need to be careful is unbounded buffering inside your own loop — never accumulate an answer into a growing string when you can yield deltas.",
+      q: "What about backpressure, what if the consumer is slow?",
+      a: "For a terminal UI it does not matter, because a human reads slower than tokens arrive. But the loop is an async generator, so a slow consumer naturally applies backpressure: it just stops pulling, the HTTP stream's reader stops being drained, and the provider's socket buffer fills. That is the correct behaviour and it is free. Where you need to be careful is unbounded buffering inside your own loop, never accumulate an answer into a growing string when you can yield deltas.",
     },
   ],
   body: () => (
@@ -44,8 +44,8 @@ export default {
         </p>
         <p>
           Two things you get for free from async generators:{" "}
-          <strong>cancellation</strong> — breaking out of the loop runs the generator&rsquo;s
-          <code className="font-mono text-[13px]">finally</code> blocks, so no orphaned processes —
+          <strong>cancellation</strong>: breaking out of the loop runs the generator&rsquo;s
+          <code className="font-mono text-[13px]">finally</code> blocks, so no orphaned processes, 
           and <strong>backpressure</strong>, because a slow consumer stops pulling and the socket
           buffer does the rest.
         </p>
@@ -57,7 +57,7 @@ export default {
         problem appears the second you need the same agent somewhere else.
       </p>
       <CodeBlock
-        label="src/agent/loop.js — the version that hurts"
+        label="src/agent/loop.js: the version that hurts"
         code={`export async function runAgentTurn(opts) {
   for (let iter = 0; iter < 25; iter++) {
     const res = await callModel(opts);
@@ -105,14 +105,14 @@ export default {
       <CodeBlock
         label="src/agent/loop.js"
         code={`/**
- * The agent loop — ONE turn of user input to completion.
+ * The agent loop, ONE turn of user input to completion.
  *
  * Streams model output, executes tool calls in-process, feeds results back,
  * and repeats until the model stops calling tools (or MAX_ITERATIONS).
  * Yields ChatEvent-shaped events: { event, data } where event is one of
  *   'text' | 'reasoning' | 'tool_call' | 'tool_result' | 'finish' | 'error' | 'done'
  *
- * This replaces the deleted Hono server's /chat route — no HTTP, no process
+ * This replaces the deleted Hono server's /chat route, no HTTP, no process
  * boundary: the TUI and CLI call it directly.
  */
 export async function* runAgentTurn(opts = {}) {
@@ -368,7 +368,7 @@ describe('the event contract', () => {
         rows={[
           [
             "Promise vs generator confusion",
-            "runAgentTurn looks synchronous, so callers await it and get the generator object back — no events, no error",
+            "runAgentTurn looks synchronous, so callers await it and get the generator object back, no events, no error",
             "Name it for what it is. Sentinel returns runAgentTurn, not runAgentTurnAsync, but the return type is AsyncGenerator and the docs say so",
           ],
           [
@@ -404,15 +404,15 @@ describe('the event contract', () => {
           },
           {
             q: "How does this make cancellation free?",
-            a: "Break out of a `for await` loop and JavaScript calls the generator's `.return()`, which runs its `finally` blocks. So cancelling a turn means `break`ing in the consumer — no abort flag threaded through five layers, no orphaned child process, no half-written file. The one thing you still need is an AbortSignal to stop the HTTP request itself, because the socket does not know about your loop.",
+            a: "Break out of a `for await` loop and JavaScript calls the generator's `.return()`, which runs its `finally` blocks. So cancelling a turn means `break`ing in the consumer, no abort flag threaded through five layers, no orphaned child process, no half-written file. The one thing you still need is an AbortSignal to stop the HTTP request itself, because the socket does not know about your loop.",
           },
           {
             q: "Should the TUI be React, or can it be plain readline?",
             a: "A full-screen TUI that repaints needs something that owns the terminal, and Ink over React is the cheapest thing that works. The important architectural point is that the choice is *contained*: `use-agent-chat.ts` is the only file that knows Ink exists, and it consumes the same events as the CLI and the MCP server. Write the loop against a plain interface first, and the front end becomes a replaceable detail.",
           },
           {
-            q: "What about backpressure — what if the consumer is slow?",
-            a: "For a terminal UI it does not matter, because a human reads slower than tokens arrive. But the loop is an async generator, so a slow consumer naturally applies backpressure: it just stops pulling, the HTTP stream's reader stops being drained, and the provider's socket buffer fills. That is the correct behaviour and it is free. Where you need to be careful is unbounded buffering inside your own loop — never accumulate an answer into a growing string when you can yield deltas.",
+            q: "What about backpressure, what if the consumer is slow?",
+            a: "For a terminal UI it does not matter, because a human reads slower than tokens arrive. But the loop is an async generator, so a slow consumer naturally applies backpressure: it just stops pulling, the HTTP stream's reader stops being drained, and the provider's socket buffer fills. That is the correct behaviour and it is free. Where you need to be careful is unbounded buffering inside your own loop, never accumulate an answer into a growing string when you can yield deltas.",
           },
         ]}
       />

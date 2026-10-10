@@ -11,7 +11,7 @@ export function DocsSidebar() {
     <nav aria-label="Documentation sections" className="space-y-6">
       {docNav.map((group) => (
         <div key={group.title}>
-          <p className="px-3 font-mono text-xs text-ink-600">
+          <p className="px-3 font-mono text-xs text-ink-500">
             {group.title}
           </p>
           <ul className="mt-2 space-y-px border-l border-ink-800">

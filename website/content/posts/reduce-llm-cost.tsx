@@ -17,15 +17,15 @@ export default {
   faq: [
     {
       q: "Why is my coding agent so expensive?",
-      a: "Almost never because of the answers. It is the context: every file read, every grep result and every test log becomes input tokens on the next call, and input is re-billed on every subsequent turn of the loop. A single unbounded grep output can cost more than every message in the conversation combined. The other common cause is a loop that has stopped converging — an agent retrying the same failing edit burns a full turn's context each time.",
+      a: "Almost never because of the answers. It is the context: every file read, every grep result and every test log becomes input tokens on the next call, and input is re-billed on every subsequent turn of the loop. A single unbounded grep output can cost more than every message in the conversation combined. The other common cause is a loop that has stopped converging, an agent retrying the same failing edit burns a full turn's context each time.",
     },
     {
       q: "What is the single highest-leverage cost change?",
-      a: "Defaulting to a free or near-free model. Teams routinely run a frontier model for every turn including the mechanical ones — listing files, grepping, formatting — when a small free model does the same job. Routing by task is the difference between a bill you watch and a bill you find out about on the invoice.",
+      a: "Defaulting to a free or near-free model. Teams routinely run a frontier model for every turn including the mechanical ones (listing files, grepping, formatting) when a small free model does the same job. Routing by task is the difference between a bill you watch and a bill you find out about on the invoice.",
     },
     {
       q: "Should I set a hard spending limit?",
-      a: "Yes, at the project level rather than the session level. A per-turn cap cannot answer the only question a team lead asks, which is what has this cost so far this week. A persisted ceiling that every run honours — and that fails toward charging you rather than away — is what makes agent spend auditable.",
+      a: "Yes, at the project level rather than the session level. A per-turn cap cannot answer the only question a team lead asks, which is what has this cost so far this week. A persisted ceiling that every run honours, and that fails toward charging you rather than away, is what makes agent spend auditable.",
     },
   ],
   body: () => (
@@ -112,15 +112,15 @@ sentinel ask -m claude-sonnet-4 "why does this deadlock under load?"`}
       <H3 id="c3" text="3. Orient with a code map, not a file dump" />
       <p>
         Reading six files to answer &ldquo;where is the retry logic&rdquo; costs six files of
-        context, every turn, forever. A symbol-level overview — functions, classes and exports per
-        file — is a fraction of the size and is usually enough to pick the one file worth reading.
+        context, every turn, forever. A symbol-level overview (functions, classes and exports per
+        file) is a fraction of the size and is usually enough to pick the one file worth reading.
         This is the cheapest quality-per-token win available to an agent.
       </p>
 
       <H3 id="c4" text="4. Compact on a threshold, not at the edge" />
       <p>
         Let context run to the model&rsquo;s limit and you are paying full price for the last turn
-        before a failure. Compact at a fixed fraction — 40k in Sentinel&rsquo;s case — and the
+        before a failure. Compact at a fixed fraction (40k in Sentinel&rsquo;s case), and the
         expensive tail never happens.
       </p>
       <div className="pt-2">
@@ -133,7 +133,7 @@ sentinel ask -m claude-sonnet-4 "why does this deadlock under load?"`}
 
       <H3 id="c5" text="5. Cap iterations and make them mean something" />
       <p>
-        An unbounded loop is a budget you did not set. A cap is necessary but not sufficient — a
+        An unbounded loop is a budget you did not set. A cap is necessary but not sufficient, a
         loop that hits its cap having accomplished nothing has wasted the maximum. Pair the cap with
         a progress signal and a backoff: an agent that has not written anything and has not met the
         goal has not moved, and should wait rather than retry immediately.
@@ -151,7 +151,7 @@ sentinel budget   # active  ████░░░░░░  $12.40 of $25.00 (50
       <H3 id="c6" text="6. Give the agent a verifier instead of a conversation" />
       <p>
         Every turn spent asking &ldquo;is this right yet?&rdquo; is a turn you pay for. A failing test
-        is a free, deterministic, unambiguous verifier — and it is why the{" "}
+        is a free, deterministic, unambiguous verifier, and it is why the{" "}
         <Link href="/docs/swe" className="underline-offset-4 hover:underline">
           reproduce-first SWE workflow
         </Link>{" "}
@@ -173,7 +173,7 @@ sentinel budget   # active  ████░░░░░░  $12.40 of $25.00 (50
       <p>
         Two details worth copying. Spend recorded <em>before</em> the budget existed should not count
         against it, or you cannot adopt a budget mid-engagement. And a turn finishing in the same
-        millisecond the budget was created <em>should</em> count — a ceiling must fail toward
+        millisecond the budget was created <em>should</em> count, a ceiling must fail toward
         charging you, not away.
       </p>
 
@@ -209,15 +209,15 @@ sentinel ask "add a regression test for the retry path"
         items={[
           {
             q: "Why is my coding agent so expensive?",
-            a: "Almost never because of the answers. It is the context: every file read, every grep result and every test log becomes input tokens on the next call, and input is re-billed on every subsequent turn of the loop. A single unbounded grep output can cost more than every message in the conversation combined. The other common cause is a loop that has stopped converging — an agent retrying the same failing edit burns a full turn's context each time.",
+            a: "Almost never because of the answers. It is the context: every file read, every grep result and every test log becomes input tokens on the next call, and input is re-billed on every subsequent turn of the loop. A single unbounded grep output can cost more than every message in the conversation combined. The other common cause is a loop that has stopped converging, an agent retrying the same failing edit burns a full turn's context each time.",
           },
           {
             q: "What is the single highest-leverage cost change?",
-            a: "Defaulting to a free or near-free model. Teams routinely run a frontier model for every turn including the mechanical ones — listing files, grepping, formatting — when a small free model does the same job. Routing by task is the difference between a bill you watch and a bill you find out about on the invoice.",
+            a: "Defaulting to a free or near-free model. Teams routinely run a frontier model for every turn including the mechanical ones (listing files, grepping, formatting) when a small free model does the same job. Routing by task is the difference between a bill you watch and a bill you find out about on the invoice.",
           },
           {
             q: "Should I set a hard spending limit?",
-            a: "Yes, at the project level rather than the session level. A per-turn cap cannot answer the only question a team lead asks, which is what has this cost so far this week. A persisted ceiling that every run honours — and that fails toward charging you rather than away — is what makes agent spend auditable.",
+            a: "Yes, at the project level rather than the session level. A per-turn cap cannot answer the only question a team lead asks, which is what has this cost so far this week. A persisted ceiling that every run honours, and that fails toward charging you rather than away, is what makes agent spend auditable.",
           },
         ]}
       />
