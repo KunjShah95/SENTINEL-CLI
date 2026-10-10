@@ -82,6 +82,10 @@ CLI consume.
 `readFile`, `writeFile`, `editFile`, `batchEdit`, `listDirectory`, `glob`, `grep`,
 `bash`, `diffFile`, `undoLastChange`, `redoLastUndo`, `searchWeb`.
 
+Every tool call is validated against its input schema before it runs, so a
+malformed call comes back as a readable error the model can correct rather than
+a partial side effect.
+
 Browser: `webSession`, `webRead`, `webProbe`, `webAct` — see below. Observation
 and commitment are separate tools, and `webAct` cannot run without naming what it
 is about to affect.
@@ -89,9 +93,11 @@ is about to affect.
 ### Shared skills and web search
 
 Sentinel discovers standard `SKILL.md` packages in project-local and global
-Sentinel, Claude Code, Codex, Agents, and OpenCode skill folders. This means a
-skill installed with skills.sh for one of those assistants is also listed to
-Sentinel and can be loaded on demand with its `skill` tool.
+Sentinel, Claude Code, Codex, Agents, and OpenCode skill folders — plus a
+`skills/` directory at the repo root, which is where the skills that ship with
+Sentinel live. This means a skill installed with skills.sh for one of those
+assistants is also listed to Sentinel and can be loaded on demand with its `skill`
+tool.
 
 Web search is available to the agent through `searchWeb`. It uses DuckDuckGo by
 default; set `SEARCH_WEB_ENDPOINT` to use a compatible internal search endpoint.
@@ -652,19 +658,88 @@ model isn't billed for markup.
 
 ### Skills
 
-Skills follow the skills.sh `SKILL.md` convention. Sentinel reads
-`.sentinel/`, `.claude/`, `.codex/`, `.agents/`, and `.opencode/` skill
-directories — project and global — so a skill installed by any other assistant
-is available without copying it.
+Skills follow the skills.sh `SKILL.md` convention. Sentinel reads `skills/` at
+the repo root first (where its own shipped skills live), then `.sentinel/`,
+`.claude/`, `.codex/`, `.agents/`, and `.opencode/` — project and global — so a
+skill installed by any other assistant is available without copying it.
 
 ```bash
 sentinel skills list
 sentinel skills install mattpocock/skills     # delegates to `npx skills add`
 sentinel skills find "tdd"
+sentinel skills run reproduce-fix-verify auth.js   # start a turn with it loaded
+sentinel skills run review --print                # show the expansion, no model call
 ```
+
+`skills run` is `/name` for anywhere you are not typing into a composer — a
+script, a shell, a CI step. Defaults to read-only PLAN mode; pass `--build` to
+allow edits.
 
 The skill listing injected into the system prompt is capped and relevance-ranked
 against your request, so a large library doesn't dominate every turn.
+
+**Invoking one.** The model reaches for a skill automatically when it matches your
+request. You can also type it: `/review auth.js` works for skills *and* for
+prompt templates, with the same argument parsing — a template wins if both
+exist, so an older project never has `/review` change meaning underneath it.
+
+**Arguments.** A skill body can take `$1`, `$ARGUMENTS`, `${1:-default}` — the
+same placeholders `/name` prompt templates use. The model fills them from the
+`args` field of the `skill` tool call, and you fill them by typing after the
+slash command. `argument-hint` in the frontmatter tells both of you what to pass,
+and shows up in the listing and in `sentinel connect --skills --list`.
+
+```markdown
+<!-- .sentinel/skills/review/SKILL.md -->
+---
+name: review
+description: Review a diff against a focus area
+argument-hint: <file>
+disable-model-invocation: false
+---
+Review $1 (or $ARGUMENTS if none given), focusing on error handling.
+```
+
+`disable-model-invocation: true` keeps a skill out of the model's system-prompt
+listing while leaving it reachable as `/review`. Use it for a workflow you want
+to run deliberately rather than have triggered by an unrelated request.
+
+**Restricting a skill's tools.** `allowed-tools` narrows the rest of that turn:
+
+```markdown
+---
+name: audit
+allowed-tools: readFile, grep, codeMap
+---
+```
+
+While the skill is loaded, a call to anything else is refused with the reason
+and the permitted list — the tool is not silently removed, because the model was
+already shown it and a vanished tool reads as a broken agent. Two loaded skills
+intersect, so an unrestricted skill cannot undo a restricted one's declaration.
+`skill` itself is always permitted, so a skill can always load another.
+
+**Delegating one.** `spawnAgent` and `spawnTeammate` both take `skills`, so the
+agent you delegate to follows the workflow instead of describing it back to you:
+
+```json
+{"tool": "spawnAgent", "prompt": "audit the auth layer", "skills": [{"name": "audit", "args": ["auth.js"]}]}
+```
+
+**Bundled scripts.** A skill may ship `scripts/` alongside `SKILL.md`, and the
+`skill` tool lists them when it expands the body. Running one is a separate
+tool, `runSkillScript`, because it executes a file that came from a registry
+directory rather than from you:
+
+```javascript
+// the model calls: runSkillScript({ name: 'review', script: 'scripts/diffstat.sh', args: ['--stat'] })
+```
+
+Traversal outside the skill directory is refused at path resolution, before the
+shell. `runSkillScript` is classified as shell, so it is refused in PLAN, REVIEW,
+SCAN and FIX modes and defaults to asking — the same treatment `bash` gets. That
+separation is the point: a read-only tool that could run code would hand every
+planning turn the ability to execute installed code.
 
 ## Configuration
 

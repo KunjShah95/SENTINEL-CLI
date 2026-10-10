@@ -14,7 +14,8 @@ import { classifyBashCommand, splitSegments } from '../src/agent/bash-validation
 import { post, drain, trackPending, resolvePending, hasPending, waitForMail, formatNotifications, resetMailboxes } from '../src/agent/mailbox.js';
 import { startBackground, checkBackground, runCommand, resetBackground } from '../src/agent/background.js';
 import { writeMemory, listMemories, deleteMemory, buildMemorySection, parseMemory, memorySlug } from '../src/agent/memory.js';
-import { substituteArgs, parseCommandArgs, expandPromptTemplate, listPromptTemplates } from '../src/agent/prompt-templates.js';
+import { substituteArgs, parseCommandArgs, expandPromptTemplate, listPromptTemplates, SLASH_RE as slashReFromTemplates } from '../src/agent/prompt-templates.js';
+import { expandSlashCommand, slashCommandSuggestions, SLASH_RE } from '../src/agent/slash-commands.js';
 import { parseVerdict, renderTranscript } from '../src/agent/goal.js';
 import { checkSubmitted, formatObservation, SUBMIT_SENTINEL, serializeTrajectory } from '../src/agent/mini.js';
 import { teammatePermission } from '../src/agent/team.js';
@@ -236,6 +237,98 @@ describe('pi-mono: prompt templates', () => {
     assert.deepEqual(expandPromptTemplate('/review src/a.js bugs', dir), { text: 'Review src/a.js for bugs.', template: 'review' });
     assert.equal(expandPromptTemplate('/unknown x', dir).template, null);
     assert.equal(expandPromptTemplate('plain text', dir).text, 'plain text');
+  });
+});
+
+// ── /name across both registries ───────────────────────────────────────────
+//
+// One syntax for prompt templates and skills. A user typing `/review auth.js`
+// should not have to know which registry it lives in.
+
+describe('slash commands resolve templates and skills alike', () => {
+  it('a prompt template wins over a skill of the same name', () => {
+    // The compat rule: a project that had `/review` before skills existed must
+    // not have it silently change meaning because someone installed a skill.
+    mkdirSync(join(dir, '.sentinel', 'prompts'), { recursive: true });
+    writeFileSync(join(dir, '.sentinel', 'prompts', 'review.md'), '---\ndescription: t\n---\nTEMPLATE BODY $1');
+    const sd = join(dir, '.sentinel', 'skills', 'review');
+    mkdirSync(sd, { recursive: true });
+    writeFileSync(join(sd, 'SKILL.md'), '---\nname: review\ndescription: s\n---\nSKILL BODY $1');
+
+    const r = expandSlashCommand('/review x', dir);
+    assert.equal(r.template, 'review');
+    assert.equal(r.skill, null);
+    assert.match(r.text, /TEMPLATE BODY x/);
+    assert.doesNotMatch(r.text, /SKILL BODY/);
+  });
+
+  it('falls through to a skill when no template matches', () => {
+    const sd = join(dir, '.sentinel', 'skills', 'audit');
+    mkdirSync(sd, { recursive: true });
+    writeFileSync(join(sd, 'SKILL.md'), '---\nname: audit\ndescription: Audit a file\n---\nCheck $1 then $ARGUMENTS.');
+
+    const r = expandSlashCommand('/audit auth.js', dir);
+    assert.equal(r.template, null);
+    assert.equal(r.skill, 'audit');
+    // The frontmatter travels with the body: invoked from the keyboard there is
+    // no system-prompt listing to tell the model which skill this is.
+    assert.match(r.text, /You are running the "audit" skill \(Audit a file\)/);
+    assert.match(r.text, /Check auth\.js then auth\.js/);
+  });
+
+  it('passes ordinary slash commands through untouched', () => {
+    // `/help`, `/steer`, `/model` are TUI commands. They must survive.
+    for (const t of ['/help', '/steer stop', '/model gpt-4', 'plain text', '/']) {
+      const r = expandSlashCommand(t, dir);
+      assert.equal(r.text, t, t);
+      assert.equal(r.template, null);
+      assert.equal(r.skill, null);
+    }
+  });
+
+  it('lists a skill\'s bundled scripts to whoever invoked it', () => {
+    const sd = join(dir, '.sentinel', 'skills', 'audit', 'scripts');
+    mkdirSync(sd, { recursive: true });
+    writeFileSync(join(dir, '.sentinel', 'skills', 'audit', 'SKILL.md'), '---\nname: audit\ndescription: d\n---\nbody');
+    writeFileSync(join(sd, 'check.js'), 'console.log(1)');
+    const r = expandSlashCommand('/audit', dir);
+    assert.deepEqual(r.scripts, ['scripts/check.js']);
+    assert.match(r.text, /runSkillScript/);
+  });
+
+  it('the two registries share one slash parser, not two copies', () => {
+    // `slash-commands.js` once carried its own copy of the regex, the registry
+    // lookup and the substitution. Every test passed and nothing said so, which
+    // is the drift `tool-taxonomy.js` is written about. The template branch now
+    // delegates; this asserts the observable consequence.
+    mkdirSync(join(dir, '.sentinel', 'prompts'), { recursive: true });
+    writeFileSync(join(dir, '.sentinel', 'prompts', 'shared.md'), '---\ndescription: t\n---\nT $1|$ARGUMENTS|${2:-d}');
+    const sd = join(dir, '.sentinel', 'skills', 'shared');
+    mkdirSync(sd, { recursive: true });
+    writeFileSync(join(sd, 'SKILL.md'), '---\nname: shared\ndescription: s\n---\nS $1|$ARGUMENTS|${2:-d}');
+
+    // One definition of the syntax, reachable from both modules.
+    assert.equal(SLASH_RE, slashReFromTemplates, 'the dispatcher must reuse the template regex');
+
+    const viaDispatcher = expandSlashCommand('/shared a b', dir);
+    const viaTemplate = expandPromptTemplate('/shared a b', dir);
+    assert.equal(viaDispatcher.template, 'shared');
+    // Identical expansion, which is the whole point of delegating rather than
+    // reimplementing: the two cannot answer differently for one input.
+    assert.equal(viaDispatcher.text, viaTemplate.text);
+    assert.equal(viaDispatcher.text, 'T a|a b|b');
+  });
+
+  it('suggests both kinds of name, tagged by source', () => {
+    mkdirSync(join(dir, '.sentinel', 'prompts'), { recursive: true });
+    writeFileSync(join(dir, '.sentinel', 'prompts', 'rev.md'), '---\ndescription: t\n---\nx');
+    const sd = join(dir, '.sentinel', 'skills', 'review');
+    mkdirSync(sd, { recursive: true });
+    writeFileSync(join(sd, 'SKILL.md'), '---\nname: review\ndescription: s\n---\nx');
+
+    const names = slashCommandSuggestions('/rev', dir).map((s) => `${s.source}:${s.name}`);
+    assert.deepEqual(names.sort(), ['skill:review', 'template:rev']);
+    assert.equal(slashCommandSuggestions('/zzz', dir).length, 0);
   });
 });
 

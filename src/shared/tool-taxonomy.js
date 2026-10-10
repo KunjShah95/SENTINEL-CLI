@@ -39,10 +39,22 @@
  * `taskPermission()` answers "may this caller run it". Collapsing the two is how
  * a list ends up encoding an approval decision nobody decided on.
  */
-import { isReadOnlyTool } from '../shared/schemas/mode.js';
+import { isReadOnlyTool, SHELL_TOOL_NAMES } from '../shared/schemas/mode.js';
 
-/** Tools that take a shell command. The only ones `bash-validation` classifies. */
-export const SHELL_TOOLS = Object.freeze(['bash', 'runTests', 'bgRun']);
+/**
+ * Tools that take a shell command. The only ones `bash-validation` classifies.
+ *
+ * The list itself lives in `mode.js` (see `SHELL_TOOL_NAMES`) because FIX
+ * mode's no-shell rule needs it too, and this module already depends on that
+ * one. Re-exported here so `isShellTool` keeps working for existing callers.
+ *
+ * `runSkillScript` is a member because it *is* a shell command — the string
+ * that runs is built by `skillScriptCommand` and handed to the same executor
+ * `bash` uses. Anywhere else and a script from an installed skill would
+ * execute without passing the risk ledger, which is the gate a registry-sourced
+ * script needs most.
+ */
+export const SHELL_TOOLS = SHELL_TOOL_NAMES;
 
 /**
  * Tools that mutate the working tree through the file API.
@@ -206,6 +218,7 @@ export const KNOWN_TOOLS = Object.freeze([
   // read-only, per mode.js
   'readFile', 'listDirectory', 'glob', 'grep', 'codeMap', 'searchWeb', 'fetchUrl',
   'todoRead', 'skill', 'bgCheck', 'teamStatus',
+  // deliberately not `runSkillScript`: it executes, so it is in SHELL_TOOLS
   // browser: observe vs commit. See WEB_TOOLS for why the commit half is excluded
   // from WRITE_TOOLS.
   ...WEB_TOOLS,

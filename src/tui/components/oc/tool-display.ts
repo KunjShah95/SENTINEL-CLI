@@ -77,7 +77,14 @@ export function toolView(name: string, input: unknown, output?: unknown, maxLine
     return { kind: "block", title: "# Todos", icon: "⚙", pending: "Updating todos…", label: "Todos", body: todos.map((t: any) => `${mark(s(t?.status))} ${s(t?.title)}`) };
   }
   case "todoRead": return { kind: "inline", icon: "⚙", pending: "Reading todos…", label: "Read todos" };
-  case "skill": return { kind: "inline", icon: "→", pending: "Loading skill…", label: `Skill ${s(i.name)}` };
+  case "skill": {
+    const args = Array.isArray(i.args) ? i.args.join(" ") : s(i.args);
+    return { kind: "inline", icon: "→", pending: "Loading skill…", label: `Skill ${s(i.name)}${args ? ` ${args.slice(0, 40)}` : ""}` };
+  }
+  // A shell tool, so it gets the shell glyph and the "&" pending verb — the row
+  // should read as execution, not as another read. `✱` is the shell glyph used
+  // elsewhere in this file.
+  case "runSkillScript": return { kind: "inline", icon: "✱", pending: "Running script…", label: `Script ${s(i.script)}` };
   case "spawnAgent": return { kind: "inline", icon: "│", pending: "Delegating…", label: `Task ${s(i.mode) || "PLAN"} · ${s(i.prompt).slice(0, 60)}` };
   case "memoryWrite": return { kind: "inline", icon: "⚙", pending: "Saving memory…", label: `Memory ${s(i.name)} (${s(i.type)})` };
   case "memoryDelete": return { kind: "inline", icon: "⚙", pending: "Deleting memory…", label: `Forget ${s(i.name)}` };

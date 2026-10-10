@@ -48,6 +48,24 @@ export function isReadOnlyTool(toolName) {
 }
 
 /**
+ * Tools that execute something.
+ *
+ * Owned here, not in `tool-taxonomy.js`, because FIX mode's no-shell rule needs
+ * it and `mode.js` is the lower layer — `tool-taxonomy` already imports this
+ * module, so the taxonomy imports the list back rather than the two modules
+ * importing each other. One copy, one direction.
+ *
+ * `runSkillScript` is in it because it runs a file from an installed skill
+ * directory. It is not "a tool with a path argument"; it is execution, and it
+ * belongs in the same refusal.
+ */
+export const SHELL_TOOL_NAMES = Object.freeze(['bash', 'runTests', 'bgRun', 'runSkillScript']);
+
+export function isShellToolName(toolName) {
+  return SHELL_TOOL_NAMES.includes(toolName);
+}
+
+/**
  * Check if a tool is allowed in the given mode.
  * @param {string} toolName
  * @param {string} mode
@@ -59,8 +77,10 @@ export function isToolAllowedInMode(toolName, mode) {
     return isReadOnlyTool(toolName) || toolName === 'diffFile';
   }
   if (mode === Mode.FIX) {
-    // FIX mode: read + write tools, but no shell
-    return toolName !== 'bash' && toolName !== 'runTests';
+    // FIX mode: read + write tools, but no shell. The check is against the
+    // shell taxonomy rather than a literal pair of names, because a new shell
+    // tool that enumerated itself here would be a silent hole in FIX mode.
+    return !isShellToolName(toolName);
   }
   return true;
 }

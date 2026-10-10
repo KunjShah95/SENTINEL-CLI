@@ -12,11 +12,11 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { runPreGates, assessCall, resolvePermissionGate, applySessionGrant, GATE_ORDER } from '../src/agent/gates.js';
+import { runPreGates, assessCall, resolvePermissionGate, applySessionGrant, commandFor, GATE_ORDER } from '../src/agent/gates.js';
 import { on, clearHooks } from '../src/agent/hooks.js';
 
 const workdir = mkdtempSync(join(tmpdir(), 'sentinel-gates-'));
@@ -129,6 +129,48 @@ test('assessCall classifies a shell command and leaves a file tool alone', () =>
   const file = assessCall('editFile', { path: 'a.js' }, workdir);
   assert.equal(file.shellish, false);
   assert.equal(file.risk, null);
+});
+
+test('assessCall reconstructs the command a skill script will run', () => {
+  // The load-bearing case. `runSkillScript` takes {name, script, args}, so the
+  // command has to be rebuilt before it can be graded — and the gate must grade
+  // the SAME string the executor runs, or it approves one thing and runs
+  // another. `commandFor` and `runSkillScriptImpl` both call
+  // `skillScriptCommand`, which is the only place that string is built.
+  const dir = join(workdir, 'skillsrc');
+  mkdirSync(join(dir, '.sentinel', 'skills', 'demo', 'scripts'), { recursive: true });
+  writeFileSync(
+    join(dir, '.sentinel', 'skills', 'demo', 'SKILL.md'),
+    '---\nname: demo\ndescription: d\n---\nbody',
+    'utf-8'
+  );
+  writeFileSync(join(dir, '.sentinel', 'skills', 'demo', 'scripts', 'go.js'), 'console.log(1)', 'utf-8');
+
+  const input = { name: 'demo', script: 'scripts/go.js', args: ['alpha'] };
+  const cmd = commandFor('runSkillScript', input, dir);
+  assert.match(cmd, /^node /, 'runs the resolved interpreter');
+  assert.match(cmd, /scripts[/\\]go\.js/, 'points at the real script');
+  assert.match(cmd, /alpha$/, 'forwards arguments');
+
+  const assessed = assessCall('runSkillScript', input, dir);
+  assert.equal(assessed.shellish, true, 'a script run is shell work');
+  assert.equal(assessed.command, cmd, 'the graded command is the one that runs');
+  // Not green: this shape has never been approved in this repo, so a session
+  // grant cannot cover it. A script from an installed skill must not be
+  // silently pre-authorized by having approved some other tool.
+  assert.equal(assessed.risk.level, 'yellow');
+});
+
+test('an unresolvable skill script grades as nothing, so nothing runs', () => {
+  const dir = join(workdir, 'noskills');
+  mkdirSync(dir, { recursive: true });
+  for (const bad of [
+    { name: 'nope', script: 'scripts/go.js' },
+    { name: 'nope', script: '../../etc/passwd' },
+    { name: 'nope', script: '' },
+  ]) {
+    assert.equal(commandFor('runSkillScript', bad, dir), '', JSON.stringify(bad));
+  }
 });
 
 // ── resolvePermissionGate ─────────────────────────────────────────────────

@@ -10,7 +10,7 @@
  * boundary: the TUI and CLI call it directly.
  */
 import { resolveChatModel, getModelPricing, estimateCostUsd } from '../shared/models/index.js';
-import { executeLocalTool, normalizeTimeoutMs } from '../shared/tools/index.js';
+import { executeLocalTool, normalizeTimeoutMs, validateToolInput, coerceToolInput } from '../shared/tools/index.js';
 import { buildSystemPrompt } from './prompt.js';
 import { streamCompletion } from './providers.js';
 import { recordUsage, estimateTokensFromText } from './cost.js';
@@ -32,6 +32,9 @@ import { budgetStatus, recordSpend } from './budget.js';
 import { createGateState } from './blast-radius.js';
 import { ReceiptLedger, checkClaims, claimGateMessage } from './receipts.js';
 import { buildProviderTools } from './tool-schemas.js';
+import { compactToolResults } from './context-budget.js';
+import { buildSkillPreamble } from './skill-delegation.js';
+import { createSkillScope, noteSkillLoaded, checkSkillScope } from './skill-scope.js';
 
 // Re-exported so the many existing importers of these names from loop.js keep
 // working. They are declared in tool-schemas.js now; a re-export is one line
@@ -127,6 +130,38 @@ export function normalizeTaskCall(input) {
 
 export const LOOP_REQUEST_CHAR_BUDGET = 200_000; // ~50k tokens: safe for all providers
 const LOOP_KEEP_TAIL = 6; // never trim the most recent messages (active context)
+
+/**
+ * Size the request actually sent to a provider, every iteration.
+ *
+ * Two stages, in this order, and the order is the whole point:
+ *
+ *   1. `compactToolResults` runs first and takes only what it can take cheaply —
+ *      superseded duplicate results, then the bulk body of oversized ones. What
+ *      survives is still real context.
+ *   2. `trimMessagesForBudget` runs second, as the backstop that keeps the
+ *      request legal. By the time it fires, stage 1 has already given up
+ *      everything it could at low cost, so what it tombstones is genuinely the
+ *      least valuable content left.
+ *
+ * Before this, only stage 2 ran, and only at the 200k cliff: a turn that grew
+ * past the budget lost old results wholesale and kept everything else at full
+ * size. That is backwards — it discarded cheap-to-lose content while paying
+ * full price for the expensive-to-lose.
+ *
+ * `trimMessagesForBudget` is pure, so the compacted array it returns can be
+ * assigned straight into the request without mutating `messages`. The original
+ * list stays intact: the trajectory recorder, the goal evaluator, and the final
+ * answer all read the uncompacted history, and compaction is a transport
+ * decision, not a loss of record.
+ */
+export function buildRequestMessages(messages, budget = LOOP_REQUEST_CHAR_BUDGET) {
+  const compacted = compactToolResults(messages, {
+    budget,
+    protectLast: LOOP_KEEP_TAIL,
+  });
+  return trimMessagesForBudget(compacted.messages, budget);
+}
 
 /**
  * Bound in-turn request growth. A 60-iteration SWE turn accumulating 30k
@@ -385,6 +420,10 @@ export async function* runAgentTurnInner(opts = {}) {
   // Blast-radius gate state is per-turn: a path challenged on Monday is not
   // challenged again on Tuesday, but a new turn re-asks.
   const gateState = createGateState();
+  // Skills loaded this turn may declare `allowed-tools`, which narrows what the
+  // rest of the turn may call. Per-turn for the same reason as `gateState`: a
+  // constraint must not outlive the request that loaded the skill.
+  const skillScope = createSkillScope();
   const callCounts = new Map(); // tool+input signature -> times called this turn
   const ledger = new ReceiptLedger(); // hashed tool evidence for claim checks
   let claimChecked = false;
@@ -465,7 +504,7 @@ export async function* runAgentTurnInner(opts = {}) {
       modelId: useModel.modelId,
       provider: useModel.provider,
       system,
-      messages: trimMessagesForBudget(messages),
+      messages: buildRequestMessages(messages),
       tools,
       signal,
     })) {
@@ -656,6 +695,12 @@ export async function* runAgentTurnInner(opts = {}) {
       subagentState: { disabled: subagentDepth >= 1 },
       editCounts,
       gateState,
+      // Shared by reference, not copied: `executeOneTool` records a skill here
+      // after the `skill` tool succeeds, and the very next tool call in the same
+      // turn has to see it. A copy per call would make the constraint apply one
+      // call late, which is the same class of bug as a toolset that changes
+      // under the model.
+      skillScope,
       externalToolNames: new Set(externalTools.map((t) => t.namespacedName)),
       mcpServers,
     });
@@ -832,7 +877,7 @@ export function loopHint(editCounts) {
  * Execute one tool call: hooks → permission → subagent-or-local → audit.
  * Extracted so batching shares one path. Returns { output, stopBlocked }.
  */
-async function executeOneTool({ tc: rawTc, mode, opts, subagentState, editCounts, gateState, externalToolNames, mcpServers }) {
+async function executeOneTool({ tc: rawTc, mode, opts, subagentState, editCounts, gateState, skillScope, externalToolNames, mcpServers }) {
   // `let`, because the unified `task` tool is rewritten into its legacy
   // equivalent below and the rest of this function reads `tc` throughout.
   let tc = rawTc;
@@ -855,6 +900,24 @@ async function executeOneTool({ tc: rawTc, mode, opts, subagentState, editCounts
   const requestedTool = tc.name;
   let granted = false;
 
+  // Validation happens here, ahead of every gate, and it is the last thing
+  // before the model learns about it. `toolInputSchemas` carries ~200 lines of
+  // validators that were never invoked (see the note in `tool-schemas.js`);
+  // running them closes that gap and puts the fix where it is visible rather
+  // than inside a refactor.
+  //
+  // Order matters in one specific way: before the permission prompt. A call
+  // that cannot be well-formed is not something to ask a human about, and a
+  // prompt for `editFile` with a numeric `oldString` trains people to approve
+  // without reading. It also sits after `runPreGates`, because a mode refusal
+  // is the more fundamental answer — "not available in PLAN mode" beats "path
+  // is required".
+  const schemaError = validateToolInput(tc.name, tc.input);
+  if (schemaError) {
+    recordGrant({ ...auditCtx, toolCallId: tc.id, tool: requestedTool, input: tc.input, decision: 'invalid', risk: null, mode, gate: null });
+    return { output: { error: schemaError } };
+  }
+
   // Gates 1-5: ordered refusals, all before anyone is asked anything. The order
   // is a stated property now — see GATE_ORDER in gates.js.
   const refusal = await runPreGates({
@@ -864,9 +927,36 @@ async function executeOneTool({ tc: rawTc, mode, opts, subagentState, editCounts
     return { output: { error: refusal.reason, gate: refusal.gate, ...(refusal.blastRadius ? { blastRadius: true } : {}) } };
   }
 
+  // A skill that declared `allowed-tools` excludes this call. Checked here,
+  // after the mode gate and before the permission prompt, for two reasons:
+  //
+  //   - After the mode gate, because "not available in PLAN mode" is the more
+  //     fundamental answer and the user is better served by it.
+  //   - Before the prompt, because a call a loaded skill forbids is not
+  //     something to ask a human about; the answer is already determined.
+  //
+  // It is a refusal rather than a narrower toolset on purpose — see the note in
+  // `skill-scope.js`. The model was shown this tool, so it has to be told why.
+  const scopeRefusal = checkSkillScope(skillScope, tc.name);
+  if (scopeRefusal) {
+    return { output: { error: scopeRefusal.reason, gate: scopeRefusal.gate } };
+  }
+
+  // Defaults are applied AFTER the gates and the permission decision, and the
+  // validated object replaces `tc.input`. Two reasons for that placement:
+  //
+  //   - The gates and the audit trail must record what the model *asked for*,
+  //     not the shape a default silently filled in. An audit entry that reads
+  //     `timeout: 120000` for a call the model never mentioned a timeout on is
+  //     a small lie, and the auditor is read long after the turn.
+  //   - `validateToolInput` is also the only reader of the defaults, so a
+  //     tool that has no validator simply passes through unchanged.
+  const validated = coerceToolInput(tc.name, tc.input);
+  if (validated !== tc.input) tc = { ...tc, input: validated };
+
   // Classification, then the permission decision. `assessCall` is shared with
   // the audit trail so both agree about how dangerous a command is.
-  const { bashCheck, risk, shellish, command } = assessCall(tc.name, tc.input, workdir);
+  const { bashCheck, risk, shellish, command } = assessCall(tc.name, tc.input, workdir || getWorkdir());
   const decision = await resolvePermissionGate({
     tool: tc.name, input: tc.input, toolCallId: tc.id, allowAll,
     onPermissionRequest, risk, bashCheck, shellish,
@@ -984,6 +1074,21 @@ async function executeOneTool({ tc: rawTc, mode, opts, subagentState, editCounts
   } catch (e) {
     output = { error: e?.message || String(e) };
   }
+
+  // A successful `skill` call may have narrowed the rest of the turn. Recorded
+  // here rather than in the tool implementation because the scope is the *turn's*
+  // state, and the tool has no business owning it.
+  if (tc.name === 'skill' && !output?.error) {
+    const { resolveSkill } = await import('./skills.js');
+    // The stacked form returns `skills: [...]`; the single form is the object
+    // itself. Both are read here so a stacked load constrains just as a single
+    // one does — otherwise `names` would be a way to opt out of `allowed-tools`.
+    const loaded = Array.isArray(output?.skills) ? output.skills : output ? [output] : [];
+    for (const one of loaded) {
+      const full = resolveSkill(one.name, workdir || getWorkdir());
+      if (full) noteSkillLoaded(skillScope, full);
+    }
+  }
   if ((tc.name === 'editFile' || tc.name === 'writeFile') && !output?.error && tc.input?.path) {
     editCounts[tc.input.path] = (editCounts[tc.input.path] || 0) + 1;
   }
@@ -1037,9 +1142,21 @@ async function spawnSubagentTask(input, { agentName, workdir, model, createStrea
   if (!subPrompt.trim()) return { output: { error: 'prompt is required' } };
   const subMode = input?.mode === 'BUILD' ? 'BUILD' : 'PLAN';
 
+  /**
+   * Optional skill, loaded into the subagent's first message.
+   *
+   * The body is prepended rather than replacing the prompt: the prompt is the
+   * task, the skill is the method, and the subagent's summary then reflects the
+   * skill's workflow rather than the caller's paraphrase of it. The preamble and
+   * its refusal behaviour live in `skill-delegation.js`, shared with `team.js`.
+   */
+  const skills = buildSkillPreamble(input?.skills ?? input?.skill, workdir);
+  if (skills.error) return { output: { error: skills.error } };
+  const fullPrompt = skills.text + subPrompt;
+
   const { id, task, rejected } = createTask({
     kind: 'agent',
-    prompt: subPrompt,
+    prompt: fullPrompt,
     mode: subMode,
     model,
     parent: parentTaskId,
@@ -1056,7 +1173,7 @@ async function spawnSubagentTask(input, { agentName, workdir, model, createStrea
     run: async ({ id: taskId, permission, signal }) => {
       let text = '';
       for await (const ev of runAgentTurnInner({
-        history: [{ id: `sub_${Date.now()}`, role: 'user', parts: [{ type: 'text', text: subPrompt }] }],
+        history: [{ id: `sub_${Date.now()}`, role: 'user', parts: [{ type: 'text', text: fullPrompt }] }],
         mode: subMode,
         model: model,
         createStream,

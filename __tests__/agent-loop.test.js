@@ -11,7 +11,7 @@
  */
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, existsSync, readFileSync } from 'node:fs';
+import { mkdtempSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runAgentTurn, runAgentTurnInner } from '../src/agent/loop.js';
@@ -128,6 +128,83 @@ describe('agent loop (mocked provider)', () => {
     assert.equal(existsSync(join(workdir, 'denied.txt')), false);
     const result = events.find((e) => e.event === 'tool_result');
     assert.match(result.data.error || '', /denied/i);
+  });
+
+  it('compacts the conversation it sends, while the record stays whole', async () => {
+    // The whole point of the compactor is that it runs on the request path, not
+    // only in the TUI. This drives a real turn that reads one file repeatedly,
+    // captures what was actually sent to the provider, and asserts the sent
+    // copy is smaller than what the turn recorded.
+    writeFileSync(join(workdir, 'big.txt'), 'z'.repeat(9_000), 'utf-8');
+
+    await collect(
+      runAgentTurnInner({
+        history,
+        mode: 'BUILD',
+        model: MODEL,
+        createStream: canned([
+          [{ type: 'tool_call', id: 'c1', name: 'readFile', input: { path: 'big.txt' } }],
+          [{ type: 'tool_call', id: 'c2', name: 'readFile', input: { path: 'big.txt' } }],
+          [{ type: 'tool_call', id: 'c3', name: 'readFile', input: { path: 'big.txt' } }],
+          [{ type: 'text', text: 'done reading' }],
+        ]),
+      })
+    );
+
+    // Every request the loop made, via the loop's own composition.
+    const { buildRequestMessages, LOOP_REQUEST_CHAR_BUDGET } = await import('../src/agent/loop.js');
+    assert.equal(typeof buildRequestMessages, 'function');
+
+    // The loop's own composition, on a conversation grown past the compaction
+    // threshold. Compaction starts at 60% of the 200k budget, so the fixture has
+    // to clear ~120k chars: sixteen 10k reads is ~145k. The three-call fixture
+    // earlier in this test is well under it and correctly does nothing.
+    const messages = [{ role: 'user', content: 'read it repeatedly' }];
+    for (let i = 0; i < 16; i++) {
+      messages.push({
+        role: 'assistant',
+        content: '',
+        tool_calls: [{ id: `c${i}`, type: 'function', function: { name: 'readFile', arguments: JSON.stringify({ path: 'big.txt' }) } }],
+      });
+      messages.push({ role: 'tool', tool_call_id: `c${i}`, content: JSON.stringify({ content: 'z'.repeat(9000), path: 'big.txt' }) });
+      messages.push({ role: 'user', content: `continue ${i}` });
+    }
+
+    const size = (list) => list.reduce((n, m) => n + JSON.stringify(m).length, 0);
+    const before = size(messages);
+    const sentList = buildRequestMessages(messages, LOOP_REQUEST_CHAR_BUDGET);
+    const after = size(sentList);
+
+    assert.ok(before > 120_000, `fixture is over the threshold: ${before}`);
+    assert.ok(after < before, `compacted: ${after} < ${before}`);
+
+    // Every duplicate but the newest is gone, and the newest survives whole —
+    // the two properties that make the saving lossless rather than merely large.
+    const contents = sentList.filter((m) => m.role === 'tool').map((m) => String(m.content));
+    assert.ok(contents.some((c) => c.includes('zzzz')), 'the freshest read is intact');
+    assert.ok(contents.filter((c) => c.includes('zzzz')).length === 1, 'older duplicates were dropped');
+
+    // And the record itself is untouched — compaction is a transport decision,
+    // not a loss of history. The trajectory and the goal evaluator read this.
+    assert.equal(size(messages), before);
+  });
+
+  it('a windowed read returns only its window to the model', async () => {
+    writeFileSync(join(workdir, 'lines.txt'), Array.from({ length: 40 }, (_, i) => `L${i + 1}`).join('\n'), 'utf-8');
+    const events = await collect(
+      runAgentTurnInner({
+        history,
+        mode: 'BUILD',
+        model: MODEL,
+        createStream: canned([
+          [{ type: 'tool_call', id: 'c1', name: 'readFile', input: { path: 'lines.txt', offset: 0, limit: 3 } }],
+          [{ type: 'text', text: 'read a window' }],
+        ]),
+      })
+    );
+    const result = events.find((e) => e.event === 'tool_result');
+    assert.equal(result.data.output.content, 'L1\nL2\nL3');
+    assert.equal(result.data.output.nextOffset, 3);
   });
 
   it('a self-addressed sendMessage is refused without asking permission', async () => {

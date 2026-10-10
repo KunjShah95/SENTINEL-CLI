@@ -113,9 +113,10 @@ not a claim.
 | anthropic, openai, github-copilot, google | yes | ~10% |
 | groq, mistral, deepseek, xai, openrouter, together, fireworks, perplexity | no | 100% |
 
-This is the largest remaining *cost* item and it is not fixable in Sentinel —
-it is a provider feature. The lever Sentinel does control is making the prefix
-small, which is what the table above does.
+This is a provider feature, not something Sentinel can turn on. The lever
+Sentinel does control is making the prefix small, which is what the table above
+does — though §5b shows the prefix is only ~10% of a turn, so the conversation
+is where the remaining cost actually lives.
 
 ### Loop CPU per model call
 
@@ -130,6 +131,78 @@ small, which is what the table above does.
 The trimming rewrite is verified **byte-identical** to the previous
 implementation across 20 size×budget combinations — the budget is unchanged,
 only the way it is measured changed.
+
+### 5b. Turn-level cost: the conversation is 90% of a turn, not the prefix
+
+The section above measures the **fixed prefix** because it is the visible,
+constant, easy-to-attribute number. It is not the biggest one. Measuring the
+whole turn instead changes where the effort should go.
+
+Reproduce: `npm run bench:turn` (no API key).
+
+A 25-iteration BUILD turn, reading one file per step at the tool's own 10k cap:
+
+| Component | Billed across the turn | Share |
+|---|---:|---:|
+| Fixed prefix (system + tool schemas), ×25 | ~87k tokens | ~10% |
+| **Growing conversation, re-sent every iteration** | **~814k tokens** | **~90%** |
+
+The conversation is re-sent on *every* model call and grows monotonically with
+tool output, so its cost compounds while the prefix's does not. Optimising tool
+schemas — the obvious target, and 71% of the prefix — addresses about 7% of a
+turn.
+
+### What that changed: progressive compaction
+
+`loop.js` bounded the conversation with `trimMessagesForBudget`, but only as a
+**cliff**: nothing until the request hit 200k chars, then old tool results were
+tombstoned wholesale. That discarded cheap-to-lose content while paying full
+price for expensive-to-lose content, and a turn that lost its file contents
+re-read them — spending more than it saved.
+
+`src/agent/context-budget.js` gives context up in order of least cost, and only
+as far as pressure demands:
+
+1. **Superseded duplicates** — the older of two identical calls is dropped. Free,
+   because the newer result still carries everything, so it is taken first and
+   unconditionally.
+2. **Bulk body** — an oversized result is shrunk to a head window plus a notice
+   naming the call that fetches the rest.
+3. **Tombstone** — the old last resort, now reached far later.
+
+Measured on the 25-iteration turn above:
+
+| Scenario | Before | After | Saved |
+|---|---:|---:|---:|
+| Distinct file each step | 818,487 | 603,569 | **26.3%** |
+| With a re-read every 4 steps | 818,678 | 604,369 | **26.2%** |
+| Peak single request | 51,474 | 31,561 | **38.7%** |
+
+Reproduce: `npm run bench:turn`. CPU cost is `npm run bench:compaction`.
+
+Compaction is **lossless where it can be** and recoverable where it cannot:
+stage 1 keeps the freshest copy of every call, and stage 2 only fires on results
+the model can re-fetch via `readFile`'s new `offset`/`limit` windowing — the
+notice written into a shrunken result names those exact parameters, because a
+truncation the model cannot act on is data loss with extra steps.
+
+It runs on the **request path only**. The turn's own `messages` list is left
+intact, because the trajectory recorder, the goal evaluator, and the final answer
+all read it. Compaction is a transport decision, not a loss of record.
+
+### Compaction CPU
+
+Scales linearly; no reintroduced O(n²).
+
+| Turn length | `trimMessagesForBudget` only | + progressive compaction | Added |
+|---|---:|---:|---:|
+| 31 messages | 0.13 ms | 0.30 ms | +0.18 ms |
+| 76 messages | 0.36 ms | 0.68 ms | +0.32 ms |
+| 181 messages | 0.71 ms | 1.21 ms | +0.50 ms |
+
+Across a full 60-iteration SWE turn: **+0.02s**, against hundreds of thousands of
+tokens saved. The repo has a documented history of this exact regression (the
+trim used to cost ~6.4s per SWE turn), so it is measured rather than assumed.
 
 ## 6. Limitations (read before citing this file)
 

@@ -43,7 +43,15 @@ export function currentGitBranch(dir = process.cwd()) {
   if (branchCache && branchCache.dir === dir) return branchCache.branch;
   let branch = null;
   try {
-    branch = execSync('git rev-parse --abbrev-ref HEAD', { cwd: dir, timeout: 3000 })
+    // stderr is discarded, not inherited. `git` writes "fatal: not a git
+    // repository" to stderr when there is no repo, and the catch below treats
+    // that as the ordinary answer of "no branch" — but the message still reached
+    // the user's terminal, once per cached lookup, for anyone running Sentinel
+    // outside a git checkout. A probe that has already decided the answer is not
+    // entitled to also print the failure.
+    branch = execSync('git rev-parse --abbrev-ref HEAD', {
+      cwd: dir, timeout: 3000, stdio: ['ignore', 'pipe', 'ignore'],
+    })
       .toString()
       .trim() || null;
   } catch {

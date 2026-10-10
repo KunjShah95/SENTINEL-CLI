@@ -18,9 +18,10 @@ import {
   EFFECT_CATEGORIES, effectCategory,
   isShellTool, isFileTool, isWriteTool, exitCodeOf,
 } from '../src/shared/tool-taxonomy.js';
-import { isReadOnlyTool } from '../src/shared/schemas/mode.js';
+import { isReadOnlyTool, isToolAllowedInMode } from '../src/shared/schemas/mode.js';
 import { TOOL_PARAM_SCHEMAS, buildProviderTools } from '../src/agent/loop.js';
 import { getToolContracts } from '../src/shared/tools/index.js';
+import { getToolPolicy } from '../src/shared/tools/permissions.js';
 
 // ── Coverage ───────────────────────────────────────────────────────────────
 
@@ -98,8 +99,33 @@ test('undo is a write tool but not a file tool', () => {
   assert.ok(!isFileTool('undoLastChange'));
 });
 
-test('the shell set is the three command-taking tools', () => {
-  assert.deepEqual([...SHELL_TOOLS].sort(), ['bash', 'bgRun', 'runTests']);
+test('the shell set is the four command-taking tools', () => {
+  // `runSkillScript` is here because it executes a file bundled in a skill. It
+  // takes {name, script, args} rather than a `command`, but the string it runs
+  // is a shell command and has to clear the same gates.
+  assert.deepEqual([...SHELL_TOOLS].sort(), ['bash', 'bgRun', 'runSkillScript', 'runTests']);
+});
+
+test('runSkillScript is never classified read-only', () => {
+  // The one that matters. `skill` IS read-only, and skills directories are read
+  // from ten locations including `~/.claude/skills` and `~/.opencode/skills`. If
+  // execution were reachable from a read-only tool, a PLAN-mode turn — refused
+  // bash, refused runTests, refused every write — could run installed code.
+  assert.equal(effectCategory('runSkillScript'), 'shell');
+  assert.ok(!isReadOnlyTool('runSkillScript'));
+  assert.equal(getToolPolicy('runSkillScript'), 'ask', 'must not default to allow');
+  assert.equal(getToolPolicy('skill'), 'allow', 'the prompt reader stays prompt-free');
+});
+
+test('every mode that refuses bash also refuses runSkillScript', () => {
+  // FIX mode's no-shell rule is checked against the taxonomy rather than a
+  // literal pair of names. This asserts the outcome for the tool that matters,
+  // in every restricted mode.
+  for (const mode of ['PLAN', 'REVIEW', 'SCAN', 'FIX']) {
+    assert.equal(isToolAllowedInMode('bash', mode), false, `bash in ${mode}`);
+    assert.equal(isToolAllowedInMode('runSkillScript', mode), false, `runSkillScript in ${mode}`);
+  }
+  assert.equal(isToolAllowedInMode('runSkillScript', 'BUILD'), true);
 });
 
 // ── exitCodeOf ─────────────────────────────────────────────────────────────

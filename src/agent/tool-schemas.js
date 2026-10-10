@@ -12,23 +12,74 @@
  * ## Why the shapes are hand-written JSON Schema
  *
  * `src/shared/tools/schemas.js` carries a second, parallel table of ~200 lines
- * of hand-rolled validators for the same inputs. It is never invoked:
- * `executeLocalTool` goes mode-check, permission-check, dispatch, with no
- * validation step, and `buildProviderTools` below reads only
- * `contract.description` plus these schemas.
+ * of hand-rolled validators for the same inputs. They used to be dead: nothing
+ * invoked them. `validateToolInput` in `src/shared/tools/index.js` now runs them
+ * on every call, in the loop (before the permission prompt) and again in
+ * `executeLocalTool` for callers that bypass the loop.
  *
- * So one tool has three representations, adding a tool means editing all three,
- * and tool inputs are unvalidated at runtime despite 200 lines of validators
- * existing.
+ * So one tool still has three representations — this JSON Schema for the model,
+ * the validator for the runtime, and the `description` + `inputSchema`
+ * contract in `tools/index.js` — and adding a tool means editing all three.
+ * That duplication is deliberate and still worth noting: the schema here is
+ * what a provider enforces and the validator is what Sentinel enforces, and a
+ * provider's idea of "valid" is looser than ours (several models send
+ * `{args: "x"}` where the array form is declared). Collapsing them is a real
+ * refactor, not a cleanup.
  *
- * Recorded here rather than fixed here: collapsing three representations into
- * one changes what the harness *accepts*, and doing that as a side effect of
- * moving a block would hide a behaviour change inside a refactor.
+ * What changed is only that the validators now run. Two of them had latent bugs
+ * that this exposed immediately: `str()` projected the bare string rather than
+ * `{ [field]: value }`, so every `readFile` would have received `'src/x.js'`
+ * where it expected `{ path }`.
  */
 import { getToolContracts } from '../shared/tools/index.js';
 
+/**
+ * The `skills` parameter, shared by `spawnAgent`, `task`, and `spawnTeammate`.
+ *
+ * One object rather than three copies. All three delegate, all three hand the
+ * callee a workflow, and all three accept the same three shapes — a name, a
+ * list of names, or `[{name, args}]`. Typed loosely on purpose: a strict
+ * `oneOf` here is the shape most likely to be rejected by some provider's
+ * schema validation, and `normalizeSkillNames` handles every form.
+ *
+ * `object` is what a naive clone or a structured-output mode produces for a
+ * union of scalars, so it is accepted too rather than refused.
+ */
+const SKILLS_PARAM = {
+  description: 'Skill workflow(s) for the delegated agent to follow. A name, a list of names, or [{name, args}].',
+  anyOf: [
+    { type: 'string' },
+    { type: 'array', items: { type: 'string' } },
+    {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          name: { type: 'string' },
+          args: { anyOf: [{ type: 'array', items: { type: 'string' } }, { type: 'string' }] },
+        },
+        required: ['name'],
+      },
+    },
+    { type: 'object' },
+  ],
+};
+
 export const TOOL_PARAM_SCHEMAS = {
-  readFile: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'] },
+  /**
+   * `offset`/`limit` are the recovery path for a read the context compactor
+   * shrank, and the cheap way to check a few definitions in a large file. The
+   * descriptions say so rather than leaving the model to infer why they exist.
+   */
+  readFile: {
+    type: 'object',
+    properties: {
+      path: { type: 'string', description: 'File path, relative to the project root.' },
+      offset: { type: 'integer', description: '0-based line to start at. Use with limit for a window.' },
+      limit: { type: 'integer', description: 'Lines to return. A windowed read returns nextOffset to continue from.' },
+    },
+    required: ['path'],
+  },
   listDirectory: { type: 'object', properties: { path: { type: 'string' } } },
   glob: { type: 'object', properties: { pattern: { type: 'string' } }, required: ['pattern'] },
   grep: {
@@ -135,16 +186,62 @@ export const TOOL_PARAM_SCHEMAS = {
     required: ['todos'],
   },
   todoRead: { type: 'object', properties: {} },
+  /**
+   * `names` is the stacked form. Loading two workflows used to mean two tool
+   * calls in one message, and the loop batches read-only calls with no ordering
+   * guarantee — so which body landed first was a race. Asking in one call makes
+   * the order the caller's.
+   *
+   * `args` is typed loosely on purpose — `anyOf: [array, string]`. Small models
+   * send `{args: "src/index.js"}` about as often as the array form, and a schema
+   * that rejects the string turns a correct intent into a retry loop.
+   * `normalizeSkillArgs` accepts both.
+   */
   skill: {
     type: 'object',
-    properties: { name: { type: 'string' } },
-    required: ['name'],
+    properties: {
+      name: { type: 'string', description: 'One skill to load.' },
+      names: { type: 'array', items: { type: 'string' }, description: 'Several skills, loaded in this order.' },
+      args: {
+        description: 'Values for $1 / $ARGUMENTS placeholders in the skill body.',
+        anyOf: [
+          { type: 'array', items: { type: 'string' } },
+          { type: 'string' },
+        ],
+      },
+    },
+    required: [],
   },
+  runSkillScript: {
+    type: 'object',
+    properties: {
+      name: { type: 'string', description: 'The skill that owns the script.' },
+      script: {
+        type: 'string',
+        description: 'Path relative to the skill directory, e.g. "scripts/verify.sh".',
+      },
+      args: {
+        description: 'Arguments passed to the script.',
+        anyOf: [
+          { type: 'array', items: { type: 'string' } },
+          { type: 'string' },
+        ],
+      },
+      timeout: { type: 'integer', description: 'Timeout in seconds (values ≥1000 are read as ms).' },
+    },
+    required: ['name', 'script'],
+  },
+  /**
+   * A subagent given a workflow stops improvising it, which is the point of
+   * delegating. The parameter itself is `SKILLS_PARAM`, shared with `task` and
+   * `spawnTeammate`.
+   */
   spawnAgent: {
     type: 'object',
     properties: {
       prompt: { type: 'string' },
       mode: { type: 'string' },
+      skills: SKILLS_PARAM,
     },
     required: ['prompt'],
   },
@@ -196,6 +293,7 @@ export const TOOL_PARAM_SCHEMAS = {
       prompt: { type: 'string', description: 'Required for spawn and spawn-async.' },
       mode: { type: 'string', enum: ['BUILD', 'PLAN'], description: 'For spawn/spawn-async. Defaults to PLAN then BUILD.' },
       name: { type: 'string', description: 'Teammate name, for spawn-async and merge.' },
+      skills: SKILLS_PARAM,
       isolation: { type: 'string', enum: ['none', 'worktree'], description: 'For spawn-async.' },
       command: { type: 'string', description: 'Required for run.' },
       timeout: { type: 'integer', description: 'Seconds, for run.' },
@@ -213,6 +311,7 @@ export const TOOL_PARAM_SCHEMAS = {
       prompt: { type: 'string' },
       mode: { type: 'string', enum: ['BUILD', 'PLAN'] },
       isolation: { type: 'string', enum: ['none', 'worktree'] },
+      skills: SKILLS_PARAM,
     },
     required: ['name', 'prompt'],
   },

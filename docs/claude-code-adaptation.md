@@ -30,7 +30,7 @@ adaptation is a small module + tool, never a framework.
 | 2 | Composable `buildEffectiveSystemPrompt()` sections | `src/agent/prompt.js`: header / environment / project-context / mode / rules / skills sections, each its own builder | ✅ done |
 | 3 | Environment section (`computeSimpleEnvInfo`) | `buildEnvironmentSection()`: cwd, OS, git branch | ✅ done |
 | 4 | Project knowledge (CLAUDE.md at every level) | `src/agent/context-files.js`: SENTINEL.md → CLAUDE.md → AGENTS.md → .sentinel/context.md, 3k-char cap, injected into prompt | ✅ done (runtime twin of TUI loader) |
-| 5 | Skills: list names cheap, expand on `Skill` call | `src/agent/skills.js` + `skill` tool; `.sentinel/skills/*/SKILL.md`; ships `reproduce-fix-verify` | ✅ done |
+| 5 | Skills: list names cheap, expand on `Skill` call | `src/agent/skills.js` + `skill` tool; `skills/*/SKILL.md` (shipped) plus `.sentinel`/`.claude`/`.codex`/`.agents`/`.opencode`; arguments via `$1`/`$ARGUMENTS`; stacked via `names`; bundled scripts via the separate `runSkillScript` tool; `/name` for explicit invocation; `skills` on `spawnAgent` and `spawnTeammate` | ✅ done |
 | 6 | Task system (TaskCreate/Update, JSON on disk) | `src/agent/tasks.js` + `todoWrite`/`todoRead` tools; `.sentinel/todos.json`; full-list overwrite semantics | ✅ done |
 | 7 | Subagents: same loop, fresh `messages[]`, restricted tools | `spawnAgent` tool in loop: fresh history, PLAN-or-BUILD, permission-deny inside, depth ≤ 1 (no chains) | ✅ done |
 | 8 | `isConcurrencySafe()` batching (≤10 parallel reads) | `batchToolCalls()`: consecutive read-only calls → `Promise.all` (cap 10); writes serial | ✅ done |
@@ -59,7 +59,7 @@ adaptation is a small module + tool, never a framework.
 - `src/shared/tools/{schemas,index}.js`: 4 new tools + impls
   (`spawnAgent` executes in loop.js, not here — avoids a require cycle)
 - `src/shared/schemas/mode.js`: `todoRead`/`skill` read-only
-- `.sentinel/skills/reproduce-fix-verify/SKILL.md`: first shipped skill
+- `reproduce-fix-verify`: first skill, at `skills/reproduce-fix-verify/SKILL.md`. Shipped — see Part 3.
 - `__tests__/harness.test.js` (15 tests), `agent-loop.test.js` +4
   (parallel reads, subagent summary, dangerous-command block, stop retry)
 
@@ -113,8 +113,29 @@ lifecycle lanes.
 
 # Part 3 — beyond the references
 
+The CodeCrafters "Build your own Claude Code" syllabus (13 stages: LLM comms,
+tool advertisement and execution, agent loop, write, bash; then skills —
+advertise, invoke, arguments, stack, bundled script, model-selects, subagent) is
+implemented and verified by `npm run verify:stages`, which exercises each stage
+through the same public entry points the model uses, with a mock provider and no
+network. One line per stage; non-zero exit on any failure. Stage *titles* come
+from the course overview — the per-stage test specs are behind a GitHub login and
+were never read, so it asserts the capability each title names, not the course's
+own acceptance criteria. It is deliberately outside `release:check`, because two
+stages shell out and would assert something about the host as well as the code.
+
 | Feature | What it does | Where |
 |---|---|---|
+| Skill in a subagent | `spawnAgent({skills: [{name, args}]})` loads a workflow into the delegated agent's first message instead of leaving the model to describe it in prose. Bodies are fenced and named so the subagent can tell following a workflow from improvising one. An unknown skill is a refusal, never a silent skip | `buildSkillPreamble` / `normalizeSkillNames` in `src/agent/loop.js` |
+| `/name` for skills and templates alike | One syntax, one argument parser. A prompt template wins on collision — a project that had `/review` before skills existed must not have it silently change meaning. Otherwise a skill, then passthrough, so `/help` and `/steer` survive | `src/agent/slash-commands.js`; `expandSlashCommand` in the CLI and TUI |
+| `allowed-tools` | A skill's declaration narrows the rest of its turn by **refusing** calls it excludes, naming the binding skill and listing what is permitted. It does not narrow the advertised toolset: a skill loads mid-turn, so removing tools the model was already shown makes the next call fail against a list it has never seen. Two loaded skills intersect, so an unrestricted one cannot hand a restricted one its restriction back; a stacked `names: [...]` load is not a way to opt out. The `skill` tool itself is always permitted, and the scope ends with the turn | `src/agent/skill-scope.js`; `skillAllowedTools` in `src/agent/skills.js` |
+| `sentinel skills run <name> [args…]` | Starts a turn with a skill already loaded, so `/name` is reachable from a shell, a script, or CI rather than only from a composer. `--print` shows the expansion and exits without a model call | `src/cli/main.js`; expansion via `src/agent/slash-commands.js` |
+| `disable-model-invocation` | Withholds a skill from the system-prompt listing and from the `sentinel_skills` MCP listing, while leaving it reachable by `/name`, by `sentinel skills run`, and by exact-name expand. Needed hyphenated frontmatter keys — the old key pattern was `/^([A-Za-z]+):/`, which silently discarded `disable-model-invocation`, `allowed-tools` and `argument-hint` rather than reading them | `parseSkillFile` in `src/agent/skills.js`; `formatSkillListing(..., {includeHidden})`; `mcp/sentinel-mcp-server.js` |
+| Stacked skills | `skill({names: [...]})` loads several in one call, in the caller's order. Two separate tool calls used to return as two unordered parallel results, so which body landed first was a race. Dedupe by name; an unknown name fails the whole call rather than half-loading | `skillImpl` in `src/shared/tools/index.js`; `normalizeSkillNames` in `src/agent/skill-delegation.js` |
+| Skill arguments | `skill({name, args})` substitutes into `$1`, `$ARGUMENTS`, `${1:-default}` in the body. Reuses `substituteArgs` from `prompt-templates.js` rather than forking it, so `/name` and the `skill` tool cannot disagree about what `$1` means. Accepts an array or a bare string — small models send both | `applySkillArgs` / `normalizeSkillArgs` in `src/agent/skills.js` |
+| Skill scripts | A skill may ship `scripts/*.sh\|js\|py\|ps1`. `runSkillScript({name, script, args})` runs one through the same sandbox `bash` uses. Path must resolve inside the skill directory; traversal and absolute paths are refused at resolution, before the shell | `resolveSkillScript`, `skillScriptCommand` in `src/agent/skills.js`; `runSkillScriptImpl` in `src/shared/tools/index.js` |
+| `runSkillScript` is not a field on `skill` | `skill` is read-only and reads ten directories including `~/.claude/skills` and `~/.opencode/skills` — registry-sourced code. Execution hanging off a read-only tool would give a PLAN-mode turn the ability to run it. It is classified `shell` instead, refused in FIX, and graded by the risk ledger on the exact string that executes | `SHELL_TOOL_NAMES` in `src/shared/schemas/mode.js`; `commandFor` in `src/agent/gates.js` |
+| Tool input validation | `toolInputSchemas` (~200 lines) was written and never called. `validateToolInput` now runs it in the loop before the permission prompt, and again in `executeLocalTool` for direct callers. Turning it on exposed a real bug: `str()` projected the bare string instead of `{ [field]: value }`, so every `readFile` would have received `'src/x.js'` where it expected `{ path }` | `validateToolInput` / `coerceToolInput` in `src/shared/tools/index.js` |
 | Async shell | `bash`/`runTests` spawn instead of `execSync` (same bwrap / sandbox-exec wrappers) — teammates and notifications keep running during long commands | `runSandboxedAsync()` in `src/shared/tools/sandbox.js` |
 | Teammate merge-back | `teamMerge` diff / apply / discard. Apply = binary patch vs the worktree's base commit, plain apply then 3-way fallback, checkpointed first (so `undoLastChange` reverts it), worktree + branch removed. Harness state (`.sentinel/audits`, checkpoints, trajectories…) is excluded from the patch | `src/agent/worktree.js`, `mergeTeammate()` |
 | **race** (best-of-N) | N candidates solve one task in parallel worktrees, each with a different approach hint and optionally a different model (round-robin → local model tournament). Your check command scores them: passes → test balance → smaller diff → cheaper. Only the winner is applied; all worktrees removed | `src/agent/race.js`, `sentinel race "<task>" --check "npm test" -n 3 -m a,b` |
@@ -126,6 +147,27 @@ lifecycle lanes.
 
 Verification: `__tests__/{ports,parity,features}.test.js` — mock provider,
 temp git repos, no key/network. Run `npm test`.
+
+## Skills ship in `skills/`, and `skills/` comes first
+
+`reproduce-fix-verify` lives at `skills/reproduce-fix-verify/SKILL.md` — tracked,
+and included in the npm tarball via `files`. It was previously at
+`.sentinel/skills/`, which is gitignored, so it existed and worked locally and in
+no clone. That is what let this document describe a skill a reader did not have.
+
+Two things had to change for the fix to be real:
+
+1. **`skills/` is FIRST in `skillDirs`, not last.** An untracked copy at
+   `.sentinel/skills/reproduce-fix-verify` shadowed the shipped one, so the skill
+   that shipped was the one that never ran. A shipped baseline that sits at the
+   bottom of the precedence list is unreachable as soon as any other registry
+   claims the name. `__tests__/harness.test.js` asserts the shipped copy wins.
+2. **`package.json` `files` includes `skills/**/*`.** A tracked directory that is
+   not in `files` is still absent from the published package, which would have
+   reproduced the original problem one level up.
+
+`harness.test.js` asserts the file exists, so removing `skills/` is a red test
+rather than a silent drift.
 
 # Part 4 — TUI in the style of opencode + MiniMax Code, receipts, replay, routing
 

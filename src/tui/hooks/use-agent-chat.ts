@@ -21,7 +21,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { randomUUID } from "node:crypto";
 import { streamChat, Sessions, steer, type ChatEvent } from "../lib/api-client.js";
-import { expandPromptTemplate } from "../../agent/prompt-templates.js";
+import { expandSlashCommand } from "../../agent/slash-commands.js";
 
 /** One-line text for loop events that are not model output. */
 export function formatHarnessNotice(ev: ChatEvent): string | null {
@@ -309,7 +309,11 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
     async (rawText: string, submitOptions: { goal?: string } = {}) => {
       if (!rawText.trim()) return;
       setError(null);
-      const userText = expandPromptTemplate(rawText).text;
+      // `/name args` resolves prompt templates first, then skills, then passes
+      // through — so `/review` works whichever registry it lives in, and an
+      // ordinary TUI command like `/help` is untouched.
+      const expanded = expandSlashCommand(rawText);
+      const userText = expanded.text;
 
       // A turn is already running: steer it instead of starting another.
       if (abortRef.current) {

@@ -54,6 +54,14 @@ const TOOL_CATEGORIES = Object.freeze({
   bgCheck: 'read',
   teamStatus: 'read',
 
+  // Shell execution, same category as `bash`, same `ask` default.
+  //
+  // Deliberately NOT folded into `skill: 'read'`. `skill` returns a prompt;
+  // this runs a file that arrived from a registry directory. One dictionary
+  // entry separating them is what keeps a PLAN-mode turn from executing
+  // installed code.
+  runSkillScript: 'shell',
+
   todoWrite: 'write',
   memoryWrite: 'write',
   memoryDelete: 'write',
@@ -105,6 +113,7 @@ const DEFAULT_TOOL_POLICIES = Object.freeze({
   bash: 'ask',
   runTests: 'ask',
   bgRun: 'ask',
+  runSkillScript: 'ask',
 });
 
 // ── Permission check ─────────────────────────────────────────────────

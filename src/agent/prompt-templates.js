@@ -83,11 +83,29 @@ export function listPromptTemplates(cwd = process.cwd()) {
 }
 
 /**
+ * `/name args…` — the shape, defined once.
+ *
+ * Exported so the unified dispatcher can recognise a slash command without
+ * keeping its own copy of this expression. Two copies of one regex is how a
+ * command name that works via `/name` stops working via `/name arg`.
+ */
+export const SLASH_RE = /^\/([\w.-]+)(?:\s+([\s\S]*))?$/;
+
+/**
  * Expand `/name args…` when a template matches; otherwise return the text
  * unchanged (so ordinary slash commands and prose pass through).
+ *
+ * Templates only. `/name` also resolves skills, and that dispatch lives in
+ * `slash-commands.js` — this module cannot do it, because `skills.js` imports
+ * `substituteArgs` from here and importing back would be a cycle.
+ *
+ * The unified dispatcher *calls this* for the template branch rather than
+ * reimplementing it. It briefly had its own copy of the regex, the lookup, and
+ * the substitution, which is precisely the three-way duplication
+ * `tool-taxonomy.js` was written about: the tests passed, and nothing said so.
  */
 export function expandPromptTemplate(text, cwd = process.cwd()) {
-  const m = /^\/([\w.-]+)(?:\s+([\s\S]*))?$/.exec(String(text || '').trim());
+  const m = SLASH_RE.exec(String(text || '').trim());
   if (!m) return { text, template: null };
   const tpl = listPromptTemplates(cwd).find((t) => t.name === m[1]);
   if (!tpl) return { text, template: null };

@@ -10,29 +10,35 @@
  */
 
 import { discoverAllModels, getFallbackModels, inferProvider as discoverInferProvider, getModelTier } from './discovery.js';
+import {
+  CONNECTOR_IDS,
+  getConnectorEnvVar,
+  getConnectorKeyPrefix,
+  isLocalConnector,
+} from '../connectors/registry.js';
+import { isConnectedSync } from '../connectors/credentials.js';
 
 export { getModelTier };
 
 export const USD_PER_CREDIT = 0.01;
 
-export const SupportedProvider = Object.freeze({
-  ANTHROPIC: 'anthropic',
-  OPENAI: 'openai',
-  GOOGLE: 'google',
-  GROQ: 'groq',
-  MISTRAL: 'mistral',
-  DEEPSEEK: 'deepseek',
-  XAI: 'xai',
-  TOGETHER: 'together',
-  FIREWORKS: 'fireworks',
-  OPENROUTER: 'openrouter',
-  OLLAMA: 'ollama',
-  LMSTUDIO: 'lmstudio',
-  PERPLEXITY: 'perplexity',
-  GITHUB_COPILOT: 'github-copilot',
-});
+/**
+ * Provider constants, derived from the registry rather than restated.
+ *
+ * This object used to be a hand-written list of the same fourteen ids the
+ * registry also knew about. `CEREBRAS` and the rest now appear automatically,
+ * and the derived form means a connector cannot exist without a constant here.
+ * Key shape is preserved (`GITHUB_COPILOT`, not `GITHUB-COPILOT`) because
+ * call sites destructure `SupportedProvider.ANTHROPIC`.
+ */
+export const SupportedProvider = Object.freeze(
+  Object.fromEntries(
+    CONNECTOR_IDS.map((id) => [id.toUpperCase().replace(/-/g, '_'), id])
+  )
+);
 
 let _refreshPromise = null;
+let _refreshOptions = null;
 
 const fallback = getFallbackModels();
 export const SUPPORTED_CHAT_MODELS = fallback.slice();
@@ -44,19 +50,40 @@ function setModels(models) {
 
 export const DEFAULT_CHAT_MODEL_ID = 'openai/gpt-oss-20b';
 
-export async function refreshModels() {
-  if (_refreshPromise) return _refreshPromise;
-  _refreshPromise = (async () => {
+/**
+ * Populate `SUPPORTED_CHAT_MODELS` from every reachable connector.
+ *
+ * The in-flight promise is shared, but only among callers that asked for the
+ * same view. Mixing a connected-only refresh with an `--all` refresh into one
+ * memo would mean whichever finished last wins, and `sentinel models --all`
+ * could leave the TUI's registry holding models the user cannot call — which
+ * then get selected by `autoSelectBestModel` and fail mid-turn.
+ *
+ * @param {{includeUnconnected?: boolean}} [options]
+ */
+export async function refreshModels(options = {}) {
+  if (_refreshPromise && _refreshOptions?.includeUnconnected === !!options.includeUnconnected) {
+    return _refreshPromise;
+  }
+  const includeUnconnected = !!options.includeUnconnected;
+  const promise = (async () => {
     try {
-      const discovered = await discoverAllModels();
+      const discovered = await discoverAllModels({ includeUnconnected });
       if (discovered && discovered.length > 0) {
         setModels(discovered);
       }
     } catch {
       // keep fallback
     }
-  })().finally(() => { _refreshPromise = null; });
-  return _refreshPromise;
+  })().finally(() => {
+    if (_refreshPromise === promise) {
+      _refreshPromise = null;
+      _refreshOptions = null;
+    }
+  });
+  _refreshPromise = promise;
+  _refreshOptions = { includeUnconnected };
+  return promise;
 }
 
 export function invalidateModelCache() {
@@ -113,16 +140,22 @@ export function getRankedModels() {
 export const LOCAL_PROVIDERS = Object.freeze(new Set(['ollama', 'lmstudio']));
 
 export function isLocalProvider(provider) {
-  return LOCAL_PROVIDERS.has(provider);
+  return isLocalConnector(provider);
 }
 
 /**
  * A provider is available if it's local (Ollama/LM Studio detected via its
- * running daemon) OR an API key is set in the environment.
+ * running daemon) OR a credential exists for it.
+ *
+ * Credential resolution is delegated to the store, which checks
+ * `~/.sentinel/auth.json` before `process.env`. That ordering is the fix for a
+ * real bug: this used to read only `process.env`, so a key saved via
+ * `sentinel connect` made every paid model look unreachable and the ranking
+ * below silently fell through to a free local model.
  */
 export function isProviderAvailable(provider) {
   if (isLocalProvider(provider)) return true;
-  return !!process.env[getEnvKeyForProvider(provider)];
+  return isConnectedSync(provider);
 }
 
 /**
@@ -143,15 +176,9 @@ export function autoSelectBestModel() {
   return pick ? pick.id : ranked[0].id;
 }
 
-function getEnvKeyForProvider(provider) {
-  const map = {
-    groq: 'GROQ_API_KEY', openai: 'OPENAI_API_KEY', anthropic: 'ANTHROPIC_API_KEY',
-    google: 'GEMINI_API_KEY', mistral: 'MISTRAL_API_KEY', deepseek: 'DEEPSEEK_API_KEY',
-    xai: 'XAI_API_KEY', together: 'TOGETHER_API_KEY', fireworks: 'FIREWORKS_API_KEY',
-    perplexity: 'PERPLEXITY_API_KEY', openrouter: 'OPENROUTER_API_KEY',
-    'github-copilot': 'GITHUB_TOKEN', ollama: 'OLLAMA_HOST', lmstudio: 'LMSTUDIO_HOST',
-  };
-  return map[provider] || '';
+/** The env var a provider reads, for setup hints. Registry-owned. */
+export function getEnvKeyForProvider(provider) {
+  return getConnectorEnvVar(provider);
 }
 
 export function inferProviderFromModelId(modelId) {
@@ -163,9 +190,25 @@ export function isSupportedChatModel(modelId) {
   return discoverInferProvider(modelId) !== null;
 }
 
+/**
+ * Strip the registry namespace off a model id, leaving the bare id the vendor
+ * expects on the wire.
+ *
+ * Prefix list comes from the registry, plus one special case. Fireworks returns
+ * ids shaped `accounts/fireworks/<model>`, a *vendor* namespace that arrives
+ * inside the id from the wire rather than a connector prefix. The old
+ * hardcoded list knew about `copilot/` and `lmstudio/` but not that one, so a
+ * Fireworks model was recognised as belonging to Fireworks by `inferProvider`
+ * and then sent to the API still wearing the namespace. It came back as a 404
+ * attributed to a credential problem, because the error formatter only knew
+ * how to talk about keys.
+ */
 export function getBareModelId(modelId) {
-  for (const prefix of ['ollama/', 'openrouter/', 'lmstudio/', 'copilot/']) {
-    if (modelId.startsWith(prefix)) return modelId.slice(prefix.length);
+  if (typeof modelId !== 'string') return modelId;
+  if (modelId.startsWith('accounts/fireworks/')) return modelId.slice('accounts/fireworks/'.length);
+  for (const id of CONNECTOR_IDS) {
+    const prefix = getConnectorKeyPrefix(id);
+    if (prefix && modelId.startsWith(prefix)) return modelId.slice(prefix.length);
   }
   return modelId;
 }

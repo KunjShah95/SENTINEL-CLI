@@ -141,15 +141,51 @@ server.tool(
 
 server.tool(
   'sentinel_skills',
-  'List installable/available skills that Sentinel can load, including skills installed by other assistants.',
+  'List installable/available skills that Sentinel can load, including skills installed by other assistants. Optionally returns one skill\'s body and bundled scripts. Pass includeHidden to also list skills marked for explicit invocation only.',
   {
     query: z.string().optional().describe('Optional skill-name filter (substring match).'),
+    name: z.string().optional().describe('Expand this skill: returns its instructions body and any bundled scripts.'),
+    args: z.array(z.string()).optional().describe('Values for $1 / $ARGUMENTS placeholders when expanding.'),
+    includeHidden: z.boolean().optional().describe('Include skills marked disable-model-invocation in the listing. Expansion by exact name always works.'),
   },
-  async ({ query }) => {
+  async ({ query, name, args, includeHidden }) => {
     try {
-      const { listSkills } = await import('../src/agent/skills.js');
+      const { listSkills, resolveSkill, applySkillArgs, listSkillScripts } = await import('../src/agent/skills.js');
       const cwd = resolveWorkdir();
+      // Expand before filtering: a caller who names a skill wants that skill,
+      // and a substring match on the listing would not reliably find it.
+      if (typeof name === 'string' && name.trim()) {
+        const skill = resolveSkill(name, cwd);
+        if (!skill) {
+          return {
+            content: [{ type: 'text', text: JSON.stringify({ error: `Unknown skill: ${name}` }) }],
+            isError: true,
+          };
+        }
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              workdir: cwd,
+              name: skill.name,
+              description: skill.description,
+              args: args ?? [],
+              instructions: applySkillArgs(skill.body, args),
+              scripts: listSkillScripts(skill),
+              // Named on the way out so the calling agent knows this was a
+              // deliberate request for a skill its own listing would not have
+              // shown it — otherwise `disable-model-invocation` is a flag that
+              // silently does nothing for anyone but Sentinel.
+              explicitOnly: Boolean(skill.disableModelInvocation),
+            }, null, 2),
+          }],
+        };
+      }
       let skills = listSkills(cwd);
+      // A hidden skill is withheld from the *listing*, which is what another
+      // agent reads to decide what to reach for. An exact-name expand above
+      // still works — that is the explicit-invocation path the flag permits.
+      if (!includeHidden) skills = skills.filter((s) => !s.disableModelInvocation);
       if (typeof query === 'string' && query.trim()) {
         const q = query.toLowerCase();
         skills = skills.filter((s) => s.name.toLowerCase().includes(q));

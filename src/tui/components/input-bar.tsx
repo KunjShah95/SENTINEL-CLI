@@ -5,6 +5,7 @@ import { useTheme } from '../providers/theme/index.js';
 import { modeColor } from '../theme.js';
 import { shortModelName, titlecase } from './oc/primitives.js';
 import { composerTip } from './oc/chrome.js';
+import { slashCommandSuggestions } from '../../agent/slash-commands.js';
 
 type Mode = 'BUILD' | 'PLAN' | 'REVIEW' | 'SCAN' | 'FIX';
 
@@ -58,12 +59,42 @@ function extractMentionToken(text: string): string | null {
   return m ? m[1] : null;
 }
 
+/**
+ * Skills available as `/name`, computed once.
+ *
+ * A module-level cache on purpose. `sameCommands` below compares entries by
+ * identity to decide whether React needs a re-render, so a freshly-built array
+ * on every keystroke is exactly the flicker bug `tui-flicker.test.mjs` locks
+ * down — and these are read from the filesystem, so an uncached version would
+ * also stat ten directories per character.
+ *
+ * One cache for the process, not per `cwd`: a session's working directory does
+ * not change under it, and completions are advisory.
+ */
+let SKILL_COMMANDS: typeof SLASH_COMMANDS | undefined;
+function getSkillCommands(): typeof SLASH_COMMANDS {
+  if (SKILL_COMMANDS) return SKILL_COMMANDS;
+  // Computed into a local first: assigning straight to the cache inside a
+  // try/catch leaves the compiler unable to prove it is defined on the way out.
+  let found: typeof SLASH_COMMANDS = [];
+  try {
+    found = slashCommandSuggestions('', process.cwd())
+      .filter(s => s.source === 'skill')
+      .map(s => ({ name: s.name, description: s.description }));
+  } catch {
+    // Never let a bad skills directory take down the composer.
+  }
+  SKILL_COMMANDS = found;
+  return SKILL_COMMANDS;
+}
+
 function getSlashSuggestions(text: string): typeof SLASH_COMMANDS {
   if (!text.startsWith('/')) return [];
   const query = text.slice(1).split(/\s/)[0].toLowerCase();
   // Only show suggestions while still on the command word (no space yet)
   if (text.includes(' ')) return [];
-  return SLASH_COMMANDS.filter(c => c.name.startsWith(query));
+  const all = SLASH_COMMANDS.concat(getSkillCommands());
+  return all.filter(c => c.name.startsWith(query));
 }
 
 /**

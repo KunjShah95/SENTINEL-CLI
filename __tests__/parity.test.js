@@ -11,7 +11,7 @@
  */
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -22,6 +22,7 @@ import { resetBackground } from '../src/agent/background.js';
 import { resetTeam } from '../src/agent/team.js';
 import { runMini, SUBMIT_SENTINEL } from '../src/agent/mini.js';
 import { listTasks, getTask, cancelTask } from '../src/agent/task.js';
+import { normalizeSkillNames } from '../src/agent/skill-delegation.js';
 
 const MODEL = 'openai/gpt-oss-20b';
 const user = (text) => [{ id: `u${Date.now()}`, role: 'user', parts: [{ type: 'text', text }] }];
@@ -94,6 +95,254 @@ describe('parity scenarios (mock provider)', () => {
     const denied = await run({ history: user('w'), mode: 'BUILD', createStream: mockProvider((c) => (c.index === 0 ? [tool('writeFile', { path: 'd.txt', content: 'x' })] : [text('ok')])).createStream, onPermissionRequest: async () => 'deny' });
     assert.equal(existsSync(join(dir, 'd.txt')), false);
     assert.match(denied.find((e) => e.event === 'tool_result').data.error, /denied/);
+  });
+
+  it('skill_with_args: the model loads a skill and its $1 is filled from the call', async () => {
+    const sd = join(dir, '.sentinel', 'skills', 'demo');
+    mkdirSync(sd, { recursive: true });
+    writeFileSync(join(sd, 'SKILL.md'), '---\nname: demo\ndescription: a demo\n---\nNow edit $ARGUMENTS carefully.');
+    const { createStream, calls } = mockProvider((call) =>
+      call.index === 0
+        ? [tool('skill', { name: 'demo', args: ['target.js'] })]
+        : [text('loaded')]);
+    const ev = await run({ history: user('use the demo skill on target.js'), mode: 'BUILD', createStream });
+    const result = ev.find((e) => e.event === 'tool_result').data.output;
+    assert.equal(result.name, 'demo');
+    assert.match(result.prompt, /Now edit target\.js carefully\./);
+    // The description comes back too, so the model can still see what the skill
+    // was after its body is in context.
+    assert.equal(result.description, 'a demo');
+    // The listing advertised the skill, which is the other half of the pair.
+    assert.match(calls[0].system, /Available skills/);
+  });
+
+  it('subagent_with_skill: the workflow reaches the subagent, the prompt stays the task', async () => {
+    const sd = join(dir, '.sentinel', 'skills', 'audit');
+    mkdirSync(sd, { recursive: true });
+    writeFileSync(join(sd, 'SKILL.md'), '---\nname: audit\ndescription: audit\n---\nCheck $1 for secrets.');
+
+    let subSeen = null;
+    const { createStream } = mockProvider((call) => {
+      if (isTeammate(call) || call.messages.length > 2) {
+        // The subagent's first user message is where the skill has to be.
+        if (!subSeen) subSeen = lastUserText(call);
+        return [text('audit complete')];
+      }
+      return [tool('spawnAgent', { prompt: 'audit the repo', skills: [{ name: 'audit', args: ['auth.js'] }] })];
+    });
+    const ev = await run({ history: user('audit the repo'), mode: 'BUILD', createStream, onPermissionRequest: async () => 'allow' });
+    const out = ev.find((e) => e.event === 'tool_result').data.output;
+    assert.match(out.summary || '', /audit complete/, 'the subagent returned');
+
+    assert.match(subSeen, /Check auth\.js for secrets\./, 'args were substituted');
+    assert.match(subSeen, /<skill name="audit">/, 'the body is fenced and named');
+    assert.match(subSeen, /audit the repo/, 'the prompt is still there');
+    assert.match(subSeen, /^You were given a skill \(audit\)/, 'the agent is told it was given one');
+  });
+
+  it('subagent_unknown_skill_is_refused, not silently skipped', async () => {
+    // The failure this prevents: a subagent asked to use a workflow that does
+    // not exist proceeds on the prompt alone and reports success. That looks
+    // exactly like working.
+    const { createStream } = mockProvider((call) =>
+      call.index === 0
+        ? [tool('spawnAgent', { prompt: 'do it', skills: ['does-not-exist'] })]
+        : [text('ok')]);
+    const ev = await run({ history: user('go'), mode: 'BUILD', createStream, onPermissionRequest: async () => 'allow' });
+    assert.match(ev.find((e) => e.event === 'tool_result').data.error, /Unknown skill: does-not-exist/);
+  });
+
+  it('subagent_stacks_two_skills in the order given, deduped', async () => {
+    for (const [n, body] of [['first', 'WORKFLOW-ONE'], ['second', 'WORKFLOW-TWO']]) {
+      const d = join(dir, '.sentinel', 'skills', n);
+      mkdirSync(d, { recursive: true });
+      writeFileSync(join(d, 'SKILL.md'), `---\nname: ${n}\ndescription: ${n}\n---\n${body}`);
+    }
+    let subSeen = null;
+    const { createStream } = mockProvider((call) => {
+      if (call.messages.length > 2) {
+        if (!subSeen) subSeen = lastUserText(call);
+        return [text('done')];
+      }
+      // `first` twice: the second must not inject the body again.
+      return [tool('spawnAgent', { prompt: 'go', skills: ['first', 'second', 'first'] })];
+    });
+    await run({ history: user('go'), mode: 'BUILD', createStream, onPermissionRequest: async () => 'allow' });
+    assert.ok(subSeen.includes('WORKFLOW-ONE'), 'first is present');
+    assert.ok(subSeen.includes('WORKFLOW-TWO'), 'second is present');
+    assert.equal(subSeen.split('WORKFLOW-ONE').length - 1, 1, 'a duplicate skill is not injected twice');
+    assert.ok(
+      subSeen.indexOf('WORKFLOW-ONE') < subSeen.indexOf('WORKFLOW-TWO'),
+      'the caller\'s order is preserved',
+    );
+  });
+
+  it('teammate_with_skill: a teammate follows the workflow too, from the same builder', async () => {
+    // A skill must behave identically whether you waited for it or delegated it
+    // to a teammate. Two builders would make "run this in parallel" mean
+    // something subtly different from "run this and wait".
+    const sd = join(dir, '.sentinel', 'skills', 'audit');
+    mkdirSync(sd, { recursive: true });
+    writeFileSync(join(sd, 'SKILL.md'), '---\nname: audit\ndescription: audit\n---\nCheck $1 for secrets.');
+
+    const { createStream, calls } = mockProvider((c) => {
+      if (isTeammate(c)) return [text('teammate summary: audited')];
+      if (c.index === 0) {
+        return [tool('spawnTeammate', { name: 'scout', prompt: 'audit the repo', mode: 'PLAN', skills: [{ name: 'audit', args: ['auth.js'] }] })];
+      }
+      // Wait for the teammate's report rather than ending the turn, so the
+      // teammate's own model call is guaranteed to have happened.
+      if (!lastUserText(c).includes('<notifications>')) return [text('waiting for scout')];
+      return [text('scout reported back')];
+    });
+    await run({ history: user('audit in parallel'), mode: 'BUILD', createStream, onPermissionRequest: async () => 'allow' });
+
+    const teammateCall = calls.find(isTeammate);
+    assert.ok(teammateCall, 'the teammate ran');
+    const brief = teammateCall.messages[0]?.content || '';
+    assert.match(brief, /Check auth\.js for secrets\./, 'args were substituted');
+    assert.match(brief, /<skill name="audit">/, 'the body is fenced and named');
+    assert.match(brief, /audit the repo/, 'the prompt is still there');
+  });
+
+  it('teammate_unknown_skill_is_refused before the task starts', async () => {
+    const { createStream } = mockProvider((call) =>
+      call.index === 0
+        ? [tool('spawnTeammate', { name: 'scout', prompt: 'go', skills: ['nope'] })]
+        : [text('ok')]);
+    const ev = await run({ history: user('go'), mode: 'BUILD', createStream, onPermissionRequest: async () => 'allow' });
+    assert.match(ev.find((e) => e.event === 'tool_result').data.error, /Unknown skill: nope/);
+    // Refused before anything started, so there is no half-spawned teammate.
+    assert.equal(listTasks({ kind: 'agent', status: 'running' }).length, 0);
+  });
+
+  it('normalizeSkillNames accepts the three shapes models send', () => {
+    assert.deepEqual(normalizeSkillNames(undefined), []);
+    assert.deepEqual(normalizeSkillNames(''), []);
+    assert.deepEqual(normalizeSkillNames('review'), [{ name: 'review', args: [] }]);
+    assert.deepEqual(normalizeSkillNames(['a', 'b']), [{ name: 'a', args: [] }, { name: 'b', args: [] }]);
+    assert.deepEqual(normalizeSkillNames({ name: 'a', args: ['x'] }), [{ name: 'a', args: ['x'] }]);
+    assert.deepEqual(normalizeSkillNames([{ name: 'a', args: 'x' }]), [{ name: 'a', args: ['x'] }]);
+    // Dedupe by name, first wins.
+    assert.deepEqual(
+      normalizeSkillNames([{ name: 'a', args: ['1'] }, { name: 'a', args: ['2'] }]),
+      [{ name: 'a', args: ['1'] }],
+    );
+    // A name is an identifier, not a list. "two words" is one name.
+    assert.deepEqual(normalizeSkillNames('two words'), [{ name: 'two words', args: [] }]);
+  });
+
+  it('allowed_tools: a skill declaration refuses a later call in the same turn', async () => {
+    // The end-to-end shape, and the reason the toolset is not narrowed: the
+    // model was *shown* writeFile at iteration 0 and only learns otherwise at
+    // iteration 1. A narrowed toolset would make that failure opaque.
+    const sd = join(dir, '.sentinel', 'skills', 'audit');
+    mkdirSync(sd, { recursive: true });
+    writeFileSync(join(sd, 'SKILL.md'), '---\nname: audit\ndescription: audit\nallowed-tools: readFile, grep\n---\nAudit $1.');
+    const { createStream } = mockProvider((call) =>
+      call.index === 0
+        ? [tool('skill', { name: 'audit' })]
+        : call.index === 1
+          ? [tool('writeFile', { path: 'leak.txt', content: 'x' })]
+          : [text('done')]);
+    const ev = await run({ history: user('audit then fix'), mode: 'BUILD', createStream, onPermissionRequest: async () => 'allow' });
+    const refused = ev.filter((e) => e.event === 'tool_result')[1];
+    assert.match(refused.data.error, /allowed-tools/, 'the reason is the declaration');
+    assert.match(refused.data.error, /"audit"/, 'and it names the skill');
+    assert.equal(existsSync(join(dir, 'leak.txt')), false, 'nothing was written');
+  });
+
+  it('allowed_tools: a stacked load cannot be used to opt out', async () => {
+    // `names` is a way to load several at once, so it must not be a way to
+    // load the unrestricted one after the restricted one and quietly discard
+    // the restriction. The intersection holds regardless of order.
+    const loose = join(dir, '.sentinel', 'skills', 'loose');
+    mkdirSync(loose, { recursive: true });
+    writeFileSync(join(loose, 'SKILL.md'), '---\nname: loose\ndescription: loose\n---\nAnything.');
+    const tight = join(dir, '.sentinel', 'skills', 'tight');
+    mkdirSync(tight, { recursive: true });
+    writeFileSync(join(tight, 'SKILL.md'), '---\nname: tight\ndescription: tight\nallowed-tools: readFile\n---\nOnly reads.');
+    const { createStream } = mockProvider((call) =>
+      call.index === 0
+        ? [tool('skill', { names: ['tight', 'loose'] })]
+        : call.index === 1
+          ? [tool('writeFile', { path: 'leak2.txt', content: 'x' })]
+          : [text('done')]);
+    const ev = await run({ history: user('go'), mode: 'BUILD', createStream, onPermissionRequest: async () => 'allow' });
+    assert.match(ev.filter((e) => e.event === 'tool_result')[1].data.error, /allowed-tools/);
+    assert.equal(existsSync(join(dir, 'leak2.txt')), false);
+  });
+
+  it('allowed_tools: the scope ends with the turn', async () => {
+    // A constraint that outlived its turn would decide what unrelated work is
+    // allowed to do.
+    const sd = join(dir, '.sentinel', 'skills', 'scoped2');
+    mkdirSync(sd, { recursive: true });
+    writeFileSync(join(sd, 'SKILL.md'), '---\nname: scoped2\ndescription: d\nallowed-tools: readFile\n---\nb');
+    const script = (call) => (call.index === 0
+      ? [tool('skill', { name: 'scoped2' })]
+      : [tool('writeFile', { path: 'turn1.txt', content: 'a' }), text('first turn done')]);
+    await run({ history: user('turn one'), mode: 'BUILD', createStream: mockProvider(script).createStream, onPermissionRequest: async () => 'allow' });
+
+    // A brand new turn, no skill loaded.
+    const second = mockProvider((call) =>
+      call.index === 0 ? [tool('writeFile', { path: 'turn2.txt', content: 'b' })] : [text('second turn done')]);
+    const ev = await run({ history: user('turn two'), mode: 'BUILD', createStream: second.createStream, onPermissionRequest: async () => 'allow' });
+    assert.equal(ev.filter((e) => e.event === 'tool_result')[0].data.error, undefined, 'the write is allowed again');
+    assert.equal(existsSync(join(dir, 'turn2.txt')), true);
+  });
+
+  it('skill_script_denied_in_PLAN: a bundled script will not execute in PLAN', async () => {
+    const sd = join(dir, '.sentinel', 'skills', 'demo', 'scripts');
+    mkdirSync(sd, { recursive: true });
+    writeFileSync(join(dir, '.sentinel', 'skills', 'demo', 'SKILL.md'), '---\nname: demo\ndescription: d\n---\nb');
+    writeFileSync(join(sd, 'boom.js'), 'require("fs").writeFileSync("pwned.txt","x")');
+    const { createStream } = mockProvider((call) =>
+      call.index === 0
+        ? [tool('runSkillScript', { name: 'demo', script: 'scripts/boom.js' })]
+        : [text('done')]);
+    const ev = await run({ history: user('run it'), mode: 'PLAN', createStream });
+    assert.match(ev.find((e) => e.event === 'tool_result').data.error, /not available in PLAN mode/);
+    assert.equal(existsSync(join(dir, 'pwned.txt')), false, 'nothing ran');
+  });
+
+  it('skill_script_traversal_refused: a script cannot escape its skill directory', async () => {
+    const sd = join(dir, '.sentinel', 'skills', 'demo');
+    mkdirSync(sd, { recursive: true });
+    writeFileSync(join(sd, 'SKILL.md'), '---\nname: demo\ndescription: d\n---\nb');
+    writeFileSync(join(dir, 'outside.js'), 'require("fs").writeFileSync("pwned.txt","x")');
+    const { createStream } = mockProvider((call) =>
+      call.index === 0
+        ? [tool('runSkillScript', { name: 'demo', script: '../../outside.js' })]
+        : [text('done')]);
+    const ev = await run({
+      history: user('run it'),
+      mode: 'BUILD',
+      createStream,
+      onPermissionRequest: async () => 'allow',
+    });
+    assert.match(ev.find((e) => e.event === 'tool_result').data.error, /stay inside the skill directory/);
+    assert.equal(existsSync(join(dir, 'pwned.txt')), false);
+  });
+
+  it('skill_script_runs_when_allowed: BUILD + approval executes the script', async () => {
+    const sd = join(dir, '.sentinel', 'skills', 'demo', 'scripts');
+    mkdirSync(sd, { recursive: true });
+    writeFileSync(join(dir, '.sentinel', 'skills', 'demo', 'SKILL.md'), '---\nname: demo\ndescription: d\n---\nb');
+    writeFileSync(join(sd, 'stamp.js'), 'require("fs").writeFileSync("ran.txt", process.argv[2] || "")');
+    const { createStream } = mockProvider((call) =>
+      call.index === 0
+        ? [tool('runSkillScript', { name: 'demo', script: 'scripts/stamp.js', args: ['hello'] })]
+        : [text('done')]);
+    const ev = await run({
+      history: user('run it'),
+      mode: 'BUILD',
+      createStream,
+      onPermissionRequest: async () => 'allow',
+    });
+    const out = ev.find((e) => e.event === 'tool_result').data.output;
+    assert.equal(out.exitCode, 0, out.stderr);
+    assert.equal(readFileSync(join(dir, 'ran.txt'), 'utf8'), 'hello', 'arguments reached the script');
   });
 
   it('plan_mode_blocks_harness_writes: bgRun is refused in PLAN', async () => {

@@ -1,9 +1,11 @@
 /**
  * Unified multi-provider LLM streaming client — raw fetch, no SDKs.
  *
- * Covers OpenAI-compatible endpoints (OpenAI, Groq, Mistral, DeepSeek, xAI,
- * Together, Fireworks, Perplexity, OpenRouter, Ollama, LM Studio, Copilot)
- * plus native Anthropic and Google Gemini wire protocols.
+ * Covers OpenAI-compatible endpoints plus native Anthropic and Google Gemini
+ * wire protocols. Which endpoints exist and where they live is decided by
+ * `src/shared/connectors/registry.js`; this file only implements the three
+ * transports. That split is what keeps adding a provider a registry edit
+ * rather than a fourth place to remember a base URL.
  *
  * Yields normalized events:
  *   { type: 'text', text }                  incremental text
@@ -12,44 +14,27 @@
  *   { type: 'usage', usage }                { inputTokens, outputTokens } or null
  *   { type: 'error', message }              fatal provider error
  */
+import {
+  TRANSPORT,
+  getConnector,
+  getConnectorBaseUrl,
+} from '../shared/connectors/registry.js';
+import { resolveCredential, credentialHint } from '../shared/connectors/credentials.js';
+import { getBareModelId } from '../shared/models/index.js';
 
-const ENV_KEYS = {
-  openai: 'OPENAI_API_KEY',
-  groq: 'GROQ_API_KEY',
-  google: 'GEMINI_API_KEY',
-  anthropic: 'ANTHROPIC_API_KEY',
-  mistral: 'MISTRAL_API_KEY',
-  deepseek: 'DEEPSEEK_API_KEY',
-  xai: 'XAI_API_KEY',
-  together: 'TOGETHER_API_KEY',
-  fireworks: 'FIREWORKS_API_KEY',
-  perplexity: 'PERPLEXITY_API_KEY',
-  openrouter: 'OPENROUTER_API_KEY',
-  'github-copilot': 'GITHUB_TOKEN',
-};
+/** Base URL for any connector, from the registry. Empty when unknown. */
+function baseUrlFor(provider) {
+  return getConnectorBaseUrl(provider);
+}
 
-const OPENAI_COMPAT = {
-  openai: () => 'https://api.openai.com/v1',
-  groq: () => 'https://api.groq.com/openai/v1',
-  mistral: () => 'https://api.mistral.ai/v1',
-  deepseek: () => 'https://api.deepseek.com/v1',
-  xai: () => 'https://api.x.ai/v1',
-  together: () => 'https://api.together.xyz/v1',
-  fireworks: () => 'https://api.fireworks.ai/inference/v1',
-  perplexity: () => 'https://api.perplexity.ai',
-  openrouter: () => 'https://openrouter.ai/api/v1',
-  ollama: () => `${(process.env.OLLAMA_HOST || 'http://localhost:11434').replace(/\/$/, '')}/v1`,
-  lmstudio: () => `${(process.env.LMSTUDIO_HOST || 'http://localhost:1234').replace(/\/$/, '')}/v1`,
-  local: () => `${(process.env.OLLAMA_HOST || 'http://localhost:11434').replace(/\/$/, '')}/v1`,
-  'github-copilot': () => 'https://api.githubcopilot.com',
-};
-
-let cachedManagerPromise = null;
-
-/** Resolve an API key: config store first (sentinel auth), then env. */
+/** Resolve an API key: the credential store first, then env. */
 export async function getApiKey(provider) {
-  const envKey = ENV_KEYS[provider];
-  const envVal = envKey ? process.env[envKey] : undefined;
+  const { key } = await resolveCredential(provider);
+  if (key) return key;
+
+  // Legacy fallback: configManager held keys before the connector store existed.
+  // Kept so an existing `~/.sentinel.yaml` provider block keeps working, but it
+  // is consulted after the store so a fresh `sentinel connect` wins.
   if (!cachedManagerPromise) {
     cachedManagerPromise = import('../config/configManager.js')
       .then(async (m) => {
@@ -64,10 +49,12 @@ export async function getApiKey(provider) {
     const stored = manager?.getApiKey?.(provider);
     if (stored) return stored;
   } catch {
-    /* fall through to env */
+    /* fall through */
   }
-  return envVal || undefined;
+  return undefined;
 }
+
+let cachedManagerPromise = null;
 
 function headersFor(provider, apiKey) {
   if (provider === 'anthropic') {
@@ -167,7 +154,7 @@ async function* sse(res) {
 // ─── OpenAI-compatible streaming ──────────────────────────────────────────────
 
 async function* streamOpenAICompat({ provider, model, messages, tools, apiKey, signal }) {
-  const base = OPENAI_COMPAT[provider]();
+  const base = baseUrlFor(provider);
   const res = await fetch(`${base}/chat/completions`, {
     method: 'POST',
     headers: headersFor(provider, apiKey),
@@ -482,21 +469,26 @@ export function adaptMessagesForGoogle(messages) {
  */
 export async function* streamCompletion(opts) {
   const { modelId, provider, system, messages, tools, signal } = opts;
-  const needsKey = provider !== 'ollama' && provider !== 'lmstudio' && provider !== 'local';
+  const conn = getConnector(provider);
+  const needsKey = !(conn?.local) && provider !== 'local';
   const apiKey = await getApiKey(provider);
   if (needsKey && !apiKey) {
-    const envKey = ENV_KEYS[provider] || `${String(provider).toUpperCase()}_API_KEY`;
+    // The old message told users to run `sentinel auth login <provider>` and
+    // that command did not exist, so a user with no key got a dead end: they
+    // ran it, got "unknown command", and had no way to tell that from the key
+    // being wrong. It exists now.
     yield {
       type: 'error',
-      message: `No API key for "${provider}". Run 'sentinel auth login ${provider}' or set ${envKey}.`,
+      message: `No credential for "${provider}". ${credentialHint(provider)}.`,
     };
     return;
   }
 
   try {
-    if (provider === 'anthropic') {
+    const transport = conn?.transport;
+    if (transport === TRANSPORT.ANTHROPIC || provider === 'anthropic') {
       yield* streamAnthropic({
-        model: modelId.replace(/^anthropic\//, ''),
+        model: getBareModelId(modelId),
         messages: adaptMessagesForAnthropic(messages),
         tools,
         apiKey,
@@ -505,9 +497,9 @@ export async function* streamCompletion(opts) {
       });
       return;
     }
-    if (provider === 'google') {
+    if (transport === TRANSPORT.GOOGLE || provider === 'google') {
       yield* streamGoogle({
-        model: modelId.replace(/^google\//, ''),
+        model: getBareModelId(modelId),
         messages, // raw OpenAI-format history; streamGoogle adapts once
         tools,
         apiKey,
@@ -516,16 +508,25 @@ export async function* streamCompletion(opts) {
       });
       return;
     }
-    if (!OPENAI_COMPAT[provider]) {
+    if (!conn && !baseUrlFor(provider)) {
       yield { type: 'error', message: `Unsupported provider: ${provider}` };
       return;
     }
     // OpenAI-compat: system prompt rides as the first message
     const msgs = system ? [{ role: 'system', content: system }, ...messages] : messages;
-    // Strip provider prefix (e.g. "ollama/", "lmstudio/", "openrouter/") — APIs expect bare model name
-    const providerPrefix = `${provider}/`;
-    const bareModelId = modelId.startsWith(providerPrefix) ? modelId.slice(providerPrefix.length) : modelId;
-    yield* streamOpenAICompat({ provider, model: bareModelId, messages: msgs, tools, apiKey, signal });
+    // Strip the registry namespace so the vendor receives a bare model id.
+    // This used to strip only `${provider}/`, which left Fireworks' wire-level
+    // `accounts/fireworks/` namespace attached and produced a 404 that the
+    // error formatter reported as a credential problem.
+    const bareModelId = getBareModelId(modelId);
+    yield* streamOpenAICompat({
+      provider,
+      model: bareModelId,
+      messages: msgs,
+      tools,
+      apiKey,
+      signal,
+    });
   } catch (e) {
     if (e?.name === 'AbortError') return;
     yield { type: 'error', message: isNetworkError(e) ? formatNetworkError(provider, e) : e?.message || String(e) };
@@ -538,10 +539,8 @@ function isNetworkError(e) {
 }
 
 function providerHost(provider) {
-  if (provider === 'anthropic') return 'api.anthropic.com';
-  if (provider === 'google') return 'generativelanguage.googleapis.com';
   try {
-    return new URL(OPENAI_COMPAT[provider]()).host;
+    return new URL(baseUrlFor(provider)).host;
   } catch {
     return provider;
   }

@@ -17,7 +17,7 @@ import { mkdtemp, writeFile, mkdir, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { executeLocalTool, Mode } from '../src/shared/tools/index.js';
+import { executeLocalTool, Mode, validateToolInput, coerceToolInput } from '../src/shared/tools/index.js';
 
 let workDir;
 let originalCwd;
@@ -113,6 +113,165 @@ test('editFile rejects ambiguous matches', async () => {
       executeLocalTool('editFile', { path: 'dup.txt', oldString: 'X', newString: 'Y' }, Mode.BUILD),
     /ambiguous/i
   );
+});
+
+// ── input validation ───────────────────────────────────────────────────────
+//
+// `toolInputSchemas` existed for the whole life of this file and was never
+// called. These are the assertions that would have caught that.
+
+test('a malformed call is refused before the implementation runs', async () => {
+  await assert.rejects(
+    () => executeLocalTool('writeFile', { path: 'v.txt' }, Mode.BUILD),
+    /writeFile: content is required/
+  );
+  await assert.rejects(
+    () => executeLocalTool('readFile', { path: 42 }, Mode.BUILD),
+    /readFile: path must be a string/
+  );
+  // Nothing was created by either refusal.
+  await assert.rejects(() => readFile(join(workDir, 'v.txt'), 'utf-8'));
+});
+
+test('validation projects the shape the implementation expects', async () => {
+  // `str()` used to return the bare string. With that bug live, `readFile`
+  // receives `'x'` where it reads `input.path` — so every read returns
+  // `{content: undefined}` or throws. This is the assertion that pins the
+  // projection.
+  assert.deepEqual(coerceToolInput('readFile', { path: 'x.txt' }), { path: 'x.txt' });
+  assert.deepEqual(coerceToolInput('memoryDelete', { name: 'n' }), { name: 'n' });
+  assert.deepEqual(coerceToolInput('glob', { pattern: '*.js' }), { pattern: '*.js', path: '.' });
+  // A field the validator drops does not survive: the model reads the result
+  // and carries on without it rather than getting a failed turn.
+  assert.deepEqual(coerceToolInput('readFile', { path: 'x', bogus: 1 }), { path: 'x' });
+  // Defaults come from the same place.
+  assert.deepEqual(coerceToolInput('runTests', { command: 'npm test' }),
+    { command: 'npm test', timeout: 120000 });
+});
+
+test('skill args accept an array or a bare string', () => {
+  assert.deepEqual(coerceToolInput('skill', { name: 'n', args: ['a', 'b'] }), { name: 'n', args: ['a', 'b'] });
+  assert.deepEqual(coerceToolInput('skill', { name: 'n', args: 'a' }), { name: 'n', args: ['a'] });
+  assert.deepEqual(coerceToolInput('skill', { name: 'n' }), { name: 'n', args: [] });
+});
+
+test('skill accepts `names` as an alternative to `name`', () => {
+  // Refusing `names` because `name` is absent would be an argument about naming,
+  // not about whether the call is well-formed.
+  assert.equal(validateToolInput('skill', { names: ['a', 'b'] }), null);
+  assert.equal(validateToolInput('skill', { name: 'a' }), null);
+  assert.match(validateToolInput('skill', {}), /name is required/);
+});
+
+test('a single-name skill call still expands its args', async () => {
+  // Regression guard. Routing the single-name path through `normalizeSkillNames`
+  // once produced an entry with no args of its own, and taking that entry's
+  // empty list expanded the body with every placeholder left in place — which
+  // reads as a broken skill, not a lost argument.
+  const d = join(workDir, '.sentinel', 'skills', 'single');
+  await mkdir(d, { recursive: true });
+  await writeFile(join(d, 'SKILL.md'), '---\nname: single\ndescription: d\n---\nEdit $1 for $ARGUMENTS.');
+  const out = await executeLocalTool('skill', { name: 'single', args: ['auth.js'] }, Mode.BUILD);
+  assert.equal(out.prompt, 'Edit auth.js for auth.js.');
+});
+
+test('a stacked skill call loads in the caller\'s order, deduped', async () => {
+  for (const [n, body] of [['alpha', 'WORKFLOW-ALPHA'], ['beta', 'WORKFLOW-BETA']]) {
+    const d = join(workDir, '.sentinel', 'skills', n);
+    await mkdir(d, { recursive: true });
+    await writeFile(join(d, 'SKILL.md'), `---\nname: ${n}\ndescription: ${n}\n---\n${body}`);
+  }
+  const out = await executeLocalTool('skill', { names: ['beta', 'alpha', 'beta'] }, Mode.BUILD);
+  assert.equal(out.count, 2, 'the duplicate is dropped');
+  assert.deepEqual(out.names, ['beta', 'alpha'], 'the caller\'s order is kept');
+  assert.ok(out.prompt.indexOf('WORKFLOW-BETA') < out.prompt.indexOf('WORKFLOW-ALPHA'));
+  assert.equal(out.prompt.split('WORKFLOW-BETA').length - 1, 1, 'no duplicated body');
+  // Each skill keeps its own metadata, so the model can still stack a third.
+  assert.deepEqual(out.skills.map((s) => s.description), ['beta', 'alpha']);
+});
+
+test('a stacked call naming an unknown skill fails rather than half-loading', async () => {
+  const d = join(workDir, '.sentinel', 'skills', 'gamma');
+  await mkdir(d, { recursive: true });
+  await writeFile(join(d, 'SKILL.md'), '---\nname: gamma\ndescription: g\n---\nbody');
+  // Loading the first and silently dropping the second is the failure that looks
+  // most like working: the model gets a partial workflow and reports success.
+  await assert.rejects(
+    () => executeLocalTool('skill', { names: ['gamma', 'does-not-exist'] }, Mode.BUILD),
+    /Unknown skill: does-not-exist/,
+  );
+});
+
+test('an unrecognised tool is not validated away', async () => {
+  // MCP tools arrive with their own schemas and their own trust story. A
+  // validator that threw for an unknown name would refuse all of them.
+  assert.equal(validateToolInput('some_mcp_tool', { anything: true }), null);
+  assert.equal(validateToolInput('readFile', { path: 'a' }), null);
+});
+
+// ── windowed reads ──────────────────────────────────────────────────────────
+//
+// `offset`/`limit` exist because the context compactor shrinks an oversized read
+// and the notice it leaves behind has to point at a call that actually fetches
+// the rest. A hint naming parameters the tool does not accept is worse than no
+// hint: the model tries it, fails, and pays for the retry.
+
+test('readFile returns a window and says how to continue', async () => {
+  await writeFile(join(workDir, 'lines.txt'), Array.from({ length: 50 }, (_, i) => `line${i + 1}`).join('\n'), 'utf-8');
+
+  const out = await executeLocalTool('readFile', { path: 'lines.txt', offset: 0, limit: 5 }, Mode.BUILD);
+  assert.equal(out.content, 'line1\nline2\nline3\nline4\nline5');
+  assert.equal(out.offset, 0);
+  assert.equal(out.lineCount, 5);
+  assert.equal(out.totalLines, 50);
+  assert.equal(out.partial, true);
+  // The continuation is stated by the tool, so neither the model nor the
+  // compactor has to derive the next offset and risk being one line off.
+  assert.equal(out.nextOffset, 5);
+
+  const next = await executeLocalTool('readFile', { path: 'lines.txt', offset: out.nextOffset, limit: 5 }, Mode.BUILD);
+  assert.equal(next.content, 'line6\nline7\nline8\nline9\nline10');
+  assert.equal(next.startedAtLine, 6, '1-based line number is reported for humans');
+});
+
+test('a read of the whole file reports no continuation', async () => {
+  await writeFile(join(workDir, 'small2.txt'), 'a\nb\nc', 'utf-8');
+  const out = await executeLocalTool('readFile', { path: 'small2.txt' }, Mode.BUILD);
+  assert.equal(out.partial, undefined);
+  assert.equal(out.nextOffset, undefined);
+});
+
+test('a window past the end of the file is empty, not an error', async () => {
+  // The compactor can name a resume point at the end of a file. Failing there
+  // would make the hint it wrote into the context an instruction to crash.
+  await writeFile(join(workDir, 'small3.txt'), 'only one line', 'utf-8');
+  const out = await executeLocalTool('readFile', { path: 'small3.txt', offset: 900, limit: 10 }, Mode.BUILD);
+  assert.equal(out.content, '');
+  // `partial` is omitted rather than false: the model reads `partial` as "there
+  // is more", and an explicit false would read as a field it has to check.
+  assert.equal(out.partial, undefined);
+  assert.equal(out.nextOffset, undefined);
+});
+
+test('window parameters are validated, and a bad one is refused', () => {
+  assert.deepEqual(coerceToolInput('readFile', { path: 'a', offset: 0, limit: 10 }), { path: 'a', offset: 0, limit: 10 });
+  // A negative offset would silently read from the end of the file, which is a
+  // worse failure than a refused call.
+  assert.match(validateToolInput('readFile', { path: 'a', offset: -1 }) ?? '', /offset must be a non-negative integer/);
+  assert.match(validateToolInput('readFile', { path: 'a', limit: 1.5 }) ?? '', /limit must be a non-negative integer/);
+  // Absent is not invalid: the common whole-file read is unchanged.
+  assert.equal(validateToolInput('readFile', { path: 'a' }), null);
+});
+
+test('readFile reports totalLines when it truncates a long file', async () => {
+  // The pre-existing 10k truncation has no resume point, so a shrunken result
+  // told the model nothing about how much was left. The line count is the one
+  // number that lets it decide whether windowing is worth it.
+  await writeFile(join(workDir, 'huge.txt'), 'abcdefghij\n'.repeat(3000), 'utf-8');
+  const out = await executeLocalTool('readFile', { path: 'huge.txt' }, Mode.BUILD);
+  assert.equal(out.truncated, true);
+  assert.equal(typeof out.totalLines, 'number');
+  assert.ok(out.totalLines > 1000);
 });
 
 test('PLAN mode rejects writeFile', async () => {

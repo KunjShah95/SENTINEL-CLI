@@ -5,6 +5,7 @@
  */
 
 import { isReadOnlyTool } from '../schemas/mode.js';
+import { normalizeSkillArgs } from '../../agent/skills.js';
 
 function validator(check) {
   const v = (input = {}) => {
@@ -20,23 +21,61 @@ function validator(check) {
   return v;
 }
 
+/**
+ * One required (or optional, or defaulted) string field.
+ *
+ * The projected value is `{ [field]: value }`, not the bare string. It has to
+ * be: every validator in this file returns the shape the *implementation*
+ * expects, and an implementation expects `{ path }`, not `'src/x.js'`. Getting
+ * this wrong was invisible while these validators were never invoked — with the
+ * validator live, `readFile` would have received the bare string and every read
+ * would fail on `input?.path`.
+ */
 function str(field, opts = {}) {
   return validator(input => {
     const v = input[field];
     if (v === undefined) {
-      if (opts.optional) return { ok: true, value: undefined };
-      if ('default' in opts) return { ok: true, value: opts.default };
+      if (opts.optional) return { ok: true, value: {} };
+      if ('default' in opts) return { ok: true, value: { [field]: opts.default } };
       return { ok: false, error: `${field} is required` };
     }
     if (typeof v !== 'string') {
       return { ok: false, error: `${field} must be a string` };
     }
-    return { ok: true, value: v };
+    return { ok: true, value: { [field]: v } };
   });
 }
 
+/**
+ * `readFile`'s validator, spelled out rather than using `str()` because it also
+ * carries the windowing parameters. `offset`/`limit` are optional and must be
+ * non-negative integers when present — a negative offset silently reading from
+ * the end of a file is a worse failure than a rejected call.
+ */
 export const toolInputSchemas = {
-  readFile: str('path'),
+  readFile: validator(input => {
+    // Missing and wrong-typed are distinguished deliberately. A model that sent
+    // `{path: 42}` did send a path, and "path is required" sends it looking for
+    // an empty value instead of fixing the type — the message is what it acts on.
+    if (input.path === undefined || input.path === null) {
+      return { ok: false, error: 'path is required' };
+    }
+    if (typeof input.path !== 'string') {
+      return { ok: false, error: 'path must be a string' };
+    }
+    if (input.path.length === 0) {
+      return { ok: false, error: 'path is required' };
+    }
+    const value = { path: input.path };
+    for (const f of ['offset', 'limit']) {
+      if (input[f] === undefined) continue;
+      if (!Number.isInteger(input[f]) || input[f] < 0) {
+        return { ok: false, error: `${f} must be a non-negative integer` };
+      }
+      value[f] = input[f];
+    }
+    return { ok: true, value };
+  }),
   listDirectory: validator(input => {
     if (input.path === undefined) return { ok: true, value: { path: '.' } };
     if (typeof input.path !== 'string') return { ok: false, error: 'path must be a string' };
@@ -239,10 +278,44 @@ export const toolInputSchemas = {
     return { ok: true, value: {} };
   }),
   skill: validator(input => {
+    // `name` is one skill; `names` is several. Either satisfies the requirement —
+    // refusing `names` on the grounds that `name` is missing would be an
+    // argument about naming, not about whether the call is well-formed.
+    const hasName = typeof input.name === 'string' && input.name.length > 0;
+    const hasNames = Array.isArray(input.names) && input.names.length > 0;
+    if (!hasName && !hasNames) {
+      return { ok: false, error: 'name is required (or `names`, to stack several)' };
+    }
+    // Only the key that was supplied appears in the projected value. Adding
+    // `names: undefined` would change the shape every other validator here
+    // returns, and a caller comparing shapes would see a difference.
+    return {
+      ok: true,
+      value: {
+        ...(hasName ? { name: input.name } : {}),
+        ...(hasNames ? { names: input.names } : {}),
+        // Accepted as an array or a bare string. See `normalizeSkillArgs` —
+        // rejecting the string form fails a correct intent over punctuation.
+        args: normalizeSkillArgs(input.args),
+      },
+    };
+  }),
+  runSkillScript: validator(input => {
     if (typeof input.name !== 'string' || input.name.length === 0) {
       return { ok: false, error: 'name is required' };
     }
-    return { ok: true, value: { name: input.name } };
+    if (typeof input.script !== 'string' || input.script.trim().length === 0) {
+      return { ok: false, error: 'script is required (a path relative to the skill directory)' };
+    }
+    return {
+      ok: true,
+      value: {
+        name: input.name,
+        script: input.script,
+        args: normalizeSkillArgs(input.args),
+        timeout: typeof input.timeout === 'number' ? input.timeout : undefined,
+      },
+    };
   }),
   spawnAgent: validator(input => {
     if (typeof input.prompt !== 'string' || input.prompt.length === 0) {
@@ -253,6 +326,9 @@ export const toolInputSchemas = {
       value: {
         prompt: input.prompt,
         mode: input.mode === 'BUILD' ? 'BUILD' : 'PLAN',
+        // A workflow to load into the subagent's context. The subagent follows
+        // it instead of improvising; the prompt stays the task.
+        skills: input.skills ?? input.skill,
       },
     };
   }),
@@ -307,6 +383,9 @@ export const toolInputSchemas = {
         prompt: input.prompt,
         mode: input.mode === 'PLAN' ? 'PLAN' : 'BUILD',
         isolation: input.isolation === 'worktree' ? 'worktree' : 'none',
+        // Same `skills` field the waited subagent takes, and the same builder
+        // renders it — see skill-delegation.js.
+        skills: input.skills ?? input.skill,
       },
     };
   }),
@@ -324,6 +403,10 @@ export const toolInputSchemas = {
   }),
 };
 
+// `skill` is read-only: it returns a prompt as a tool result and runs nothing.
+// `runSkillScript` is deliberately absent — it executes a file, so it belongs to
+// the shell category and is gated like `bash`. Keeping the two apart is what
+// stops a PLAN-mode turn from acquiring execution by way of a skills folder.
 export const READ_ONLY_TOOL_NAMES = ['readFile', 'listDirectory', 'glob', 'grep', 'codeMap', 'searchWeb', 'fetchUrl', 'memoryRecall', 'todoRead', 'skill', 'bgCheck', 'teamStatus', 'webRead'];
 export const BUILD_TOOL_NAMES = [
   ...READ_ONLY_TOOL_NAMES,
@@ -345,6 +428,7 @@ export const BUILD_TOOL_NAMES = [
   'spawnTeammate',
   'sendMessage',
   'teamMerge',
+  'runSkillScript',
 ];
 
 export function isReadOnly(toolName) {

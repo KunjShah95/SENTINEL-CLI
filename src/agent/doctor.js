@@ -20,6 +20,7 @@ import { platform, release, totalmem, freemem } from 'node:os';
 import { join, resolve, delimiter } from 'node:path';
 import { getWorkdir } from '../shared/tools/workdir.js';
 import { classifyBashCommand } from './bash-validation.js';
+import { CONNECTORS, getConnectorEnvVars } from '../shared/connectors/registry.js';
 
 export const MIN_NODE_MAJOR = 20;
 
@@ -27,43 +28,41 @@ export const MIN_NODE_MAJOR = 20;
 export const LEVELS = Object.freeze(['pass', 'warn', 'fail', 'skip']);
 
 /**
- * Provider env var(s) per registry key.
+ * Provider env vars, derived from the connector registry.
  *
- * A value may be an array when a provider is reachable under more than one
- * name. Copilot is the case that forced it: `/setup` writes `GITHUB_TOKEN`
- * (provider-setup.tsx) and `discovery.js:261` reads `GITHUB_TOKEN ||
- * GITHUB_COPILOT_TOKEN`, but this table listed only `GITHUB_COPILOT_TOKEN` — so
- * a user who had run `/setup` successfully was told by `sentinel doctor` that
- * they had no key. Seven copies of this mapping existed and two had already
- * drifted; the alternative to this fix was a seventh.
+ * This table used to be hand-written and is the fourth copy of this mapping
+ * (the others were in models/index.js, agent/providers.js, and the default
+ * config block). The comment above it documented a real drift: Copilot listed
+ * `GITHUB_COPILOT_TOKEN` here while `/setup` wrote `GITHUB_TOKEN` and discovery
+ * read either — so a user who had connected successfully was told by
+ * `sentinel doctor` that they had no key. Seven copies existed and two had
+ * already drifted.
+ *
+ * Derived from the registry, there is one copy and no drift is expressible.
+ * Kept as an exported constant because `__tests__/doctor.test.js` asserts the
+ * Copilot alias pair specifically.
  */
-export const PROVIDER_ENV = Object.freeze({
-  openai: 'OPENAI_API_KEY',
-  anthropic: 'ANTHROPIC_API_KEY',
-  google: 'GEMINI_API_KEY',
-  groq: 'GROQ_API_KEY',
-  openrouter: 'OPENROUTER_API_KEY',
-  mistral: 'MISTRAL_API_KEY',
-  deepseek: 'DEEPSEEK_API_KEY',
-  xai: 'XAI_API_KEY',
-  together: 'TOGETHER_API_KEY',
-  fireworks: 'FIREWORKS_API_KEY',
-  perplexity: 'PERPLEXITY_API_KEY',
-  'github-copilot': ['GITHUB_TOKEN', 'GITHUB_COPILOT_TOKEN'],
-});
+export const PROVIDER_ENV = Object.freeze(
+  Object.fromEntries(
+    Object.entries(CONNECTORS)
+      .filter(([, c]) => c.env.length > 0)
+      .map(([id, c]) => [id, c.env.length === 1 ? c.env[0] : c.env.slice()])
+  )
+);
 
 /** Every var name for a provider, as an array. The single place callers ask. */
 export function providerEnvVars(provider) {
-  const v = PROVIDER_ENV[provider];
-  if (!v) return [];
-  return Array.isArray(v) ? v : [v];
+  return getConnectorEnvVars(provider);
 }
 
 /** Local model servers need no key, so they get their own probe. */
-export const LOCAL_HOSTS = Object.freeze({
-  ollama: 'http://localhost:11434',
-  lmstudio: 'http://localhost:1234/v1',
-});
+export const LOCAL_HOSTS = Object.freeze(
+  Object.fromEntries(
+    Object.entries(CONNECTORS)
+      .filter(([, c]) => c.local)
+      .map(([id, c]) => [id, c.discoveryBaseURL ? c.discoveryBaseURL() : c.baseURL()])
+  )
+);
 
 function check(id, title, level, detail, hint) {
   return { id, title, level, detail, hint: hint || null };

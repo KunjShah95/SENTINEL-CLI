@@ -1,15 +1,41 @@
 /**
- * Dynamic model discovery — fetches available models from each provider's API.
+ * Dynamic model discovery — registry-driven, no per-provider code.
  *
- * Instead of hardcoding model IDs, this queries provider APIs at runtime
- * using the user's API keys. Falls back to a minimal static list when
- * APIs are unreachable or unconfigured.
+ * This used to hold thirteen near-identical `discoverOpenAI`, `discoverGroq`,
+ * `discoverMistral`, … functions, each re-deriving the base URL, the auth
+ * header, and the response shape that the provider table already knew. The
+ * duplication was not neutral: `getBareModelId` grew a second prefix list,
+ * which is how `accounts/fireworks/` ended up recognised as a provider but
+ * never stripped from the id sent on the wire.
  *
- * Supports: OpenAI, Groq, Mistral, Together, Fireworks, OpenRouter,
- *           Perplexity, xAI/Grok, DeepSeek, Ollama, LM Studio, Google.
- * Static fallback (no listing API): Anthropic.
+ * Now a connector's row in `registry.js` carries the listing endpoint and the
+ * response shape, so discovery is one generic fetch plus one of three mappers.
+ * Adding a provider is a registry row, not a function.
+ *
+ * Three sources feed the registry, in increasing reach:
+ *   1. the connector's own listing API  — exact, per-account, needs a credential
+ *   2. the models.dev catalog           — broad, free, fills pricing and the
+ *                                        vendors with no listing API (Anthropic)
+ *   3. the pinned fallback list         — always present, works offline
  */
+import {
+  CONNECTOR_IDS,
+  CONNECTORS,
+  MODEL_MAPPERS,
+  canDiscoverModels,
+  getConnectorKeyPrefix,
+  getDiscoveryBaseUrl,
+  isLocalConnector,
+} from '../connectors/registry.js';
+import { resolveCredential } from '../connectors/credentials.js';
+import {
+  fetchCatalogModels,
+  fetchAvailableCatalogModels,
+  mergeWithCatalog,
+  invalidateCatalog,
+} from '../connectors/catalog.js';
 
+/** Two slots: connected-only, and the widened `includeUnconnected` view. */
 let cache = null;
 let cacheTimestamp = 0;
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
@@ -31,282 +57,172 @@ async function fetchJson(url, options = {}) {
   }
 }
 
-async function discoverOpenAI() {
-  const key = process.env.OPENAI_API_KEY;
-  if (!key) return [];
-  const data = await fetchJson('https://api.openai.com/v1/models', {
-    headers: { Authorization: `Bearer ${key}` },
-  });
-  if (!data?.data) return [];
-  return data.data
-    .filter((m) => m.id.startsWith('gpt-') || m.id.startsWith('o') || m.id.startsWith('chatgpt-'))
-    .map((m) => ({
-      id: m.id,
-      provider: 'openai',
-      label: m.id,
-      inputUsdPerMillionTokens: 0,
-      outputUsdPerMillionTokens: 0,
-      ownedBy: m.owned_by,
-    }));
-}
-
-async function discoverGroq() {
-  const key = process.env.GROQ_API_KEY;
-  if (!key) return [];
-  const data = await fetchJson('https://api.groq.com/openai/v1/models', {
-    headers: { Authorization: `Bearer ${key}` },
-  });
-  if (!data?.data) return [];
-  return data.data
-    .filter((m) => m.active !== false)
-    .map((m) => ({
-      id: m.id,
-      provider: 'groq',
-      label: m.id,
-      inputUsdPerMillionTokens: 0,
-      outputUsdPerMillionTokens: 0,
-      ownedBy: m.owned_by,
-    }));
-}
-
-async function discoverMistral() {
-  const key = process.env.MISTRAL_API_KEY;
-  if (!key) return [];
-  const data = await fetchJson('https://api.mistral.ai/v1/models', {
-    headers: { Authorization: `Bearer ${key}` },
-  });
-  if (!data?.data) return [];
-  return data.data.map((m) => ({
-    id: m.id,
-    provider: 'mistral',
-    label: m.id,
-    inputUsdPerMillionTokens: 0,
-    outputUsdPerMillionTokens: 0,
-    ownedBy: m.owned_by,
-  }));
-}
-
-async function discoverTogether() {
-  const key = process.env.TOGETHER_API_KEY;
-  if (!key) return [];
-  const data = await fetchJson('https://api.together.xyz/v1/models', {
-    headers: { Authorization: `Bearer ${key}` },
-  });
-  if (!data) return [];
-  const list = Array.isArray(data) ? data : data.data;
-  if (!list) return [];
-  return list
-    .filter((m) => m.id && (m.id.includes('llama') || m.id.includes('qwen') || m.id.includes('deepseek') || m.id.includes('mistral')))
-    .map((m) => ({
-      id: m.id,
-      provider: 'together',
-      label: m.id,
-      inputUsdPerMillionTokens: 0,
-      outputUsdPerMillionTokens: 0,
-      ownedBy: m.owned_by || 'together',
-    }));
-}
-
-async function discoverFireworks() {
-  const key = process.env.FIREWORKS_API_KEY;
-  if (!key) return [];
-  const data = await fetchJson('https://api.fireworks.ai/inference/v1/models', {
-    headers: { Authorization: `Bearer ${key}` },
-  });
-  if (!data?.data) return [];
-  return data.data.map((m) => ({
-    id: m.id,
-    provider: 'fireworks',
-    label: m.id,
-    inputUsdPerMillionTokens: 0,
-    outputUsdPerMillionTokens: 0,
-    ownedBy: m.owned_by,
-  }));
-}
-
-async function discoverOpenRouter() {
-  const key = process.env.OPENROUTER_API_KEY;
-  if (!key) return [];
-  const data = await fetchJson('https://openrouter.ai/api/v1/models', {
-    headers: { Authorization: `Bearer ${key}` },
-  });
-  if (!data?.data) return [];
-  return data.data.map((m) => ({
-    id: `openrouter/${m.id}`,
-    provider: 'openrouter',
-    label: m.name || m.id,
-    inputUsdPerMillionTokens: m.pricing?.prompt ? parseFloat(m.pricing.prompt) * 1_000_000 : 0,
-    outputUsdPerMillionTokens: m.pricing?.completion ? parseFloat(m.pricing.completion) * 1_000_000 : 0,
-    contextLength: m.context_length,
-    ownedBy: m.id?.split('/')[0],
-  }));
-}
-
-async function discoverPerplexity() {
-  const key = process.env.PERPLEXITY_API_KEY;
-  if (!key) return [];
-  const data = await fetchJson('https://api.perplexity.ai/v1/models', {
-    headers: { Authorization: `Bearer ${key}` },
-  });
-  if (!data) return [];
-  const list = Array.isArray(data) ? data : data.data;
-  if (!list) return [];
-  return list.map((m) => ({
-    id: m.id,
-    provider: 'perplexity',
-    label: m.id,
-    inputUsdPerMillionTokens: 0,
-    outputUsdPerMillionTokens: 0,
-    ownedBy: 'perplexity',
-  }));
-}
-
-async function discoverXAI() {
-  const key = process.env.XAI_API_KEY;
-  if (!key) return [];
-  const data = await fetchJson('https://api.x.ai/v1/models', {
-    headers: { Authorization: `Bearer ${key}` },
-  });
-  if (!data?.data) return [];
-  return data.data.map((m) => ({
-    id: m.id,
-    provider: 'xai',
-    label: m.id,
-    inputUsdPerMillionTokens: 0,
-    outputUsdPerMillionTokens: 0,
-    ownedBy: m.owned_by,
-  }));
-}
-
-async function discoverDeepSeek() {
-  const key = process.env.DEEPSEEK_API_KEY;
-  if (!key) return [];
-  const data = await fetchJson('https://api.deepseek.com/v1/models', {
-    headers: { Authorization: `Bearer ${key}` },
-  });
-  if (!data?.data) return [];
-  return data.data.map((m) => ({
-    id: m.id,
-    provider: 'deepseek',
-    label: m.id,
-    inputUsdPerMillionTokens: 0,
-    outputUsdPerMillionTokens: 0,
-    ownedBy: m.owned_by,
-  }));
-}
-
-async function discoverGoogle() {
-  const key = process.env.GEMINI_API_KEY;
-  if (!key) return [];
-  const data = await fetchJson(
-    `https://generativelanguage.googleapis.com/v1/models?key=${key}`
-  );
-  if (!data?.models) return [];
-  return data.models
-    .filter((m) => m.name.includes('gemini'))
-    .map((m) => ({
-      id: m.name.replace('models/', ''),
-      provider: 'google',
-      label: m.displayName || m.name,
-      inputUsdPerMillionTokens: 0,
-      outputUsdPerMillionTokens: 0,
-      ownedBy: 'google',
-      contextLength: m.inputTokenLimit,
-      description: m.description,
-    }));
+/** Authorization header for a connector, or null when it needs none. */
+async function authHeadersFor(connectorId) {
+  const conn = CONNECTORS[connectorId];
+  if (!conn || conn.local) return {};
+  const { key } = await resolveCredential(connectorId);
+  if (!key) return {};
+  if (connectorId === 'google') return { 'x-goog-api-key': key };
+  return { Authorization: `Bearer ${key}` };
 }
 
 /**
- * Embedding models (bge, nomic-embed, *-embedding) are installed alongside
- * chat models but cannot hold a conversation; picking one fails the turn.
- * The family alone is not enough: qwen3-embedding reports family "qwen3".
+ * Response mappers. Three shapes cover every connector.
+ *
+ * Each returns registry-shaped models or `[]`. Returning `[]` rather than
+ * throwing keeps one broken endpoint from sinking the whole catalog — the
+ * caller uses `Promise.allSettled` and falls through to models.dev.
  */
-export function isEmbeddingOnlyModel(m) {
-  const family = String(m?.details?.family || '');
-  if (/bert$/i.test(family)) return true;
-  return /embed|(^|[/:-])bge-|minilm/i.test(String(m?.name || ''));
+const MAPPERS = {
+  /** OpenAI-compatible: `{ data: [{ id, ... }] }`. */
+  [MODEL_MAPPERS.OPENAI](connectorId, payload) {
+    const prefix = getConnectorKeyPrefix(connectorId);
+    const list = Array.isArray(payload) ? payload : payload?.data;
+    if (!Array.isArray(list)) return [];
+    return list
+      .filter((m) => m?.id)
+      .map((m) => ({
+        id: prefix ? `${prefix}${m.id}` : m.id,
+        provider: connectorId,
+        label: m.name || m.display_name || m.id,
+        // A listing endpoint returns ids, not prices. Zero here is corrected by
+        // the models.dev merge below for every provider it knows.
+        inputUsdPerMillionTokens: 0,
+        outputUsdPerMillionTokens: 0,
+        contextLength: m.context_length || m.context_window || undefined,
+        ownedBy: m.owned_by,
+        source: 'live',
+      }));
+  },
+
+  /** Google: `{ models: [{ name: "models/gemini-…" }] }`. */
+  [MODEL_MAPPERS.GOOGLE](connectorId, payload) {
+    const list = payload?.models;
+    if (!Array.isArray(list)) return [];
+    return list
+      .filter((m) => m?.name && !isEmbeddingOnlyModel({ name: m.name }))
+      .map((m) => ({
+        id: m.name.replace(/^models\//, ''),
+        provider: connectorId,
+        label: m.displayName || m.name,
+        inputUsdPerMillionTokens: 0,
+        outputUsdPerMillionTokens: 0,
+        contextLength: m.inputTokenLimit,
+        description: m.description,
+        source: 'live',
+      }));
+  },
+
+  /** Ollama native `/api/tags`: carries size and context that /v1/models omits. */
+  [MODEL_MAPPERS.OLLAMA](connectorId, payload) {
+    const list = payload?.models;
+    if (!Array.isArray(list)) return [];
+    const prefix = getConnectorKeyPrefix(connectorId) || '';
+    return list
+      .filter((m) => m?.name && !isEmbeddingOnlyModel(m))
+      .map((m) => ({
+        id: `${prefix}${m.name}`,
+        provider: connectorId,
+        label: `Ollama ${m.name}`,
+        inputUsdPerMillionTokens: 0,
+        outputUsdPerMillionTokens: 0,
+        size: m.size,
+        contextLength: m.details?.context_length,
+        ownedBy: 'ollama',
+        source: 'live',
+      }));
+  },
+};
+
+/**
+ * Ask one connector what it serves.
+ * @returns {Promise<Array>} empty when unconfigured, unreachable, or unshaped.
+ */
+async function discoverConnector(connectorId) {
+  const conn = CONNECTORS[connectorId];
+  if (!conn || !canDiscoverModels(connectorId)) return [];
+
+  const url = `${getDiscoveryBaseUrl(connectorId)}${conn.modelsPath}`;
+  const headers = await authHeadersFor(connectorId);
+
+  // An OpenAI-compatible connector with a keyPrefix already namespaces its own
+  // ids, so do not re-add the prefix on a second pass.
+  const payload = await fetchJson(url, { headers });
+  if (!payload) return [];
+
+  const map = MAPPERS[conn.mapModels] || MAPPERS[MODEL_MAPPERS.OPENAI];
+  const models = map(connectorId, payload);
+
+  // OpenAI's listing returns non-chat models too (whisper, tts, embeddings).
+  if (connectorId === 'openai') {
+    return models.filter((m) => /^gpt-|^o[1-9]|^chatgpt-/.test(m.id));
+  }
+  return models;
 }
 
-async function discoverOllama() {
-  const host = process.env.OLLAMA_HOST || 'http://localhost:11434';
-  const data = await fetchJson(`${host}/api/tags`);
-  if (!data?.models) return [];
-  return data.models.filter((m) => !isEmbeddingOnlyModel(m)).map((m) => ({
-    id: `ollama/${m.name}`,
-    provider: 'ollama',
-    label: `Ollama ${m.name}`,
-    inputUsdPerMillionTokens: 0,
-    outputUsdPerMillionTokens: 0,
-    ownedBy: 'ollama',
-    size: m.size,
-    contextLength: m.details?.context_length,
-  }));
-}
-
-async function discoverLMStudio() {
-  const host = process.env.LMSTUDIO_HOST || 'http://localhost:1234';
-  const data = await fetchJson(`${host}/v1/models`);
-  if (!data?.data) return [];
-  return data.data.map((m) => ({
-    id: `lmstudio/${m.id}`,
-    provider: 'lmstudio',
-    label: `LM Studio ${m.id}`,
-    inputUsdPerMillionTokens: 0,
-    outputUsdPerMillionTokens: 0,
-    ownedBy: 'lmstudio',
-  }));
-}
-
-async function discoverGitHubCopilot() {
-  const token = process.env.GITHUB_TOKEN || process.env.GITHUB_COPILOT_TOKEN;
-  if (!token) return [];
-  const data = await fetchJson('https://api.githubcopilot.com/v1/models', {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!data?.data) return [];
-  return data.data.map((m) => ({
-    id: `copilot/${m.id}`,
-    provider: 'github-copilot',
-    label: `${m.id} (GitHub Copilot)`,
-    inputUsdPerMillionTokens: 0,
-    outputUsdPerMillionTokens: 0,
-    ownedBy: m.owned_by,
-  }));
-}
-
-export async function discoverAllModels() {
-  if (cache && Date.now() - cacheTimestamp < CACHE_TTL_MS) {
-    return cache;
+/**
+ * Live discovery across every connector the user can reach.
+ *
+ * Replaces the hand-maintained array of thirteen promises. A connector added
+ * to the registry is discovered with no change here.
+ *
+ * @param {{includeUnconnected?: boolean}} [options]
+ *   `includeUnconnected` widens the result to every catalog connector, not just
+ *   ones with a credential. `sentinel models --all` uses it to show what *would*
+ *   become available. It is deliberately opt-in: without it the default answer
+ *   is "what can I actually call right now", which is the question the command
+ *   usually exists to answer.
+ */
+export async function discoverAllModels({ includeUnconnected = false } = {}) {
+  const slot = includeUnconnected ? 'all' : 'connected';
+  const cached = cache?.[slot];
+  if (cached && Date.now() - cacheTimestamp < CACHE_TTL_MS) {
+    return cached;
   }
 
-  const discoveries = await Promise.allSettled([
-    discoverOpenAI(),
-    discoverGroq(),
-    discoverMistral(),
-    discoverTogether(),
-    discoverFireworks(),
-    discoverOpenRouter(),
-    discoverPerplexity(),
-    discoverXAI(),
-    discoverDeepSeek(),
-    discoverGoogle(),
-    discoverOllama(),
-    discoverLMStudio(),
-    discoverGitHubCopilot(),
-  ]);
+  const connected = [];
+  for (const id of CONNECTOR_IDS) {
+    if (isLocalConnector(id)) { connected.push(id); continue; }
+    if (includeUnconnected) { connected.push(id); continue; }
+    const { key } = await resolveCredential(id);
+    if (key) connected.push(id);
+  }
 
-  const allModels = [];
-  for (const result of discoveries) {
+  const results = await Promise.allSettled(connected.map(discoverConnector));
+  const live = [];
+  for (const result of results) {
     if (result.status === 'fulfilled' && result.value.length > 0) {
-      allModels.push(...result.value);
+      live.push(...result.value);
     }
   }
+
+  // Live endpoints do not report prices, so the catalog fills pricing, capability
+  // flags and breadth. A live id still wins over its catalog twin — the user's
+  // key proves the model is really reachable for them — but inherits the money.
+  const catalog = includeUnconnected
+    ? await fetchCatalogModels()
+    : await fetchAvailableCatalogModels();
+  const liveIds = new Set(live.map((m) => m.id));
+  const withPrices = live.map((m) => {
+    const priced = catalog.find((c) => c.id === m.id);
+    if (!priced) return m;
+    return {
+      ...priced,
+      ...m,
+      inputUsdPerMillionTokens: m.inputUsdPerMillionTokens || priced.inputUsdPerMillionTokens,
+      outputUsdPerMillionTokens: m.outputUsdPerMillionTokens || priced.outputUsdPerMillionTokens,
+    };
+  });
+
+  const allModels = [...withPrices, ...catalog.filter((m) => !liveIds.has(m.id))];
 
   if (allModels.length === 0) {
     return getFallbackModels();
   }
 
-  cache = allModels;
+  if (!cache) cache = {};
+  cache[slot] = allModels;
   cacheTimestamp = Date.now();
   return allModels;
 }
@@ -327,28 +243,10 @@ export function getFallbackModels() {
   ];
 }
 
-function getAnthropicStaticModels() {
-  // Static catalog: Anthropic exposes no model-listing API, and flagship
-  // pricing below is pinned from official Sep 2026 announcements so cost
-  // accounting is right even before a live discovery refresh. `tier`
-  // classifies entries for the model picker (flagship | mid | budget).
-  return [
-    { id: 'claude-opus-5-5', provider: 'anthropic', label: 'Claude Opus 5.5', inputUsdPerMillionTokens: 4, outputUsdPerMillionTokens: 20, thinking: true, tier: 'flagship' },
-    { id: 'gpt-6-astra', provider: 'openai', label: 'GPT-6 Astra', inputUsdPerMillionTokens: 10, outputUsdPerMillionTokens: 50, thinking: true, tier: 'flagship' },
-    { id: 'gpt-6-sol', provider: 'openai', label: 'GPT-6 Sol', inputUsdPerMillionTokens: 2, outputUsdPerMillionTokens: 10, thinking: true, tier: 'mid' },
-    { id: 'gpt-6-luna', provider: 'openai', label: 'GPT-6 Luna', inputUsdPerMillionTokens: 0.1, outputUsdPerMillionTokens: 0.5, tier: 'budget' },
-    { id: 'claude-opus-4-6', provider: 'anthropic', label: 'Claude Opus 4.6', inputUsdPerMillionTokens: 5, outputUsdPerMillionTokens: 25, thinking: true, tier: 'flagship' },
-    { id: 'claude-sonnet-4-6', provider: 'anthropic', label: 'Claude Sonnet 4.6', inputUsdPerMillionTokens: 3, outputUsdPerMillionTokens: 15, thinking: true, tier: 'mid' },
-    { id: 'claude-haiku-4-5', provider: 'anthropic', label: 'Claude Haiku 4.5', inputUsdPerMillionTokens: 1, outputUsdPerMillionTokens: 5, tier: 'budget' },
-    { id: 'claude-opus-4-5', provider: 'anthropic', label: 'Claude Opus 4.5', inputUsdPerMillionTokens: 10, outputUsdPerMillionTokens: 30, thinking: true, tier: 'flagship' },
-    { id: 'claude-sonnet-4-5', provider: 'anthropic', label: 'Claude Sonnet 4.5', inputUsdPerMillionTokens: 3, outputUsdPerMillionTokens: 15, thinking: true, tier: 'mid' },
-  ];
-}
-
 /**
- * Classify any registry model (static or live-discovered) into a pricing
- * tier. Static entries carry their own tier; discovered models (which
- * usually lack pricing) are classified by id prefix.
+ * Classify any registry model (pinned, live, or from the catalog) into a
+ * pricing tier. Pinned entries carry their own tier; everything else is
+ * classified by id.
  */
 export function getModelTier(model) {
   if (model?.tier) return model.tier;
@@ -360,9 +258,21 @@ export function getModelTier(model) {
   return 'mid';
 }
 
+/**
+ * Embedding models are installed alongside chat models but cannot hold a
+ * conversation; picking one fails the turn. The family alone is not enough:
+ * qwen3-embedding reports family "qwen3".
+ */
+export function isEmbeddingOnlyModel(m) {
+  const family = String(m?.details?.family || '');
+  if (/bert$/i.test(family)) return true;
+  return /embed|(^|[/:-])bge-|minilm/i.test(String(m?.name || ''));
+}
+
 export function invalidateCache() {
   cache = null;
   cacheTimestamp = 0;
+  invalidateCatalog();
 }
 
 export async function resolveModel(modelId) {
@@ -370,9 +280,14 @@ export async function resolveModel(modelId) {
   const found = models.find((m) => m.id === modelId);
   if (found) return found;
 
-  const staticModels = getAnthropicStaticModels();
-  const staticFound = staticModels.find((m) => m.id === modelId);
+  const staticFound = getFallbackModels().find((m) => m.id === modelId);
   if (staticFound) return staticFound;
+
+  // Catalog entries not surfaced by discoverAllModels (connector unconfigured)
+  // still resolve — the user may be about to configure it.
+  const catalog = await fetchCatalogModels();
+  const catalogFound = catalog.find((m) => m.id === modelId);
+  if (catalogFound) return catalogFound;
 
   const provider = inferProvider(modelId);
   if (provider) {
@@ -382,11 +297,22 @@ export async function resolveModel(modelId) {
   return null;
 }
 
+/**
+ * Which connector serves a namespaced model id.
+ *
+ * Registry-driven: every connector that namespaces its ids contributes its
+ * prefix, so a new connector's prefix cannot be forgotten here. The explicit
+ * `accounts/fireworks/` case stays because it is a *vendor* namespace that
+ * arrives inside the id from the wire, not a connector prefix.
+ */
 export function inferProvider(modelId) {
-  if (modelId.startsWith('ollama/')) return 'ollama';
-  if (modelId.startsWith('openrouter/')) return 'openrouter';
-  if (modelId.startsWith('lmstudio/')) return 'lmstudio';
-  if (modelId.startsWith('copilot/')) return 'github-copilot';
+  if (typeof modelId !== 'string') return null;
+  for (const id of CONNECTOR_IDS) {
+    const prefix = getConnectorKeyPrefix(id);
+    if (prefix && modelId.startsWith(prefix)) return id;
+  }
   if (modelId.startsWith('accounts/fireworks/')) return 'fireworks';
   return null;
 }
+
+export { mergeWithCatalog };

@@ -24,6 +24,7 @@
  * rewrites every call site at once is a unification nobody can review.
  */
 import { post, trackPending, resolvePending } from './mailbox.js';
+import { buildSkillPreamble } from './skill-delegation.js';
 import {
   createTask,
   getTask,
@@ -136,13 +137,21 @@ export function spawnTeammate(input, ctx) {
   const mode = input?.mode === 'PLAN' ? 'PLAN' : 'BUILD';
   const isolation = input?.isolation === 'worktree' ? 'worktree' : 'none';
 
+  // A teammate can carry a skill too. The preamble comes from
+  // `skill-delegation.js`, the same builder a waited subagent uses, so a
+  // workflow behaves identically whether you delegated it to a subagent or to a
+  // teammate — otherwise "run this workflow in parallel" would quietly mean
+  // something different from "run this workflow and wait".
+  const skills = buildSkillPreamble(input?.skills ?? input?.skill, workdir, { heading: 'skill' });
+  if (skills.error) throw new Error(skills.error);
+
   const brief = [
     `You are teammate "${name}" working for the lead agent "${owner}".`,
     isolation === 'worktree'
       ? 'You work in an isolated git worktree; commit nothing, the lead merges.'
       : '',
     'Use sendMessage to ask the lead a blocking question only if you cannot proceed. When done, reply with a concise summary of what you changed and verified.',
-    '',
+    skills.text,
     prompt,
   ].filter(Boolean).join('\n');
 

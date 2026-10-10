@@ -133,8 +133,8 @@ program
       console.error('Usage: sentinel ask "your question"');
       process.exit(1);
     }
-    const { expandPromptTemplate } = await import('../agent/prompt-templates.js');
-    const question = expandPromptTemplate(raw).text;
+    const { expandSlashCommand } = await import('../agent/slash-commands.js');
+    const question = expandSlashCommand(raw).text;
     const { runAgentTurn } = await import('../agent/loop.js');
     const { DEFAULT_CHAT_MODEL_ID } = await import('../shared/models/index.js');
     const { formatUsd } = await import('../agent/cost.js');
@@ -250,8 +250,8 @@ program
   .option('--budget <usd>', 'Stop the turn once it has cost this many USD')
   .option('--route <model>', 'Cheap model for read-only exploration steps (main model plans and edits)')
   .action(async (condParts, options) => {
-    const { expandPromptTemplate } = await import('../agent/prompt-templates.js');
-    const condition = expandPromptTemplate((condParts || []).join(' ').trim()).text;
+    const { expandSlashCommand } = await import('../agent/slash-commands.js');
+    const condition = expandSlashCommand((condParts || []).join(' ').trim()).text;
     if (!condition) {
       console.error('Usage: sentinel goal "pytest tests/auth exits 0" [--task "fix the auth bug"]');
       process.exit(1);
@@ -450,8 +450,8 @@ program
   .option('--interval <ms>', 'Base wait between ticks, doubled on each unproductive tick', '60000')
   .option('-y, --yes', 'Auto-approve tools incl. shell (destructive commands are still denied)')
   .action(async (taskParts, options) => {
-    const { expandPromptTemplate } = await import('../agent/prompt-templates.js');
-    const task = expandPromptTemplate((taskParts || []).join(' ').trim()).text;
+    const { expandSlashCommand } = await import('../agent/slash-commands.js');
+    const task = expandSlashCommand((taskParts || []).join(' ').trim()).text;
     if (!task) {
       console.error('Usage: sentinel watch "fix whatever breaks" -t "command:npm test" -t git');
       process.exit(1);
@@ -1036,8 +1036,8 @@ program
   .option('--plan', 'Only write the contract; do not start the work')
   .option('--no-save', 'Do not persist the contract to .sentinel/outcome.json')
   .action(async (askParts, options) => {
-    const { expandPromptTemplate } = await import('../agent/prompt-templates.js');
-    const ask = expandPromptTemplate((askParts || []).join(' ').trim()).text;
+    const { expandSlashCommand } = await import('../agent/slash-commands.js');
+    const ask = expandSlashCommand((askParts || []).join(' ').trim()).text;
     if (!ask) {
       console.error('Usage: sentinel outcome "the sync is flaky" [--plan]');
       process.exit(1);
@@ -1175,6 +1175,206 @@ program
     process.exit(report.ok ? 0 : 1);
   });
 
+// ── auth: manage LLM connector credentials ────────────────────────────────────
+//
+// The command name is not new. `providers.js` has been telling users to run
+// `sentinel auth login <provider>` in its no-credential error for a long time,
+// and no such command existed — so the error dead-ended. This is that command.
+//
+// `connect` is already taken by the MCP assistant registrar, which is a
+// different concept entirely (wiring SENTINEL's MCP server into Claude Code /
+// Cursor / Zed) and must not be overloaded.
+program
+  .command('auth')
+  .description('Manage LLM connector credentials stored in ~/.sentinel/auth.json')
+  .option('--json', 'Print status as JSON')
+  .action(async (options) => {
+    const { connectionStatus } = await import('../shared/connectors/credentials.js');
+    const { listConnectors } = await import('../shared/connectors/registry.js');
+    const rows = await connectionStatus();
+    if (options.json) {
+      process.stdout.write(JSON.stringify(rows, null, 2) + '\n');
+      process.exit(0);
+    }
+    console.log('\n\x1b[1mConnectors\x1b[0m\n');
+    const byState = { connected: [], available: [] };
+    for (const row of rows) {
+      (row.connected ? byState.connected : byState.available).push(row);
+    }
+    for (const row of byState.connected) {
+      const how = row.local ? 'local daemon'
+        : row.source === 'store' ? 'saved key'
+          : row.source === 'env' ? row.envName : '';
+      console.log(`  \x1b[32m●\x1b[0m ${row.label.padEnd(24)} \x1b[2m${how}\x1b[0m`);
+    }
+    if (byState.connected.length) console.log('');
+    console.log('  \x1b[2mNot connected\x1b[0m');
+    for (const row of byState.available) {
+      console.log(`  \x1b[2m○\x1b[0m ${row.label.padEnd(24)}`);
+    }
+    console.log(`\n  \x1b[2m${listConnectors().length} connectors known. Add one: \x1b[0msentinel auth login <id>\x1b[0m`);
+    console.log('  \x1b[2mKeys are stored at ~/.sentinel/auth.json (mode 0600) and never printed.\x1b[0m\n');
+    process.exit(0);
+  });
+
+program
+  .command('auth login <connector>')
+  .description('Store a credential for a connector, or run its OAuth flow')
+  .option('--key <key>', 'Pass the key inline instead of prompting')
+  .action(async (connectorId, options) => {
+    const { getConnector } = await import('../shared/connectors/registry.js');
+    const { setCredential, credentialHint, redact } = await import('../shared/connectors/credentials.js');
+    const conn = getConnector(connectorId);
+    if (!conn) {
+      const { listConnectors } = await import('../shared/connectors/registry.js');
+      console.error(`\x1b[31mUnknown connector "${connectorId}".\x1b[0m Known: ${listConnectors().map((c) => c.id).join(', ')}`);
+      process.exit(1);
+    }
+    if (conn.local) {
+      console.log(`${conn.label} runs on your machine and needs no key.`);
+      console.log(`  ${credentialHint(connectorId)}`);
+      process.exit(0);
+    }
+    let key = options.key;
+    if (!key) {
+      console.log(`\n\x1b[1m${conn.label}\x1b[0m`);
+      console.log(`  \x1b[2mGet a key: ${conn.docs}\x1b[0m`);
+      if (conn.auth.includes('oauth-device')) {
+        console.log(`  \x1b[2mOAuth device flow available — run \`sentinel auth login ${conn.id} --oauth\`.\x1b[0m`);
+      }
+      process.stdout.write('\n  API key: ');
+      key = (await readLine()).trim();
+    }
+    if (!key) {
+      console.error('\n\x1b[31mNo key entered. Nothing saved.\x1b[0m');
+      process.exit(1);
+    }
+    try {
+      await setCredential(conn.id, { key });
+      console.log(`\n\x1b[32mSaved\x1b[0m ${redact(key)} for ${conn.label}.`);
+      console.log(`  \x1b[2mRun \`sentinel models --connector ${conn.id}\` to see what it serves.\x1b[0m\n`);
+      process.exit(0);
+    } catch (e) {
+      console.error(`\n\x1b[31m${e?.message || e}\x1b[0m`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('auth logout <connector>')
+  .description('Remove a stored credential for a connector')
+  .action(async (connectorId) => {
+    const { getConnector } = await import('../shared/connectors/registry.js');
+    const { clearCredential } = await import('../shared/connectors/credentials.js');
+    const conn = getConnector(connectorId);
+    if (!conn) {
+      console.error(`\x1b[31mUnknown connector "${connectorId}".\x1b[0m`);
+      process.exit(1);
+    }
+    const { removed } = await clearCredential(conn.id);
+    console.log(removed
+      ? `Removed the stored key for ${conn.label}.`
+      : `No stored key for ${conn.label} — nothing to remove.`);
+    process.exit(0);
+  });
+
+/** Read one line from stdin. Kept local so `login` does not pull in readline. */
+function readLine() {
+  return new Promise((resolveLine) => {
+    process.stdin.setEncoding('utf8');
+    process.stdin.once('data', (chunk) => resolveLine(String(chunk)));
+    process.stdin.once('end', () => resolveLine(''));
+    process.stdin.resume();
+  });
+}
+
+// ── models: what can I actually call right now ────────────────────────────────
+program
+  .command('models')
+  .description('List models from connected connectors, grouped by connector')
+  .option('-c, --connector <id>', 'Only show one connector')
+  .option('-s, --search <text>', 'Filter by id or label substring')
+  .option('--all', 'Include connectors with no credential')
+  .option('--offline', 'Skip network calls; use the cached catalog')
+  .option('--json', 'Print as JSON')
+  .action(async (options) => {
+    const { refreshModels, getRankedModels, getModelTier, isLocalProvider } =
+      await import('../shared/models/index.js');
+    const { listConnectors } = await import('../shared/connectors/registry.js');
+
+    if (!options.offline) await refreshModels({ includeUnconnected: !!options.all });
+    let models = getRankedModels();
+
+    if (options.connector) {
+      const { getConnector } = await import('../shared/connectors/registry.js');
+      if (!getConnector(options.connector)) {
+        console.error(`\x1b[31mUnknown connector "${options.connector}".\x1b[0m Known: ${listConnectors().map((c) => c.id).join(', ')}`);
+        process.exit(1);
+      }
+      models = models.filter((m) => m.provider === options.connector);
+    }
+    if (options.search) {
+      const q = options.search.toLowerCase();
+      models = models.filter((m) =>
+        m.id.toLowerCase().includes(q) || String(m.label).toLowerCase().includes(q));
+    }
+
+    if (options.json) {
+      process.stdout.write(JSON.stringify(models, null, 2) + '\n');
+      process.exit(0);
+    }
+
+    if (models.length === 0) {
+      // With nothing connected the filtered answer is legitimately empty, but an
+      // empty list is a bad first run. Show the pinned fallback — the models
+      // SENTINEL will use once a key exists — so the user sees something real
+      // and knows what to do next.
+      if (!options.connector && !options.search && !options.all) {
+        const { getFallbackModels } = await import('../shared/models/discovery.js');
+        const fallbacks = getFallbackModels();
+        console.log('\n\x1b[1mNo connector is connected yet.\x1b[0m');
+        console.log('  \x1b[2mThese are what SENTINEL falls back to. Connect a provider to use them:\x1b[0m\n');
+        for (const m of fallbacks) {
+          console.log(`  \x1b[2m${m.id.padEnd(28)} ${String(m.label)}\x1b[0m`);
+        }
+        console.log('\n  \x1b[2mConnect one:  \x1b[0msentinel auth login <id>   \x1b[2mor run Ollama/LM Studio for a free local model.\x1b[0m');
+        console.log('  \x1b[2mSee the list: \x1b[0msentinel auth\n');
+        process.exit(0);
+      }
+      console.log('\nNo models matched.');
+      console.log('  \x1b[2mConnect a provider: sentinel auth login <id>\x1b[0m');
+      console.log('  \x1b[2mOr widen the search: sentinel models --all\x1b[0m\n');
+      process.exit(0);
+    }
+
+    const { isOllamaCloudModel } = await import('../shared/models/index.js');
+    const byConnector = new Map();
+    for (const m of models) {
+      if (!byConnector.has(m.provider)) byConnector.set(m.provider, []);
+      byConnector.get(m.provider).push(m);
+    }
+
+    console.log('');
+    for (const [connectorId, rows] of byConnector) {
+      const { label } = listConnectors().find((c) => c.id === connectorId) || { label: connectorId };
+      console.log(`\x1b[1m${label}\x1b[0m \x1b[2m(${rows.length})\x1b[0m`);
+      for (const m of rows) {
+        const price = (m.inputUsdPerMillionTokens || 0) + (m.outputUsdPerMillionTokens || 0) === 0
+          ? (isOllamaCloudModel(m) ? 'cloud, metered' : isLocalProvider(m.provider) ? 'local' : 'free tier')
+          : `$${m.inputUsdPerMillionTokens}/$${m.outputUsdPerMillionTokens} per M`;
+        const flags = [
+          m.thinking ? '\x1b[35mthinking\x1b[0m' : null,
+          m.toolCall ? 'tools' : null,
+          getModelTier(m),
+        ].filter(Boolean).join(', ');
+        console.log(`  ${m.id.padEnd(44)} \x1b[2m${price.padEnd(22)} ${flags}\x1b[0m`);
+      }
+      console.log('');
+    }
+    console.log('  \x1b[2mSwitch with -m <id> on any command, or /model <id> in the TUI.\x1b[0m\n');
+    process.exit(0);
+  });
+
 // ── connect: wire SENTINEL (and third-party MCP servers) into assistants ──────
 program
   .command('connect')
@@ -1185,7 +1385,7 @@ program
   .option('--providers', 'List available third-party MCP providers and exit')
   .option('--logout', 'Forget stored credentials for --mcp <provider>')
   .option('--list', 'List detected assistants and exit')
-  .option('--skills', 'Show skill directories SENTINEL can read')
+  .option('--skills', 'Show skill directories SENTINEL can read (with --list: the skills themselves)')
   .option('--remove', 'Remove the SENTINEL entry instead of adding it')
   .option('--dry-run', 'Show what would change without writing')
   .option('--json', 'Print the result as JSON')
@@ -1235,7 +1435,51 @@ program
     }
 
     if (options.skills) {
-      const dirs = skillDiscovery(cwd);
+      // `--skills` alone answers "where does Sentinel look". Adding `--list`
+      // answers the question that actually follows it — "what is in there" —
+      // which the directory view cannot answer, because it never opens a
+      // SKILL.md.
+      if (options.list) {
+        const { listSkills, resolveSkill, listSkillScripts } = await import('../agent/skills.js');
+        // Every skill, including the ones withheld from the model. This view is
+        // for a human deciding what to type as `/name`, and a skill marked
+        // `disable-model-invocation` is exactly the one they most need to see.
+        const skills = listSkills(cwd);
+        if (options.json) {
+          process.stdout.write(
+            JSON.stringify(
+              {
+                count: skills.length,
+                skills: skills.map((s) => ({
+                  name: s.name,
+                  description: s.description,
+                  // Reachable as `/name`, but not advertised to the model.
+                  explicitOnly: Boolean(s.disableModelInvocation),
+                  argumentHint: s.argumentHint || undefined,
+                  scripts: listSkillScripts(resolveSkill(s.name, cwd)),
+                })),
+              },
+              null,
+              2,
+            ) + '\n',
+          );
+          return;
+        }
+        if (skills.length === 0) {
+          console.log('No skills found. Install one with: npx skills add <owner/repo>');
+          return;
+        }
+        console.log(`Skills (${skills.length}) — invoke one with /<name>:`);
+        for (const s of skills) {
+          const scripts = listSkillScripts(resolveSkill(s.name, cwd));
+          const hint = s.argumentHint ? ` ${s.argumentHint}` : '';
+          const explicit = s.disableModelInvocation ? '  [explicit only — the model will not pick this]' : '';
+          console.log(`  ${s.name}${hint}: ${s.description}${explicit}`);
+          if (scripts.length) console.log(`      scripts: ${scripts.join(', ')}`);
+        }
+        return;
+      }
+      const dirs = await skillDiscovery(cwd);
       if (options.json) {
         process.stdout.write(JSON.stringify({ skills: dirs }, null, 2) + '\n');
       } else if (dirs.length === 0) {
@@ -1625,18 +1869,79 @@ program
 program
   .command('skills')
   .description('Install or list skills via the skills.sh CLI (npx skills)')
-  .argument('[action]', 'install | list | find', 'list')
+  .argument('[action]', 'install | list | find | run', 'list')
   .argument('[pkg]', 'Skill package, e.g. mattpocock/skills')
   .option('-s, --skill <name>', 'Specific skill name (default: all in the package)')
   .option('-a, --agent <agent>', 'Target agent for the install (default: auto-detect)')
   .option('-g, --global', 'Install globally instead of project-level')
   .option('--json', 'Print skill directories as JSON')
+  .option('--print', 'With `run`: print the expanded skill and exit instead of running a turn')
+  .option('-b, --build', 'With `run`: allow edits (default: PLAN, read-only)')
+  .option('-m, --model <id>', 'With `run`: model to use')
+  .option('--budget <usd>', 'With `run`: stop the turn once it has cost this many USD')
   .action(async (action, pkg, options) => {
     const { skillDiscovery } = await import('./connect.js');
     const cwd = path.resolve(options.dir || process.cwd());
 
+    // `run` starts a turn with a skill already loaded, rather than waiting for
+    // the model to decide it wants one. `sentinel skills run review auth.js` is
+    // `/review auth.js` for a shell, a script, or a CI step — none of which have
+    // a composer to type into.
+    if (action === 'run') {
+      const { expandSlashCommand } = await import('../agent/slash-commands.js');
+      // `pkg` is the skill name and everything after it is its arguments, which
+      // is why this branch runs before the `!pkg` check below.
+      const raw = `/${pkg || ''}`.trim();
+      if (!pkg) {
+        console.error('Usage: sentinel skills run <name> [args...] [--build] [--model id]');
+        process.exit(1);
+      }
+      const expanded = expandSlashCommand(raw, cwd);
+      if (!expanded.skill) {
+        console.error(`Unknown skill: ${pkg}`);
+        console.error('List what is available with: sentinel connect --skills --list');
+        process.exit(1);
+      }
+      if (options.print) {
+        process.stdout.write(expanded.text + '\n');
+        return;
+      }
+      const { runAgentTurn } = await import('../agent/loop.js');
+      const { DEFAULT_CHAT_MODEL_ID } = await import('../shared/models/index.js');
+      const { formatUsd } = await import('../agent/cost.js');
+      const mode = options.build ? 'BUILD' : 'PLAN';
+      const model = options.model || DEFAULT_CHAT_MODEL_ID;
+      let sawError = false;
+      try {
+        for await (const ev of runAgentTurn({
+          history: [{ id: `skill_${Date.now()}`, role: 'user', parts: [{ type: 'text', text: expanded.text }] }],
+          mode,
+          model,
+          budgetUsd: options.budget ? Number(options.budget) : undefined,
+        })) {
+          if (ev.event === 'text') process.stdout.write(ev.data.delta);
+          else if (ev.event === 'tool_result') {
+            process.stderr.write(`\x1b[2m  ${ev.data.tool || ev.data.toolCallId || 'tool'}\x1b[0m\n`);
+          } else if (ev.event === 'error') {
+            sawError = true;
+            process.stderr.write(`\x1b[31m${ev.data.message}\x1b[0m\n`);
+          } else if (ev.event === 'finish') {
+            const inputTokens = ev.data.usage?.inputTokens ?? '?';
+            const outputTokens = ev.data.usage?.outputTokens ?? '?';
+            process.stderr.write(
+              `\n\x1b[2m${inputTokens} in / ${outputTokens} out · ${formatUsd(ev.data.costUsd || 0)} · ${model}\x1b[0m\n`,
+            );
+          }
+        }
+      } catch (err) {
+        console.error(`\x1b[31m${err.message}\x1b[0m`);
+        process.exit(1);
+      }
+      process.exit(sawError ? 1 : 0);
+    }
+
     if (action === 'list' || !pkg) {
-      const dirs = skillDiscovery(cwd);
+      const dirs = await skillDiscovery(cwd);
       if (options.json) {
         process.stdout.write(JSON.stringify({ skills: dirs }, null, 2) + '\n');
       } else if (!dirs.length) {

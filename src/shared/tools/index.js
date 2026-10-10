@@ -18,6 +18,7 @@ import { createCheckpoint, restoreCheckpoint, redoCheckpoint } from './checkpoin
 import { toolInputSchemas, READ_ONLY_TOOL_NAMES, BUILD_TOOL_NAMES, isReadOnly } from './schemas.js';
 import { getWorkdir } from './workdir.js';
 import { withFileMutationQueues } from './mutation-queue.js';
+import { normalizeSkillNames } from '../../agent/skill-delegation.js';
 import { tailWithNotice } from './truncate.js';
 
 // Re-export so callers can import Mode and toolInputSchemas from this module directly.
@@ -83,16 +84,65 @@ export function truncate(value, limit) {
   return `${value.slice(0, limit)}\n... (truncated, ${value.length} total chars)`;
 }
 
+/**
+ * Read a file, optionally a window of it.
+ *
+ * ## Why offset/limit exist
+ *
+ * The context compactor (`src/agent/context-budget.js`) shrinks an oversized
+ * read to a head window plus a notice naming the call that fetches the rest.
+ * That only works if the notice points at a real call — a truncation the model
+ * cannot act on is data loss with extra steps. So the recovery path has to
+ * exist at the tool layer, not just in the prompt.
+ *
+ * They also serve the ordinary case: an agent that needs to check three
+ * definitions in a 4000-line file does not need the file.
+ *
+ * The window is line-based because the compactor's hints are line offsets. A
+ * character offset would be cheaper to compute but would slice mid-token and
+ * mid-identifier, and a re-read that starts inside a string literal produces
+ * output that looks plausible and is wrong.
+ */
 async function readFileImpl(input) {
   const p = input?.path;
   if (typeof p !== 'string') throw new Error('path is required');
   const { resolved, relative } = resolveInsideCwd(p);
   const content = await fs.readFile(resolved, 'utf-8');
+
+  const offset = typeof input?.offset === 'number' && input.offset >= 0 ? Math.floor(input.offset) : null;
+  const limit = typeof input?.limit === 'number' && input.limit > 0 ? Math.floor(input.limit) : null;
+
+  if (offset !== null || limit !== null) {
+    // split('\n') is correct here even though it leaves a trailing '' on a
+    // newline-terminated file: line N is at index N, and the offset a caller
+    // echoes back is a line index, not a byte position.
+    const lines = content.split('\n');
+    const start = offset ?? 0;
+    const end = limit === null ? lines.length : Math.min(lines.length, start + limit);
+    const slice = lines.slice(start, end);
+    const out = {
+      content: slice.join('\n'),
+      path: relative,
+      offset: start,
+      lineCount: slice.length,
+      totalLines: lines.length,
+    };
+    if (start > 0) out.startedAtLine = start + 1;
+    if (end < lines.length) {
+      out.partial = true;
+      // The continuation call, so the model does not have to reconstruct the
+      // arithmetic. This is the field the compactor's notice mirrors.
+      out.nextOffset = end;
+    }
+    return out;
+  }
+
   if (content.length > MAX_FILE_SIZE) {
     return {
       content: content.slice(0, MAX_FILE_SIZE),
       truncated: true,
       totalLength: content.length,
+      totalLines: content.split('\n').length,
       path: relative,
     };
   }
@@ -630,11 +680,146 @@ async function memoryRememberImpl(input) {
   return { stored: true, similarTo: out.similarTo || null };
 }
 
+/**
+ * `skill` — expand a SKILL.md body into context. Runs nothing.
+ *
+ * The frontmatter is echoed back with the body. It used to be dropped, which
+ * meant that once the body was expanded the model could no longer see the
+ * skill's own name and description — the two facts it needs in order to decide
+ * whether to stack a second skill on top of the one it just loaded.
+ *
+ * Bundled scripts are listed too. A skill that ships `scripts/verify.sh` is
+ * asking to be run, and if the model cannot see that from here it will
+ * improvise a shell command to reach the same file.
+ */
 async function skillImpl(input) {
-  const { getSkillPrompt } = await import('../../agent/skills.js');
-  const body = getSkillPrompt(input.name);
-  if (!body) throw new Error(`Unknown skill: ${input.name}. Use listDirectory on .sentinel/skills to discover skills.`);
-  return { name: input.name, prompt: body };
+  const { resolveSkill, applySkillArgs, listSkillScripts } = await import('../../agent/skills.js');
+
+  const expandOne = (name, args) => {
+    const skill = resolveSkill(name);
+    if (!skill) {
+      throw new Error(
+        `Unknown skill: ${name}. Use listDirectory on .sentinel/skills to discover skills, ` +
+        'or omit `names` to load one skill at a time.',
+      );
+    }
+    const scripts = listSkillScripts(skill);
+    const out = {
+      name: skill.name,
+      description: skill.description,
+      prompt: applySkillArgs(skill.body, args),
+    };
+    if (args !== undefined) out.args = args;
+    if (scripts.length) {
+      out.scripts = scripts;
+      out.scriptHint =
+        `This skill ships ${scripts.length} script(s). Run one with the runSkillScript tool: ` +
+        `{ name: "${skill.name}", script: "<path from scripts>", args: [...] }.`;
+    }
+    return out;
+  };
+
+  // `names` is the stacked form. A model that wants two workflows used to have
+  // to emit two tool calls in one message, and the answers came back as two
+  // unordered parallel results — the loop batches read-only calls with no
+  // ordering guarantee, so which body appeared first was a race. Asking for both
+  // in one call makes the order the caller's.
+  //
+  // `viaNames` matters and is easy to get wrong: a bare `name` carries its args
+  // at the top level, so normalizing it produces an entry with none of its own.
+  // Taking that entry's empty `args` expands the body with every placeholder
+  // left in place, which looks like a broken skill rather than a lost argument.
+  const viaNames = Array.isArray(input.names) && input.names.length > 0;
+  const names = normalizeSkillNames(viaNames ? input.names : input.name);
+  if (names.length > 1) {
+    // Dedupe by name, first occurrence wins — see normalizeSkillNames. Two
+    // entries for one skill would inject its body twice, and the model reads a
+    // duplicated workflow as two separate instructions.
+    const loaded = names.map(({ name, args }) => expandOne(name, args));
+    return {
+      count: loaded.length,
+      skills: loaded,
+      names: loaded.map((s) => s.name),
+      prompt: loaded.map((s) => `<skill name="${s.name}">\n${s.prompt}\n</skill>`).join('\n\n'),
+    };
+  }
+  if (names.length === 1) return expandOne(names[0].name, viaNames ? names[0].args : input.args);
+  throw new Error('skill requires `name` or `names`.');
+}
+
+/**
+ * `runSkillScript` — execute a script bundled inside a skill.
+ *
+ * ## Why this is not a field on the `skill` tool
+ *
+ * Because `skill` is read-only, and in a read-only tool's contract "run the
+ * file next to the skill" is not a detail. Skills install from a registry
+ * (`.claude/skills`, `.codex/skills`, `~/.opencode/skills` are all read by
+ * `skillDirs`), so a skill directory is code from somewhere else that a user
+ * did not write and has not read. A PLAN-mode turn — which is refused
+ * `bash`, refused `runTests`, and refused every write — would acquire the
+ * ability to execute that code if execution hung off the `skill` tool.
+ *
+ * So execution is its own tool, classified as shell, gated by the same mode
+ * check, permission policy, blast-radius gate, and risk ledger as `bash`.
+ * The cost is one more name for the model to learn; the alternative is a
+ * read-only tool that runs code.
+ *
+ * ## Why the command is built once
+ *
+ * ## Why the command is built once
+ *
+ * The command string is constructed by `skillScriptCommand` and used for
+ * execution, the permission prompt, the risk grade, and bash validation. Four
+ * layers grading four independently-assembled strings would mean the gate
+ * approves one command while a different one runs.
+ */
+async function runSkillScriptImpl(input) {
+  const { resolveSkill, resolveSkillScript, listSkillScripts, skillScriptCommand } =
+    await import('../../agent/skills.js');
+  const skill = resolveSkill(input.name);
+  if (!skill) throw new Error(`Unknown skill: ${input.name}`);
+  const resolved = resolveSkillScript(skill, input.script);
+  if (resolved.error) {
+    // The suffix depends on what we actually know. For a refusal (traversal,
+    // absolute path) `available` is absent — the scripts list would be
+    // irrelevant noise next to "you asked for something outside this skill",
+    // and claiming "this skill ships no scripts" when it ships three is worse
+    // than saying nothing.
+    const suffix = resolved.available
+      ? resolved.available.length
+        ? ` Available scripts: ${resolved.available.join(', ')}.`
+        : ' This skill ships no scripts.'
+      : '';
+    throw new Error(suffix ? `${resolved.error}. ${suffix.trim()}` : resolved.error);
+  }
+  // The absolute path, not `resolved.relative`: the relative form is only
+  // meaningful from the skill directory, and the command runs with the project
+  // as cwd. The sandbox binds `/` read-only and the cwd writable, so an
+  // absolute path into a home-directory skill resolves without needing the
+  // skill directory to be inside the project.
+  const workdir = getWorkdir();
+  const command = skillScriptCommand({
+    scriptPath: resolved.path,
+    runner: resolved.runner,
+    args: input.args,
+  });
+  const timeout = normalizeTimeoutMs(input.timeout, DEFAULT_TIMEOUT);
+  const r = await runSandboxedAsync(command, {
+    cwd: workdir,
+    timeout,
+    env: { ...process.env, TERM: 'dumb' },
+  });
+  return {
+    skill: skill.name,
+    script: resolved.relative,
+    command,
+    stdout: tailWithNotice(r.stdout, MAX_OUTPUT),
+    stderr: tailWithNotice(r.stderr, MAX_OUTPUT),
+    exitCode: r.exitCode,
+    timedOut: r.timedOut,
+    availableScripts: listSkillScripts(skill),
+  };
 }
 
 /**
@@ -862,6 +1047,7 @@ const TOOL_IMPLS = {
   todoWrite: todoWriteImpl,
   todoRead: todoReadImpl,
   skill: skillImpl,
+  runSkillScript: runSkillScriptImpl,
   memoryWrite: memoryWriteImpl,
   memoryDelete: memoryDeleteImpl,
   // Browser tools. Lazily bound rather than imported at module load: `web-tools`
@@ -876,7 +1062,9 @@ const TOOL_IMPLS = {
 
 export const readOnlyToolContracts = Object.freeze({
   readFile: {
-    description: 'Read a file from the current project directory.',
+    description:
+      'Read a file. Pass offset/limit (0-based lines) for a window instead of the whole file — ' +
+      'cheaper when you only need part of a large one, and the way to recover a read that was elided.',
     inputSchema: toolInputSchemas.readFile,
   },
   listDirectory: {
@@ -918,7 +1106,11 @@ export const readOnlyToolContracts = Object.freeze({
     inputSchema: toolInputSchemas.todoRead,
   },
   skill: {
-    description: 'Load a skill workflow by name. Invoke BEFORE handling a matching request yourself.',
+    description:
+      'Load a skill workflow by name. Invoke BEFORE handling a matching request yourself. ' +
+      'Pass `args` to fill $1 / $ARGUMENTS placeholders in the skill body. ' +
+      'Pass `names: [...]` instead of `name` to stack several in one call — they load in the order given, which two separate calls do not guarantee. ' +
+      'Returns any bundled scripts.',
     inputSchema: toolInputSchemas.skill,
   },
   bgCheck: {
@@ -995,11 +1187,24 @@ export const buildToolContracts = Object.freeze({
     inputSchema: toolInputSchemas.todoRead,
   },
   skill: {
-    description: 'Load a skill workflow by name. Invoke BEFORE handling a matching request yourself.',
+    description:
+      'Load a skill workflow by name. Invoke BEFORE handling a matching request yourself. ' +
+      'Pass `args` to fill $1 / $ARGUMENTS placeholders in the skill body. ' +
+      'Pass `names: [...]` instead of `name` to stack several in one call — they load in the order given, which two separate calls do not guarantee. ' +
+      'Returns any bundled scripts.',
     inputSchema: toolInputSchemas.skill,
   },
+  runSkillScript: {
+    description:
+      'Run a script bundled inside a skill (load the skill first to see its scripts). ' +
+      '`script` is a path relative to the skill directory, e.g. "scripts/verify.sh". ' +
+      'Gated like bash: it executes a file, so it is refused in PLAN/REVIEW/SCAN/FIX modes and may ask for approval.',
+    inputSchema: toolInputSchemas.runSkillScript,
+  },
   spawnAgent: {
-    description: 'Delegate a bounded subtask to a fresh subagent. Returns its final summary text.',
+    description:
+      'Delegate a bounded subtask to a fresh subagent. Returns its final summary text. ' +
+      'Pass `skills` (a name, or [{name, args}]) to load a skill workflow into the subagent — it follows the stated workflow instead of improvising one.',
     inputSchema: toolInputSchemas.spawnAgent,
   },
   memoryWrite: {
@@ -1035,7 +1240,7 @@ export const buildToolContracts = Object.freeze({
     inputSchema: toolInputSchemas.bgRun,
   },
   spawnTeammate: {
-    description: 'Start a named teammate agent that works in parallel (optionally isolation="worktree" for its own git worktree/branch). Its summary arrives as a notification. Propose the team to the user first.',
+    description: 'Start a named teammate agent that works in parallel (optionally isolation="worktree" for its own git worktree/branch). Its summary arrives as a notification. Propose the team to the user first. Pass `skills` to hand the teammate a workflow to follow.',
     inputSchema: toolInputSchemas.spawnTeammate,
   },
   sendMessage: {
@@ -1064,8 +1269,8 @@ export const buildToolContracts = Object.freeze({
   task: {
     description:
       'Start and manage concurrent work. Actions: ' +
-      '"spawn" starts a subagent (prompt, mode) and WAITS for its summary; ' +
-      '"spawn-async" starts one that reports back later (name, prompt, mode, isolation); ' +
+      '"spawn" starts a subagent (prompt, mode, skills) and WAITS for its summary; ' +
+      '"spawn-async" starts one that reports back later (name, prompt, mode, isolation, skills); ' +
       '"run" starts a shell command in the background (command, timeout); ' +
       '"status" lists running and finished work; ' +
       '"check" reads one background command\'s output (id); ' +
@@ -1088,11 +1293,74 @@ export function getToolNames(mode) {
 }
 
 /**
+ * Validate a tool call's input against its hand-rolled schema.
+ *
+ * Returns an error string, or null when the input is acceptable. This is the
+ * step `executeLocalTool` did not have: `toolInputSchemas` was written, exported,
+ * referenced from every contract, and never called, so ~200 lines of validators
+ * guarded nothing. Every implementation validates its own fields, but only the
+ * fields that implementation happens to care about — `editFileImpl` checks
+ * `oldString` is a string, while `batchEditImpl` re-checks its whole operation
+ * list, and neither knows what the schema says about the tool.
+ *
+ * Two deliberate properties:
+ *
+ *   - **Unknown tools pass.** A validator that threw for an unrecognised name
+ *     would refuse every MCP tool, which has its own schema and its own trust
+ *     story.
+ *   - **Unknown fields are dropped, not rejected.** The validators project a
+ *     value rather than checking a shape, so an extra key the model invented
+ *     disappears instead of erroring. Rejecting would turn a hallucinated
+ *     optional parameter into a failed turn; the model reads the result and
+ *     carries on without the field it asked for.
+ *
+ * The error text is deliberately the schema's own, because it is already written
+ * for the model ("path is required", not "E_VALIDATION"). The loop turns it into
+ * a tool result, so the model gets to correct itself.
+ */
+export function validateToolInput(toolName, input) {
+  const schema = toolInputSchemas[toolName];
+  if (!schema || typeof schema !== 'function') return null;
+  try {
+    schema(input);
+    return null;
+  } catch (e) {
+    return `${toolName}: ${e.message}`;
+  }
+}
+
+/**
+ * Validate and return the normalized input, or the original if validation fails.
+ *
+ * The defaults inside the validators (`searchWeb.count`, `runTests.timeout`,
+ * `todoRead`) only exist in that projected value, so callers that want the
+ * defaults must use this rather than `validateToolInput`. Returns the input
+ * unchanged when there is no schema, or when the input is invalid — the caller
+ * has already turned that case into an error by then.
+ */
+export function coerceToolInput(toolName, input) {
+  const schema = toolInputSchemas[toolName];
+  if (!schema || typeof schema !== 'function') return input;
+  try {
+    return schema(input);
+  } catch {
+    return input;
+  }
+}
+
+/**
  * Execute a local tool call.
  * 1. Mode check (PLAN/REVIEW/SCAN block writes; FIX blocks shell) — a mode
  *    boundary is a hard capability gate, so it wins over any permission ask
  * 2. Permission check (allow/deny/ask)
  * 3. Execute the tool implementation
+ *
+ * Validation lives in `validateToolInput` above rather than in this function,
+ * because the loop calls it before the permission prompt while `executeLocalTool`
+ * is reached only after. The two are not redundant: this one is the boundary for
+ * anything else that calls a tool directly (the MCP bridge, tests, the review
+ * path), and it is the last chance to catch a malformed call before an
+ * implementation touches the filesystem.
  *
  * @param {string} toolName
  * @param {object} input
@@ -1128,5 +1396,12 @@ export async function executeLocalTool(toolName, input, mode = Mode.BUILD, _opti
   if (!impl) {
     throw new Error(`Unknown tool: ${toolName}`);
   }
+
+  // Validation last, before dispatch. The loop already ran it, but this
+  // function is also the direct entry point for anything that bypasses the
+  // loop, and a schema that only the happy path checks is not a check.
+  const invalid = validateToolInput(toolName, input);
+  if (invalid) throw new Error(invalid);
+
   return await impl(input);
 }

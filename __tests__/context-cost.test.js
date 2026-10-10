@@ -88,9 +88,15 @@ describe('skill listing stays inside its budget', () => {
   it('caps the listing no matter how many skills are installed', () => {
     seedSkills(300);
     const listing = formatSkillListing(dir, { includeGlobal: false });
-    // The note line reporting the overflow is part of the budget.
+    // The overflow note counts against the cap, not on top of it.
+    //
+    // This was `<= cap + 200`, which is how the section shipped at 2113 chars
+    // against a 2000 cap on a real 208-skill install: every individual number
+    // was measured correctly and the total was still over, because the note —
+    // the one string that matters most when the list is full — was appended
+    // after the last count. Now it is reserved up front, and the cap is the cap.
     assert.ok(
-      listing.length <= SKILL_LISTING_CHAR_CAP + 200,
+      listing.length <= SKILL_LISTING_CHAR_CAP,
       `listing ${listing.length} chars, cap ${SKILL_LISTING_CHAR_CAP}`
     );
   });

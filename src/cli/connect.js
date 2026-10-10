@@ -425,30 +425,32 @@ export function unregisterFromAssistant(options = {}) {
  * Which skill directories SENTINEL can currently read. No writes: skills.js
  * already scans all of these, so this is verification, not installation.
  */
-export function skillDiscovery(cwd = process.cwd()) {
+export async function skillDiscovery(cwd = process.cwd()) {
+  // Derived from `skillDirs`, not restated here.
+  //
+  // It used to be a hand-written list of the same ten directories, which meant
+  // adding `skills/` to `skills.js` left this view quietly reporting the wrong
+  // thing — the drift is silent, produces no failure, and is exactly what
+  // `tool-taxonomy.js` was written about. One owner: `skillDirs` is the single
+  // source of truth for where Sentinel looks, and this reports it.
+  const { skillDirs } = await import('../agent/skills.js');
   const home = homedir();
-  const candidates = [
-    { owner: 'sentinel', path: join(cwd, '.sentinel', 'skills'), scope: 'project' },
-    { owner: 'claude', path: join(cwd, '.claude', 'skills'), scope: 'project' },
-    { owner: 'codex', path: join(cwd, '.codex', 'skills'), scope: 'project' },
-    { owner: 'agents', path: join(cwd, '.agents', 'skills'), scope: 'project' },
-    { owner: 'opencode', path: join(cwd, '.opencode', 'skills'), scope: 'project' },
-    { owner: 'sentinel', path: join(home, '.sentinel', 'skills'), scope: 'global' },
-    { owner: 'claude', path: join(home, '.claude', 'skills'), scope: 'global' },
-    { owner: 'codex', path: join(home, '.codex', 'skills'), scope: 'global' },
-    { owner: 'agents', path: join(home, '.agents', 'skills'), scope: 'global' },
-    { owner: 'opencode', path: join(home, '.opencode', 'skills'), scope: 'global' },
-  ];
   const dirs = [];
-  for (const c of candidates) {
-    if (!existsSync(c.path)) continue;
+  for (const path of skillDirs(cwd)) {
+    if (!existsSync(path)) continue;
     let count = 0;
     try {
-      count = readdirSync(c.path, { withFileTypes: true }).filter((e) => e.isDirectory()).length;
+      count = readdirSync(path, { withFileTypes: true }).filter((e) => e.isDirectory()).length;
     } catch {
       count = 0;
     }
-    dirs.push({ ...c, count });
+    const inHome = path.startsWith(home);
+    // The owner is the dot-directory that names the registry, or `repo` for the
+    // shipped `skills/` location, which belongs to no other assistant.
+    const segs = path.split(/[\\/]/);
+    const seg = segs[segs.length - 2] || '';
+    const owner = seg.startsWith('.') ? seg.slice(1) : seg;
+    dirs.push({ owner, path, scope: inHome ? 'global' : 'project', count });
   }
   return dirs;
 }

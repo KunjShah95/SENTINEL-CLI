@@ -30,6 +30,7 @@
  */
 import { isToolAllowedInMode, isReadOnlyTool } from '../shared/schemas/mode.js';
 import { isShellTool } from '../shared/tool-taxonomy.js';
+import { resolveSkill, resolveSkillScript, skillScriptCommand } from './skills.js';
 import { builtinPreToolUseGuard, runHooks } from './hooks.js';
 import { checkBlastRadius } from './blast-radius.js';
 import { classifyBashCommand } from './bash-validation.js';
@@ -104,9 +105,44 @@ export async function runPreGates({
  * two calls to `classifyBashCommand` on the same command is two chances to
  * disagree about how dangerous something is.
  */
+/**
+ * The command string a call is about to run, or '' when it has none.
+ *
+ * `runSkillScript` takes { name, script, args } rather than a `command`, so the
+ * string has to be reconstructed before it can be graded. That reconstruction
+ * is the same `skillScriptCommand` the executor uses, not a second copy: a gate
+ * that graded a different string than the one that runs is not a gate.
+ *
+ * Returns '' when the skill or script does not resolve — the call will fail in
+ * the executor with a precise message, and grading an empty string here (which
+ * `classifyBashCommand` reads as benign) is correct: nothing runs.
+ */
+/**
+ * @param cwd  the agent's working directory, which is NOT `process.cwd()` for a
+ *   teammate running in an isolated worktree. Skills resolve relative to the
+ *   caller, so grading against the wrong cwd would either miss the skill or
+ *   grade a different one than the executor loads.
+ */
+export function commandFor(tool, input, cwd = process.cwd()) {
+  if (typeof input?.command === 'string') return input.command;
+  if (tool !== 'runSkillScript') return '';
+  try {
+    const skill = resolveSkill(input?.name, cwd);
+    if (!skill) return '';
+    const resolved = resolveSkillScript(skill, input?.script);
+    if (resolved.error) return '';
+    return skillScriptCommand({ scriptPath: resolved.path, runner: resolved.runner, args: input?.args });
+  } catch {
+    // An unresolvable skill or an unreadable skills directory is not this
+    // module's problem to report. The call fails in the executor with a
+    // message naming the skill and listing its scripts.
+    return '';
+  }
+}
+
 export function assessCall(tool, input, workdir) {
   if (!isShellTool(tool)) return { shellish: false, bashCheck: null, risk: null, command: '' };
-  const command = typeof input?.command === 'string' ? input.command : '';
+  const command = commandFor(tool, input, workdir);
   return {
     shellish: true,
     command,
