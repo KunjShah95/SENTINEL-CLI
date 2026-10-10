@@ -22,6 +22,7 @@
  * the reason rides along on the result so the failure is visible rather than
  * silently hidden.
  */
+import { userAgent } from '../version.js';
 
 const DEFAULT_MAX_CHARS = 8000;
 const TIMEOUT_MS = 20_000;
@@ -178,7 +179,7 @@ async function directFetch(urlString, maxChars) {
     signal: AbortSignal.timeout(TIMEOUT_MS),
     redirect: 'follow',
     headers: {
-      'user-agent': 'Mozilla/5.0 (compatible; sentinel-cli/3.4.0; +https://github.com/KunjShah95/SENTINEL-CLI)',
+      'user-agent': userAgent(),
       accept: 'text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8',
     },
   });

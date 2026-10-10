@@ -41,18 +41,14 @@ import path from 'path';
 import { join } from 'path';
 import { readFileSync } from 'fs';
 import { fileURLToPath, pathToFileURL } from 'url';
+import { getVersion } from '../version.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const root = path.resolve(__dirname, '..', '..');
 
-const CLI_VERSION = (() => {
-  try {
-    return JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8')).version || '0.0.0';
-  } catch {
-    return '0.0.0';
-  }
-})();
+// One source, not a fourth copy of the package.json walk.
+const CLI_VERSION = getVersion();
 
 /**
  * --yes permission callback for headless runs: approve everything except

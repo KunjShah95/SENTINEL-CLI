@@ -19,8 +19,16 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { getTokenProvider, authSummary } from './mcp-oauth.js';
+import { getVersion } from '../version.js';
 
-const CLIENT_INFO = { name: 'sentinel-cli', version: '3.4.0' };
+// Read from package.json, not a literal. This one reaches a *third party*: an MCP
+// server logs the client's version, and a hardcoded string here meant a 3.5.0
+// build introduced itself as 3.4.0 with nothing failing.
+//
+// Exported because `scripts/check-version.mjs` has to be able to observe what
+// this reports. A version that cannot be read cannot be checked, which is how
+// the literal survived in the first place.
+export const CLIENT_INFO = { name: 'sentinel-cli', version: getVersion() };
 
 const NAME_SEP = '__';
 const CONNECT_TIMEOUT_MS = 15_000;

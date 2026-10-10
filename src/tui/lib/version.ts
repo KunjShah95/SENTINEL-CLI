@@ -1,30 +1,9 @@
-import { readFileSync } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
-
-let _version: string | null = null;
-
-function findPackageJson(): string | null {
-  const __dirname = dirname(fileURLToPath(import.meta.url));
-  const candidates = [
-    join(__dirname, '..', '..', '..', 'package.json'),
-    join(__dirname, '..', '..', '..', '..', 'package.json'),
-    join(process.cwd(), 'package.json'),
-  ];
-  for (const p of candidates) {
-    try {
-      return JSON.parse(readFileSync(p, 'utf-8')).version;
-    } catch {}
-  }
-  return null;
-}
-
-export function getVersion(): string {
-  if (_version) return _version;
-  _version = findPackageJson() || '2.0.0';
-  return _version;
-}
-
-export function getDisplayVersion(): string {
-  return `v${getVersion()}`;
-}
+/**
+ * Re-exported from the single implementation.
+ *
+ * This file used to be the *fourth* copy of the package.json walk — with its own
+ * candidate paths, its own hardcoded `'2.0.0'` fallback (which was wrong; the
+ * real answer had been 3.x for a long time), and no test. The logic now lives in
+ * `src/version.js`, which every other caller uses too.
+ */
+export { getVersion, getDisplayVersion } from '../../version.js';

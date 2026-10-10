@@ -12,19 +12,17 @@
 import { spawn } from 'node:child_process';
 import { resolve, dirname } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { getVersion } from '../src/version.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, '..');
 const tuiEntry = resolve(root, 'src/tui/index.tsx');
 
 function version() {
-  try {
-    return JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8')).version || '0.0.0';
-  } catch {
-    return '0.0.0';
-  }
+  // Delegates to the one implementation, rather than being the second.
+  return getVersion();
 }
 
 const args = process.argv.slice(2);
