@@ -299,6 +299,28 @@ export function checkPathDelimiter() {
 }
 
 /**
+ * Live probe of every connector that has a credential.
+ *
+ * Deliberately not a failure: an unreachable or quota-blocked connector still
+ * leaves the others usable, and `sentinel doctor` exiting non-zero would be
+ * wrong when a valid local model is loaded. It reports as `warn` so it is
+ * visible without blocking.
+ */
+async function checkConnectorHealth() {
+  const { probeConnectors, summarize, HEALTH } = await import('../shared/connectors/health.js');
+  const rows = await probeConnectors();
+  if (rows.length === 0) {
+    return check('connector-health', 'Connector health', 'warn',
+      'no connector has a credential',
+      'Add one with `sentinel auth login <id>`, or run Ollama for a free local model.');
+  }
+  const broken = rows.filter((r) => r.state !== HEALTH.OK && r.state !== HEALTH.DEGRADED);
+  const level = broken.length === rows.length ? 'fail' : broken.length ? 'warn' : 'pass';
+  return check('connector-health', 'Connector health', level, summarize(rows),
+    broken.length ? broken.map((r) => `${r.label}: ${r.advice}`).join(' · ') : null);
+}
+
+/**
  * Every check, in the order a failure is most likely to be the real cause.
  * `probeNetwork` defaults to false so a plain `sentinel doctor` stays offline.
  */
@@ -319,8 +341,13 @@ export async function runDoctor({ cwd = getWorkdir(), env = process.env, probeNe
 
   if (probeNetwork) {
     checks.push(await checkLocalModels(Object.entries(LOCAL_HOSTS)));
+    // Key presence is not health. A set key can be expired, revoked, or
+    // quota-blocked, and `checkProviders` cannot tell — it only reads names.
+    // Probing answers the question the user actually has.
+    checks.push(await checkConnectorHealth());
   } else {
     checks.push(check('local-models', 'Local model servers', 'skip', 'not probed (--network)'));
+    checks.push(check('connector-health', 'Connector health', 'skip', 'not probed (--network)'));
   }
 
   return {

@@ -1175,6 +1175,55 @@ program
     process.exit(report.ok ? 0 : 1);
   });
 
+// ── health: are my connectors actually answering? ─────────────────────────────
+program
+  .command('health')
+  .description('Probe every configured connector and report latency, quota and reachability')
+  .option('-c, --connector <id>', 'Probe only one connector (repeatable)')
+  .option('--json', 'Print as JSON')
+  .action(async (options) => {
+    const { probeConnectors, HEALTH } = await import('../shared/connectors/health.js');
+    const only = options.connector
+      ? (Array.isArray(options.connector) ? options.connector : [options.connector])
+      : undefined;
+    const rows = await probeConnectors({ only });
+
+    if (options.json) {
+      process.stdout.write(JSON.stringify(rows, null, 2) + '\n');
+      process.exit(rows.some((r) => r.state !== HEALTH.OK && r.state !== HEALTH.DEGRADED) ? 1 : 0);
+    }
+
+    if (rows.length === 0) {
+      console.log('\nNo connector has a credential, so there is nothing to probe.');
+      console.log('  \x1b[2mAdd one:  sentinel auth login <id>\x1b[0m');
+      console.log('  \x1b[2mOr free:   run Ollama, then `sentinel models`\x1b[0m\n');
+      process.exit(0);
+    }
+
+    const MARK = {
+      [HEALTH.OK]: ['\x1b[32m●\x1b[0m', 'ok'],
+      [HEALTH.DEGRADED]: ['\x1b[33m●\x1b[0m', 'slow'],
+      [HEALTH.QUOTA]: ['\x1b[33m●\x1b[0m', 'no quota'],
+      [HEALTH.UNAUTHORIZED]: ['\x1b[31m●\x1b[0m', 'bad key'],
+      [HEALTH.UNSUPPORTED]: ['\x1b[31m●\x1b[0m', 'no endpoint'],
+      [HEALTH.ERROR]: ['\x1b[31m●\x1b[0m', 'server error'],
+      [HEALTH.UNREACHABLE]: ['\x1b[31m●\x1b[0m', 'unreachable'],
+    };
+
+    console.log('');
+    for (const r of rows) {
+      const [mark, label] = MARK[r.state] || ['\x1b[2m○\x1b[0m', r.state];
+      const latency = r.latencyMs != null ? `${String(r.latencyMs).padStart(5)}ms` : '      ';
+      const models = r.models ? `${r.models} models` : '';
+      console.log(`  ${mark} ${r.label.padEnd(24)} ${latency}  \x1b[2m${label.padEnd(13)} ${models}\x1b[0m`);
+      if (r.advice && r.state !== HEALTH.OK) {
+        console.log(`    \x1b[2m${r.advice}\x1b[0m`);
+      }
+    }
+    console.log('');
+    process.exit(rows.some((r) => r.state !== HEALTH.OK && r.state !== HEALTH.DEGRADED) ? 1 : 0);
+  });
+
 // ── auth: manage LLM connector credentials ────────────────────────────────────
 //
 // The command name is not new. `providers.js` has been telling users to run
