@@ -157,8 +157,23 @@ async function* sse(res) {
 
 // ─── OpenAI-compatible streaming ──────────────────────────────────────────────
 
-async function* streamOpenAICompat({ provider, model, messages, tools, apiKey, signal }) {
+/**
+ * Visible-answer headroom reserved on top of an Anthropic thinking budget.
+ *
+ * Anthropic caps `max_tokens` across thinking *and* visible output, so a budget
+ * set equal to max_tokens yields a response with nothing left to say. 8192
+ * leaves room for a code edit plus a short explanation, which is what a turn's
+ * final step actually needs.
+ */
+const ANTHROPIC_REPLY_HEADROOM = 8192;
+
+async function* streamOpenAICompat({ provider, model, messages, tools, apiKey, signal, providerOptions }) {
   const base = baseUrlFor(provider);
+  // Effort settings, e.g. `{ reasoning_effort: 'high' }`. Only the reasoning
+  // knobs are forwarded — spreading providerOptions wholesale would let a
+  // per-model override set arbitrary body fields on every OpenAI-compatible
+  // endpoint, including ones that reject unknown keys with a 400.
+  const reasoning = providerOptions?.openai?.thinking || providerOptions?.reasoning;
   const res = await fetch(`${base}/chat/completions`, {
     method: 'POST',
     headers: headersFor(provider, apiKey),
@@ -166,6 +181,8 @@ async function* streamOpenAICompat({ provider, model, messages, tools, apiKey, s
       model,
       messages,
       stream: true,
+      ...(reasoning ? { reasoning_effort: reasoning.reasoningEffort } : {}),
+      ...(reasoning?.include ? { include: reasoning.include } : {}),
       ...(tools && tools.length ? { tools } : {}),
     }),
     signal,
@@ -228,7 +245,7 @@ function makeToolCall(slot, i) {
 
 // ─── Anthropic native streaming ───────────────────────────────────────────────
 
-async function* streamAnthropic({ model, messages, tools, apiKey, system, signal }) {
+async function* streamAnthropic({ model, messages, tools, apiKey, system, signal, providerOptions }) {
   // Explicit prompt caching. The system prompt is the stable prefix: it is
   // rebuilt from the same sections every turn and only varies when the project
   // context files, skills, or memory change. Marking it ephemeral makes Anthropic
@@ -241,6 +258,13 @@ async function* streamAnthropic({ model, messages, tools, apiKey, system, signal
     typeof system === 'string' && system
       ? [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }]
       : undefined;
+  // Reasoning config: the effort variant's thinking budget, or the model default.
+  //
+  // This was computed by `getProviderOptions` and then thrown away — the loop
+  // never passed it and the body below never read it, so every Anthropic model
+  // ran with no `thinking` at all regardless of what the registry said it
+  // supported. Extended thinking is the whole point of picking Opus over Haiku.
+  const thinking = providerOptions?.anthropic?.thinking;
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: headersFor('anthropic', apiKey),
@@ -248,7 +272,11 @@ async function* streamAnthropic({ model, messages, tools, apiKey, system, signal
       model,
       ...(systemBlocks ? { system: systemBlocks } : system ? { system } : {}),
       messages,
-      max_tokens: 8192,
+      // Thinking budget is billed output, so max_tokens has to cover the budget
+      // plus room for the visible answer. Without this headroom a `max` variant
+      // spends its entire allowance reasoning and returns an empty reply.
+      max_tokens: thinking?.budgetTokens ? thinking.budgetTokens + ANTHROPIC_REPLY_HEADROOM : 8192,
+      ...(thinking ? { thinking } : {}),
       stream: true,
       ...(tools && tools.length ? { tools } : {}),
     }),
@@ -475,10 +503,11 @@ export function adaptMessagesForGoogle(messages) {
 /**
  * Stream one provider turn. Yields normalized events (see file header).
  * @param {{ modelId: string, provider: string, system?: string,
- *           messages: Array, tools?: Array, signal?: AbortSignal }} opts
+ *           messages: Array, tools?: Array, signal?: AbortSignal,
+ *           providerOptions?: object }} opts
  */
 export async function* streamCompletion(opts) {
-  const { modelId, provider, system, messages, tools, signal } = opts;
+  const { modelId, provider, system, messages, tools, signal, providerOptions } = opts;
   const conn = getConnector(provider);
   const needsKey = !(conn?.local) && provider !== 'local';
   const apiKey = await getApiKey(provider);
@@ -504,6 +533,7 @@ export async function* streamCompletion(opts) {
         apiKey,
         system,
         signal,
+        providerOptions,
       });
       return;
     }
@@ -515,6 +545,7 @@ export async function* streamCompletion(opts) {
         apiKey,
         system,
         signal,
+        providerOptions,
       });
       return;
     }
@@ -536,6 +567,7 @@ export async function* streamCompletion(opts) {
       tools,
       apiKey,
       signal,
+      providerOptions,
     });
   } catch (e) {
     if (e?.name === 'AbortError') return;

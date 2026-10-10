@@ -9,7 +9,7 @@
  * This replaces the deleted Hono server's /chat route — no HTTP, no process
  * boundary: the TUI and CLI call it directly.
  */
-import { resolveChatModel, getModelPricing, estimateCostUsd, findSupportedChatModel } from '../shared/models/index.js';
+import { resolveChatModel, getModelPricing, estimateCostUsd, findSupportedChatModel, applyModelOverrides } from '../shared/models/index.js';
 import { executeLocalTool, normalizeTimeoutMs, validateToolInput, coerceToolInput } from '../shared/tools/index.js';
 import { buildSystemPrompt } from './prompt.js';
 import { streamCompletion } from './providers.js';
@@ -346,14 +346,38 @@ export async function* runAgentTurnInner(opts = {}) {
 
   let resolved;
   let cheap = null;
+  // Declared before the resolve block below, which assigns them.
+  let activeVariant = null;
+  let cheapVariant = null;
   try {
-    resolved = resolveChatModel(model);
-    if (routeModel) cheap = resolveChatModel(routeModel);
+    // An id may carry an inline effort suffix (`claude-sonnet-4-6#high`).
+    // Parsed before resolution so the registry never has to know about
+    // suffixes, and carried through so the level reaches the request.
+    const { parseVariant } = await import('../shared/models/variants.js');
+    const { modelId: bareId, variant: inlineVariant } = parseVariant(model);
+    resolved = resolveChatModel(bareId);
+    activeVariant = inlineVariant;
+    if (routeModel) {
+      const routed = parseVariant(routeModel);
+      cheap = resolveChatModel(routed.modelId);
+      cheapVariant = routed.variant;
+    }
   } catch (e) {
     yield { event: 'error', data: { message: e.message } };
     yield { event: 'done', data: {} };
     return;
   }
+
+  // Reasoning effort, resolved once per turn: the inline suffix if given,
+  // otherwise whatever this model was last set to. Only a model that actually
+  // reasons gets one.
+  const { loadVariant, supportsThinking } = await import('../shared/models/variants.js');
+  const effortFor = async (id, inline) => {
+    if (!id || !supportsThinking(id)) return null;
+    return inline || await loadVariant(id);
+  };
+  activeVariant = await effortFor(resolved.modelId, activeVariant);
+  if (cheap) cheapVariant = await effortFor(cheap.modelId, cheapVariant);
   if (cheap && cheap.modelId === resolved.modelId) cheap = null;
   const cheapUsage = { inputTokens: 0, outputTokens: 0 };
   let lastBatchReadOnly = false;
@@ -516,14 +540,27 @@ export async function* runAgentTurnInner(opts = {}) {
       }
     }
 
-    const attemptStream = (attempt) => (createStream ?? streamCompletion)({
-      modelId: attempt.modelId,
-      provider: attempt.provider,
-      system,
-      messages: buildRequestMessages(messages),
-      tools,
-      signal,
-    });
+    // Reasoning effort and any stored per-model overrides, resolved once per
+    // iteration. This was computed by `resolveChatModel` and then dropped on the
+    // floor — the request went out with no `thinking` block at all, so picking
+    // a reasoning model changed the price and the label but not the behaviour.
+    const mainOptions = await applyModelOverrides(resolved.modelId, resolved.providerOptions, activeVariant);
+    const cheapOptions = cheap
+      ? await applyModelOverrides(cheap.modelId, cheap.providerOptions, cheapVariant)
+      : undefined;
+
+    const attemptStream = (attempt) => {
+      const opts = attempt.modelId === cheap?.modelId ? cheapOptions : mainOptions;
+      return (createStream ?? streamCompletion)({
+        modelId: attempt.modelId,
+        provider: attempt.provider,
+        providerOptions: attempt.providerOptions || opts,
+        system,
+        messages: buildRequestMessages(messages),
+        tools,
+        signal,
+      });
+    };
 
     const events = failoverChain
       ? streamWithFailover({

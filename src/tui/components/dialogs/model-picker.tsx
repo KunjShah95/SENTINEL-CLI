@@ -4,6 +4,7 @@ import TextInput from 'ink-text-input';
 import { useTheme } from '../../providers/theme/index.js';
 import { useDialog } from '../../providers/dialog/index.js';
 import { useViewport } from '../oc/overlay.js';
+import { variantLabel } from '../../../shared/models/variants.js';
 
 type ModelEntry = {
   id: string;
@@ -12,6 +13,7 @@ type ModelEntry = {
   inputUsdPerMillionTokens: number;
   outputUsdPerMillionTokens: number;
   thinking?: boolean;
+  toolCall?: boolean;
 };
 
 type ModelPickerDialogProps = {
@@ -35,6 +37,12 @@ export function ModelPickerDialog({ currentModel, onSelect }: ModelPickerDialogP
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [scrollOffset, setScrollOffset] = useState(0);
   const [query, setQuery] = useState('');
+  // Effort level chosen for the highlighted model. Switching effort is not a
+  // model switch — the conversation stays — so it is a property of the
+  // selection rather than something baked into what gets passed back.
+  const [variant, setVariant] = useState<string>('');
+  const [variantsFor, setVariantsFor] = useState<string[]>([]);
+  const [badge, setBadge] = useState<string | null>(null);
   const loaded = useRef(false);
 
   useEffect(() => {
@@ -68,8 +76,32 @@ export function ModelPickerDialog({ currentModel, onSelect }: ModelPickerDialogP
     setSelectedIdx(0);
   }, [query, models]);
 
-  const handleSelect = useCallback((m: ModelEntry) => {
-    onSelect(m.id);
+  // Recompute the effort levels and the measured score whenever the highlight
+  // moves, so the footer describes what Enter would actually select.
+  useEffect(() => {
+    const m = filtered[selectedIdx];
+    if (!m) { setVariantsFor([]); setBadge(null); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const variants = await import('../../../shared/models/variants.js');
+        const levels = variants.availableVariants(m.id);
+        if (!cancelled) setVariantsFor(levels);
+      } catch { if (!cancelled) setVariantsFor([]); }
+      try {
+        const bench = await import('../../../agent/bench-scores.js');
+        const b = bench.badgeFor(m.id);
+        if (!cancelled) setBadge(b);
+      } catch { if (!cancelled) setBadge(null); }
+    })();
+    return () => { cancelled = true; };
+  }, [filtered, selectedIdx]);
+
+  const handleSelect = useCallback((m: ModelEntry, v?: string) => {
+    // The variant rides on the id so everything downstream — the pref, the
+    // session header, the cost record — can see which effort level produced the
+    // spend without a second piece of state that can disagree.
+    onSelect(variantLabel(m.id, v ?? null));
     close();
   }, [onSelect, close]);
 
@@ -80,6 +112,17 @@ export function ModelPickerDialog({ currentModel, onSelect }: ModelPickerDialogP
   const visible = filtered.slice(scrollOffset, scrollOffset + PAGE);
 
   useInput((input, key) => {
+    // `v` cycles the effort level of whatever is highlighted. Shift-V steps
+    // back, so a user who overshoots does not have to cycle all the way round.
+    if (!query.trim() && (input === 'v' || input === 'V') && variantsFor.length > 0) {
+      const at = variantsFor.indexOf(variant);
+      const step = input === 'V' ? -1 : 1;
+      const next = at < 0
+        ? variantsFor[0]
+        : variantsFor[(at + step + variantsFor.length) % variantsFor.length];
+      setVariant(next);
+      return;
+    }
     if (key.upArrow || (!query && input === 'k')) {
       setSelectedIdx(i => {
         const next = Math.max(0, i - 1);
@@ -123,7 +166,7 @@ export function ModelPickerDialog({ currentModel, onSelect }: ModelPickerDialogP
       return;
     }
     if (key.return && filtered[selectedIdx]) {
-      handleSelect(filtered[selectedIdx]);
+      handleSelect(filtered[selectedIdx], variant);
     }
   });
 
@@ -170,9 +213,10 @@ export function ModelPickerDialog({ currentModel, onSelect }: ModelPickerDialogP
                 </Text>
                 <Text bold={isSelected} color={isSelected ? colors.selection : undefined}>
                   {modelDisplayName(m)}
+                  {isSelected && variant ? `#${variant}` : ''}
                 </Text>
                 <Text dimColor>
-                  {m.thinking ? '🧠' : ''}{priceStr}
+                  {m.thinking ? '🧠' : ''}{m.toolCall ? '🔧' : ''}{priceStr}
                 </Text>
               </Box>
             );
@@ -182,9 +226,13 @@ export function ModelPickerDialog({ currentModel, onSelect }: ModelPickerDialogP
           )}
         </Box>
       )}
-      <Box flexDirection="row" gap={2}>
+      <Box flexDirection="row" gap={2} flexWrap="wrap">
         <Text dimColor>↑↓ navigate  ←→ provider  Enter select  Esc close  Type to filter</Text>
+        {variantsFor.length > 0 && (
+          <Text dimColor>{`  v effort: ${variant || '(default)'} (${variantsFor.length} levels)`}</Text>
+        )}
       </Box>
+      {badge && <Text dimColor>{`Measured here: ${badge}`}</Text>}
     </Box>
   );
 }
