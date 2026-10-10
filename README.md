@@ -62,12 +62,150 @@ bin/sentinel.js          entry point (TUI / ask / mcp / --version)
 src/cli/main.js          headless command surface (ask, goal, mini, race, onboard, help)
 src/agent/               the agent: loop, providers, tools glue, cost, sessions, prompt
 src/shared/tools/        sandboxed local tools: read, write, edit, glob, grep, bash…
-src/shared/models/       model registry + live discovery from provider APIs
+src/shared/connectors/   connector registry, models.dev catalog, credentials, health
+src/shared/models/       model registry, effort variants, per-model preferences
 src/config/              config store (~/.sentinel.json > $XDG > project-local)
 src/tui/                 the Ink (React) terminal UI
 mcp/                     MCP stdio server (health, ask, review-diff)
 __tests__/               unit tests (node:test + jest)
 ```
+
+## Connectors, models, and resilience
+
+### `sentinel auth` — one credential store
+
+Twenty-two connectors, one frozen registry, one key store. Adding a provider is
+a row in `src/shared/connectors/registry.js`, not twenty lines of copy-pasted
+discovery code.
+
+```bash
+sentinel auth                          # what is connected, and where from
+sentinel auth login groq               # paste a key
+sentinel auth login openai             # or export OPENAI_API_KEY and skip this
+sentinel auth logout groq
+sentinel auth --json                   # never contains a key — presence only
+```
+
+Keys live in `~/.sentinel/auth.json` (mode 0600). Resolution is **store first,
+environment second**, so an exported variable is the zero-config path and a
+pasted key is the explicit one. `sentinel auth --json` reports `source` and
+`connected`, never the credential — a status listing ends up in scrollback and
+in bug reports.
+
+### `sentinel models` — what you can call right now
+
+```bash
+sentinel models                         # connected connectors, grouped, priced
+sentinel models --all                   # everything in the catalog
+sentinel models --connector anthropic   # one connector
+sentinel models --search sonnet
+sentinel models --json
+```
+
+Model metadata comes from [models.dev](https://models.dev), with live discovery
+against each connector layered on top. That is why prices are real for every
+provider: a `/models` endpoint returns ids, not money, so before this every
+connector except OpenRouter reported $0 and cost accounting was wrong.
+
+Pinned entries win on id collision, so a release newer than the catalog still
+resolves offline.
+
+### `sentinel health` — is it actually answering?
+
+```bash
+sentinel health                  # probes every configured connector
+sentinel health --connector groq
+sentinel doctor --network        # same probes, inside the doctor report
+```
+
+The distinction this exists for: **out of quota** and **rejected credential**
+both fail your next turn, and they are fixed by opposite things — upgrade vs
+re-auth. Both used to surface as "provider error", which is why provider outages
+are slow to diagnose. A set key can also be expired or revoked, so key
+*presence* was never a health check.
+
+An unconfigured connector is `absent`, not unhealthy. Anthropic exposes no
+listing endpoint, so it is reported as inference-only rather than probed with a
+request that cannot succeed.
+
+### Effort variants
+
+A named reasoning level for the same model. Switching effort is not a model
+switch, so it does not cost you the thread.
+
+```bash
+sentinel ask "…" -m claude-sonnet-4-6#high
+sentinel ask "…" -m claude-sonnet-4-6#fast
+```
+
+Levels: `off` `fast` `standard` `high` `max`. In the picker, `v` / `V` cycles
+the highlighted model. Stored per model — `high` for an architecture change and
+`fast` for a rename are different moments.
+
+Budgets are clamped to what the API accepts. Anthropic rejects `budgetTokens`
+below 1024 with a 400 that reads like a malformed request, so the floor is
+enforced before the wire. `max` is capped at the model's own output limit,
+because thinking and visible output share one allowance and a budget equal to
+`max_tokens` returns an empty reply.
+
+### Failover chains
+
+A named group of models that try each other in order when one fails.
+
+```yaml
+# ~/.sentinel.yaml
+failover:
+  default: gpt-6-luna, claude-haiku-4-5, ollama/qwen3:8b
+  gpt-6-astra: gpt-6-sol, claude-haiku-4-5      # a careful chain for the expensive one
+```
+
+```bash
+SENTINEL_FAILOVER=gpt-6-luna,claude-haiku-4-5 sentinel ask "…"   # one run
+SENTINEL_FAILOVER=off sentinel ask "…"                          # disable
+```
+
+Not the same as `sentinel race`: race runs N models in parallel and keeps the
+best answer, costing N times the tokens for a quality decision. Failover costs
+one call and only spends more when a call *fails*.
+
+What continues and what stops is the design. A malformed request (400) fails
+identically on every model, so retrying it three times just triples the latency
+of an error you have to fix — 400 and abort are terminal. 402, 429, 5xx, network
+failures and 404 move on. 401/403 move on too, because a chain usually spans
+connectors and a stale key on one should not end a turn a healthy second key
+could serve.
+
+Two rules the tests pin: no retry after partial text or a tool call (replaying
+output the user already saw is worse than showing the error), and the chosen
+model is reported in the turn's finish event so cost stays explainable.
+
+### Per-connector spend caps
+
+A single engagement ceiling cannot tell you *which key* is burning it. Caps are
+independent ceilings, not a partition of the total.
+
+```bash
+sentinel budget --connector openai --usd 10    # cap one connector
+sentinel budget --connector openai             # what it has spent
+sentinel budget --connector openai --usd 0     # clear
+```
+
+Checked after every model call like the engagement budget, and only when the
+turn opted into the engagement guard.
+
+### Bench-verified models
+
+`npm run bench` and `npm run bench:security` measure real task completion. Those
+numbers now surface in `/models` and the picker as measured evidence.
+
+A score describes this repo, on this machine, at this commit — so it informs a
+human choosing from the picker and never reorders what `autoSelectBestModel`
+picks. Absence of a benchmark is not evidence of a bad model, so unbenchmarked
+models print nothing rather than an empty column you learn to ignore. Scores
+from another commit are shown as stale rather than hidden.
+
+Record one with `sentinel bench -m <model-id>`, and read them back with
+`sentinel bench --scores`.
 
 ### The agent loop
 

@@ -2128,9 +2128,41 @@ program
 program
   .command('bench')
   .description('Run the offline SWE-mini capability harness (no API key needed)')
-  .action(async () => {
+  .option('-m, --model <id>', 'Record the result against this model id')
+  .option('-d, --dir <path>', 'Project to record against (default: cwd)')
+  .option('--scores', 'Show measured model scores instead of running the harness')
+  .action(async (options) => {
+    const cwd = path.resolve(options.dir || process.cwd());
+    const { scoreTable } = await import('../agent/bench-scores.js');
+
+    if (options.scores) {
+      const rows = scoreTable(cwd);
+      if (rows.length === 0) {
+        console.log('\nNo measurements recorded yet.');
+        console.log('  \x1b[2mRecord one: sentinel bench -m <model-id>\x1b[0m\n');
+        process.exit(0);
+      }
+      console.log('');
+      for (const r of rows) {
+        console.log(`  ${r.model.padEnd(32)} ${r.resolved != null ? `${Math.round(r.resolved * 100)}% solved` : '—'}${r.security != null ? `  ${Math.round(r.security * 100)}% secure` : ''}${r.stale ? '  \x1b[2m(stale)\x1b[0m' : ''}`);
+      }
+      console.log('');
+      process.exit(0);
+    }
+
     const { runMiniBench } = await import('../../scripts/bench-swe-mini.js');
     const { passed, total } = await runMiniBench({ verbose: true });
+
+    // Recording is opt-in per run because a harness pass rate is evidence about
+    // *this* harness on *this* repo, and attaching it to a model id by default
+    // would make every CI run claim a measurement nobody chose to make.
+    if (options.model) {
+      const { recordScore } = await import('../agent/bench-scores.js');
+      const resolved = total > 0 ? passed / total : 0;
+      recordScore(options.model, { resolved, tasks: total }, cwd);
+      console.log(`\nRecorded ${options.model}: ${Math.round(resolved * 100)}% of ${total} tasks.`);
+      console.log('  \x1b[2mVisible in /models and the picker. View all: sentinel bench --scores\x1b[0m');
+    }
     process.exit(passed === total ? 0 : 1);
   });
 
