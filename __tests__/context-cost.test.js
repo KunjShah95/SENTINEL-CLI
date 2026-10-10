@@ -245,12 +245,35 @@ describe('trimMessagesForBudget honours the bound and stays pure', () => {
   it('stays fast on a 60-round conversation instead of re-serializing it', () => {
     const msgs = convo(60);
     trimMessagesForBudget(convo(60)); // warm
-    const t0 = performance.now();
-    for (let i = 0; i < 10; i++) trimMessagesForBudget(msgs);
-    const ms = (performance.now() - t0) / 10;
-    // The re-serializing version measured 94ms here. 10ms leaves generous
-    // headroom for slow CI while still failing if it regresses to O(n^2).
-    assert.ok(ms < 10, `trim took ${ms.toFixed(1)}ms per call (budget 10ms)`);
+
+    // Best-of-N, not the mean of one window.
+    //
+    // This asserts wall-clock time, and wall-clock time is a function of what
+    // else the machine is doing. The first version timed a single 10-iteration
+    // window and averaged it, which made the result a measure of machine load as
+    // much as a measure of the code: it passed 3/3 alone at ~4ms and failed once
+    // mid-suite at 12ms against the same 10ms budget, with nothing about
+    // `trimMessagesForBudget` having changed.
+    //
+    // The minimum is the right estimator because contention can only ever make a
+    // trial *slower* — a GC pause, a scheduler preemption or a busy core adds
+    // time and never removes it. So the fastest observed trial approaches the
+    // true unloaded cost, and the whole 10ms-vs-94ms margin stays intact: a real
+    // O(n^2) regression inflates every trial and is still caught immediately.
+    // A regression hides from this only by getting *faster*, which is not a
+    // failure mode.
+    const TRIALS = 12;
+    const PER_TRIAL = 10;
+    let best = Infinity;
+    for (let t = 0; t < TRIALS; t++) {
+      const t0 = performance.now();
+      for (let i = 0; i < PER_TRIAL; i++) trimMessagesForBudget(msgs);
+      const perCall = (performance.now() - t0) / PER_TRIAL;
+      if (perCall < best) best = perCall;
+    }
+    // The re-serializing version measured 94ms here. 10ms still fails if it
+    // regresses to O(n^2); it just no longer also fails if the CI runner is busy.
+    assert.ok(best < 10, `trim took ${best.toFixed(1)}ms per call (budget 10ms)`);
   });
 });
 
