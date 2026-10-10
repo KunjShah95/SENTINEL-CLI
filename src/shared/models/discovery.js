@@ -189,6 +189,14 @@ export async function discoverAllModels({ includeUnconnected = false } = {}) {
     if (key) connected.push(id);
   }
 
+  // Started before the live probes and awaited after them, so the catalog's
+  // network round trip overlaps the providers' instead of following it.
+  // Serialising them meant a cold start paid both timeouts back to back —
+  // measured at 5.4s for a turn that had already found its models.
+  const catalogPromise = includeUnconnected
+    ? fetchCatalogModels()
+    : fetchAvailableCatalogModels();
+
   const results = await Promise.allSettled(connected.map(discoverConnector));
   const live = [];
   for (const result of results) {
@@ -200,9 +208,7 @@ export async function discoverAllModels({ includeUnconnected = false } = {}) {
   // Live endpoints do not report prices, so the catalog fills pricing, capability
   // flags and breadth. A live id still wins over its catalog twin — the user's
   // key proves the model is really reachable for them — but inherits the money.
-  const catalog = includeUnconnected
-    ? await fetchCatalogModels()
-    : await fetchAvailableCatalogModels();
+  const catalog = await catalogPromise.catch(() => []);
   const liveIds = new Set(live.map((m) => m.id));
   const withPrices = live.map((m) => {
     const priced = catalog.find((c) => c.id === m.id);

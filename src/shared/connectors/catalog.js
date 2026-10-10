@@ -41,7 +41,9 @@ import {
 
 const CATALOG_URL = 'https://models.dev/api.json';
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // a day — this is a slow-moving file
-const FETCH_TIMEOUT_MS = 8000;
+// Matches the per-provider discovery timeout. This runs concurrently with live
+// discovery, so the two share one timeout window rather than adding up.
+const FETCH_TIMEOUT_MS = 5000;
 
 /** Global cache path, beside preferences.json. */
 const CACHE_DIR = join(homedir(), '.sentinel');
@@ -111,6 +113,10 @@ export function toRegistryModel(connectorId, raw) {
     attachment: raw.attachment === true,
     contextLength: raw.limit?.context || undefined,
     outputTokenLimit: raw.limit?.output || undefined,
+    // The API rejects a thinking budget below this with a 400 that reads like a
+    // malformed request. Carrying it here lets the variant layer clamp before
+    // the wire instead of after.
+    reasoningMinTokens: raw.reasoning_options?.find((o) => o.type === 'budget_tokens')?.min || undefined,
     releaseDate: raw.release_date || undefined,
     source: 'models.dev',
   };

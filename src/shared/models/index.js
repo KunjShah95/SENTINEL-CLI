@@ -213,6 +213,14 @@ export function getBareModelId(modelId) {
   return modelId;
 }
 
+/**
+ * Base provider options for a model.
+ *
+ * Effort levels live in `variants.js` and are applied by
+ * `applyModelOverrides`, not here. That direction matters: variants.js needs
+ * `findSupportedChatModel`, so if this function reached back into variants.js
+ * the two modules would form a cycle.
+ */
 export function getProviderOptions(modelId) {
   const model = findSupportedChatModel(modelId);
   if (!model) return undefined;
@@ -226,20 +234,65 @@ export function getProviderOptions(modelId) {
   return Object.keys(opts).length > 0 ? opts : undefined;
 }
 
-export async function applyModelOverrides(modelId, baseOptions) {
+/**
+ * Merge the stored option overrides for a model, then apply its effort variant.
+ *
+ * Order is deliberate: a variant sets reasoning *budget*, and a hand-written
+ * override in `preferences.json` is more specific than a named level, so the
+ * override wins. Reversing it would make a variant silently un-tunable by
+ * anyone who had ever touched the config, which is exactly the opacity this
+ * replaces.
+ */
+export async function applyModelOverrides(modelId, baseOptions, variant) {
   const model = findSupportedChatModel(modelId);
   if (!model) return baseOptions;
+
+  let merged = baseOptions;
   const { loadModelConfig } = await import('./prefs.js');
   const overrides = await loadModelConfig(model.provider, model.id);
-  if (!overrides) return baseOptions;
-  return {
-    ...baseOptions,
-    ...overrides.options,
-    provider: {
-      ...baseOptions?.provider,
-      ...overrides.options?.provider,
-    },
-  };
+  if (overrides) {
+    merged = {
+      ...merged,
+      ...overrides.options,
+      provider: {
+        ...merged?.provider,
+        ...overrides.options?.provider,
+      },
+    };
+  }
+
+  if (!variant) return merged;
+  const { optionsForVariant } = await import('./variants.js');
+  return mergeProviderOptions(merged, optionsForVariant(modelId, variant));
+}
+
+/**
+ * Merge two provider-option bags, later keys winning.
+ *
+ * Recurses into plain objects because the option bags are nested one level
+ * deeper than a shallow spread suggests: `{ anthropic: { thinking: { … } } }`.
+ * A shallow merge there replaces the whole `thinking` object, which silently
+ * drops every field the other side set — so a variant would erase a user's
+ * hand-written override rather than just overriding the one key it owns.
+ *
+ * Arrays are replaced, not concatenated: a request option that is a list is set
+ * as a whole by whoever supplies it.
+ */
+export function mergeProviderOptions(base, overlay) {
+  if (!overlay) return base;
+  if (!base) return overlay;
+  const out = { ...base };
+  for (const [key, value] of Object.entries(overlay)) {
+    const existing = out[key];
+    out[key] = isPlainObject(existing) && isPlainObject(value)
+      ? mergeProviderOptions(existing, value)
+      : value;
+  }
+  return out;
+}
+
+function isPlainObject(v) {
+  return !!v && typeof v === 'object' && !Array.isArray(v);
 }
 
 export function getModelPricing(modelId) {

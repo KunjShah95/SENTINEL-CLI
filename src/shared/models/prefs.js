@@ -93,3 +93,42 @@ export async function getAllModelConfigs() {
     return {};
   }
 }
+
+/**
+ * Per-model reasoning effort, kept in its own map rather than stuffed into
+ * `modelConfigs`.
+ *
+ * `modelConfigs` is keyed by connector then model id and holds request options
+ * — the same slot is what `applyModelOverrides` reads. Putting a UI preference
+ * there would make an unknown key in that map ambiguous between "an option I
+ * should merge into the request" and "a level the user picked", and one wrong
+ * merge would send a display setting to the provider.
+ */
+export async function saveModelVariant(modelId, variant) {
+  try {
+    const prefs = await ensurePrefs();
+    if (!prefs.modelVariants) prefs.modelVariants = {};
+    prefs.modelVariants[modelId] = variant;
+    await fs.writeFile(PREFS_PATH, JSON.stringify(prefs, null, 2), { mode: 0o600 });
+  } catch {
+    // ignore
+  }
+}
+
+export async function loadModelVariant(modelId) {
+  try {
+    const prefs = await ensurePrefs();
+    return prefs.modelVariants?.[modelId] || null;
+  } catch {
+    return null;
+  }
+}
+
+export async function getAllModelVariants() {
+  try {
+    const prefs = await ensurePrefs();
+    return prefs.modelVariants || {};
+  } catch {
+    return {};
+  }
+}

@@ -161,7 +161,7 @@ describe('model ids', () => {
     }
   });
 
-  it("strips Fireworks' wire-level accounts/ namespace", () => {
+  it('strips Fireworks\' wire-level accounts/ namespace', () => {
     // inferProvider recognised this namespace but the old hardcoded prefix
     // list did not, so the id went on the wire still namespaced and 404'd.
     assert.equal(

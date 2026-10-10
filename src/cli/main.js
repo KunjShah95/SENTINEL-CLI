@@ -550,14 +550,53 @@ program
   .option('--deadline <when>', 'Deadline: ISO date or relative (45m, 2h, 3d)')
   .option('--condition <text>', 'Stop condition recorded alongside the budget')
   .option('--clear', 'Remove the engagement budget')
+  .option('--connector <id>', 'Set or show a per-connector spend cap instead of the total')
   .option('--history', 'List recent turns and their spend')
   .option('--json', 'Print as JSON')
   .action(async (options) => {
     const {
       readBudget, writeBudget, clearBudget, budgetStatus, formatStatus, burnBar,
       readSpend, parseDeadline, BUDGET_PATH, SPEND_PATH, formatDuration,
+      setConnectorCap, connectorSpend,
     } = await import('../agent/budget.js');
     const cwd = path.resolve(options.dir || process.cwd());
+
+    // A per-connector cap is a separate question from the engagement total:
+    // it names which key to revoke, which the total cannot.
+    if (options.connector) {
+      const { getConnector } = await import('../shared/connectors/registry.js');
+      if (!getConnector(options.connector)) {
+        const { listConnectors } = await import('../shared/connectors/registry.js');
+        console.error(`\x1b[31mUnknown connector "${options.connector}".\x1b[0m Known: ${listConnectors().map((c) => c.id).join(', ')}`);
+        process.exit(1);
+      }
+      if (options.usd != null) {
+        const cap = Number(options.usd);
+        if (!Number.isFinite(cap) || cap < 0) {
+          console.error(`\x1b[31m--usd must be a positive number (got "${options.usd}")\x1b[0m`);
+          process.exit(1);
+        }
+        const saved = setConnectorCap(options.connector, cap, cwd);
+        console.log(saved
+          ? `Cap for ${options.connector}: $${saved.toFixed(2)}.`
+          : `Cleared the cap for ${options.connector}.`);
+        process.exit(0);
+      }
+      const { byConnector } = connectorSpend(cwd);
+      const row = byConnector[options.connector];
+      const spend = row || { usd: 0, turns: 0, capUsd: readBudget(cwd).connectorCaps?.[options.connector] || 0 };
+      if (options.json) {
+        process.stdout.write(JSON.stringify({ connector: options.connector, ...spend }, null, 2) + '\n');
+        process.exit(0);
+      }
+      console.log(`\n  ${options.connector}`);
+      console.log(`  spent  $${spend.usd.toFixed(4)} over ${spend.turns} turn${spend.turns === 1 ? '' : 's'}`);
+      console.log(spend.capUsd
+        ? `  cap    $${spend.capUsd.toFixed(2)}  ${spend.usd >= spend.capUsd ? '\x1b[31m(exceeded)\x1b[0m' : `(${(spend.usd / spend.capUsd * 100).toFixed(0)}% used)`}`
+        : '  cap    none set');
+      console.log(`\n  \x1b[2mSet or clear: sentinel budget --connector ${options.connector} --usd <n>\x1b[0m\n`);
+      process.exit(0);
+    }
 
     if (options.clear) {
       clearBudget(cwd);

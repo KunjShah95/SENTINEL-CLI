@@ -9,11 +9,12 @@
  * This replaces the deleted Hono server's /chat route — no HTTP, no process
  * boundary: the TUI and CLI call it directly.
  */
-import { resolveChatModel, getModelPricing, estimateCostUsd } from '../shared/models/index.js';
+import { resolveChatModel, getModelPricing, estimateCostUsd, findSupportedChatModel } from '../shared/models/index.js';
 import { executeLocalTool, normalizeTimeoutMs, validateToolInput, coerceToolInput } from '../shared/tools/index.js';
 import { buildSystemPrompt } from './prompt.js';
 import { streamCompletion } from './providers.js';
 import { streamWithFailover } from './failover.js';
+import { CONNECTOR_IDS, getConnectorKeyPrefix } from '../shared/connectors/registry.js';
 import { recordUsage, estimateTokensFromText } from './cost.js';
 import { withTrajectory, newRunId } from './trajectory.js';
 import { runHooks, auditToolUse, checkStop, projectHasTests, STOP_RETRIES } from './hooks.js';
@@ -29,7 +30,7 @@ import { createTask, awaitTask, cancelTask, getTask, PERMISSIONS } from './task.
 import { spawnTeammate, sendTeamMessage, listTeam, mergeTeammate } from './team.js';
 import { evaluateGoal, GOAL_MAX_CHECKS, GOAL_WORKER_RULE } from './goal.js';
 import { workerBrief, contractBrief } from './outcome.js';
-import { budgetStatus, recordSpend } from './budget.js';
+import { budgetStatus, recordSpend, connectorGate } from './budget.js';
 import { createGateState } from './blast-radius.js';
 import { ReceiptLedger, checkClaims, claimGateMessage } from './receipts.js';
 import { buildProviderTools } from './tool-schemas.js';
@@ -603,6 +604,16 @@ export async function* runAgentTurnInner(opts = {}) {
         yield* finishEvents({ budgetExceeded: true, engagement: status.status });
         return;
       }
+      // A per-connector cap answers "which key is burning it", which the
+      // engagement total cannot. Checked on the connector actually used, and
+      // only when the turn opted into the engagement guard — a cap with no
+      // budget should not silently start enforcing itself on unrelated runs.
+      const gate = connectorGate(activeModel ? connectorOf(activeModel) : null, workdir);
+      if (!gate.allowed) {
+        yield { event: 'error', data: { message: gate.reason } };
+        yield* finishEvents({ budgetExceeded: true, connectorCap: true, connector: activeModel });
+        return;
+      }
       if (status.budget.budgetUsd > 0) {
         // The turn itself must not overshoot the engagement it is part of.
         const turnUsd = runningCostUsd(resolved.modelId, inputTokens, outputTokens)
@@ -859,6 +870,27 @@ export function doomLoopCheck(counts, toolCalls) {
  * read-only tools, and fewer than ROUTE_MAX_CHEAP_STREAK cheap calls ran in
  * a row (the main model re-plans periodically).
  */
+/**
+ * Which connector a model id belongs to, for the per-connector spend gate.
+ *
+ * Namespaced ids are matched against the registry prefixes first, since that
+ * needs no lookup at all. Bare ids — `gpt-6-luna`, `claude-sonnet-4-6` — are the
+ * common case for the paid connectors, so they fall through to the model
+ * registry, which the TUI and CLI both populate at startup. Without this second
+ * step the gate would silently never fire for exactly the connectors most worth
+ * capping.
+ */
+export function connectorOf(modelId) {
+  if (!modelId || typeof modelId !== 'string') return null;
+  if (modelId.startsWith('accounts/fireworks/')) return 'fireworks';
+  for (const id of CONNECTOR_IDS) {
+    const prefix = getConnectorKeyPrefix(id);
+    if (prefix && modelId.startsWith(prefix)) return id;
+  }
+  const found = findSupportedChatModel(modelId);
+  return found?.provider || null;
+}
+
 export const ROUTE_MAX_CHEAP_STREAK = 3;
 export function pickIterationModel({ cheap, iter, lastBatchReadOnly, cheapStreak }) {
   if (!cheap || iter === 0 || !lastBatchReadOnly) return 'main';
