@@ -113,7 +113,11 @@ async function* sse(res) {
     } catch {
       /* ignore */
     }
-    yield { type: 'error', message: formatProviderError(res.status, detail, res.statusText) };
+    // `status` is additive: existing consumers read `message`, which is still
+    // the human-readable form. Failover needs the raw code to tell "this
+    // provider is rate limited, try the next one" apart from "this request is
+    // malformed, every provider will reject it identically".
+    yield { type: 'error', status: res.status, message: formatProviderError(res.status, detail, res.statusText) };
     return;
   }
   const reader = res.body.getReader();
@@ -296,7 +300,13 @@ async function* streamAnthropic({ model, messages, tools, apiKey, system, signal
         usage: { inputTokens: 0, outputTokens: j.usage.output_tokens || 0 },
       };
     } else if (j.type === 'error') {
-      yield { type: 'error', message: j.error?.message || 'anthropic error' };
+      // Anthropic reports the HTTP status on the error object rather than the
+      // stream, so it is lifted here for the same reason as in sse().
+      yield {
+        type: 'error',
+        status: j.error?.status_code || j.error?.status || undefined,
+        message: j.error?.message || 'anthropic error',
+      };
       return;
     }
   }

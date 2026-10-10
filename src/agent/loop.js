@@ -13,6 +13,7 @@ import { resolveChatModel, getModelPricing, estimateCostUsd } from '../shared/mo
 import { executeLocalTool, normalizeTimeoutMs, validateToolInput, coerceToolInput } from '../shared/tools/index.js';
 import { buildSystemPrompt } from './prompt.js';
 import { streamCompletion } from './providers.js';
+import { streamWithFailover } from './failover.js';
 import { recordUsage, estimateTokensFromText } from './cost.js';
 import { withTrajectory, newRunId } from './trajectory.js';
 import { runHooks, auditToolUse, checkStop, projectHasTests, STOP_RETRIES } from './hooks.js';
@@ -500,14 +501,48 @@ export async function* runAgentTurnInner(opts = {}) {
       yield { event: 'route', data: { model: activeModel, reason: route === 'cheap' ? 'read-only exploration' : 'main model' } };
     }
 
-    for await (const ev of (createStream ?? streamCompletion)({
-      modelId: useModel.modelId,
-      provider: useModel.provider,
+    // Failover is opt-in: a chain is loaded only when one is configured for
+    // this model. Without it `chain` is null and the call below is the same
+    // generator as before, so the common path costs one extra config read and
+    // nothing else.
+    let failoverChain = null;
+    if (iter === 0) {
+      try {
+        const { loadFailoverChain } = await import('./failover.js');
+        failoverChain = await loadFailoverChain(useModel.modelId);
+      } catch {
+        failoverChain = null;
+      }
+    }
+
+    const attemptStream = (attempt) => (createStream ?? streamCompletion)({
+      modelId: attempt.modelId,
+      provider: attempt.provider,
       system,
       messages: buildRequestMessages(messages),
       tools,
       signal,
-    })) {
+    });
+
+    const events = failoverChain
+      ? streamWithFailover({
+        model: useModel,
+        chain: failoverChain.models,
+        stream: attemptStream,
+        onFailover: ({ to }) => {
+          activeModel = to.modelId;
+        },
+      })
+      : attemptStream(useModel);
+
+    for await (const ev of events) {
+      if (ev.type === 'failover') {
+        // Surfaced as a route event so the existing UI channel shows the swap
+        // rather than a silent substitution the user only learns about from
+        // the cost total.
+        yield { event: 'route', data: { model: ev.to, from: ev.from, reason: ev.reason } };
+        continue;
+      }
       if (ev.type === 'text') {
         text += ev.text;
         yield { event: 'text', data: { delta: ev.text } };
