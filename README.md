@@ -916,6 +916,71 @@ npm run release:check  # all three
 
 ## Changelog
 
+### v3.5.0 — Connectors, failover, and a skills system that can restrict itself
+
+60 files, ~8.1k lines. Two themes: the provider layer stopped assuming one
+provider, and the skills layer stopped assuming one registry.
+
+**Providers and connectors**
+- One connector registry for providers, the models.dev catalog, and the auth
+  store — previously spread across a provider table, a discovery module and a
+  per-provider key check.
+- `sentinel health` performs live connector probes that distinguish *a bad key*
+  from *no quota left*, which are the two failures a 401-vs-429 conflation hides.
+- Named model **failover chains**: if a provider dies mid-turn the turn moves to
+  the next model in the chain instead of ending.
+- **Effort variants** per model, **per-connector spend caps**, and bench-verified
+  badges on models whose numbers were actually measured.
+
+**Skills**
+- `skill({names: [...]})` stacks several workflows in one call, in the caller's
+  order. Two separate calls used to return as unordered parallel results, so
+  which body landed first was a race.
+- `allowed-tools` is enforced. A skill may narrow the rest of its turn; the call
+  is **refused with the binding skill named** rather than the tool silently
+  disappearing, because a skill loads mid-turn and a vanished tool reads as a
+  broken agent. Two loaded skills intersect, so an unrestricted one cannot undo a
+  restricted one's declaration.
+- A skill may bundle executable scripts, run with `runSkillScript`. That is a
+  *separate tool* classified as shell — a read-only `skill` tool that could run
+  code would hand every PLAN-mode turn the ability to execute installed code.
+- `spawnAgent` and `spawnTeammate` both accept `skills`, so a delegated agent
+  follows the workflow instead of describing it back to you.
+- `/name args` resolves prompt templates and skills through one syntax and one
+  argument parser, and `sentinel skills run <name>` does the same from a shell,
+  a script, or CI.
+- `disable-model-invocation` withholds a skill from the model entirely while
+  leaving it reachable by name. This needed hyphenated frontmatter keys — the old
+  parser silently discarded every one of them.
+- Skills ship in `skills/` at the repo root, tracked and in the npm tarball.
+
+**Correctness**
+- Tool inputs are now validated before dispatch. `toolInputSchemas` had ~200
+  lines of validators that were written, exported, referenced from every
+  contract, and **never invoked**. Turning them on immediately exposed a real
+  bug: the string validator projected the bare string rather than
+  `{ [field]: value }`, so every `readFile` would have received `'src/x.js'`
+  where it expected `{ path }`.
+- The skill listing no longer overflows its own character cap. The overflow note
+  was appended after the last count, so a real 208-skill install produced 2113
+  chars against a 2000 cap while every individual measurement was correct.
+- `git` failures are no longer printed to the user's terminal: running Sentinel
+  outside a git checkout printed `fatal: not a git repository` once per turn.
+- `providerOptions` is threaded to the wire; `thinking` was configured and never
+  actually sent.
+
+**Tooling**
+- `npm run verify:stages` — asserts all 13 stages of the CodeCrafters "Build your
+  own Claude Code" syllabus against the live code. Kept out of `release:check`
+  because two stages shell out and would assert something about the host too.
+- `npm run check:version` — the version lived in six places, five of them
+  copies. Now one source (`src/version.js`); this resolves every surface and
+  fails if any disagrees. The previous check-by-grep reported package.json's own
+  dependency versions as mismatches, so it asks what each surface *reports*
+  instead.
+- `scripts/tree-quiet.mjs` — waits for file writes to pause before declaring a
+  tree committable, for when more than one agent is working in one checkout.
+
 ### v3.4.0 — Context.dev web context + cheaper turns
 
 **New**
