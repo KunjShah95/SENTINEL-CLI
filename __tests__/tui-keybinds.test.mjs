@@ -117,6 +117,24 @@ describe('compileKeybinds', () => {
     const { app } = compileKeybinds();
     assert.equal(app.get('ctrl+x'), undefined);
   });
+
+  it('lets ctrl+a mean line-home in the prompt and the provider list in the dialog', () => {
+    const { app, prompt } = compileKeybinds();
+    // The collision this guards: one chord, two owners. opencode scopes
+    // `model.dialog.provider` to the model dialog, and the split tables are what
+    // make that expressible — a single flat table would have let whichever id
+    // compiled first silently take ctrl+a and dead the other.
+    assert.equal(prompt.get('ctrl+a'), 'input.line.home', 'ctrl+a still jumps to line start while typing');
+    assert.equal(app.get('ctrl+a'), 'model.dialog.provider', 'ctrl+a opens the provider list in the model dialog');
+  });
+
+  it('routes model.dialog.provider through the app table and honours a rebind', () => {
+    const { app, prompt } = compileKeybinds({ 'model.dialog.provider': 'ctrl+y' });
+    assert.equal(lookup(app, 'a', { ctrl: true }), null, 'rebound chord frees ctrl+a in the app table');
+    assert.equal(lookup(app, 'y', { ctrl: true }), 'model.dialog.provider');
+    // The prompt is untouched by an app-side rebind: ctrl+a is still line-home.
+    assert.equal(prompt.get('ctrl+a'), 'input.line.home');
+  });
 });
 
 describe('lookup + routing', () => {

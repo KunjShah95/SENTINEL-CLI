@@ -3,6 +3,7 @@ import { Box, Text, useInput } from 'ink';
 import { useTheme } from '../../providers/theme/index.js';
 import { useDialog } from '../../providers/dialog/index.js';
 import { useViewport, windowRange } from '../oc/overlay.js';
+import { listConnectors } from '../../../shared/connectors/registry.js';
 
 type ProviderDef = {
   id: string;
@@ -11,35 +12,78 @@ type ProviderDef = {
   keyUrl: string;
   keyPrefix: string;
   isLocal: boolean;
-  isFree: boolean;
-  defaultModel: string;
+  authMethods: string[];
   docs: string;
 };
 
-const PROVIDERS: ProviderDef[] = [
-  { id: 'groq', name: 'Groq (Free Tier)', envKey: 'GROQ_API_KEY', keyUrl: 'https://console.groq.com/keys', keyPrefix: 'gsk_', isLocal: false, isFree: true, defaultModel: 'openai/gpt-oss-20b', docs: 'Free GPT-OSS / Qwen / Llama models — default provider' },
-  { id: 'openai', name: 'OpenAI / ChatGPT', envKey: 'OPENAI_API_KEY', keyUrl: 'https://platform.openai.com/api-keys', keyPrefix: 'sk-', isLocal: false, isFree: false, defaultModel: 'gpt-4o-mini', docs: 'ChatGPT Plus/Pro users get API credits included' },
-  { id: 'anthropic', name: 'Anthropic / Claude', envKey: 'ANTHROPIC_API_KEY', keyUrl: 'https://console.anthropic.com/settings/keys', keyPrefix: 'sk-ant-', isLocal: false, isFree: false, defaultModel: 'claude-sonnet-4-6', docs: 'Claude Pro/Max/Team users get API credits included' },
-  // `id` is the REGISTRY key, not a display name: it is passed to
-  // configManager.setApiKey / getApiKey and matched against
-  // SupportedProvider. It was 'gemini' here while the registry says 'google'
-  // (models/index.js:21, providers.js:487, doctor.js), so /setup saved the key
-  // under config.providers.gemini and every reader looked under
-  // config.providers.google — a saved Gemini key that no provider could find.
-  { id: 'google', name: 'Google Gemini', envKey: 'GEMINI_API_KEY', keyUrl: 'https://aistudio.google.com/apikey', keyPrefix: 'AIza', isLocal: false, isFree: true, defaultModel: 'gemini-2.0-flash', docs: 'Free tier available from Google AI Studio' },
-  { id: 'github-copilot', name: 'GitHub Copilot', envKey: 'GITHUB_TOKEN', keyUrl: 'https://github.com/settings/tokens', keyPrefix: 'ghp_', isLocal: false, isFree: false, defaultModel: 'copilot/gpt-4o', docs: 'Uses your GitHub Copilot subscription' },
-  { id: 'mistral', name: 'Mistral AI', envKey: 'MISTRAL_API_KEY', keyUrl: 'https://console.mistral.ai/api-keys', keyPrefix: '', isLocal: false, isFree: true, defaultModel: 'mistral-small-latest', docs: 'Free tier available (Mistral Small)' },
-  { id: 'deepseek', name: 'DeepSeek', envKey: 'DEEPSEEK_API_KEY', keyUrl: 'https://platform.deepseek.com', keyPrefix: 'sk-', isLocal: false, isFree: true, defaultModel: 'deepseek-chat', docs: 'Very affordable, excellent reasoning models' },
-  { id: 'xai', name: 'xAI / Grok', envKey: 'XAI_API_KEY', keyUrl: 'https://console.x.ai', keyPrefix: '', isLocal: false, isFree: false, defaultModel: 'grok-2', docs: 'Grok models via xAI API' },
-  { id: 'together', name: 'Together AI', envKey: 'TOGETHER_API_KEY', keyUrl: 'https://api.together.ai/settings/api-keys', keyPrefix: 'tgp_', isLocal: false, isFree: true, defaultModel: 'mistralai/Mixtral-8x7B-Instruct-v0.1', docs: 'Open-source model hosting with free credits' },
-  { id: 'fireworks', name: 'Fireworks AI', envKey: 'FIREWORKS_API_KEY', keyUrl: 'https://fireworks.ai/api-keys', keyPrefix: 'fw_', isLocal: false, isFree: true, defaultModel: 'accounts/fireworks/models/llama-v3p1-8b', docs: 'Fast inference on open-source models' },
-  { id: 'perplexity', name: 'Perplexity', envKey: 'PERPLEXITY_API_KEY', keyUrl: 'https://perplexity.ai/settings/api', keyPrefix: 'pplx-', isLocal: false, isFree: false, defaultModel: 'sonar-pro', docs: 'Search-grounded models via Perplexity API' },
-  { id: 'openrouter', name: 'OpenRouter', envKey: 'OPENROUTER_API_KEY', keyUrl: 'https://openrouter.ai/keys', keyPrefix: 'sk-or-', isLocal: false, isFree: true, defaultModel: 'mistralai/mixtral-8x7b-instruct', docs: 'Router to 200+ models, free credits available' },
-  { id: 'ollama', name: 'Ollama (Local)', envKey: 'OLLAMA_HOST', keyUrl: '', keyPrefix: '', isLocal: true, isFree: true, defaultModel: 'llama3.2', docs: 'Fully local — no key needed. Install Ollama and pull models' },
-  { id: 'lm-studio', name: 'LM Studio (Local)', envKey: 'LMSTUDIO_HOST', keyUrl: '', keyPrefix: '', isLocal: true, isFree: true, defaultModel: 'local-model', docs: 'Local — no key needed. Runs OpenAI-compatible server' },
-];
+/**
+ * API-key prefix hints, for the "Paste gsk_… key" placeholder.
+ *
+ * Display-only, and deliberately not read from the registry: a connector's
+ * `keyPrefix` there namespaces *model ids* (`ollama/`, `openrouter/`), which has
+ * nothing to do with the shape of its credential. A missing hint only makes the
+ * placeholder less specific — it never blocks a key.
+ */
+const KEY_PREFIX_HINTS: Record<string, string> = {
+  groq: 'gsk_',
+  openai: 'sk-',
+  anthropic: 'sk-ant-',
+  google: 'AIza',
+  'github-copilot': 'ghp_',
+  together: 'tgp_',
+  fireworks: 'fw_',
+  perplexity: 'pplx-',
+  openrouter: 'sk-or-',
+  cerebras: 'csk-',
+  nvidia: 'nvapi-',
+  deepinfra: 'sk-',
+  nebius: 'eyJ',
+  moonshot: 'sk-',
+  'vercel-ai-gateway': 'vck_',
+  huggingface: 'hf_',
+  zai: '',
+};
 
-export const PROVIDER_ENV_KEYS = PROVIDERS.map(p => p.envKey);
+/**
+ * The provider list, derived from the connector registry.
+ *
+ * This was a hand-written array, and it had drifted in every way a parallel
+ * list can: nine of the twenty-two connectors were missing (Cerebras, NVIDIA,
+ * DeepInfra, Nebius, Moonshot, Vercel AI Gateway, HuggingFace, Z.AI, and
+ * LM Studio under the id `lm-studio`, which no connector has), while the
+ * ids it did carry had to be reconciled by hand elsewhere — `gemini` versus
+ * `google`, `copilot` versus `github-copilot`.
+ *
+ * One list, owned by the registry, means a connector added there appears here
+ * with its real id and its real env var, and there is nothing to forget.
+ */
+const PROVIDERS: ProviderDef[] = listConnectors().map((c) => ({
+  id: c.id,
+  name: c.label,
+  envKey: c.env?.[0] || '',
+  keyUrl: c.docs || '',
+  keyPrefix: KEY_PREFIX_HINTS[c.id] ?? '',
+  isLocal: c.local === true,
+  authMethods: c.auth || [],
+  docs: c.docs || '',
+}));
+
+/**
+ * Every connector's env var, from the registry.
+ *
+ * Session start uses this to decide whether anything is configured at all. It
+ * was derived from the same hand-written array, so it inherited the same gaps.
+ */
+export const PROVIDER_ENV_KEYS: string[] = PROVIDERS.map((p) => p.envKey).filter(Boolean);
+
+/** How the registry names each way of supplying a credential. */
+const AUTH_LABEL: Record<string, string> = {
+  key: 'API key',
+  'oauth-device': 'device-code login',
+  'oauth-browser': 'browser login',
+  'cli-session': 'reuse your CLI login',
+  none: 'nothing to supply',
+};
 
 type ProviderSetupDialogProps = {
   onComplete?: () => void;
@@ -103,21 +147,21 @@ export function ProviderSetupDialog({ onComplete }: ProviderSetupDialogProps) {
     if (statusesLoaded.current) return;
     statusesLoaded.current = true;
     (async () => {
-      try {
-        const { configManager } = await import('../../../config/configManager.js');
-        await configManager.load();
-        const map: Record<string, 'configured' | 'missing' | 'local' | 'error'> = {};
-        for (const p of PROVIDERS) {
-          if (p.isLocal) { map[p.id] = 'local'; continue; }
-          const envValue = process.env[p.envKey];
-          const cmKey = p.id === 'github-copilot' ? configManager.getApiKey('copilot') : configManager.getApiKey(p.id);
-          map[p.id] = (envValue || cmKey) ? 'configured' : 'missing';
-        }
-        setStatusMap(map);
-      } catch (e) {
-        // configManager unavailable — show all as missing
+      // Status comes from the credential store, which is what the runtime
+      // actually reads — store first, then environment. Asking configManager
+      // instead reported "missing" for a provider connected by
+      // `sentinel auth login`, because that writes the store and not the config
+      // file. One source, so the check cannot disagree with the answer.
+      const { isConnected } = await import('../../../shared/connectors/credentials.js');
+      const map: Record<string, 'configured' | 'missing' | 'local' | 'error'> = {};
+      for (const p of PROVIDERS) {
+        if (p.isLocal) { map[p.id] = 'local'; continue; }
+        map[p.id] = (await isConnected(p.id)) ? 'configured' : 'missing';
       }
-    })();
+      setStatusMap(map);
+    })().catch(() => {
+      // Credential store unavailable — show all as missing rather than crash.
+    });
   }, []);
 
   useInput((input, key) => {
@@ -132,6 +176,8 @@ export function ProviderSetupDialog({ onComplete }: ProviderSetupDialogProps) {
     }
     if (key.return) {
       const p = PROVIDERS[selectedIdx];
+      // A local daemon needs no credential — its availability is proven by the
+      // daemon answering, which discovery already checks.
       if (p.isLocal) return;
       setSelected(p);
       setKeyInput('');
@@ -148,12 +194,17 @@ export function ProviderSetupDialog({ onComplete }: ProviderSetupDialogProps) {
     setSaving(true);
     setKeyError('');
     try {
-      const { configManager } = await import('../../../config/configManager.js');
-      await configManager.load();
-      const providerId = selected.id === 'github-copilot' ? 'copilot' : selected.id;
-      await configManager.setApiKey(providerId, trimmed);
-      configManager.injectEnvVars();
-      process.env[selected.envKey] = trimmed;
+      // The credential store is the destination, keyed by connector id. This is
+      // the same write `sentinel auth login` performs, so a key added in /setup
+      // and a key added from the shell are the same key to every reader.
+      //
+      // It used to be written to configManager only, and the store only ever
+      // saw it for the rest of that session via process.env — so a Mistral or
+      // xAI key vanished on the next start.
+      const { setCredential } = await import('../../../shared/connectors/credentials.js');
+      await setCredential(selected.id, { key: trimmed });
+      // Publish for this process too, so the change is live without a restart.
+      if (selected.envKey) process.env[selected.envKey] = trimmed;
       setStatusMap(prev => ({ ...prev, [selected.id]: 'configured' }));
       setKeySaved(selected.id);
       setStep('list');
@@ -180,10 +231,9 @@ export function ProviderSetupDialog({ onComplete }: ProviderSetupDialogProps) {
     return (
       <Box flexDirection="column" gap={1} width="100%">
         <Text bold>{selected.name}</Text>
-        <Text dimColor>{selected.docs}</Text>
-        {!selected.isFree && (
-          <Text dimColor>Paid subscription — API key from your account</Text>
-        )}
+        <Text dimColor>
+          {selected.authMethods.map((m) => AUTH_LABEL[m] || m).join(' or ') || 'API key'}
+        </Text>
         <Box flexDirection="column" gap={0} marginTop={1}>
           <Text>Enter your {selected.envKey}:</Text>
           {selected.keyUrl && (
@@ -237,7 +287,9 @@ export function ProviderSetupDialog({ onComplete }: ProviderSetupDialogProps) {
                 <Text bold={isSelected} color={isSelected ? colors.selection : undefined}>
                   {p.name}
                 </Text>
-                <Text dimColor>{p.docs}</Text>
+                <Text dimColor>
+                  {p.isLocal ? 'Local — no key needed, runs on your machine' : p.docs}
+                </Text>
               </Box>
             </Box>
           );

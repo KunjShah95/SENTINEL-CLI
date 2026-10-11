@@ -36,7 +36,7 @@
     "typecheck": "tsc -p src/tui/tsconfig.json --noEmit",
     "check:imports": "node scripts/check-imports.mjs",
     "release:check": "npm run lint && npm run typecheck && npm run check:imports && npm run check:version && npm run test",
-    "test:tui": "node --import tsx --test __tests__/tui.test.mjs __tests__/tui-overlay.test.mjs __tests__/tui-keybinds.test.mjs __tests__/tui-scroll.test.mjs __tests__/tui-flicker.test.mjs",
+    "test:tui": "node --import tsx --test __tests__/tui.test.mjs __tests__/tui-overlay.test.mjs __tests__/tui-keybinds.test.mjs __tests__/tui-model-picker.test.mjs __tests__/tui-scroll.test.mjs __tests__/tui-flicker.test.mjs",
     "tui:snapshot": "tsx scripts/tui-snapshot.tsx",
     "tui:probe": "tsx --tsconfig src/tui/tsconfig.json scripts/tui-probe.tsx",
     "verify:stages": "node scripts/verify-codecrafters-stages.mjs",

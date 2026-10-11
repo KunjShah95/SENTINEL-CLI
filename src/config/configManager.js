@@ -16,6 +16,20 @@ import { promises as fs } from 'fs';
 import { existsSync } from 'fs';
 import path from 'path';
 import os from 'os';
+// registry.js has no imports of its own, so this cannot cycle.
+import { getConnectorEnvVar } from '../shared/connectors/registry.js';
+
+/**
+ * Config keys that predate the connector registry, or never matched it.
+ *
+ * `copilot` is the one that matters: `/setup` has always stored the GitHub
+ * Copilot key under `providers.copilot`, while the connector is `github-copilot`.
+ * Mapping it here keeps an existing config working without renaming files on
+ * disk, and without the caller having to know the two names differ.
+ */
+const CONFIG_KEY_ALIASES = {
+  copilot: 'github-copilot',
+};
 
 class ConfigManager {
   constructor() {
@@ -493,19 +507,23 @@ class ConfigManager {
   injectEnvVars() {
     if (!this.config?.providers) return;
 
-    const envMap = {
-      openai: 'OPENAI_API_KEY',
-      anthropic: 'ANTHROPIC_API_KEY',
-      google: 'GEMINI_API_KEY',
-      groq: 'GROQ_API_KEY',
-      openrouter: 'OPENROUTER_API_KEY',
-      ollama: 'OLLAMA_HOST'
-    };
-
-    for (const [provider, envKey] of Object.entries(envMap)) {
-      const apiKey = this.config.providers[provider]?.apiKey;
-      if (apiKey && !process.env[envKey]) {
-        process.env[envKey] = apiKey;
+    // Driven by the connector registry, not by a hand-written map. The map this
+    // replaced named six providers, so a key saved in /setup for Mistral,
+    // DeepSeek, xAI, Together, Fireworks, Perplexity or GitHub Copilot was
+    // written to config, read back at startup, and then dropped: it worked for
+    // the rest of that session only, and silently did nothing after a restart.
+    //
+    // A registry row is the single source of which env var a provider reads, so
+    // adding a connector now makes its key persist without touching this file.
+    for (const [configKey, entry] of Object.entries(this.config.providers)) {
+      const apiKey = entry?.apiKey;
+      if (!apiKey) continue;
+      const connectorId = CONFIG_KEY_ALIASES[configKey] || configKey;
+      const envName = getConnectorEnvVar(connectorId);
+      // An unknown provider keeps its key in config; there is simply no env var
+      // to publish it under.
+      if (envName && !process.env[envName]) {
+        process.env[envName] = apiKey;
       }
     }
   }

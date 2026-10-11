@@ -29,6 +29,7 @@ import {
   credentialHint,
   isConnectedSync,
   redact,
+  resolveCredential,
   resolveCredentialSync,
 } from '../src/shared/connectors/credentials.js';
 import { mergeWithCatalog, toRegistryModel } from '../src/shared/connectors/catalog.js';
@@ -48,10 +49,31 @@ describe('connector registry', () => {
     }
   });
 
-  it('a local connector has no credential and says so', () => {
+  it('a local connector has no credential and says so', async () => {
     for (const id of CONNECTOR_IDS.filter(isLocalConnector)) {
-      assert.deepEqual(CONNECTORS[id].env, [], `${id} reads no key`);
       assert.deepEqual(CONNECTORS[id].auth, [AUTH.NONE], `${id} needs no auth method`);
+
+      // A local connector may still declare an env var — Ollama and LM Studio
+      // read a host override through the same field (`OLLAMA_HOST`). What must
+      // never happen is that value being treated as a credential, so this
+      // asserts the property rather than the shape: with every declared env
+      // var populated, resolution still reports local and still yields no key.
+      const saved = {};
+      for (const name of getConnectorEnvVars(id)) {
+        saved[name] = process.env[name];
+        process.env[name] = 'http://127.0.0.1:9/not-a-key';
+      }
+      try {
+        const resolved = await resolveCredential(id);
+        assert.equal(resolved.key, null, `${id} resolves no key from its env vars`);
+        assert.equal(resolved.source, 'local', `${id} reports itself as local`);
+        assert.equal(isConnectedSync(id), true, `${id} is available without a credential`);
+      } finally {
+        for (const [name, value] of Object.entries(saved)) {
+          if (value === undefined) delete process.env[name];
+          else process.env[name] = value;
+        }
+      }
     }
   });
 
