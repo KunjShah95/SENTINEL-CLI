@@ -19,7 +19,7 @@ import { executeCustomCommand } from '../lib/custom-commands.js';
 import { parseMentions, buildAgentPrompt } from '../../shared/tools/agent-mentions.js';
 import { expandPromptTemplate } from '../../agent/prompt-templates.js';
 import { getTotals as getCostTotals } from '../../agent/cost.js';
-import { Home } from '../components/oc/chrome.js';
+import { Home, type BootState } from '../components/oc/chrome.js';
 import { Overlay } from '../components/oc/overlay.js';
 import {
   chordOf,
@@ -418,58 +418,91 @@ export function Session() {
     import('../../shared/models/prefs.js').then(m => m.saveLastModel(model)).catch(() => {});
   }, [model]);
 
+  /**
+   * Whether startup has finished, for the welcome frame's status line.
+   *
+   * The old splash read "Ready" from the first paint, while `loadLastModel()`,
+   * `configManager.load()` and a networked `refreshModels()` pass were all still
+   * outstanding — so the one place a new user looks to confirm the tool works
+   * was asserting a result before it existed, and asserting it identically when
+   * discovery failed.
+   *
+   * Starts at 'booting' and is set once the sequence below settles, including
+   * when it throws. `degraded` is what makes a discovery failure visible instead
+   * of invisible behind a green dot.
+   */
+  const [boot, setBoot] = useState<BootState>('booting');
+
   const firstRunChecked = useRef(false);
   useEffect(() => {
     if (firstRunChecked.current) return;
     firstRunChecked.current = true;
     (async () => {
-      const { loadLastModel } = await import('../../shared/models/prefs.js');
-      const saved = await loadLastModel();
-      if (saved) {
-        const { findSupportedChatModel, refreshModels } = await import('../../shared/models/index.js');
-        // Local models (Ollama, LM Studio) only exist after discovery; without
-        // this a saved local pick was dropped and overwritten on every launch.
-        if (!findSupportedChatModel(saved)) await refreshModels();
-        // A local model that is missing only because its daemon is down stays
-        // selected: the first turn then says "start ollama serve" instead of
-        // silently switching to a provider the user never chose.
-        if (findSupportedChatModel(saved) || /^(ollama|lmstudio)\//.test(saved)) {
-          setModel(saved);
+      let failed = false;
+      try {
+        const { loadLastModel } = await import('../../shared/models/prefs.js');
+        const saved = await loadLastModel();
+        if (saved) {
+          const { findSupportedChatModel, refreshModels } = await import('../../shared/models/index.js');
+          // Local models (Ollama, LM Studio) only exist after discovery; without
+          // this a saved local pick was dropped and overwritten on every launch.
+          if (!findSupportedChatModel(saved)) await refreshModels();
+          // A local model that is missing only because its daemon is down stays
+          // selected: the first turn then says "start ollama serve" instead of
+          // silently switching to a provider the user never chose.
+          if (findSupportedChatModel(saved) || /^(ollama|lmstudio)\//.test(saved)) {
+            setModel(saved);
+            return;
+          }
+        }
+        const { configManager } = await import('../../config/configManager.js');
+        await configManager.load();
+        const configured = configManager.getConfiguredProviders();
+        const hasEnvKeys = PROVIDER_ENV_KEYS.some(k => process.env[k]);
+        // Local providers (Ollama / LM Studio) need no API key — if their daemon is
+        // running, discovery returns their installed models. Detecting any means we
+        // can skip the provider-setup prompt and just use a local model.
+        const { refreshModels, getRankedModels, isLocalProvider, autoSelectBestModel } =
+          await import('../../shared/models/index.js');
+        await refreshModels();
+        const hasLocalModels = getRankedModels().some(m => isLocalProvider(m.provider));
+        if (configured.length > 0 || hasEnvKeys || hasLocalModels) {
+          const best = autoSelectBestModel();
+          if (best) {
+            // An automatic pick is not a preference: mark it seen so the save
+            // effect above does not overwrite the user's saved choice with it.
+            lastModelRef.current = best;
+            setModel(best);
+          }
           return;
         }
+        dialog.open({
+          title: 'Welcome to Sentinel — Set Up AI Providers',
+          width: 72,
+          height: 35,
+          children: (
+            <ProviderSetupDialog onComplete={() => {
+              toast.success('Providers configured!');
+              dialog.close();
+            }} />
+          ),
+        });
+      } catch {
+        // Boot failed partway. The rejection was previously unhandled, so it
+        // surfaced as nothing at all: the app came up with an empty session and
+        // a green "Ready", and the first turn then failed on an unconfigured
+        // provider. Naming the cause is the difference between a five-second fix
+        // and an afternoon of guessing.
+        failed = true;
+        toast.warning('Startup could not finish — check your config, or run `sentinel doctor`.');
+      } finally {
+        // In `finally`, not after the last statement: the two early returns above
+        // are ordinary success paths, and a trailing call would leave the splash
+        // on "Starting…" forever for every returning user — which is exactly the
+        // users who already had a working config.
+        if (!failed) setBoot('ready');
+        else setBoot('degraded');
       }
-      const { configManager } = await import('../../config/configManager.js');
-      await configManager.load();
-      const configured = configManager.getConfiguredProviders();
-      const hasEnvKeys = PROVIDER_ENV_KEYS.some(k => process.env[k]);
-      // Local providers (Ollama / LM Studio) need no API key — if their daemon is
-      // running, discovery returns their installed models. Detecting any means we
-      // can skip the provider-setup prompt and just use a local model.
-      const { refreshModels, getRankedModels, isLocalProvider, autoSelectBestModel } =
-        await import('../../shared/models/index.js');
-      await refreshModels();
-      const hasLocalModels = getRankedModels().some(m => isLocalProvider(m.provider));
-      if (configured.length > 0 || hasEnvKeys || hasLocalModels) {
-        const best = autoSelectBestModel();
-        if (best) {
-          // An automatic pick is not a preference: mark it seen so the save
-          // effect above does not overwrite the user's saved choice with it.
-          lastModelRef.current = best;
-          setModel(best);
-        }
-        return;
-      }
-      dialog.open({
-        title: 'Welcome to Sentinel — Set Up AI Providers',
-        width: 72,
-        height: 35,
-        children: (
-          <ProviderSetupDialog onComplete={() => {
-            toast.success('Providers configured!');
-            dialog.close();
-          }} />
-        ),
-      });
     })();
   }, []);
 
@@ -553,7 +586,7 @@ export function Session() {
           onViewportRows={(rows) => { useViewportRowsRef.current = rows; }}
           onSubmitScrollReset={jumpToBottom}
         >
-          {messages.length === 0 ? <Home version={getVersion()} /> : null}
+          {messages.length === 0 ? <Home version={getVersion()} boot={boot} /> : null}
           {messages.map((msg, idx) => {
             if (msg.role === 'error') {
               const textPart = msg.parts.find((p): p is { type: 'text'; text: string } => p.type === 'text');

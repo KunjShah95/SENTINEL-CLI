@@ -310,15 +310,44 @@ export function Logo() {
   );
 }
 
+/**
+ * Where startup actually got to.
+ *
+ * This replaces a hardcoded "● Ready" string, which asserted a fact the app
+ * could not know. Boot runs `loadLastModel()`, `configManager.load()` and a
+ * `refreshModels()` discovery pass that reaches the network under a multi-second
+ * timeout, all of it kicked off after the first paint — so the splash claimed
+ * readiness before anything had finished, and went on claiming it when
+ * discovery failed outright and the registry fell back to its pinned list.
+ */
+export type BootState = "booting" | "ready" | "degraded";
+
+const BOOT_STATUS: Record<BootState, { dot: string; label: string }> = {
+  booting: { dot: "○", label: "Starting…" },
+  ready: { dot: "●", label: "Ready" },
+  degraded: { dot: "●", label: "Degraded" },
+};
+
 /** MiniMax welcome frame: version, tips, and a short what's-new list. */
-export function WelcomeFrame({ version }: { version?: string }) {
+export function WelcomeFrame({ version, boot }: { version?: string; boot: BootState }) {
   const { colors } = useTheme();
+  const status = BOOT_STATUS[boot];
+  // Amber for degraded rather than red: the app still runs off the pinned model
+  // list, so this is a warning about discovery, not a failure. Red here would
+  // overstate it, and the whole point is that the previous green overstated it
+  // in the other direction.
+  const tone = boot === "ready" ? colors.success : boot === "degraded" ? colors.warning : colors.textMuted;
   return (
     <Box flexDirection="column" borderStyle="round" borderColor={colors.border} paddingX={1} width="100%">
       <Box flexDirection="row" justifyContent="space-between">
         <Text color={colors.textMuted}>{version ? `v${version}` : "sentinel"}</Text>
-        <Text color={colors.success}>● Ready</Text>
+        <Text color={tone}>{status.dot} {status.label}</Text>
       </Box>
+      {boot === "degraded" && (
+        <Text color={colors.warning}>
+          {"Model discovery failed — using the built-in model list. Run /health to retry."}
+        </Text>
+      )}
       <Box marginTop={1}>
         <Text bold color={colors.primary}>Tips for getting started</Text>
       </Box>
@@ -340,12 +369,16 @@ export function WelcomeFrame({ version }: { version?: string }) {
   );
 }
 
-export function Home({ version }: { version?: string }) {
+/**
+ * `boot` is required rather than defaulted, so a caller cannot forget it and
+ * silently restore the old unbacked "Ready".
+ */
+export function Home({ version, boot }: { version?: string; boot: BootState }) {
   return (
     <Box flexDirection="column" width="100%" paddingY={1} alignItems="center">
       <Logo />
       <Box marginTop={1} width="100%">
-        <WelcomeFrame version={version} />
+        <WelcomeFrame version={version} boot={boot} />
       </Box>
     </Box>
   );

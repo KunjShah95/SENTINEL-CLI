@@ -10,7 +10,7 @@ import { ThemeProvider } from '../src/tui/providers/theme/index.js';
 import { DialogProvider } from '../src/tui/providers/dialog/index.js';
 import { PermissionDialog } from '../src/tui/components/dialogs/permission-dialog.js';
 import { UserMessage, BotMessage, ErrorMessage } from '../src/tui/components/messages/index.js';
-import { Home, ActivityLine, Footer, TodoPanel } from '../src/tui/components/oc/chrome.js';
+import { Home, ActivityLine, Footer, TodoPanel, type BootState } from '../src/tui/components/oc/chrome.js';
 import { InputBar } from '../src/tui/components/input-bar.js';
 import { Box } from 'ink';
 
@@ -29,11 +29,14 @@ const VERSION: string = JSON.parse(
   readFileSync(new URL('../package.json', import.meta.url), 'utf8')
 ).version;
 
-export async function snapshot(themeName?: string, { home = false, columns = 100 } = {}): Promise<string> {
+export async function snapshot(
+  themeName?: string,
+  { home = false, columns = 100, boot = 'ready' }: { home?: boolean; columns?: number; boot?: BootState } = {},
+): Promise<string> {
   const App = () => {
     return (
       <Box flexDirection="column" width={100}>
-        {home ? <Home version={VERSION} /> : (
+        {home ? <Home version={VERSION} boot={boot} /> : (
           <>
             <UserMessage message="fix the failing date parser test" mode="BUILD" />
             <BotMessage parts={FIXTURE_PARTS as any} model="groq/openai/gpt-oss-20b" mode="BUILD" duration={8400} done />
