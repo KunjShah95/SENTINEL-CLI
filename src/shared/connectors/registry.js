@@ -27,7 +27,9 @@
  *   label        display name in `/connect` and `/models`
  *   transport    how requests are shaped — see TRANSPORT
  *   baseURL()    root for the OpenAI-compatible / native endpoints
- *   env[]        credential env vars, in precedence order
+ *   env[]        credential env vars, in precedence order. For a local daemon
+ *                this holds the host override instead, which is where that
+ *                connector reads its configuration from.
  *   auth[]       how a user can supply a credential — see AUTH
  *   modelsPath   listing endpoint, or null when the vendor exposes none
  *   mapModels    response shape at modelsPath — see MODEL_MAPPERS
@@ -238,7 +240,15 @@ const CONNECTOR_LIST = [
     // context length, which /v1/models omits. Availability is proof the
     // daemon answered, so there is deliberately no credential.
     discoveryBaseURL: () => (process.env.OLLAMA_HOST || 'http://localhost:11434').replace(/\/$/, ''),
-    env: [],
+    // Not a credential — a host override. It is listed because `env[]` is what
+    // answers "where does this connector read its configuration from", and the
+    // two `baseURL` closures above read exactly this variable. Declaring `[]`
+    // made OLLAMA_HOST invisible to `getConnectorEnvVar`, so a host saved via
+    // /setup or config was never published back into the environment.
+    //
+    // Safe to add: every credential path short-circuits on `local` — see
+    // `resolveCredential` and `authHeadersFor` — so this is never sent as a key.
+    env: ['OLLAMA_HOST'],
     auth: [AUTH.NONE],
     modelsPath: '/api/tags',
     mapModels: MODEL_MAPPERS.OLLAMA,
@@ -251,7 +261,8 @@ const CONNECTOR_LIST = [
     label: 'LM Studio (local)',
     transport: TRANSPORT.OPENAI_COMPAT,
     baseURL: () => `${(process.env.LMSTUDIO_HOST || 'http://localhost:1234').replace(/\/$/, '')}/v1`,
-    env: [],
+    // Host override, not a credential — same reasoning as the Ollama row above.
+    env: ['LMSTUDIO_HOST'],
     auth: [AUTH.NONE],
     modelsPath: '/v1/models',
     mapModels: MODEL_MAPPERS.OPENAI,

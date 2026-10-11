@@ -113,6 +113,11 @@ export const DEFAULT_KEYBINDS = Object.freeze({
   'model.list': '<leader>m',
   'agent.cycle': 'shift+tab',
   'variant.cycle': 'ctrl+t',
+  // `ctrl+a` is `input.line.home` in the prompt table, and that is not a clash:
+  // the two tables are consulted by focus, and this one is only ever read by the
+  // model dialog, which owns ctrl+a while it is open — the same scoping
+  // opencode uses. In the prompt, ctrl+a is still "jump to start of line".
+  'model.dialog.provider': 'ctrl+a',
 });
 
 const ALL_ACTION_IDS = new Set(Object.keys(DEFAULT_KEYBINDS));

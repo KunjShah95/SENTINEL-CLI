@@ -23,16 +23,10 @@ import { Overlay, windowRange } from '../src/tui/components/oc/overlay.tsx';
 import { ThemeProvider } from '../src/tui/providers/theme/index.tsx';
 import { DialogProvider, useDialog } from '../src/tui/providers/dialog/index.tsx';
 import { Viewport } from '../src/tui/app.tsx';
-import { ProviderSetupDialog } from '../src/tui/components/dialogs/provider-setup.tsx';
+import { ProviderSetupDialog, PROVIDER_ENV_KEYS } from '../src/tui/components/dialogs/provider-setup.tsx';
+import { CONNECTOR_IDS } from '../src/shared/connectors/registry.js';
 
 const h = React.createElement;
-
-const PROVIDER_ENV_KEYS = [
-  'GROQ_API_KEY', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GEMINI_API_KEY',
-  'DEEPSEEK_API_KEY', 'MISTRAL_API_KEY', 'XAI_API_KEY', 'OPENROUTER_API_KEY',
-  'TOGETHER_API_KEY', 'FIREWORKS_API_KEY', 'PERPLEXITY_API_KEY', 'GITHUB_TOKEN',
-  'OLLAMA_HOST', 'LMSTUDIO_HOST',
-];
 
 class FakeStdout extends Writable {
   constructor(columns, rows) {
@@ -195,11 +189,15 @@ describe('dialog is an overlay, not a sibling pushed below the app', () => {
     assert.ok(max <= 90, `frame fits the width: ${max} <= 90`);
 
     assert.match(frame, /AI Provider Setup/, 'dialog title is on screen');
-    assert.match(frame, /Groq \(Free Tier\)/, 'provider names are visible, not clipped');
+    // Labels come from the connector registry, so assert on a connector that
+    // has one rather than on a hand-written display string that can drift.
+    assert.match(frame, /Groq/, 'provider names are visible, not clipped');
     assert.match(frame, /esc/, 'close hint is shown');
     // One title only: the overlay frames the dialog, so the dialog must not repeat it.
     assert.equal([...frame.matchAll(/AI Provider Setup/g)].length, 1);
-    // The list windows itself instead of overflowing the panel.
-    assert.match(frame, /\/14/, 'position indicator');
+    // The list windows itself instead of overflowing the panel, and the count
+    // is every connector the registry knows — not a copied number that goes
+    // stale the moment a provider is added.
+    assert.match(frame, new RegExp(`1/${CONNECTOR_IDS.length}`), 'position indicator');
   });
 });

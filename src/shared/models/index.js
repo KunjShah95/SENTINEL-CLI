@@ -117,8 +117,20 @@ function getModelCapability(model) {
   return 1;
 }
 
-export function getRankedModels() {
-  return [...SUPPORTED_CHAT_MODELS].sort((a, b) => {
+/**
+ * Shared ordering: free first, then thinking-capable, then capability, then id.
+ *
+ * `connectedFirst` is only used by the browse view. The runtime registry is
+ * connected-only by construction, so every row there already ties on that key
+ * and passing it there would be a no-op.
+ */
+function rankModels(models, { connectedFirst = false } = {}) {
+  const list = [...models].sort((a, b) => {
+    if (connectedFirst) {
+      const aConn = a.connected ? 0 : 1;
+      const bConn = b.connected ? 0 : 1;
+      if (aConn !== bConn) return aConn - bConn;
+    }
     // Ollama cloud models list at $0 but are metered, so they rank as paid.
     const aFree = (a.inputUsdPerMillionTokens || 0) + (a.outputUsdPerMillionTokens || 0) === 0 && !isOllamaCloudModel(a) ? 0 : 1;
     const bFree = (b.inputUsdPerMillionTokens || 0) + (b.outputUsdPerMillionTokens || 0) === 0 && !isOllamaCloudModel(b) ? 0 : 1;
@@ -131,6 +143,53 @@ export function getRankedModels() {
     if (aCap !== bCap) return bCap - aCap;
     return a.provider.localeCompare(b.provider);
   });
+
+  if (!connectedFirst) return list;
+
+  // Then make each provider contiguous. The sort above is stable, so recording
+  // the rank of a provider's first appearance and re-sorting on it leaves the
+  // per-provider ordering intact — and connected providers come first because
+  // their best model reached the top of `list` before any unconnected one did.
+  //
+  // This is what the picker needs: at ~1500 models, interleaving a 379-model
+  // vendor between every other provider made ←→ jump to a random spot inside the
+  // same list instead of to the next provider.
+  const providerOrder = new Map();
+  for (const m of list) {
+    if (!providerOrder.has(m.provider)) providerOrder.set(m.provider, providerOrder.size);
+  }
+  return [...list].sort((a, b) => providerOrder.get(a.provider) - providerOrder.get(b.provider));
+}
+
+export function getRankedModels() {
+  return rankModels(SUPPORTED_CHAT_MODELS);
+}
+
+/**
+ * Every model SENTINEL could call, connected or not — the browsing view.
+ *
+ * `SUPPORTED_CHAT_MODELS` deliberately means "what can I actually call right
+ * now", and `autoSelectBestModel`, failover chains and the bare `sentinel ask`
+ * path all read it that way. Widening that array to the whole catalog would let
+ * auto-select hand back a model with no credential behind it, which fails on
+ * the first request instead of at selection time.
+ *
+ * So the browser gets its own widened view rather than a mutated registry, and
+ * every row carries `connected` so the picker can say which ones are live. Live
+ * discovery still beats its catalog twin for the reason it does everywhere else:
+ * a daemon that actually answered is proof the model is really served, where the
+ * catalog is only a claim about what the vendor might offer.
+ */
+export async function getBrowseModels() {
+  const widened = await discoverAllModels({ includeUnconnected: true });
+  const seen = new Map();
+  for (const m of SUPPORTED_CHAT_MODELS) seen.set(m.id, m);
+  for (const m of widened) if (!seen.has(m.id)) seen.set(m.id, m);
+  const merged = [...seen.values()].map((m) => ({
+    ...m,
+    connected: isProviderAvailable(m.provider),
+  }));
+  return rankModels(merged, { connectedFirst: true });
 }
 
 // Local providers run on the user's machine (no API key, no signup). They are

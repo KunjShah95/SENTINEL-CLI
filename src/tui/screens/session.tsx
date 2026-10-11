@@ -355,7 +355,10 @@ export function Session() {
       case 'session.toggle.thinking': setShowThinking((v) => !v); return true;
       case 'session.toggle.details': setShowDetails((v) => !v); return true;
       case 'model.list':
-        dialog.open({ title: 'Model Picker', width: 60, height: 25, children: <ModelPickerDialog currentModel={model} onSelect={(m) => { setModel(m); dialog.close(); }} /> });
+        // closeOnEscape is off because the picker is two levels deep now: Esc
+        // steps back out of the ctrl+a provider list to the model list before it
+        // closes anything. The picker calls close() itself at the top level.
+        dialog.open({ title: 'Model Picker', width: 60, height: 25, closeOnEscape: false, children: <ModelPickerDialog currentModel={model} onSelect={(m) => { setModel(m); dialog.close(); }} /> });
         return true;
       case 'command.palette.show': setShowCommands((v) => !v); return true;
       case 'session.new': clear(); toast.info('New session'); return true;

@@ -67,6 +67,10 @@ for (const k of keys) {
   await delay(700);
 }
 
+// Extra settle window after the last key, for surfaces that fetch on open —
+// the model picker pulls the provider catalog, which is not instant.
+await delay(Number(process.env.SETTLE || 0));
+
 inst.unmount();
 
 process.stdout.write(`===== FRAME (${stdout.columns}x${stdout.rows}` +
