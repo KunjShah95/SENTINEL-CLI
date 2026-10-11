@@ -42,7 +42,16 @@ function saveTheme(name: string) {
     const dir = dirname(prefsPath);
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
     let prefs: Record<string, unknown> = {};
-    if (existsSync(prefsPath)) prefs = JSON.parse(readFileSync(prefsPath, "utf-8"));
+    if (existsSync(prefsPath)) {
+      const parsed = JSON.parse(readFileSync(prefsPath, "utf-8"));
+      // Same trap as prefs.js, in the other direction: assigning a property on
+      // a parsed array is discarded by JSON.stringify, so the theme would never
+      // persist and the picker would silently revert. Start from a clean object
+      // rather than adopting a shape that cannot hold the key.
+      if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+        prefs = parsed as Record<string, unknown>;
+      }
+    }
     prefs.theme = name;
     writeFileSync(prefsPath, JSON.stringify(prefs, null, 2));
   } catch {}

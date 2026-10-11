@@ -5,22 +5,42 @@ import os from 'os';
 const PREFS_DIR = path.join(os.homedir(), '.sentinel');
 const PREFS_PATH = path.join(PREFS_DIR, 'preferences.json');
 
+/**
+ * Is this parsed JSON somewhere preference keys can live?
+ *
+ * `JSON.stringify` on an array emits only its indices, so every named property
+ * set on it is discarded on write. That makes a non-object preferences file the
+ * worst kind of corruption: reads still work, writes report success, and every
+ * preference the user changes simply does not stick. The failure surfaces as
+ * "the app ignores me" rather than as an error.
+ */
+function isPreferenceObject(value) {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function defaultPrefs() {
+  return {
+    lastModel: '',
+    smallModel: '',
+    theme: 'default',
+    modelConfigs: {},
+  };
+}
+
 async function ensurePrefs() {
   try {
     await fs.mkdir(PREFS_DIR, { recursive: true });
     try {
-      const raw = await fs.readFile(PREFS_PATH, 'utf8');
-      return JSON.parse(raw);
+      const parsed = JSON.parse(await fs.readFile(PREFS_PATH, 'utf8'));
+      if (isPreferenceObject(parsed)) return parsed;
+      // Present, parses, but is not an object (an array, a string, null).
+      // Fall through and rewrite it so the file is usable again.
     } catch {
-      const defaults = {
-        lastModel: '',
-        smallModel: '',
-        theme: 'default',
-        modelConfigs: {},
-      };
-      await fs.writeFile(PREFS_PATH, JSON.stringify(defaults, null, 2), { mode: 0o600 });
-      return defaults;
+      // Missing or unparseable — same outcome.
     }
+    const defaults = defaultPrefs();
+    await fs.writeFile(PREFS_PATH, JSON.stringify(defaults, null, 2), { mode: 0o600 });
+    return defaults;
   } catch {
     return {};
   }
@@ -43,13 +63,24 @@ async function ensurePrefs() {
  */
 let writeChain = Promise.resolve();
 
-/** Read, mutate and persist preferences without interleaving another writer. */
+/**
+ * Read, mutate and persist preferences without interleaving another writer.
+ *
+ * The written document is always `prefs` itself and never the mutator's return
+ * value. That distinction is load-bearing: a mutator that returns its own slice
+ * of the document — a favourites list, a recents ring — would otherwise be
+ * written *as the whole file*, replacing every other preference with an array.
+ * The symptom is invisible at the write and catastrophic later: the theme resets,
+ * the last model is forgotten, and model configs are gone.
+ *
+ * Callers that need the derived value read it off the returned document.
+ */
 function updatePrefs(mutator) {
   const run = writeChain.then(async () => {
     const prefs = await ensurePrefs();
-    const next = (await mutator(prefs)) ?? prefs;
-    await fs.writeFile(PREFS_PATH, JSON.stringify(next, null, 2), { mode: 0o600 });
-    return next;
+    await mutator(prefs);
+    await fs.writeFile(PREFS_PATH, JSON.stringify(prefs, null, 2), { mode: 0o600 });
+    return prefs;
   });
   // Keep the chain alive after a failure, and hand the caller the real result.
   writeChain = run.then(() => {}, () => {});
@@ -177,7 +208,6 @@ export async function toggleFavoriteModel(modelId) {
       if (at >= 0) list.splice(at, 1);
       else list.unshift(modelId);
       prefs.favoriteModels = list;
-      return list;
     });
     return next.favoriteModels || [];
   } catch {
@@ -219,7 +249,6 @@ export async function recordModelUse(modelId, limit = 10) {
         : [];
       list.unshift(modelId);
       prefs.recentModels = list.slice(0, limit);
-      return prefs.recentModels;
     });
     return next.recentModels || [];
   } catch {
