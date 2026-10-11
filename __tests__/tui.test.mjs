@@ -167,6 +167,23 @@ describe('render snapshot', () => {
     assert.match(out, /● Ready/);
   });
 
+  // The regression: the status line was a hardcoded "● Ready", so it asserted
+  // readiness from the first paint while loadLastModel(), configManager.load()
+  // and a networked refreshModels() were still outstanding — and rendered
+  // exactly the same green when startup failed outright.
+  it('home frame reports real startup state, not a fixed Ready', async () => {
+    const booting = stripAnsi(await snapshot('OpenCode', { home: true, boot: 'booting' }));
+    assert.match(booting, /○ Starting…/);
+    assert.doesNotMatch(booting, /● Ready/, 'must not claim Ready before startup finished');
+
+    const degraded = stripAnsi(await snapshot('OpenCode', { home: true, boot: 'degraded' }));
+    assert.match(degraded, /● Degraded/);
+    assert.doesNotMatch(degraded, /● Ready/, 'a failed startup must not still claim Ready');
+    assert.match(degraded, /Model discovery failed/);
+    // The remediation has to be on screen, not just implied by an amber word.
+    assert.match(degraded, /sentinel health|\/health/);
+  });
+
   it('renders under every theme without throwing', async () => {
     for (const t of THEMES) {
       const out = await snapshot(t.name);
