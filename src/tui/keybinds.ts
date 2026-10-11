@@ -118,6 +118,12 @@ export const DEFAULT_KEYBINDS = Object.freeze({
   // model dialog, which owns ctrl+a while it is open — the same scoping
   // opencode uses. In the prompt, ctrl+a is still "jump to start of line".
   'model.dialog.provider': 'ctrl+a',
+  // `ctrl+f` is `input.move.right` in the prompt table, same by-focus split as
+  // ctrl+a above.
+  'model.dialog.favorite': 'ctrl+f',
+  'model.cycle_recent': 'f2',
+  'model.cycle_recent_reverse': 'shift+f2',
+  'variant.list': '<leader>v',
 });
 
 const ALL_ACTION_IDS = new Set(Object.keys(DEFAULT_KEYBINDS));

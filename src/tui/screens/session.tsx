@@ -6,6 +6,7 @@ import { UserMessage, BotMessage, ErrorMessage } from '../components/messages/in
 import { CommandMenu } from '../components/command-menu/index.js';
 import { ProviderSetupDialog, PROVIDER_ENV_KEYS } from '../components/dialogs/provider-setup.js';
 import { ModelPickerDialog } from '../components/dialogs/model-picker.js';
+import { VariantListDialog } from '../components/dialogs/variant-list.js';
 import { HelpDialog } from '../components/dialogs/help-dialog.js';
 import { LogViewer, appendLog } from '../components/dialogs/log-viewer.js';
 import { usePermission } from '../components/dialogs/permission-dialog.js';
@@ -341,6 +342,65 @@ export function Session() {
   // history while their own turn starts.
   const jumpToBottom = useCallback(() => setScrollFromBottom(0), []);
 
+  /**
+   * Step to another recently used model, without opening the picker.
+   *
+   * The list is read fresh each press rather than held in state: another
+   * component (the picker) writes it, and a cached copy would cycle through a
+   * stale ring while claiming to be current.
+   */
+  const cycleRecent = useCallback(async (step: number) => {
+    try {
+      const { loadRecentModels } = await import('../../shared/models/prefs.js');
+      const { cycleModel } = await import('../../shared/models/favorites.js');
+      const recents = await loadRecentModels();
+      const next = cycleModel(recents, model, step);
+      // Null is a real answer, not a failure: one model in the ring, or the
+      // current one not in it. Say which instead of silently doing nothing.
+      if (!next) {
+        toast.info(recents.length < 2
+          ? 'No other recent model to switch to — pick one with ctrl+x m first'
+          : 'Current model is not in your recent list');
+        return;
+      }
+      const { applyVariant, loadVariant } = await import('../../shared/models/variants.js');
+      const resolved = await applyVariant(next, await loadVariant(next));
+      setModel(resolved);
+      toast.success(`Model: ${resolved}`);
+    } catch (e) {
+      toast.error('Could not switch model: ' + String(e));
+    }
+  }, [model, setModel, toast]);
+
+  /**
+   * Step the effort level of the model already in use.
+   *
+   * This binding existed in the registry with no handler behind it, so ctrl+t
+   * did nothing at all — the failure mode the keybind file's own comments call
+   * worse than leaving a key unbound, because it looked bound.
+   */
+  const cycleVariant = useCallback(async () => {
+    try {
+      const { parseVariant, loadVariant, availableVariants, applyVariant } =
+        await import('../../shared/models/variants.js');
+      const { modelId: bareId } = parseVariant(model);
+      const levels = availableVariants(bareId);
+      if (levels.length === 0) {
+        toast.info(`${bareId} has no reasoning levels to switch between`);
+        return;
+      }
+      const stored = (await loadVariant(bareId)) || levels[0];
+      const at = levels.indexOf(stored);
+      // Step from the level in effect; wrap past the ends so it cycles rather
+      // than sticking at `max`.
+      const next = levels[(at + 1) % levels.length];
+      setModel(await applyVariant(bareId, next));
+      toast.info(`Effort: ${next}`);
+    } catch (e) {
+      toast.error('Could not change effort: ' + String(e));
+    }
+  }, [model, setModel, toast]);
+
   const runAction = useCallback((action: string) => {
     const page = Math.max(1, Math.floor((useViewportRowsRef.current || 20) / 2));
     switch (action) {
@@ -359,6 +419,34 @@ export function Session() {
         // steps back out of the ctrl+a provider list to the model list before it
         // closes anything. The picker calls close() itself at the top level.
         dialog.open({ title: 'Model Picker', width: 60, height: 25, closeOnEscape: false, children: <ModelPickerDialog currentModel={model} onSelect={(m) => { setModel(m); dialog.close(); }} /> });
+        return true;
+      case 'variant.cycle':
+        cycleVariant();
+        return true;
+      case 'variant.list':
+        // Only offered for a model that actually has levels; otherwise the
+        // dialog would open to say what a toast can say in one line.
+        (async () => {
+          const { parseVariant, availableVariants } = await import('../../shared/models/variants.js');
+          const { modelId: bareId } = parseVariant(model);
+          if (availableVariants(bareId).length === 0) {
+            toast.info(`${bareId} has no reasoning levels to change`);
+            return;
+          }
+          dialog.open({
+            title: 'Reasoning Effort',
+            width: 60,
+            height: 18,
+            closeOnEscape: false,
+            children: <VariantListDialog modelId={bareId} onSelect={(m) => setModel(m)} />,
+          });
+        })();
+        return true;
+      case 'model.cycle_recent':
+        cycleRecent(1);
+        return true;
+      case 'model.cycle_recent_reverse':
+        cycleRecent(-1);
         return true;
       case 'command.palette.show': setShowCommands((v) => !v); return true;
       case 'session.new': clear(); toast.info('New session'); return true;
@@ -380,7 +468,7 @@ export function Session() {
       case 'app.exit': process.exit(0);
       default: return false;
     }
-  }, [clear, dialog, handleExternalEditor, handleHelp, handleLogs, jumpToBottom, maxScroll, model, setModel, toast, toggleMode, wrappedSubmit]);
+  }, [clear, cycleRecent, cycleVariant, dialog, handleExternalEditor, handleHelp, handleLogs, jumpToBottom, maxScroll, model, setModel, toast, toggleMode, wrappedSubmit]);
 
   useInput((input, key) => {
     const { leader, app } = keybinds();
@@ -416,6 +504,11 @@ export function Session() {
     if (lastModelRef.current === model) return;
     lastModelRef.current = model;
     import('../../shared/models/prefs.js').then(m => m.saveLastModel(model)).catch(() => {});
+    // Feed the f2 ring from the same signal. Two writers to preferences.json on
+    // one model change is exactly the overlap the write queue in prefs.js
+    // exists to absorb — without it the recents write would land on the stale
+    // document and drop the lastModel update.
+    import('../../shared/models/prefs.js').then(m => m.recordModelUse(model)).catch(() => {});
   }, [model]);
 
   /**

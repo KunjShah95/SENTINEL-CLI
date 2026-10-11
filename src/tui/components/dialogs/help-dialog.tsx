@@ -43,7 +43,11 @@ const SECTIONS: Array<{ title: string; bindings: Array<{ keys: string; desc: str
     title: 'Leader Keys (Ctrl+X)',
     bindings: [
       { keys: 'Ctrl+X M', desc: 'Open model picker' },
+      { keys: 'F2 / Shift+F2', desc: 'Cycle recent models' },
+      { keys: 'Ctrl+T', desc: 'Cycle reasoning effort' },
+      { keys: 'Ctrl+X V', desc: 'Choose reasoning effort' },
       { keys: 'Ctrl+A', desc: 'In the model picker: list providers' },
+      { keys: 'Ctrl+F / F', desc: 'In the model picker: star a model / show favourites' },
       { keys: 'Ctrl+X N', desc: 'New session' },
       { keys: 'Ctrl+X B', desc: 'Toggle the session sidebar' },
       { keys: 'Ctrl+X L', desc: 'List sessions' },
