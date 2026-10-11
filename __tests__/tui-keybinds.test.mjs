@@ -128,6 +128,23 @@ describe('compileKeybinds', () => {
     assert.equal(app.get('ctrl+a'), 'model.dialog.provider', 'ctrl+a opens the provider list in the model dialog');
   });
 
+  it('binds every model-dialog and cycling action opencode names', () => {
+    const { app } = compileKeybinds();
+    assert.equal(app.get('ctrl+a'), 'model.dialog.provider');
+    assert.equal(app.get('ctrl+f'), 'model.dialog.favorite');
+    assert.equal(app.get('f2'), 'model.cycle_recent');
+    assert.equal(app.get('shift+f2'), 'model.cycle_recent_reverse');
+    assert.equal(app.get('ctrl+xv'), 'variant.list');
+  });
+
+  it('keeps ctrl+f in the app table while the prompt still owns it for the caret', () => {
+    const { app, prompt } = compileKeybinds();
+    // Same by-focus split as ctrl+a: starring a model must not break
+    // "move right one character" in the composer.
+    assert.equal(prompt.get('ctrl+f'), 'input.move.right');
+    assert.equal(app.get('ctrl+f'), 'model.dialog.favorite');
+  });
+
   it('routes model.dialog.provider through the app table and honours a rebind', () => {
     const { app, prompt } = compileKeybinds({ 'model.dialog.provider': 'ctrl+y' });
     assert.equal(lookup(app, 'a', { ctrl: true }), null, 'rebound chord frees ctrl+a in the app table');

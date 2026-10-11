@@ -205,3 +205,24 @@ export async function loadVariant(modelId, { smallModelFallback = true } = {}) {
 export function variantLabel(modelId, variant) {
   return variant && variant !== VARIANT.STANDARD ? `${modelId}#${variant}` : modelId;
 }
+
+/**
+ * Persist an effort level and return the model id to put in play.
+ *
+ * Lives here rather than in each caller because the two callers disagreed on
+ * what to do about a level the model cannot take: `/model <id>#high` stripped
+ * it silently, while the in-picker `v` cycle could select a level that
+ * `availableVariants` had just excluded. Both now go through one function that
+ * refuses the level for a non-reasoning model, so a requested effort either
+ * applies or is reported rather than quietly dropped.
+ *
+ * Returns the id unchanged when the level is unusable, which is the honest
+ * outcome — the model is still the one the user asked for.
+ */
+export async function applyVariant(modelId, level) {
+  if (!level || !supportsThinking(modelId)) return modelId;
+  const allowed = availableVariants(modelId);
+  const chosen = allowed.includes(level) ? level : VARIANT.STANDARD;
+  await saveVariant(modelId, chosen);
+  return variantLabel(modelId, chosen);
+}

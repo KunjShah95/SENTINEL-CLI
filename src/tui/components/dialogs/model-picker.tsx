@@ -18,6 +18,7 @@ import {
   type ModelEntry,
   type ProviderSummary,
 } from './model-picker.logic.js';
+import { favoritesFirst } from '../../../shared/models/favorites.js';
 
 export type { ModelEntry, ProviderSummary } from './model-picker.logic.js';
 
@@ -72,6 +73,10 @@ export function ModelPickerDialog({ currentModel, onSelect }: ModelPickerDialogP
   const [loadError, setLoadError] = useState<string | null>(null);
   const [providerLabels, setProviderLabels] = useState<Record<string, string>>({});
   const [providerLocal, setProviderLocal] = useState<Record<string, boolean>>({});
+  /** Starred model ids, newest first. */
+  const [favorites, setFavorites] = useState<string[]>([]);
+  /** Show only starred models. */
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
   const loaded = useRef(false);
 
   useEffect(() => {
@@ -98,6 +103,15 @@ export function ModelPickerDialog({ currentModel, onSelect }: ModelPickerDialogP
         const connectors = listConnectors() as { id: string; label: string; local?: boolean }[];
         setProviderLabels(Object.fromEntries(connectors.map(c => [c.id, c.label])));
         setProviderLocal(Object.fromEntries(connectors.map(c => [c.id, c.local === true])));
+        // Starred models, so the picker opens already sorted and already knows
+        // which rows are starred. A failed read is not worth an error: the user
+        // simply has no favourites yet, which is the default state anyway.
+        try {
+          const { loadFavoriteModels } = await import('../../../shared/models/prefs.js');
+          setFavorites(await loadFavoriteModels());
+        } catch {
+          setFavorites([]);
+        }
       } catch (e) {
         // Surfaced rather than swallowed: the dialog now says what failed and
         // what to run, instead of showing an empty list that reads like a
@@ -117,7 +131,14 @@ export function ModelPickerDialog({ currentModel, onSelect }: ModelPickerDialogP
   /**
    * The models reachable at this level: the whole catalog, or one provider.
    */
-  const scoped = useMemo(() => scopeModels(models, providerFilter), [models, providerFilter]);
+  const scoped = useMemo(() => {
+    // Favourites are hoisted, not filtered into a separate view, so a starred
+    // model stays reachable by provider and by search — a starred model you
+    // cannot find is not a favourite, it is a decoration.
+    const narrowed = scopeModels(models, providerFilter);
+    const starred = favoritesOnly ? narrowed.filter((m) => favorites.includes(m.id)) : narrowed;
+    return favoritesFirst(starred, favorites);
+  }, [models, providerFilter, favoritesOnly, favorites]);
 
   useEffect(() => {
     const next = filterModels(scoped, query);
@@ -273,6 +294,27 @@ export function ModelPickerDialog({ currentModel, onSelect }: ModelPickerDialogP
     setView('providers');
   }, [view, loading]);
 
+  /**
+   * Star or unstar the highlighted model.
+   *
+   * `toggleFavoriteModel` returns the list it persisted, and that return value
+   * is what goes into state. Re-reading the file afterwards would be a second
+   * source of truth for a decision the write already made, and the star can lag
+   * a frame behind the keypress if it does.
+   */
+  const toggleFavoriteAt = useCallback((modelId: string) => {
+    if (!modelId) return;
+    (async () => {
+      try {
+        const { toggleFavoriteModel } = await import('../../../shared/models/prefs.js');
+        setFavorites(await toggleFavoriteModel(modelId));
+      } catch {
+        // A failed write is not worth an error toast over a decoration; the
+        // star simply does not appear.
+      }
+    })();
+  }, []);
+
   useInput((input, key) => {
     // Escape is handled FIRST, before the chord table is consulted at all.
     //
@@ -292,9 +334,19 @@ export function ModelPickerDialog({ currentModel, onSelect }: ModelPickerDialogP
     // honours `cli.keybinds`. `ctrl+a` also resolves to `input.line.home` in the
     // prompt table — different table, different owner, no conflict.
     const chord = chordOf(input, key as any);
-    if (chord && activeKeybinds().app.get(chord) === 'model.dialog.provider') {
-      toggleProviders();
-      return;
+    if (chord) {
+      const action = activeKeybinds().app.get(chord);
+      if (action === 'model.dialog.provider') {
+        toggleProviders();
+        return;
+      }
+      // Only on the model level: the provider list has no highlighted model, so
+      // there is nothing to star. Silently ignoring it there beats starring
+      // whichever provider happens to be highlighted.
+      if (action === 'model.dialog.favorite' && view === 'models') {
+        toggleFavoriteAt(filtered[selectedIdx]?.id ?? '');
+        return;
+      }
     }
 
     if (view === 'providers') {
@@ -338,6 +390,16 @@ export function ModelPickerDialog({ currentModel, onSelect }: ModelPickerDialogP
     // empty — otherwise it belongs to the query the user is still typing.
     if (key.backspace && !query && providerFilter) {
       clearProviderFilter();
+      return;
+    }
+    // `f` toggles the favourites-only view. A bare letter rather than a chord
+    // because it is a filter, and it is only reachable while the search box is
+    // empty — otherwise it is a character of the query, which is where a user
+    // typing "fast" or "fire" needs it to stay.
+    if (input === 'f' && !query) {
+      setFavoritesOnly(v => !v);
+      setSelectedIdx(0);
+      setScrollOffset(0);
       return;
     }
     if (key.upArrow || (!query && input === 'k')) {
@@ -473,6 +535,11 @@ export function ModelPickerDialog({ currentModel, onSelect }: ModelPickerDialogP
           {`▸ ${providerName(providerFilter)} only — ${filtered.length} models · backspace to clear`}
         </Text>
       )}
+      {favoritesOnly && (
+        <Text color={colors.primary}>
+          {`★ Favourites only — ${filtered.length} of ${models.length} models · f to clear`}
+        </Text>
+      )}
       <Box borderStyle="single" borderColor={colors.primary} paddingX={1}>
         <TextInput
           value={query}
@@ -520,11 +587,16 @@ export function ModelPickerDialog({ currentModel, onSelect }: ModelPickerDialogP
             // Unconnected rows stay selectable but recede, so "connected" is
             // legible at a glance without hiding the provider you may want next.
             const mark = m.connected === false ? colors.dimSeparator : undefined;
+            const isFavorite = favorites.includes(m.id);
             return (
               <Box key={m.id} flexDirection="row" gap={1}>
                 <Text color={isSelected ? colors.selection : colors.dimSeparator}>
                   {isSelected ? '▶' : isCurrent ? '●' : ' '}
                 </Text>
+                {/* Its own column so the model names stay aligned whether or not
+                    a row is starred — the same reason the star is not appended
+                    to the name. */}
+                <Text color={colors.warning}>{isFavorite ? '★' : ' '}</Text>
                 <Text bold={isSelected} color={isSelected ? colors.selection : mark}>
                   {modelDisplayName(m)}
                   {isSelected && variant ? `#${variant}` : ''}
@@ -542,7 +614,7 @@ export function ModelPickerDialog({ currentModel, onSelect }: ModelPickerDialogP
       )}
       <Box flexDirection="row" gap={2} flexWrap="wrap">
         <Text dimColor>
-          {`↑↓ navigate  ←→ provider  ctrl+a providers  Enter select  Esc close  Type to filter`}
+          {`↑↓ navigate  ←→ provider  ctrl+a providers  ctrl+f star  f favourites  Enter select  Esc close`}
         </Text>
         {variantsFor.length > 0 && (
           <Text dimColor>{`  v effort: ${variant || '(default)'} (${variantsFor.length} levels)`}</Text>
