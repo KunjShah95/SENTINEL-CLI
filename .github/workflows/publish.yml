@@ -69,6 +69,13 @@ jobs:
     runs-on: ubuntu-latest # self-hosted runners are not supported by OIDC
     steps:
       - uses: actions/checkout@v4
+        with:
+          # onboard.test.js surveys this repo's own git history (owners, hot
+          # files); a depth-1 clone has none, and `release:check` below fails on
+          # "git history should yield owners". CI has had this since the test
+          # landed; this workflow never got it, which is part of why it had never
+          # completed a run.
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
