@@ -233,6 +233,62 @@ agentCmd
     process.exit(result.exitCode);
   });
 
+agentCmd
+  .command('serve')
+  .description('Serve the same run stream over HTTP + SSE (loopback only)')
+  .option('--port <n>', 'Port to listen on', '8787')
+  .option('--host <h>', 'Host to bind (non-loopback needs --allow-remote)', '127.0.0.1')
+  .option('--allow-remote', 'Permit a non-loopback bind (no auth: do this only behind a trusted proxy)')
+  .option('-m, --model <id>', 'Default model for runs started here')
+  .option('--plan', 'Default to read-only runs')
+  .option('--budget <usd>', 'Default USD ceiling per run')
+  .option('--max-turns <n>', 'Default turn ceiling per run')
+  .option('--max-tokens <n>', 'Default token ceiling per run')
+  .option('--time <seconds>', 'Default wall-clock ceiling per run')
+  .action(async (options) => {
+    const { createAgentServer, isLoopback, DEFAULT_HOST } = await import('../agent/serve.js');
+    const host = options.host || DEFAULT_HOST;
+
+    // A process that can run shell commands should not be reachable from the
+    // network by accident. Refusing here is deliberate: the dangerous case is
+    // `--host 0.0.0.0` typed without thinking, and a warning nobody reads is
+    // not a control.
+    if (!isLoopback(host) && !options.allowRemote) {
+      console.error(
+        `\x1b[31mRefusing to bind ${host}: not a loopback address.\x1b[0m\n` +
+        'This server starts agents that can run shell commands, and it has no authentication.\n' +
+        'Use --allow-remote only behind a trusted proxy that does the auth.',
+      );
+      process.exit(1);
+    }
+
+    // Defaults for runs started here; a request may still set its own.
+    const runOpts = {};
+    if (options.model) runOpts.model = options.model;
+    if (options.plan) runOpts.mode = 'PLAN';
+    if (options.budget) runOpts.maxCostUsd = Number(options.budget) || 0;
+    if (options.maxTurns) runOpts.maxTurns = Number(options.maxTurns) || 0;
+    if (options.maxTokens) runOpts.maxTokens = Number(options.maxTokens) || 0;
+    if (options.time) runOpts.maxTimeMs = Number(options.time) * 1000;
+
+    const server = createAgentServer({ runOpts });
+    server.listen(Number(options.port) || 8787, host, () => {
+      const addr = server.address();
+      console.log(`sentinel agent serve  http://${host}:${addr.port}`);
+      console.log('POST /runs {"task":"..."} · GET /runs/:id/events · POST /runs/:id/cancel');
+    });
+
+    // One Ctrl-C closes the listener and lets in-flight runs finish their
+    // cancellation path, so a server shutdown does not strand a half-done run.
+    const shutdown = () => {
+      console.log('\nshutting down');
+      server.close(() => process.exit(0));
+      setTimeout(() => process.exit(0), 3000).unref();
+    };
+    process.on('SIGINT', shutdown);
+    process.on('SIGTERM', shutdown);
+  });
+
 // ── swe: SWE-bench style fix turn (reproduce → fix → verify) ──────────────
 program
   .command('swe [task...]')
