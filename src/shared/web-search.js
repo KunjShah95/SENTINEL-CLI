@@ -10,7 +10,13 @@
  * Everything is opt-in: with no keys configured, search falls back to
  * DuckDuckGo, which needs no account. That preserves the previous behavior
  * of the searchWeb tool.
+ *
+ * Every provider honours one signal, threaded through the chain. Each request
+ * already had a deadline of its own; the deadline is composed with the caller's
+ * signal rather than replacing it, so a run the user cancelled stops here too.
  */
+import { composeAbort } from '../utils/abort.js';
+
 const DEFAULT_TIMEOUT_MS = 12_000;
 
 function envKeys() {
@@ -83,8 +89,20 @@ async function searchContextDev(query, count) {
   return contextDevSearch(query, count);
 }
 
-async function fetchJson(url, init, timeout = DEFAULT_TIMEOUT_MS) {
-  const res = await fetch(url, { ...init, signal: AbortSignal.timeout(timeout) });
+async function fetchJson(url, init, timeout = DEFAULT_TIMEOUT_MS, signal = null) {
+  const composed = composeAbort(signal, timeout);
+  let res;
+  try {
+    res = await fetch(url, { ...init, signal: composed.signal });
+  } catch (e) {
+    // Spelled out rather than left to the default "This operation was
+    // aborted", which cannot distinguish a user cancelling from a slow provider.
+    if (composed.aborted()) throw new Error('Search cancelled');
+    if (composed.timedOut()) throw new Error(`Search provider timed out after ${timeout}ms`);
+    throw e;
+  } finally {
+    composed.dispose();
+  }
   if (!res.ok) {
     const body = await res.text().catch(() => '');
     throw new Error(`${res.status} ${res.statusText}${body ? `: ${body.slice(0, 200)}` : ''}`);
@@ -92,14 +110,14 @@ async function fetchJson(url, init, timeout = DEFAULT_TIMEOUT_MS) {
   return res.json();
 }
 
-async function searchExa(query, count) {
+async function searchExa(query, count, signal) {
   const key = envKeys().exa;
   if (!key) return [];
   const data = await fetchJson('https://api.exa.ai/search', {
     method: 'POST',
     headers: { 'x-api-key': key, 'content-type': 'application/json' },
     body: JSON.stringify({ query, numResults: count, type: 'auto' }),
-  });
+  }, DEFAULT_TIMEOUT_MS, signal);
   return (data.results || []).map((r) => ({
     title: r.title || r.url,
     url: r.url,
@@ -109,14 +127,14 @@ async function searchExa(query, count) {
   }));
 }
 
-async function searchTavily(query, count) {
+async function searchTavily(query, count, signal) {
   const key = envKeys().tavily;
   if (!key) return [];
   const data = await fetchJson('https://api.tavily.com/search', {
     method: 'POST',
     headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` },
     body: JSON.stringify({ query, max_results: count, search_depth: 'basic' }),
-  });
+  }, DEFAULT_TIMEOUT_MS, signal);
   return (data.results || []).map((r) => ({
     title: r.title || r.url,
     url: r.url,
@@ -126,11 +144,11 @@ async function searchTavily(query, count) {
   }));
 }
 
-async function searchBrave(query, count) {
+async function searchBrave(query, count, signal) {
   const key = envKeys().brave;
   if (!key) return [];
   const url = `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=${count}`;
-  const data = await fetchJson(url, { headers: { 'x-subscription-token': key, accept: 'application/json' } });
+  const data = await fetchJson(url, { headers: { 'x-subscription-token': key, accept: 'application/json' } }, DEFAULT_TIMEOUT_MS, signal);
   return (data.web?.results || []).map((r) => ({
     title: r.title,
     url: r.url,
@@ -146,13 +164,14 @@ async function searchBrave(query, count) {
  * Instant Answer JSON API when the HTML returns nothing (which happens
  * when the endpoint rate-limits or the markup changes).
  */
-async function searchDuck(query, count) {
+async function searchDuck(query, count, signal) {
   const endpoint =
     (process.env.SEARCH_WEB_ENDPOINT || 'https://html.duckduckgo.com/html/').replace(/\/+$/, '') + '/';
   const results = [];
+  const lite = composeAbort(signal, DEFAULT_TIMEOUT_MS);
   try {
     const res = await fetch(`${endpoint}?q=${encodeURIComponent(query)}`, {
-      signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+      signal: lite.signal,
       headers: { 'user-agent': 'Mozilla/5.0 (compatible; sentinel-cli)' },
     });
     const html = await res.text();
@@ -171,14 +190,20 @@ async function searchDuck(query, count) {
       results.push({ ...links[i], snippet: snippets[i] || '', provider: 'duckduckgo' });
     }
   } catch {
-    // fall through to the JSON API
+    // fall through to the JSON API — unless the caller cancelled, in which case
+    // there is nothing left to fall through to.
+    if (signal?.aborted) return [];
+  } finally {
+    lite.dispose();
   }
   if (results.length === 0) {
+    if (signal?.aborted) return [];
     try {
       const data = await fetchJson(
         `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json`,
         {},
         DEFAULT_TIMEOUT_MS,
+        signal,
       );
       if (data.AbstractText) {
         results.push({
@@ -235,16 +260,20 @@ export async function search(input = {}) {
     }
     attempted.push(name);
     try {
-      const results = await impl(query, count);
+      const results = await impl(query, count, input.signal);
       if (results.length) {
         return { results: results.slice(0, count), provider: name, attempted, errors };
       }
       errors.push({ provider: name, error: 'no results' });
     } catch (e) {
       errors.push({ provider: name, error: e?.message || String(e) });
+      // The chain is a fallback list, so an abort on one provider used to fall
+      // straight through to the next four. Every one of them is another billed
+      // request made after the user asked to stop.
+      if (input.signal?.aborted) break;
     }
   }
-  return { results: [], provider: null, attempted, errors };
+  return { results: [], provider: null, attempted, errors, ...(input.signal?.aborted ? { cancelled: true } : {}) };
 }
 
 /** Compact rendering for the searchWeb tool: URLs plus one-line snippets. */

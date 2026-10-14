@@ -541,7 +541,7 @@ async function batchEditImpl(input) {
   }
 }
 
-async function runBashImpl(input) {
+async function runBashImpl(input, { signal } = {}) {
   const command = input?.command;
   const timeout = normalizeTimeoutMs(input?.timeout, DEFAULT_TIMEOUT);
   if (typeof command !== 'string' || command.length === 0) {
@@ -551,30 +551,35 @@ async function runBashImpl(input) {
     cwd: getWorkdir(),
     timeout,
     env: { ...process.env, TERM: 'dumb' },
+    signal,
   });
   return {
     stdout: tailWithNotice(r.stdout, MAX_OUTPUT),
     stderr: tailWithNotice(r.stderr, MAX_OUTPUT),
     exitCode: r.exitCode,
     timedOut: r.timedOut,
+    // Reported as its own field rather than folded into exitCode, because 130 is
+    // a normal command's exit code too and "the user cancelled this" is not a
+    // conclusion the model should have to infer from a number.
+    ...(r.aborted ? { cancelled: true } : {}),
   };
 }
 
-async function searchWebImpl(input) {
+async function searchWebImpl(input, { signal } = {}) {
   // Multi-provider chain (Exa → Tavily → Brave → DuckDuckGo) lives in
   // web-search.js. This remains the tool entry point so the tool contract,
   // permissions, and modes are unchanged.
   const { search, formatSearchResults } = await import('../web-search.js');
-  const outcome = await search({ query: input?.query, count: input?.count });
+  const outcome = await search({ query: input?.query, count: input?.count, signal });
   if (!outcome.results.length && outcome.errors.length) {
     return { error: formatSearchResults(outcome) };
   }
   return { provider: outcome.provider, results: outcome.results };
 }
 
-async function fetchUrlImpl(input) {
+async function fetchUrlImpl(input, { signal } = {}) {
   const { fetchUrl } = await import('../fetch-url.js');
-  return fetchUrl({ url: input?.url, maxChars: input?.maxChars });
+  return fetchUrl({ url: input?.url, maxChars: input?.maxChars, signal });
 }
 
 async function diffFileImpl(input) {
@@ -1012,16 +1017,23 @@ function applyHunks(original, hunkLines, rel) {
  * Serialize mutations per target file (pi-mono file-mutation-queue): with
  * teammates and background subagents, two writers can race on one file.
  * Paths that fail to resolve fall through so the impl reports the error.
+ *
+ * `options` is forwarded rather than dropped. It carries the agent's
+ * `AbortSignal`, and a queued mutation that silently waited its turn while the
+ * run it belonged to had already been cancelled would still write the file —
+ * the one mutation a user pressing Ctrl-C cannot take back.
  */
 function queued(impl, pathsOf) {
-  return async (input) => {
+  return async (input, options) => {
     let paths = [];
     try {
       paths = pathsOf(input).map((p) => resolveInsideCwd(p).resolved);
     } catch {
-      return impl(input);
+      return impl(input, options);
     }
-    return paths.length ? withFileMutationQueues(paths, () => impl(input)) : impl(input);
+    return paths.length
+      ? withFileMutationQueues(paths, () => impl(input, options))
+      : impl(input, options);
   };
 }
 
@@ -1054,6 +1066,10 @@ const TOOL_IMPLS = {
   // reaches for the filesystem state dir on call, and pulling it in eagerly
   // would make every tool registry load touch the disk — including in the TUI,
   // where no browser is ever opened.
+  // Not forwarded a signal, unlike `fetchUrl` and `searchWeb`: these drive a
+  // browser, which has no place to put one yet. Claiming cancellation here would
+  // be a promise the callee does not keep. The driver has to grow a signal
+  // before these can honestly say they stop.
   webSession: async (input) => (await import('../../agent/web-tools.js')).webSession(input),
   webRead: async (input) => (await import('../../agent/web-tools.js')).webRead(input),
   webProbe: async (input) => (await import('../../agent/web-tools.js')).webProbe(input),
@@ -1368,7 +1384,7 @@ export function coerceToolInput(toolName, input) {
  * @param {object} [options]
  * @param {function} [options.onPermissionAsk] — callback for 'ask' policy
  */
-export async function executeLocalTool(toolName, input, mode = Mode.BUILD, _options = {}) {
+export async function executeLocalTool(toolName, input, mode = Mode.BUILD, options = {}) {
   // ── Mode check ─────────────────────────────────────────────────────
   const { isToolAllowedInMode } = await import('../schemas/mode.js');
   if (!isToolAllowedInMode(toolName, mode)) {
@@ -1377,7 +1393,7 @@ export async function executeLocalTool(toolName, input, mode = Mode.BUILD, _opti
 
   // ── Permission check ───────────────────────────────────────────────
   // Skip when the caller (loop.js executeOneTool) already obtained user approval.
-  if (!_options.preAuthorized) {
+  if (!options.preAuthorized) {
     try {
       const { checkPermission } = await import('./permissions.js');
       const permCheck = checkPermission(toolName);
@@ -1392,6 +1408,14 @@ export async function executeLocalTool(toolName, input, mode = Mode.BUILD, _opti
     }
   }
 
+  // Checked after the permission decision, not before it: a run the user has
+  // already cancelled should not stop to ask a question nobody will answer.
+  // Thrown rather than returned, so every tool reports cancellation the same
+  // way and the loop's `catch` produces one tool_result for it.
+  if (options.signal?.aborted) {
+    throw new Error('Cancelled before the tool started');
+  }
+
   const impl = TOOL_IMPLS[toolName];
   if (!impl) {
     throw new Error(`Unknown tool: ${toolName}`);
@@ -1403,5 +1427,7 @@ export async function executeLocalTool(toolName, input, mode = Mode.BUILD, _opti
   const invalid = validateToolInput(toolName, input);
   if (invalid) throw new Error(invalid);
 
-  return await impl(input);
+  // `options` carries the run's AbortSignal, so an interrupted turn takes its
+  // work with it instead of finishing a tool call nobody will read.
+  return await impl(input, options);
 }

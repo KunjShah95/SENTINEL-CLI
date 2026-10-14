@@ -23,6 +23,7 @@
  * silently hidden.
  */
 import { userAgent } from '../version.js';
+import { composeAbort } from '../utils/abort.js';
 
 const DEFAULT_MAX_CHARS = 8000;
 const TIMEOUT_MS = 20_000;
@@ -151,7 +152,7 @@ export async function fetchUrl(input = {}) {
     const { hasContextDevKey, scrape } = await import('./context-dev.js');
     if (hasContextDevKey()) {
       try {
-        const scraped = await scrape(parsed.toString(), { maxChars });
+        const scraped = await scrape(parsed.toString(), { maxChars, signal: input.signal });
         if (scraped.text && scraped.text.trim().length > 40) {
           return { ...scraped, via: 'context.dev' };
         }
@@ -164,7 +165,7 @@ export async function fetchUrl(input = {}) {
     }
   }
 
-  const direct = await directFetch(parsed.toString(), maxChars);
+  const direct = await directFetch(parsed.toString(), maxChars, input.signal);
   return contextDevNote ? { ...direct, via: 'direct', contextDev: contextDevNote } : { ...direct, via: 'direct' };
 }
 
@@ -174,15 +175,31 @@ export async function fetchUrl(input = {}) {
  * readable, and so the fallback is an explicit call rather than a `return`
  * buried in a conditional.
  */
-async function directFetch(urlString, maxChars) {
-  const res = await fetch(urlString, {
-    signal: AbortSignal.timeout(TIMEOUT_MS),
-    redirect: 'follow',
-    headers: {
-      'user-agent': userAgent(),
-      accept: 'text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8',
-    },
-  });
+async function directFetch(urlString, maxChars, signal) {
+  // The caller's signal and the request deadline are composed rather than one
+  // replacing the other. `AbortSignal.timeout` alone made Ctrl-C impossible to
+  // honour here: the fetch had exactly one abort source, and it was the clock.
+  const composed = composeAbort(signal, TIMEOUT_MS);
+  let res;
+  try {
+    res = await fetch(urlString, {
+      signal: composed.signal,
+      redirect: 'follow',
+      headers: {
+        'user-agent': userAgent(),
+        accept: 'text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8',
+      },
+    });
+  } catch (e) {
+    // Re-thrown with the reason spelled out, because the default message for an
+    // aborted fetch is "This operation was aborted" — true, and useless to
+    // someone who pressed Ctrl-C and is waiting on an explanation.
+    if (composed.aborted()) throw new Error('Fetch cancelled');
+    if (composed.timedOut()) throw new Error(`Fetch timed out after ${TIMEOUT_MS}ms`);
+    throw e;
+  } finally {
+    composed.dispose();
+  }
   if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
 
   const contentType = res.headers.get('content-type') || '';

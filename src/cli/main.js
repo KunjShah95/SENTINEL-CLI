@@ -187,6 +187,52 @@ program
     process.exit(sawError && !wrote ? 1 : 0);
   });
 
+// ── agent: the run primitive, headless ───────────────────────────────────────
+// A task, one in-process agent, one event stream printed as it happens. The same
+// loop the TUI drives; this is the version with no terminal UI attached, which
+// is also what an SSE server will be.
+//
+// A command group rather than a flat `sentinel run`, because the noun is what
+// makes it extensible: the next consumer of this loop is a server, and it belongs
+// under the same word rather than as a third top-level verb.
+const agentCmd = program
+  .command('agent')
+  .description('Run the agent on a task (headless)');
+
+agentCmd
+  .command('run [task...]')
+  .description('Run one task to completion: stream the answer, print tools as they happen, Ctrl-C cleanly')
+  .option('-m, --model <id>', 'Model id (defaults to the cheap default model)')
+  .option('--plan', 'Read-only: no edits, no shell (default is BUILD)')
+  .option('-q, --quiet-cost', 'Do not print the token/cost summary')
+  .option('-y, --yes', 'Approve tools without prompting (destructive commands are still denied)')
+  .option('--budget <usd>', 'Stop once the run has cost this many USD')
+  .option('--max-turns <n>', 'Stop after n model turns (default 25)')
+  .option('--max-tokens <n>', 'Stop once the run has used this many tokens')
+  .option('--time <seconds>', 'Stop after this many seconds of wall clock')
+  .action(async (taskParts, options) => {
+    const raw = (taskParts || []).join(' ').trim();
+    if (!raw) {
+      console.error('Usage: sentinel agent run "<task>"');
+      process.exit(1);
+    }
+    const { expandSlashCommand } = await import('../agent/slash-commands.js');
+    const { runTask } = await import('../agent/run.js');
+
+    const result = await runTask(expandSlashCommand(raw).text, {
+      model: options.model,
+      mode: options.plan ? 'PLAN' : 'BUILD',
+      maxCostUsd: Number(options.budget) || 0,
+      maxTurns: Number(options.maxTurns) || 0,
+      maxTokens: Number(options.maxTokens) || 0,
+      maxTimeMs: Number(options.time) > 0 ? Number(options.time) * 1000 : 0,
+      quietCost: options.quietCost,
+      engagement: await engagementEnabled(),
+      onPermissionRequest: options.yes ? await autoApprove() : undefined,
+    });
+    process.exit(result.exitCode);
+  });
+
 // ── swe: SWE-bench style fix turn (reproduce → fix → verify) ──────────────
 program
   .command('swe [task...]')

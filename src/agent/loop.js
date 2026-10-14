@@ -37,6 +37,7 @@ import { buildProviderTools } from './tool-schemas.js';
 import { compactToolResults } from './context-budget.js';
 import { buildSkillPreamble } from './skill-delegation.js';
 import { createSkillScope, noteSkillLoaded, checkSkillScope } from './skill-scope.js';
+import { abortReason } from '../utils/abort.js';
 
 // Re-exported so the many existing importers of these names from loop.js keep
 // working. They are declared in tool-schemas.js now; a re-export is one line
@@ -338,6 +339,12 @@ export async function* runAgentTurnInner(opts = {}) {
     outcome,
     engagement,
     maxCostUsd = Number(process.env.SENTINEL_MAX_COST_USD) || 0,
+    // Explicit budgets for a caller that has its own idea of how long a run may
+    // last. Both default to 0, meaning "the per-mode defaults apply" — so every
+    // existing caller keeps the behaviour it had, and only a caller that asked
+    // for a ceiling gets one.
+    maxTurns = 0,
+    maxTokens = 0,
     routeModel = process.env.SENTINEL_ROUTE_MODEL || undefined,
     runId = null,
     rung = null,
@@ -434,7 +441,13 @@ export async function* runAgentTurnInner(opts = {}) {
   }
   const tools = buildProviderTools(mode, externalTools);
   const isSwe = mode === 'SWE';
-  const maxIterations = isSwe ? SWE_ITERATIONS : MAX_ITERATIONS;
+  // A caller-supplied turn ceiling wins over the per-mode default. `> 0` is the
+  // whole of the validation: 0 means unset, and anything fractional or negative
+  // that survives it is a rounding problem, not a policy question. Clamping a
+  // ceiling that reads 0 up to 1 instead would be the dangerous direction —
+  // `--max-turns 0` from a shell that swallowed its argument must not mean
+  // "unlimited".
+  const maxIterations = maxTurns > 0 ? Math.floor(maxTurns) : (isSwe ? SWE_ITERATIONS : MAX_ITERATIONS);
   const resultCap = isSwe ? SWE_TOOL_RESULT_CAP : TOOL_RESULT_CAP;
   const messages = historyToMessages(history, { preserveToolCalls: isSwe });
   const allowAll = new Set(); // tools allowed for the rest of the session
@@ -494,6 +507,20 @@ export async function* runAgentTurnInner(opts = {}) {
     }
     yield { event: 'finish', data: { usage, costUsd: usd, model: resolved.modelId, ...routed, ...extra } };
     yield { event: 'done', data: {} };
+  };
+
+  // The one way out for "the caller stopped us", however it was noticed.
+  //
+  // Two places notice: the top of the iteration, and the end-of-answer path. The
+  // second one matters because the caller usually aborts *during* the model
+  // stream — which is where a person actually presses Ctrl-C — so an abort
+  // almost never lands on the top-of-loop check. Without this, the most common
+  // cancellation there is was reported as a clean `end_turn`, and the run's own
+  // stop reason said the model had finished on its own terms.
+  const cancelledExit = function* () {
+    const stop = abortReason(signal);
+    yield { event: 'error', data: { message: stop.message, interrupted: stop.kind === 'interrupted' } };
+    yield* finishEvents({ interrupted: true, stoppedBy: stop.kind });
   };
 
   for (let iter = 0; iter < maxIterations; iter++) {
@@ -626,7 +653,21 @@ export async function* runAgentTurnInner(opts = {}) {
         + (cheap ? runningCostUsd(cheap.modelId, cheapUsage.inputTokens, cheapUsage.outputTokens) : 0);
       if (spent >= maxCostUsd) {
         yield { event: 'error', data: { message: `Budget exceeded: $${spent.toFixed(4)} ≥ $${maxCostUsd} limit.` } };
-        yield* finishEvents({ budgetExceeded: true });
+        yield* finishEvents({ budgetExceeded: true, stoppedBy: 'usd' });
+        return;
+      }
+    }
+
+    // Token ceiling, checked at the same point for the same reason: usage only
+    // becomes knowable after a model call returns, so checking earlier would
+    // enforce it against a number that does not exist yet. Counted across both
+    // models, because a run that routes to a cheap model has still spent the
+    // tokens, and a limit the routed half of the spend escapes is not a limit.
+    if (maxTokens > 0) {
+      const total = inputTokens + outputTokens + cheapUsage.inputTokens + cheapUsage.outputTokens;
+      if (total >= maxTokens) {
+        yield { event: 'error', data: { message: `Token budget exceeded: ${total} ≥ ${maxTokens}.` } };
+        yield* finishEvents({ budgetExceeded: true, stoppedBy: 'tokens' });
         return;
       }
     }
@@ -638,7 +679,7 @@ export async function* runAgentTurnInner(opts = {}) {
       const status = budgetStatus(workdir);
       if (!status.mayContinue) {
         yield { event: 'error', data: { message: status.stopReason || 'Engagement budget reached.' } };
-        yield* finishEvents({ budgetExceeded: true, engagement: status.status });
+        yield* finishEvents({ budgetExceeded: true, stoppedBy: 'engagement', engagement: status.status });
         return;
       }
       // A per-connector cap answers "which key is burning it", which the
@@ -648,7 +689,7 @@ export async function* runAgentTurnInner(opts = {}) {
       const gate = connectorGate(activeModel ? connectorOf(activeModel) : null, workdir);
       if (!gate.allowed) {
         yield { event: 'error', data: { message: gate.reason } };
-        yield* finishEvents({ budgetExceeded: true, connectorCap: true, connector: activeModel });
+        yield* finishEvents({ budgetExceeded: true, stoppedBy: 'connector', connectorCap: true, connector: activeModel });
         return;
       }
       if (status.budget.budgetUsd > 0) {
@@ -657,7 +698,7 @@ export async function* runAgentTurnInner(opts = {}) {
           + (cheap ? runningCostUsd(cheap.modelId, cheapUsage.inputTokens, cheapUsage.outputTokens) : 0);
         if (turnUsd >= status.remainingUsd) {
           yield { event: 'error', data: { message: `Stop: this turn alone would exceed the remaining engagement budget ($${turnUsd.toFixed(4)} ≥ $${status.remainingUsd.toFixed(4)} left).` } };
-          yield* finishEvents({ budgetExceeded: true });
+          yield* finishEvents({ budgetExceeded: true, stoppedBy: 'engagement' });
           return;
         }
       }
@@ -728,6 +769,13 @@ export async function* runAgentTurnInner(opts = {}) {
           continue;
         }
       }
+      // Aborted while the model was producing this answer. The text is already
+      // yielded, so the user has it; what was missing was the run admitting it
+      // was cancelled rather than completed.
+      if (signal?.aborted) {
+        yield* cancelledExit();
+        return;
+      }
       yield* finishEvents();
       return;
     }
@@ -773,6 +821,11 @@ export async function* runAgentTurnInner(opts = {}) {
         headless: !onPermissionRequest,
         runId,
         rung,
+        // The run's one cancellation source, handed to every tool. The model
+        // stream already stopped on this signal; without it a `bash` tool would
+        // keep running after Ctrl-C, and the user would be told the run had
+        // stopped while their build was still going.
+        signal,
         parentTaskId: opts.parentTaskId || null,
       },
       subagentState: { disabled: subagentDepth >= 1 },
@@ -821,12 +874,17 @@ export async function* runAgentTurnInner(opts = {}) {
     if (hint) messages.push({ role: 'user', content: hint });
   }
 
-  // Aborted (Esc / timeout) — not the iteration cap. Found in a live
-  // benchmark: a 240s timeout after 4 tool calls was reported as
+  // Aborted (Esc / timeout / a budget deadline) — not the iteration cap. Found in
+  // a live benchmark: a 240s timeout after 4 tool calls was reported as
   // "Stopped after 25 tool iterations".
+  //
+  // The reason is read off the signal rather than assumed, because a user
+  // pressing Ctrl-C and a run hitting its time budget stop the same way
+  // mechanically and mean completely different things. Reporting one as the
+  // other is how a run that was cancelled gets logged as a timeout and nobody
+  // ever looks into it.
   if (signal?.aborted) {
-    yield { event: 'error', data: { message: 'Interrupted.', interrupted: true } };
-    yield* finishEvents({ interrupted: true });
+    yield* cancelledExit();
     return;
   }
   // Hit the iteration cap
@@ -834,7 +892,7 @@ export async function* runAgentTurnInner(opts = {}) {
     event: 'error',
     data: { message: `Stopped after ${maxIterations} tool iterations.` },
   };
-  yield { event: 'done', data: {} };
+  yield* finishEvents({ stoppedBy: 'turns' });
 }
 
 /**
@@ -1174,7 +1232,7 @@ async function executeOneTool({ tc: rawTc, mode, opts, subagentState, editCounts
   let output;
   try {
     output = await runInWorkdir(workdir, () =>
-      executeLocalTool(tc.name, tc.input, mode, { preAuthorized: permission != null }));
+      executeLocalTool(tc.name, tc.input, mode, { preAuthorized: permission != null, signal: opts.signal }));
   } catch (e) {
     output = { error: e?.message || String(e) };
   }

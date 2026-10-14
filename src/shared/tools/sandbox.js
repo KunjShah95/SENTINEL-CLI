@@ -119,16 +119,32 @@ function sandboxedSpawnArgs(command, cwd) {
 
 /**
  * Run a command without blocking the event loop.
- * Resolves { stdout, stderr, exitCode, timedOut }; never rejects.
+ * Resolves { stdout, stderr, exitCode, timedOut, aborted }; never rejects.
+ *
+ * `signal` is the agent's one cancellation source. A timeout kills the child
+ * after `timeout`ms; an abort kills it because the caller said so. They are
+ * reported separately because they mean different things: a timeout is the
+ * command running too long, an abort is the user having pressed Ctrl-C, and a
+ * tool result that says "timedOut" for the second one is a lie the model will
+ * act on.
  */
 export function runSandboxedAsync(command, options = {}) {
-  const { cwd = process.cwd(), timeout = 30000, maxBuffer = 10 * 1024 * 1024, env } = options;
+  const { cwd = process.cwd(), timeout = 30000, maxBuffer = 10 * 1024 * 1024, env, signal } = options;
   return new Promise((resolve) => {
     const spec = sandboxedSpawnArgs(command, cwd);
     let stdout = '';
     let stderr = '';
     let timedOut = false;
+    let aborted = false;
     let child;
+    // Already aborted before we spawn: killing a process we never started is
+    // not a plan, and spawning one anyway would run a command the user already
+    // cancelled.
+    if (signal?.aborted) {
+      spec.cleanup();
+      resolve({ stdout: '', stderr: '\nCancelled before the command started', exitCode: 130, timedOut: false, aborted: true });
+      return;
+    }
     try {
       child = spawn(spec.file, spec.args, {
         cwd,
@@ -149,12 +165,21 @@ export function runSandboxedAsync(command, options = {}) {
       timedOut = true;
       killTree(child);
     }, timeout);
+    const onAbort = () => {
+      aborted = true;
+      killTree(child);
+    };
+    signal?.addEventListener('abort', onAbort, { once: true });
     const finish = (exitCode, extra = '') => {
       clearTimeout(timer);
+      signal?.removeEventListener('abort', onAbort);
       spec.cleanup();
-      resolve({ stdout, stderr: stderr + extra, exitCode, timedOut });
+      resolve({ stdout, stderr: stderr + extra, exitCode, timedOut, aborted });
     };
     child.on('error', (e) => finish(1, `\n${e.message}`));
-    child.on('close', (code) => finish(timedOut ? 124 : (code ?? 1), timedOut ? `\nCommand timed out after ${timeout}ms` : ''));
+    child.on('close', (code) => {
+      if (aborted) return finish(130, '\nCancelled');
+      finish(timedOut ? 124 : (code ?? 1), timedOut ? `\nCommand timed out after ${timeout}ms` : '');
+    });
   });
 }
