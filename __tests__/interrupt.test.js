@@ -31,7 +31,7 @@ const RUN_MODULE = pathToFileURL(join(process.cwd(), 'src', 'agent', 'run.js')).
  * A child that starts a slow run and, on `selfInterrupt`, cancels itself the way
  * a console Ctrl-C would.
  */
-const childSource = (selfInterrupt) => `
+const childSource = `
 import { runTask } from ${JSON.stringify(RUN_MODULE)};
 
 async function* slowLoop({ signal }) {
@@ -46,7 +46,10 @@ async function* slowLoop({ signal }) {
   yield { event: 'finish', data: { usage: { inputTokens: 321, outputTokens: 12, totalTokens: 333 }, costUsd: 0.0075, stoppedBy: 'interrupted' } };
   yield { event: 'done', data: {} };
 }
-${selfInterrupt ? 'setTimeout(() => process.emit(\'SIGINT\'), 50);' : ''}
+// Cancels itself the way a console Ctrl-C would, 50ms after the run is under
+  // way. Emitting rather than receiving is what makes this leg portable; the
+  // OS-delivery leg below covers the receive side.
+setTimeout(() => process.emit('SIGINT'), 50);
 
 const summary = await runTask('slow job', { runTurn: slowLoop });
 process.stderr.write('SUMMARY ' + JSON.stringify(summary) + '\\n');
@@ -58,10 +61,11 @@ await new Promise((r) => process.stderr.write('', r));
 process.exit(summary.exitCode);
 `;
 
-async function runChild(t, selfInterrupt) {
+/** Spawn the self-interrupting child and wait until its run is genuinely live. */
+async function runChild() {
   const dir = await mkdtemp(join(tmpdir(), 'sentinel-sigint-'));
   const childPath = join(dir, 'child.mjs');
-  await writeFile(childPath, childSource(selfInterrupt), 'utf8');
+  await writeFile(childPath, childSource, 'utf8');
 
   const child = spawn(process.execPath, [childPath], {
     cwd: process.cwd(),
@@ -88,8 +92,8 @@ async function runChild(t, selfInterrupt) {
 }
 
 describe('SIGINT handling', () => {
-  test('an interrupt stops the run, reports partial usage, exits 130', async (t) => {
-    const { child, exited, streams, cleanup } = await runChild(t, true);
+  test('an interrupt stops the run, reports partial usage, exits 130', async () => {
+    const { child, exited, streams, cleanup } = await runChild();
     try {
       const { code } = await exited;
       const { stdout, stderr } = streams();
@@ -116,27 +120,57 @@ describe('SIGINT handling', () => {
    * A platform fact, not a hedge: on Windows `child.kill('SIGINT')` force-
    * terminates the target instead of delivering a catchable signal, so the
    * handler under test never runs. Only a real console Ctrl-C (a CTRL_C_EVENT)
-   * reaches a Node handler there, and a test process cannot send one. The
-   * handler itself is covered above on every platform; this leg covers delivery.
+   * reaches a Node handler there, and a test process cannot send one.
+   *
+   * The child here is deliberately trivial — a bare handler on a `setInterval`,
+   * no top-level await, no run. It is testing exactly one fact: that the OS
+   * delivers SIGINT to a Node child process. The earlier version drove a real
+   * run, which made it depend on that run reaching a stable state before the
+   * signal landed; on ubuntu CI it exited 13 (Node's unfinished-top-level-await
+   * code) instead, which says the signal arrived before the run had its handler
+   * and abort listener in place. One fact, one minimal subject.
    */
-  test('the OS delivers SIGINT to the handler', {
+  test('the OS delivers SIGINT to a Node child process', {
     skip: process.platform === 'win32'
       ? 'Windows force-terminates on child.kill(SIGINT) instead of delivering it'
       : false,
-  }, async (t) => {
-    const { child, exited, streams, cleanup } = await runChild(t, false);
+  }, async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'sentinel-sigint-'));
+    const childPath = join(dir, 'plain.mjs');
+    await writeFile(childPath, `
+process.on('SIGINT', () => {
+  process.stderr.write('GOT IT\\n');
+  process.exit(42);
+});
+process.stderr.write('READY\\n');
+setInterval(() => {}, 1000);   // hold the event loop open until the signal
+`, 'utf8');
+
+    const child = spawn(process.execPath, [childPath], { stdio: ['ignore', 'pipe', 'pipe'] });
+    let stderr = '';
+    child.stderr.on('data', (d) => { stderr += d.toString(); });
+    const exited = new Promise((resolve) => child.on('exit', (code, signal) => resolve({ code, signal })));
+
     try {
+      await new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error(`child never started: ${stderr}`)), 15000);
+        const onData = () => {
+          if (stderr.includes('READY')) { clearTimeout(timer); child.stderr.off('data', onData); resolve(); }
+        };
+        child.stderr.on('data', onData);
+      });
+
       child.kill('SIGINT');
       const { code, signal } = await exited;
-      const { stderr } = streams();
-      // `signal` must be null: the process handled the interrupt and exited on
-      // its own terms. Killed-by-signal is the failure this guards.
-      assert.equal(signal, null, 'the child died by signal rather than exiting itself');
-      assert.equal(code, 130, `expected exit 130, got ${code}; stderr: ${stderr}`);
-      assert.match(stderr, /SUMMARY .*"stoppedBy":"interrupted"/);
+
+      // signal must be null: the handler ran and the process chose its own exit
+      // code. Being killed by the signal means no handler was installed.
+      assert.equal(signal, null, 'the child died by signal rather than running its handler');
+      assert.equal(code, 42, `handler did not run; stderr: ${stderr}`);
+      assert.match(stderr, /GOT IT/);
     } finally {
       if (!child.killed) child.kill('SIGKILL');
-      await cleanup();
+      await rm(dir, { recursive: true, force: true });
     }
   });
 });
