@@ -1127,3 +1127,11 @@ so the app looked completely frozen — nothing you typed did anything.
 ## License
 
 MIT © Kunj Shah. See [LICENSE](LICENSE).
+
+---
+
+## Case study
+
+The full write-up of SENTINEL CLI (problem, architecture, trade-offs and results) lives at **[kunjshah.in/projects/sentinel-cli](https://kunjshah.in/projects/sentinel-cli)**.
+
+Built by [Kunj Shah](https://kunjshah.in), AI engineer.
