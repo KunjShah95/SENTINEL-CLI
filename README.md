@@ -59,8 +59,10 @@ sentinel                        # auto-discovers installed models
 
 ```
 bin/sentinel.js          entry point (TUI / ask / mcp / --version)
-src/cli/main.js          headless command surface (ask, goal, mini, race, onboard, help)
+src/cli/main.js          headless command surface (ask, goal, agent run|serve, mini, race, onboard)
 src/agent/               the agent: loop, providers, tools glue, cost, sessions, prompt
+src/agent/run.js         one run, and the terminal consumer of its event stream
+src/agent/serve.js       the same event stream over HTTP + SSE
 src/shared/tools/        sandboxed local tools: read, write, edit, glob, grep, bash…
 src/shared/connectors/   connector registry, models.dev catalog, credentials, health
 src/shared/models/       model registry, effort variants, per-model preferences
@@ -211,9 +213,70 @@ Record one with `sentinel bench -m <model-id>`, and read them back with
 
 `src/agent/loop.js` is the whole brain: one turn of user input → stream from the
 provider → execute tool calls in-process (sandboxed to the project directory) →
-feed results back → repeat until done or `MAX_ITERATIONS`. It yields typed events
-(`text`, `tool_call`, `tool_result`, `finish`, `error`) that both the TUI and the
-CLI consume.
+feed results back → repeat until done or the turn ceiling. It yields typed events
+(`text`, `reasoning`, `tool_call`, `tool_result`, `receipts`, `goal`, `finish`,
+`error`, and more) that the TUI, the CLI and an HTTP server all consume.
+
+A run stops for exactly one reason at a time, and says which: `end_turn`, a
+budget ceiling (`usd`, `tokens`, `turns`, `engagement`), `interrupted`,
+`deadline`, or an error. That `stoppedBy` is on the `finish` event, so a consumer
+never has to infer why a run ended.
+
+## `sentinel agent run` — one primitive, three consumers
+
+```bash
+sentinel agent run "add a --json flag to the bench command"
+sentinel agent run "find every caller of executeLocalTool" --plan --max-turns 8
+sentinel agent run "find the flaky test" --budget 0.50 --time 300
+```
+
+The agent owns the loop, the history, the tools, the budget, and exactly one
+cancellation source. `sentinel agent run` embeds it in-process and prints the
+event stream: the answer streams delta by delta, and every tool call is printed
+before it runs and its result after it finishes.
+
+`Ctrl-C` is not a process kill. It asks the run to stop, finishes the tool call in
+flight, prints what was spent, and exits 130, the same number a shell means by an
+interrupt. That signal reaches the model stream, every tool call and every HTTP
+request, so a cancelled run leaves nothing running behind it. `--time` fires the
+same signal, so a deadline and a Ctrl-C stop a run by one mechanism and are
+reported differently.
+
+Budgets are explicit and all four are optional: `--budget` (USD), `--max-turns`,
+`--max-tokens`, `--time` (seconds). Hitting a ceiling is a successful exit: the
+run did what it was told and stopped at the line you drew. A deadline or an error
+is not.
+
+`sentinel ask`, `swe`, `goal` and the skill runner are all this same consumer, so
+`Ctrl-C` works the same in every one of them.
+
+## `sentinel agent serve` — the same run over HTTP
+
+```bash
+sentinel agent serve --port 8787
+
+curl -N -X POST localhost:8787/runs \
+  -H 'content-type: application/json' \
+  -d '{"task":"add a --json flag to bench","mode":"PLAN","maxTurns":8}'
+# {"runId":"rmv7gqnz1dcu9c"}
+
+curl -N localhost:8787/runs/rmv7gqnz1dcu9c/events     # SSE, live
+curl -X POST  localhost:8787/runs/rmv7gqnz1dcu9c/cancel # stop it
+```
+
+A second consumer of the same event stream, and the test of whether that stream is
+an interface or merely a refactor that suited one caller. It needed nothing added
+underneath it: no new loop option, no new event, no budget reimplemented.
+`POST /runs/:id/cancel` routes to the same controller `Ctrl-C` uses. A client that
+connects late still receives the whole run, replayed from the start.
+
+The server binds loopback and **refuses** a non-loopback bind without
+`--allow-remote`, because a process that can run shell commands should not be
+reachable from the network by accident. It has no authentication, so a
+non-loopback bind is only correct behind a proxy that does the auth. Request
+bodies are filtered to a whitelist of run knobs: `runTurn` and
+`onPermissionRequest` are how a caller gets code executed, so an HTTP caller
+cannot set them.
 
 ### Tools
 

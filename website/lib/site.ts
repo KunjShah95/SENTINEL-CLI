@@ -7,7 +7,7 @@ export const site = {
    * One product, one name.
    */
   tagline: "A local coding agent for the terminal.",
-  version: "3.5.0",
+  version: "3.6.0",
   /** Canonical origin. One place, so sitemap/robots/canonical/OG never drift. */
   url: "https://sentinel-cli.dev",
   repo: "https://github.com/KunjShah95/SENTINEL-CLI",
