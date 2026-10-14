@@ -67,23 +67,6 @@ async function autoApprove() {
   };
 }
 
-/** Print receipts / routing / notices to stderr. Returns true when handled. */
-function printHarnessEvent(ev) {
-  const dim = (s) => process.stderr.write(`\x1b[2m${s}\x1b[0m\n`);
-  if (ev.event === 'receipts') {
-    const mark = { supported: '\x1b[32m✓', stale: '\x1b[33m~', contradicted: '\x1b[31m✗', unsupported: '\x1b[33m?' };
-    process.stderr.write(ev.data.blocking ? '\n\x1b[33mreceipt check: unbacked claims, asking the model to verify\x1b[0m\n' : '\n');
-    for (const c of ev.data.claims) {
-      const r = c.receipt ? ` · ${c.receipt.id} \`${c.receipt.command}\` exit ${c.receipt.exitCode} · sha ${c.receipt.sha}` : '';
-      process.stderr.write(`${mark[c.status]} ${c.kind}: ${c.status}\x1b[0m\x1b[2m${r}\x1b[0m\n`);
-    }
-    return true;
-  }
-  if (ev.event === 'route') { dim(`⇄ ${ev.data.model} (${ev.data.reason})`); return true; }
-  if (ev.event === 'waiting') { dim('⏳ waiting for background work / teammates…'); return true; }
-  return false;
-}
-
 /**
  * A project-level engagement budget, when one has been set. Commands that run
  * agent turns opt in by passing `engagement: true`, so setting a budget once
@@ -130,61 +113,23 @@ program
       process.exit(1);
     }
     const { expandSlashCommand } = await import('../agent/slash-commands.js');
-    const question = expandSlashCommand(raw).text;
-    const { runAgentTurn } = await import('../agent/loop.js');
+    const { runTask } = await import('../agent/run.js');
     const { DEFAULT_CHAT_MODEL_ID } = await import('../shared/models/index.js');
-    const { formatUsd } = await import('../agent/cost.js');
-
-    const mode = options.build ? 'BUILD' : 'PLAN';
     const model = options.model || DEFAULT_CHAT_MODEL_ID;
 
-    let sawError = false;
-    let wrote = false;
-
-    try {
-      for await (const ev of runAgentTurn({
-        history: [
-          {
-            id: `ask_${Date.now()}`,
-            role: 'user',
-            parts: [{ type: 'text', text: question }],
-          },
-        ],
-        mode,
-        model,
-        maxCostUsd: Number(options.budget) || undefined,
-        engagement: await engagementEnabled(),
-        routeModel: options.route,
-        onPermissionRequest: options.yes ? await autoApprove() : undefined,
-      })) {
-        if (printHarnessEvent(ev)) continue;
-        if (ev.event === 'text') {
-          process.stdout.write(ev.data.delta);
-          wrote = true;
-        } else if (ev.event === 'reasoning' && process.env.SENTINEL_VERBOSE) {
-          process.stderr.write(`\x1b[2m${ev.data.text}\x1b[0m`);
-        } else if (ev.event === 'tool_call') {
-          process.stderr.write(`\x1b[2m→ ${ev.data.toolName}\x1b[0m\n`);
-        } else if (ev.event === 'finish') {
-          if (wrote) process.stdout.write('\n'); // keep the answer and the cost line apart
-          if (!options.quietCost && ev.data.usage) {
-            const { inputTokens = 0, outputTokens = 0 } = ev.data.usage;
-            process.stderr.write(
-              `\x1b[2m${inputTokens} in / ${outputTokens} out · ${formatUsd(ev.data.costUsd || 0)} · ${model}\x1b[0m\n`
-            );
-          }
-        } else if (ev.event === 'error') {
-          sawError = true;
-          process.stderr.write(`\n\x1b[31m${ev.data.message}\x1b[0m\n`);
-        }
-      }
-    } catch (e) {
-      console.error(`\x1b[31m${e.message}\x1b[0m`);
-      process.exit(1);
-    }
-
-    if (wrote) process.stdout.write('\n');
-    process.exit(sawError && !wrote ? 1 : 0);
+    // Same consumer as `sentinel agent run`. This used to be a fourth copy of
+    // the print loop, which meant it had no Ctrl-C at all: pressing it killed
+    // the process outright, leaving no partial usage and no tools cancelled.
+    const result = await runTask(expandSlashCommand(raw).text, {
+      model,
+      mode: options.build ? 'BUILD' : 'PLAN',
+      maxCostUsd: Number(options.budget) || 0,
+      routeModel: options.route,
+      quietCost: options.quietCost,
+      engagement: await engagementEnabled(),
+      onPermissionRequest: options.yes ? await autoApprove() : undefined,
+    });
+    process.exit(result.exitCode);
   });
 
 // ── agent: the run primitive, headless ───────────────────────────────────────
@@ -301,41 +246,16 @@ program
       console.error('Usage: sentinel swe "bug report + FAIL_TO_PASS tests"');
       process.exit(1);
     }
-    const { runAgentTurn } = await import('../agent/loop.js');
+    const { runTask } = await import('../agent/run.js');
     const { DEFAULT_CHAT_MODEL_ID } = await import('../shared/models/index.js');
-    const { formatUsd } = await import('../agent/cost.js');
     const model = options.model || DEFAULT_CHAT_MODEL_ID;
-    let sawError = false;
-    let wrote = false;
-    try {
-      for await (const ev of runAgentTurn({
-        history: [{ id: `swe_${Date.now()}`, role: 'user', parts: [{ type: 'text', text: task }] }],
-        mode: 'SWE',
-        model,
-      })) {
-        if (ev.event === 'text') {
-          process.stdout.write(ev.data.delta);
-          wrote = true;
-        } else if (ev.event === 'tool_call') {
-          process.stderr.write(`\x1b[2m→ ${ev.data.toolName}\x1b[0m\n`);
-        } else if (ev.event === 'finish') {
-          if (!options.quietCost && ev.data.usage) {
-            const { inputTokens = 0, outputTokens = 0 } = ev.data.usage;
-            process.stderr.write(
-              `\x1b[2m${inputTokens} in / ${outputTokens} out · ${formatUsd(ev.data.costUsd || 0)} · ${model} · SWE\x1b[0m\n`
-            );
-          }
-        } else if (ev.event === 'error') {
-          sawError = true;
-          process.stderr.write(`\n\x1b[31m${ev.data.message}\x1b[0m\n`);
-        }
-      }
-    } catch (e) {
-      console.error(`\x1b[31m${e.message}\x1b[0m`);
-      process.exit(1);
-    }
-    if (wrote) process.stdout.write('\n');
-    process.exit(sawError && !wrote ? 1 : 0);
+
+    const result = await runTask(task, {
+      mode: 'SWE',
+      model,
+      quietCost: options.quietCost,
+    });
+    process.exit(result.exitCode);
   });
 
 // ── goal: s17 goal loop — worker keeps going until the evaluator agrees ──
@@ -354,36 +274,28 @@ program
       console.error('Usage: sentinel goal "pytest tests/auth exits 0" [--task "fix the auth bug"]');
       process.exit(1);
     }
-    const { runAgentTurn } = await import('../agent/loop.js');
+    const { runTask } = await import('../agent/run.js');
     const { DEFAULT_CHAT_MODEL_ID } = await import('../shared/models/index.js');
     const model = options.model || DEFAULT_CHAT_MODEL_ID;
     const task = options.task ? `${options.task}\n\nDone when: ${condition}` : `Make this true: ${condition}`;
+
+    // The verdict arrives as an event, so this command observes the stream
+    // rather than owning a second copy of it. `met` is the exit condition: a run
+    // that stopped for any reason other than satisfying the goal is a failure,
+    // however well the work went.
     let met = false;
-    let sawError = false;
-    for await (const ev of runAgentTurn({
-      history: [{ id: `goal_${Date.now()}`, role: 'user', parts: [{ type: 'text', text: task }] }],
+    const result = await runTask(task, {
       mode: 'BUILD',
       model,
       goal: condition,
-      maxCostUsd: Number(options.budget) || undefined,
+      maxCostUsd: Number(options.budget) || 0,
       routeModel: options.route,
       onPermissionRequest: options.yes ? await autoApprove() : undefined,
-    })) {
-      if (printHarnessEvent(ev)) continue;
-      if (ev.event === 'text') process.stdout.write(ev.data.delta);
-      else if (ev.event === 'tool_call') process.stderr.write(`\x1b[2m→ ${ev.data.toolName}\x1b[0m\n`);
-      else if (ev.event === 'notification') process.stderr.write(`\x1b[2m✉ ${ev.data.count} notification(s)\x1b[0m\n`);
-      else if (ev.event === 'goal') {
-        met = ev.data.ok;
-        const tag = ev.data.ok ? '\x1b[32mgoal met' : ev.data.impossible ? '\x1b[31mgoal impossible' : '\x1b[33mgoal not met';
-        process.stderr.write(`\n${tag} (check ${ev.data.check})\x1b[0m ${ev.data.reason}\n`);
-      } else if (ev.event === 'error') {
-        sawError = true;
-        process.stderr.write(`\n\x1b[31m${ev.data.message}\x1b[0m\n`);
-      }
-    }
-    process.stdout.write('\n');
-    process.exit(met && !sawError ? 0 : 1);
+      onEvent: (ev) => {
+        if (ev.event === 'goal' && ev.data.ok) met = true;
+      },
+    });
+    process.exit(met && result.exitCode === 0 ? 0 : 1);
   });
 
 // ── replay: past sessions as a regression suite ────────────────────────────
@@ -2092,38 +2004,21 @@ program
         process.stdout.write(expanded.text + '\n');
         return;
       }
-      const { runAgentTurn } = await import('../agent/loop.js');
+      const { runTask } = await import('../agent/run.js');
       const { DEFAULT_CHAT_MODEL_ID } = await import('../shared/models/index.js');
-      const { formatUsd } = await import('../agent/cost.js');
       const mode = options.build ? 'BUILD' : 'PLAN';
       const model = options.model || DEFAULT_CHAT_MODEL_ID;
-      let sawError = false;
-      try {
-        for await (const ev of runAgentTurn({
-          history: [{ id: `skill_${Date.now()}`, role: 'user', parts: [{ type: 'text', text: expanded.text }] }],
-          mode,
-          model,
-          budgetUsd: options.budget ? Number(options.budget) : undefined,
-        })) {
-          if (ev.event === 'text') process.stdout.write(ev.data.delta);
-          else if (ev.event === 'tool_result') {
-            process.stderr.write(`\x1b[2m  ${ev.data.tool || ev.data.toolCallId || 'tool'}\x1b[0m\n`);
-          } else if (ev.event === 'error') {
-            sawError = true;
-            process.stderr.write(`\x1b[31m${ev.data.message}\x1b[0m\n`);
-          } else if (ev.event === 'finish') {
-            const inputTokens = ev.data.usage?.inputTokens ?? '?';
-            const outputTokens = ev.data.usage?.outputTokens ?? '?';
-            process.stderr.write(
-              `\n\x1b[2m${inputTokens} in / ${outputTokens} out · ${formatUsd(ev.data.costUsd || 0)} · ${model}\x1b[0m\n`,
-            );
-          }
-        }
-      } catch (err) {
-        console.error(`\x1b[31m${err.message}\x1b[0m`);
-        process.exit(1);
-      }
-      process.exit(sawError ? 1 : 0);
+
+      // This passed `budgetUsd`, which the loop has never read — it destructures
+      // `maxCostUsd`. The flag was accepted, documented in --help, and did
+      // nothing at all.
+      const result = await runTask(expanded.text, {
+        mode,
+        model,
+        maxCostUsd: Number(options.budget) || 0,
+        quietCost: options.quiet,
+      });
+      process.exit(result.exitCode);
     }
 
     if (action === 'list' || !pkg) {

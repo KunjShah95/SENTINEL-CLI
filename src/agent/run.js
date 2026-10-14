@@ -152,6 +152,24 @@ export function startRun(task, opts = {}) {
   };
 }
 
+/**
+ * Events this consumer prints. Everything else the loop emits is either ignored
+ * on purpose (`done`) or a gap.
+ *
+ * Kept as data rather than inferred from the switch below, so a test can compare
+ * it against the events `loop.js` actually yields. Four hand-written print loops
+ * in `main.js` each handled a different subset — `ask` showed receipts and
+ * `goal` did not — and nothing failed when they drifted, because a dropped event
+ * looks exactly like an event that had nothing to say.
+ */
+export const PRINTED_EVENTS = Object.freeze([
+  'text', 'reasoning', 'tool_call', 'tool_result', 'error', 'finish',
+  'warning', 'route', 'waiting', 'notification', 'receipts', 'goal',
+]);
+
+/** The one event with nothing to show. It means "the stream ended". */
+export const IGNORED_EVENTS = Object.freeze(['done']);
+
 /** The real process. Replaced wholesale in tests. */
 export const processIo = {
   out: (s) => process.stdout.write(s),
@@ -209,31 +227,34 @@ function head(text) {
  *                    costUsd: number, text: string}>}
  */
 export async function runTask(task, opts = {}) {
-  const { io = processIo, quietCost = false, model, ...rest } = opts;
+  const { io = processIo, quietCost = false, model, onEvent, ...rest } = opts;
 
   if (!task || !task.trim()) {
     io.err('Usage: sentinel agent run "<task>"\n');
     return { exitCode: EXIT_ERROR, stoppedBy: 'usage', usage: null, costUsd: 0, text: '' };
   }
 
-  // Prints and nothing else. Every decision about the run was made by
-  // `startRun` before this callback existed.
+  // Prints, and nothing else: every decision about the run was made by
+  // `startRun` before this callback existed. An observer is chained in rather
+  // than replacing it, so a command can watch for its own event — `goal` reads
+  // the verdict — without reimplementing the rendering.
   const run = startRun(task, {
     ...rest,
     model,
     onEvent: (ev) => {
+      onEvent?.(ev);
       switch (ev.event) {
       case 'text':
         io.out(ev.data.delta);
         break;
       case 'tool_call':
-        // Before the tool runs, so the user sees what is about to happen
-        // rather than finding out afterwards.
+        // Before the tool runs, so the user sees what is about to happen rather
+        // than finding out afterwards.
         io.err(`\n${dim(`→ ${ev.data.toolName}`)}\n`);
         break;
       case 'tool_result': {
-        // `ask` printed calls and never results, which left the user watching
-        // a tool take thirty seconds with no sign it had finished.
+        // `ask` printed calls and never results, which left the user watching a
+        // tool take thirty seconds with no sign it had finished.
         const line = summarizeToolResult(ev.data);
         if (line) io.err(`${dim('  ' + line)}\n`);
         break;
@@ -250,13 +271,41 @@ export async function runTask(task, opts = {}) {
       case 'waiting':
         io.err(`${dim('⏳ waiting for background work / teammates…')}\n`);
         break;
+      case 'notification':
+        io.err(`${dim(`✉ ${ev.data.count} notification(s)`)}\n`);
+        break;
       case 'warning':
         io.err(`\x1b[33m${ev.data.message}\x1b[0m\n`);
         break;
+      case 'goal': {
+        const tag = ev.data.ok
+          ? '\x1b[32mgoal met'
+          : ev.data.impossible ? '\x1b[31mgoal impossible' : '\x1b[33mgoal not met';
+        io.err(`\n${tag} (check ${ev.data.check})\x1b[0m ${ev.data.reason}\n`);
+        break;
+      }
+      case 'receipts': {
+        // An unbacked claim — "the tests pass" with no passing run behind it.
+        // Printed as a warning, not an error, because the loop asks the model to
+        // go and verify: it is a prompt, not a failure.
+        const mark = {
+          supported: '\x1b[32m✓', stale: '\x1b[33m~', contradicted: '\x1b[31m✗', unsupported: '\x1b[33m?',
+        };
+        io.err(ev.data.blocking
+          ? '\n\x1b[33mreceipt check: unbacked claims, asking the model to verify\x1b[0m\n'
+          : '\n');
+        for (const c of ev.data.claims) {
+          const r = c.receipt
+            ? ` · ${c.receipt.id} \`${c.receipt.command}\` exit ${c.receipt.exitCode} · sha ${c.receipt.sha}`
+            : '';
+          io.err(`${mark[c.status]} ${c.kind}: ${c.status}\x1b[0m${dim(r)}\n`);
+        }
+        break;
+      }
       default:
-        // `done`, `receipts`, and whatever a future consumer adds. Ignored, not
-        // fatal: a consumer that dies on an event it does not recognise cannot
-        // be extended.
+        // `done`, and whatever a future consumer adds. Ignored, not fatal: a
+        // consumer that dies on an event it does not recognise cannot be
+        // extended. PRINTED_EVENTS is what keeps that from being accidental.
         break;
       }
     },
