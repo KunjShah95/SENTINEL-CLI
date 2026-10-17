@@ -303,6 +303,22 @@ tool.
 Web search is available to the agent through `searchWeb`. It uses DuckDuckGo by
 default; set `SEARCH_WEB_ENDPOINT` to use a compatible internal search endpoint.
 
+For free web search with [Parallel Search MCP](https://docs.parallel.ai/integrations/mcp/search-mcp),
+add this to your existing `~/.sentinel.json` (or project config):
+
+```json
+{ "search": { "providers": ["parallel"] } }
+```
+
+Parallel uses Fast mode with no account or API key. Search results include source
+URLs and relevant excerpts. Requests go to `https://search.parallel.ai/mcp` only
+when `searchWeb` runs with Parallel selected; the existing tool permissions still
+apply. Service errors and free-tier limits are reported as search errors. A single
+selected provider never falls back to another provider. To explicitly allow
+fallback, list providers in order, for example `["parallel", "duckduckgo"]`.
+Remove `search.providers` to restore the existing key-preferred chain and keyless
+DuckDuckGo fallback. `fetchUrl` keeps its existing behavior.
+
 - Writes are sandboxed to the project root (path traversal rejected).
 - `bash` runs with a timeout and output cap.
 - PLAN/REVIEW modes refuse non-read-only tools; BUILD mode allows everything.

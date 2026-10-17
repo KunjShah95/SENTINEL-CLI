@@ -68,7 +68,7 @@ export function providerOrder(configured = []) {
 export function availableProviders(configured) {
   const keys = envKeys();
   return providerOrder(configured).filter((p) => {
-    if (p === 'duckduckgo') return true;
+    if (p === 'duckduckgo' || p === 'parallel') return true;
     if (p === 'contextdev') return Boolean(keys.contextdev);
     return Boolean(keys[p]);
   });
@@ -87,6 +87,11 @@ export function isKnownProvider(name) {
 async function searchContextDev(query, count) {
   const { search: contextDevSearch } = await import('./context-dev.js');
   return contextDevSearch(query, count);
+}
+
+async function searchParallel(query, count, signal) {
+  const { searchParallel: run } = await import('./parallel-search.js');
+  return run(query, count, signal);
 }
 
 async function fetchJson(url, init, timeout = DEFAULT_TIMEOUT_MS, signal = null) {
@@ -228,6 +233,7 @@ function stripTags(value) {
 }
 
 const IMPLEMENTATIONS = {
+  parallel: searchParallel,
   contextdev: searchContextDev,
   exa: searchExa,
   tavily: searchTavily,

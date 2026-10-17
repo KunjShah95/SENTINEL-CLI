@@ -570,7 +570,13 @@ async function searchWebImpl(input, { signal } = {}) {
   // web-search.js. This remains the tool entry point so the tool contract,
   // permissions, and modes are unchanged.
   const { search, formatSearchResults } = await import('../web-search.js');
-  const outcome = await search({ query: input?.query, count: input?.count, signal });
+  const { configManager } = await import('../../config/configManager.js');
+  if (!configManager.config) await configManager.load();
+  const providers = configManager.get('search.providers');
+  if (providers !== null && (!Array.isArray(providers) || !providers.length || providers.some((p) => typeof p !== 'string' || !p.trim()))) {
+    return { error: 'search.providers must be a non-empty array of provider names' };
+  }
+  const outcome = await search({ query: input?.query, count: input?.count, providers, signal });
   if (!outcome.results.length && outcome.errors.length) {
     return { error: formatSearchResults(outcome) };
   }
