@@ -1198,3 +1198,8 @@ MIT © Kunj Shah. See [LICENSE](LICENSE).
 The full write-up of SENTINEL CLI (problem, architecture, trade-offs and results) lives at **[kunjshah.in/projects/sentinel-cli](https://kunjshah.in/projects/sentinel-cli)**.
 
 Built by [Kunj Shah](https://kunjshah.in), AI engineer.
+
+---
+Built by [Kunj Shah](https://kunjshah.in), AI engineer in Ahmedabad.
+[See the shipped-project portfolio and 138+ merged PRs (67 public)](https://kunjshah.in/proof-of-work).
+Available for [fixed-scope AI agent projects](https://kunjshah.in/hire-ai-agent-developer).
